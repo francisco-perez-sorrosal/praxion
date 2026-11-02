@@ -11,6 +11,7 @@ import dataclasses
 import json
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
@@ -18,6 +19,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import spawn_transcripts as st  # noqa: E402
+from _plan_steps import parse_plan_steps  # noqa: E402
+from _step_loop_render import PromptInputs, RequestKey, render_prompt, spawn_request  # noqa: E402
 
 FLOOR_MODEL = "claude-sonnet-5-5"
 SESSION = "5e55a1b2-0000-4000-8000-000000000001"
@@ -176,12 +179,12 @@ def test_one_agent_call_is_one_spawn_whatever_record_kinds_carry_a_copy_of_it(tm
 
 
 def test_a_driver_pointer_prompt_names_the_request_it_answers(tmp_path):
-    prompt = "Task slug: x\nSpawn request: s7-a1-review-r1\nRead PROMPT_s7.md first."
-    _record(tmp_path, SESSION, "verifier", "a1", prompt=prompt)
+    issued = _issued()
+    _record(tmp_path, SESSION, "implementer", "a1", prompt=issued.prompt)
 
     (spawn,) = st.read_spawns(tmp_path)
 
-    assert spawn.driver == st.DriverRequest("s7-a1-review-r1", None)
+    assert spawn.driver == st.DriverRequest("s7-a1-implement", None)
 
 
 @pytest.mark.parametrize(
@@ -202,60 +205,77 @@ def test_a_prompt_that_is_not_a_driver_pointer_names_no_request(tmp_path, prompt
     assert spawn.driver is None
 
 
-RENDERED_PATH = "/sandbox/.ai-work/x/PROMPT_s7-a1-implement.md"
-DRIVER_PROMPT = (
-    f"Task slug: x\nSpawn request: s7-a1-implement\nRead {RENDERED_PATH} first and follow it."
+SLUG = "x"
+WORK = "/sandbox/.ai-work/x"
+STEP_HEADING = "### Step 7"  # id-citation-discipline:ignore
+STEP_TEXT = (
+    STEP_HEADING + ": Write the widget\n\n**Assignee**: implementer\n{hint}**Done when**: ok\n"
 )
-STEP_BLOCK = "### Write the widget\n\n**Assignee**: implementer\n{hint}**Done when**: green."
+REVIEW_RANGE = ("base", "head")
+
+
+class Issued(NamedTuple):
+    """A request as the step-loop driver builds it: the pointer prompt the Agent call carries, the
+    file it names and the text rendered into that file. All three come from the driver's own
+    builders, so a change to the pointer or the rendered shape reaches these fixtures too."""
+
+    id: str
+    prompt: str
+    path: str
+    rendered: str
+
+    def read(self, **options) -> list[dict]:
+        return _read_of_rendered(self.rendered, path=self.path, **options)
+
+
+def _issued(hint: str = "", *, kind: str = "implement", wip_text: str = "") -> Issued:
+    (step,) = parse_plan_steps(STEP_TEXT.format(hint=hint))
+    key = RequestKey("7", 1, kind, round=None if kind == "implement" else 1)
+    request = spawn_request(SLUG, step, key, 3, WORK)
+    inputs = PromptInputs(request, step, WORK, wip_text=wip_text, review_range=REVIEW_RANGE)
+    rendered, _ = render_prompt(inputs)
+    return Issued(key.id, request.agent_call.prompt, request.prompt_path, rendered)
 
 
 def _numbered(text: str) -> str:
     return "".join(f"{n:>6}\t{line}\n" for n, line in enumerate(text.splitlines(), 1))
 
 
-REVIEW_DRIVER_PROMPT = DRIVER_PROMPT.replace("Read ", "Mode: light-review. Read ")
-
-
 def _read_of_rendered(
     text: str,
     *,
     raw: bool = True,
-    path: str = RENDERED_PATH,
+    counts: bool = True,
+    path: str,
     total_lines: int | None = None,
+    asked: dict | None = None,
     use_id: str = "toolu_r",
 ) -> list[dict]:
-    """The spawn's own records of reading its rendered request: the call, then the result with the
-    numbered lines in the message and, when `raw`, the file itself in `toolUseResult`;
-    `total_lines` above the lines read makes it a part of a longer file."""
+    """The spawn's own records of reading its rendered request: the call (with the `offset` or
+    `limit` it `asked` for), then the result with the numbered lines in the message and, when `raw`,
+    the file itself in `toolUseResult`, with line counts when `counts`; `total_lines` above the
+    lines read makes it a part of a longer file."""
+    call_input = {"file_path": path, **(asked or {})}
     call = {
         "type": "assistant",
         "message": {
             "role": "assistant",
             "model": FLOOR_MODEL,
-            "content": [
-                {"type": "tool_use", "id": use_id, "name": "Read", "input": {"file_path": path}}
-            ],
+            "content": [{"type": "tool_use", "id": use_id, "name": "Read", "input": call_input}],
         },
     }
     result_block = {"type": "tool_result", "tool_use_id": use_id, "content": _numbered(text)}
     result = {"type": "user", "message": {"role": "user", "content": [result_block]}}
     if raw:
-        lines_read = len(text.splitlines())
-        result["toolUseResult"] = {
-            "type": "text",
-            "file": {
-                "filePath": path,
-                "content": text,
-                "numLines": lines_read,
-                "totalLines": total_lines or lines_read,
-            },
-        }
+        file_result = {"filePath": path, "content": text}
+        if counts:
+            lines_read = len(text.splitlines())
+            file_result |= {"numLines": lines_read, "totalLines": total_lines or lines_read}
+        result["toolUseResult"] = {"type": "text", "file": file_result}
     return [call, result]
 
 
-def _driver_spawn(
-    directory: Path, own_records: list[dict], prompt: str = DRIVER_PROMPT
-) -> st.Spawn:
+def _driver_spawn(directory: Path, own_records: list[dict], prompt: str) -> st.Spawn:
     _record(directory, SESSION, "implementer", "a1", prompt=prompt)
     own = directory / SESSION / "subagents" / "agent-a1.jsonl"
     _write_lines(own, [*_own_transcript(FLOOR_MODEL), *own_records])
@@ -263,102 +283,134 @@ def _driver_spawn(
     return spawn
 
 
+def _implied(tmp_path, issued: Issued, records: list[dict] | None = None):
+    spawn = _driver_spawn(tmp_path, issued.read() if records is None else records, issued.prompt)
+    assert spawn.driver.id == issued.id
+    return spawn.driver.implied
+
+
 @pytest.mark.parametrize(
-    ("rendered", "implied"),
+    ("hint", "implied"),
     [
-        ("Mode: light-review\n\n" + STEP_BLOCK.format(hint=""), "sonnet"),
-        (STEP_BLOCK.format(hint="tier: H\n"), "opus"),
-        (STEP_BLOCK.format(hint="tier: L\n"), "haiku"),
-        (STEP_BLOCK.format(hint=""), "floor"),
-        (STEP_BLOCK.format(hint="tier: High\n"), "floor"),
+        ("", "floor"),
+        ("tier: H\n", "opus"),
+        ("**tier**: H\n", "opus"),
+        ("- **Tier**: L\n", "haiku"),
+        ("tier: L\n", "haiku"),
+        ("tier: High\n", "floor"),
     ],
 )
-def test_a_driver_request_implies_the_routing_its_rendered_prompt_states(
-    tmp_path, rendered, implied
-):
-    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered))
-
-    assert spawn.driver == st.DriverRequest("s7-a1-implement", implied)
+def test_a_driver_request_implies_the_routing_of_its_steps_own_tier_field(tmp_path, hint, implied):
+    assert _implied(tmp_path, _issued(hint)) == implied
 
 
-def test_a_review_prompt_quoting_a_tier_h_step_block_still_implies_sonnet(tmp_path):
-    rendered = "Mode: light-review\n\n" + STEP_BLOCK.format(hint="tier: H\n")
+def test_a_light_review_the_pointer_states_implies_sonnet_whatever_the_step_hints(tmp_path):
+    issued = _issued("tier: H\n", kind="review")
 
-    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered))
-
-    assert spawn.driver.implied == "sonnet"
+    assert _implied(tmp_path, issued) == "sonnet"
 
 
-def test_a_review_stated_only_on_the_pointers_third_line_implies_sonnet(tmp_path):
-    rendered = STEP_BLOCK.format(hint="tier: H\n")
-
-    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered), REVIEW_DRIVER_PROMPT)
-
-    assert spawn.driver.implied == "sonnet"
+def test_a_light_review_the_spawn_never_read_still_implies_sonnet_from_its_pointer(tmp_path):
+    assert _implied(tmp_path, _issued(kind="review"), records=[]) == "sonnet"
 
 
-def test_a_review_the_spawn_never_read_still_implies_sonnet_from_its_pointer(tmp_path):
-    spawn = _driver_spawn(tmp_path, [], REVIEW_DRIVER_PROMPT)
+def test_a_light_review_marker_inside_the_rendered_request_sets_nothing(tmp_path):
+    issued = _issued("Mode: light-review\n")
 
-    assert spawn.driver == st.DriverRequest("s7-a1-implement", "sonnet")
-
-
-def test_step_prose_quoting_a_marker_sets_the_routing_like_the_marker_itself(tmp_path):
-    rendered = "The step says to treat `tier: H` as a hint.\n" + STEP_BLOCK.format(hint="")
-
-    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered))
-
-    assert spawn.driver.implied == "opus"
+    assert _implied(tmp_path, issued) == "floor"
 
 
-def test_a_first_part_of_a_longer_request_with_no_marker_does_not_show_the_request(tmp_path):
-    first_part = _read_of_rendered("# Widget\n\nWrite it.", total_lines=40)
+@pytest.mark.parametrize(
+    "hint",
+    [
+        "The step says to treat `tier: H` as a hint.\n",
+        "```\ntier: H\n```\n",
+        "Follow the tier: H hint, a routine one.\n",
+    ],
+)
+def test_a_marker_in_step_prose_or_a_code_fence_sets_nothing(tmp_path, hint):
+    assert _implied(tmp_path, _issued(hint)) == "floor"
 
-    assert _driver_spawn(tmp_path, first_part).driver.implied is None
 
+def test_a_tier_line_in_a_section_after_the_step_block_sets_nothing(tmp_path):
+    wip_text = "## Corrections in force\n\ntier: H\n"
 
-def test_a_part_of_a_longer_request_that_holds_a_marker_shows_it(tmp_path):
-    part = _read_of_rendered("**Assignee**: implementer\ntier: L", total_lines=40)
-
-    assert _driver_spawn(tmp_path, part).driver.implied == "haiku"
-
-
-def test_the_marker_in_a_later_part_of_the_request_is_found_across_reads(tmp_path):
-    records = [
-        *_read_of_rendered("# Widget\n\nWrite it.", total_lines=40, use_id="toolu_1"),
-        *_read_of_rendered("**Assignee**: implementer\ntier: H", total_lines=40, use_id="toolu_2"),
-    ]
-
-    assert _driver_spawn(tmp_path, records).driver.implied == "opus"
+    assert _implied(tmp_path, _issued(wip_text=wip_text)) == "floor"
 
 
 def test_a_driver_request_read_back_only_as_numbered_lines_implies_the_same_routing(tmp_path):
-    rendered = STEP_BLOCK.format(hint="tier: H\n")
+    issued = _issued("tier: H\n")
 
-    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered, raw=False))
+    assert _implied(tmp_path, issued, issued.read(raw=False)) == "opus"
 
-    assert spawn.driver.implied == "opus"
+
+def _lines_until_the_step_heading(issued: Issued) -> tuple[str, str]:
+    """The rendered request split just after the step's heading line: the part before the step's
+    fields, and the rest."""
+    lines = issued.rendered.splitlines()
+    cut = next(n for n, line in enumerate(lines) if line.startswith(STEP_HEADING)) + 1
+    return "\n".join(lines[:cut]), "\n".join(lines[cut:])
+
+
+def test_a_first_part_of_a_longer_request_that_stops_short_of_the_tier_does_not_show_it(tmp_path):
+    issued = _issued("tier: H\n")
+    before_fields, _ = _lines_until_the_step_heading(issued)
+    first_part = _read_of_rendered(before_fields, path=issued.path, total_lines=40)
+
+    assert _implied(tmp_path, issued, first_part) is None
+
+
+def test_a_part_of_a_longer_request_that_holds_the_tier_field_shows_it(tmp_path):
+    issued = _issued("tier: H\n")
+    part = _read_of_rendered("**Assignee**: implementer\ntier: L", path=issued.path, total_lines=40)
+
+    assert _implied(tmp_path, issued, part) == "haiku"
+
+
+def test_the_tier_field_in_a_later_part_of_the_request_is_found_across_reads(tmp_path):
+    issued = _issued("tier: H\n")
+    before_fields, fields = _lines_until_the_step_heading(issued)
+    records = [
+        *_read_of_rendered(before_fields, path=issued.path, total_lines=40),
+        *_read_of_rendered(fields, path=issued.path, total_lines=40, use_id="toolu_2"),
+    ]
+
+    assert _implied(tmp_path, issued, records) == "opus"
+
+
+@pytest.mark.parametrize("asked", [{"limit": 3}, {"offset": 20}, {"offset": 2, "limit": 5}])
+def test_a_read_with_no_line_counts_that_asked_for_a_part_is_not_the_whole_request(tmp_path, asked):
+    issued = _issued()
+    part = _read_of_rendered("# Widget\n\nWrite it.", path=issued.path, counts=False, asked=asked)
+
+    assert _implied(tmp_path, issued, part) is None
+
+
+def test_a_read_with_no_line_counts_that_asked_for_no_part_is_the_whole_request(tmp_path):
+    issued = _issued()
+
+    assert _implied(tmp_path, issued, issued.read(counts=False)) == "floor"
 
 
 def test_a_driver_request_the_spawn_never_read_implies_nothing(tmp_path):
-    spawn = _driver_spawn(tmp_path, [])
+    issued = _issued("tier: H\n")
 
-    assert spawn.driver == st.DriverRequest("s7-a1-implement", None)
+    assert _implied(tmp_path, issued, records=[]) is None
 
 
 def test_a_read_of_another_file_does_not_show_the_request(tmp_path):
-    rendered = STEP_BLOCK.format(hint="tier: H\n")
+    issued = _issued("tier: H\n")
+    other = _read_of_rendered(issued.rendered, path="/sandbox/other.md")
 
-    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered, path="/sandbox/other.md"))
-
-    assert spawn.driver.implied is None
+    assert _implied(tmp_path, issued, other) is None
 
 
 def test_a_read_that_errored_does_not_show_the_request(tmp_path):
-    records = _read_of_rendered("File does not exist.", raw=False)
+    issued = _issued("tier: H\n")
+    records = _read_of_rendered("File does not exist.", raw=False, path=issued.path)
     records[1]["message"]["content"][0]["is_error"] = True
 
-    assert _driver_spawn(tmp_path, records).driver.implied is None
+    assert _implied(tmp_path, issued, records) is None
 
 
 def test_a_driver_prompt_with_no_third_line_names_no_file_to_read(tmp_path):

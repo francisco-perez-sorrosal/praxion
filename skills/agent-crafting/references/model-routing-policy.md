@@ -54,7 +54,7 @@ The claim that a spawn passing no `model` runs at its definition's floor is re-c
 Three readings are worth knowing:
 
 - A prompt marker such as `Mode: light-review` or `tier: H` counts as a whole phrase anywhere in the request.
-- A driver-issued spawn is judged against the routing its rendered request implies; with no recorded read of that request the spawn is `unknown`.
+- A driver-issued spawn is judged against the routing the driver gave its request: a light review stated in the spawn's pointer prompt implies `sonnet`, otherwise the step's own `tier:` field in the rendered request it read implies `opus` (`H`), the L tier (`L`) or, with none, the floor. A marker in the step's prose or a code fence sets nothing, and with no recorded read of the field (or of the whole request) the spawn is `unknown`.
 - A session on one model across spawns whose floors differ reads `unknown`, because forcing cannot be excluded.
 
 ## Quality-Cliff Guards

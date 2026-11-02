@@ -12,12 +12,16 @@ many records carry it. A prompt marker counts as a whole phrase anywhere in the 
 character or hyphen on either side ("tier: High" and "routinely" hold none): a prompt that writes a
 marker states that routing, and negation or quotation is not interpreted. A prompt whose first line is
 `Task slug: <slug>` and a later line starts with `Spawn request: <id>` was issued by the step-loop
-driver, and the spawn keeps that id together with the routing its prompt and rendered request
-imply: its third line names the request's file (and may open with `Mode: light-review`, which the
-renderer writes there and nowhere in the file), and the spawn's own transcript records its `Read`s of
-it. A request is shown only when a read held a marker or the whole file; a first part of a longer
-file that stops short of the step's hint shows nothing. Markers in the request are read as anywhere
-else, so step prose that quotes one (`tier: H` inside a sentence) sets the routing too.
+driver, and the spawn keeps that id together with the routing its request implies. The driver
+routes a spawn by the step's own `tier:` field (`_plan_steps.py` is the grammar that reads it) and
+a light review by the pointer prompt, so that is all the reading takes from it: a `Mode:
+light-review` in the pointer (its third line names the request's file and may open with it, which
+the renderer writes there and nowhere in the file) implies `sonnet`; otherwise the spawn's own
+transcript records its `Read`s of the file, and the step's `tier:` field in what it read implies
+the routing, `floor` when it read the whole file and the step has none. A marker in step prose, in
+a code fence or in a section after the step block sets nothing. A request is shown only when a read
+held the field or the whole file; a first part of a longer file that stops short of it shows
+nothing, and neither does a read with no line counts that asked for an `offset` or a `limit`.
 
 Stdlib only and Python 3.9-safe: the check runs under the ambient interpreter.
 """
@@ -34,6 +38,7 @@ from typing import Literal
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from _plan_steps import Routing, parse_plan_steps  # noqa: E402
 from check_model_routing_parity import frontmatter_model  # noqa: E402
 
 ROLE_PREFIX = "praxion:"
@@ -55,6 +60,9 @@ _MARKER_PATTERNS = {
     marker: re.compile(rf"(?<![\w-]){re.escape(marker)}(?![\w-])") for marker in PROMPT_MARKERS
 }
 _REQUEST_PATH = re.compile(r"\bRead (\S+)")
+_LINE_NUMBER_PREFIX = re.compile(r"^\s*\d+[\t\u2192]", re.MULTILINE)
+_STEP_BLOCK_END = "\n</step>"
+_STEP_OPENING = "### Step 0\n"  # id-citation-discipline:ignore
 _TASK_SLUG_LINE = re.compile(r"Task slug: \S")
 _SPAWN_REQUEST_LINE = re.compile(r"^Spawn request: (\S+)", re.MULTILINE)
 
@@ -65,8 +73,10 @@ ImpliedRouting = Literal["sonnet", "opus", "haiku", "floor"]
 
 @dataclass(frozen=True)
 class DriverRequest:
-    """The step-loop request a spawn answers. `implied` is None when the spawn recorded no read of
-    its rendered request, so what the request implies is not shown."""
+    """The step-loop request a spawn answers. `implied` is the routing the spawn's request states:
+    `sonnet` for a light review its pointer prompt names, else the one its rendered request's step
+    names by its own `tier:` field (`floor` when it read the whole request and there is none).
+    None when neither is shown."""
 
     id: str
     implied: ImpliedRouting | None = None
@@ -185,8 +195,9 @@ def _driver_request(prompt: object, own_records: list[dict]) -> DriverRequest | 
     request = _SPAWN_REQUEST_LINE.search(rest)
     if not (request and _TASK_SLUG_LINE.match(first_line)):
         return None
-    request_markers = _request_markers(own_records, _request_path(text))
-    return DriverRequest(request.group(1), _implied_routing(_prompt_markers(text), request_markers))
+    if LIGHT_REVIEW in _prompt_markers(text):
+        return DriverRequest(request.group(1), "sonnet")
+    return DriverRequest(request.group(1), _read_step_routing(own_records, _request_path(text)))
 
 
 def _request_path(prompt: str) -> str | None:
@@ -196,32 +207,51 @@ def _request_path(prompt: str) -> str | None:
     return named.group(1) if named else None
 
 
-def _request_markers(own_records: list[dict], path: str | None) -> frozenset[str] | None:
-    """The markers of what the spawn's own transcript records it read from `path`, across all its
-    reads. None when it read nothing, or only parts of the file that held no marker: the transcripts
-    then do not show the request."""
-    read_ids = {
-        block.get("id")
+def _read_step_routing(own_records: list[dict], path: str | None) -> ImpliedRouting | None:
+    """The routing of the step in what the spawn's own transcript records it read from `path`,
+    across all its reads. None when it read nothing, or only parts of the file that held no tier
+    field: the transcripts then do not show the request."""
+    reads = _request_reads(own_records, path)
+    if not reads:
+        return None
+    routing = _step_routing("\n".join(text for text, _ in reads))
+    if routing != "sonnet":
+        return routing
+    return "floor" if any(whole for _, whole in reads) else None
+
+
+def _step_routing(text: str) -> Routing:
+    """The routing the driver derives from the first step in `text`, which ends at the rendered
+    step block's closing tag; text that opens no step heading (a later part of the file) is read as
+    the body of one."""
+    block = text.partition(_STEP_BLOCK_END)[0]
+    steps = parse_plan_steps(block) or parse_plan_steps(_STEP_OPENING + block)
+    return steps[0].routing if steps else "sonnet"
+
+
+def _request_reads(own_records: list[dict], path: str | None) -> list[tuple[str, bool]]:
+    """(text, whole file) of each successful `Read` of `path` in the spawn's own transcript."""
+    asked = {
+        block.get("id"): block["input"]
         for block in _blocks(own_records, "tool_use")
         if block.get("name") == "Read"
         and isinstance(block.get("input"), dict)
         and block["input"].get("file_path") == path
     }
-    markers: set[str] = set()
-    whole_file_read = False
+    reads = []
     for record in own_records:
         for block in _blocks([record], "tool_result"):
-            if block.get("tool_use_id") not in read_ids or block.get("is_error"):
+            if block.get("tool_use_id") not in asked or block.get("is_error"):
                 continue
             text = _read_result_text(record, block)
             if text:
-                markers |= _prompt_markers(text)
-                whole_file_read = whole_file_read or _is_whole_file(record)
-    return frozenset(markers) if markers or whole_file_read else None
+                reads.append((text, _is_whole_file(record, asked[block["tool_use_id"]])))
+    return reads
 
 
 def _read_result_text(record: dict, result_block: dict) -> str | None:
-    """The file as Claude Code stores it in `toolUseResult`, else the numbered lines of the result."""
+    """The file as Claude Code stores it in `toolUseResult`, else the numbered lines of the result
+    without their numbers."""
     file_result = _file_result(record)
     content = file_result.get("content") if file_result else None
     if isinstance(content, str):
@@ -229,38 +259,23 @@ def _read_result_text(record: dict, result_block: dict) -> str | None:
     content = result_block.get("content")
     if isinstance(content, list):
         content = "".join(b.get("text", "") for b in content if isinstance(b, dict))
-    return content if isinstance(content, str) else None
+    return _LINE_NUMBER_PREFIX.sub("", content) if isinstance(content, str) else None
 
 
-def _is_whole_file(record: dict) -> bool:
-    """Whether a read result holds the whole file; one that records no line counts is taken whole."""
+def _is_whole_file(record: dict, read_input: dict) -> bool:
+    """Whether a read result holds the whole file. The line counts decide when the result records
+    them; without, the read is whole unless it asked for an `offset` or a `limit`."""
     file_result = _file_result(record) or {}
     lines, total = file_result.get("numLines"), file_result.get("totalLines")
-    return not (isinstance(lines, int) and isinstance(total, int) and lines < total)
+    if isinstance(lines, int) and isinstance(total, int):
+        return lines >= total
+    return not (read_input.get("offset") or read_input.get("limit"))
 
 
 def _file_result(record: dict) -> dict | None:
     result = record.get("toolUseResult")
     file_result = result.get("file") if isinstance(result, dict) else None
     return file_result if isinstance(file_result, dict) else None
-
-
-def _implied_routing(
-    pointer_markers: frozenset[str], request_markers: frozenset[str] | None
-) -> ImpliedRouting | None:
-    """The routing a driver spawn's prompt and rendered request state, by the markers the routing
-    rule names: a light review outranks any step hint, and the pointer states it even when the
-    request was not read. None when the request is not shown and the pointer states no review."""
-    if request_markers is None and LIGHT_REVIEW not in pointer_markers:
-        return None
-    markers = pointer_markers | (request_markers or frozenset())
-    if LIGHT_REVIEW in markers:
-        return "sonnet"
-    if "tier: H" in markers:
-        return "opus"
-    if "tier: L" in markers:
-        return "haiku"
-    return "floor"
 
 
 def _blocks(records: list[dict], block_type: str):

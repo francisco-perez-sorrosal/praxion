@@ -14,16 +14,20 @@ classifies every ``praxion:`` spawn:
 
 Rules that refine the reading of production transcripts:
 
-- A spawn the step-loop driver issued is judged against the routing its rendered request implies.
-  Its prompt's first line is ``Task slug: <slug>``, a later line starts with ``Spawn request: <id>``
+- A spawn the step-loop driver issued is judged against the routing its request implies. Its
+  prompt's first line is ``Task slug: <slug>``, a later line starts with ``Spawn request: <id>``
   and the third line names the rendered request, which the spawn's own transcript records it
-  reading; the third line may itself open with ``Mode: light-review``. A light review (stated by
-  either) implies ``sonnet``, a step hinted ``tier: H`` ``opus``, ``tier: L``
-  ``haiku``, anything else the floor. Off its floor, the spawn reads ``override`` on the family its
-  request implies, ``unexplained`` on any other (a request that implies the floor included), and
-  ``unknown`` when the transcripts do not show the request and the prompt states no light review,
-  or (for ``unexplained``) when a forced model cannot be excluded, as below. A driver spawn on its
-  floor family is an ``override`` even when it passed another model, as a driver spawn always has.
+  reading; the third line may itself open with ``Mode: light-review``. A light review stated in
+  the prompt implies ``sonnet``; otherwise the routing is that of the step's own ``tier:`` field
+  in the rendered request, read with the driver's field grammar: ``H`` ``opus``, ``L`` ``haiku``,
+  none (the whole request read) the floor. A marker in the step's prose, a code fence or a later
+  section sets nothing. Off its floor, the spawn reads ``override`` on the family its request
+  implies, ``unexplained`` on any other (a request that implies the floor included), and
+  ``unknown`` when the transcripts do not show the request (nothing read, only a part that held
+  no ``tier:`` field, or a part asked for by ``offset``/``limit`` with no line counts) and the
+  prompt states no light review, or (for ``unexplained``) when a forced model cannot be excluded,
+  as below. A driver spawn on its floor family is an ``override`` even when it passed another
+  model, as a driver spawn always has.
 - A prompt marker (``Mode: light-review``, ``tier: H``, ``routine``, ...) counts when it appears as
   a whole phrase anywhere in the prompt (mid-line, indented, negated or inside backticks); one held
   only inside a longer word (``tier: High``) never sanctions a deviation.

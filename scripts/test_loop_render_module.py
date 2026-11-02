@@ -121,6 +121,7 @@ def make_step(step_id="7", title="Add the widget", extra=()):
 
 STEP_SEVEN = parse_plan_steps(PLAN)[0]
 STEP_HIGH = make_step(extra=("tier: H",))
+STEP_LOW = make_step(extra=("tier: L",))
 
 
 def request_for(step=STEP_SEVEN, kind="implement", attempt=1, cap=2, series=1):
@@ -253,9 +254,14 @@ def test_the_agent_call_has_exactly_four_fields_and_none_that_picks_a_mode():
     assert list(asdict(request_for().agent_call)) == names
 
 
-def test_the_agent_call_refuses_haiku():
-    with pytest.raises(ValueError, match="haiku"):
-        AgentCall("praxion:implementer", "haiku", f"{STEP}7 attempt 1/2", "p")
+def test_the_agent_call_accepts_haiku():
+    call = AgentCall("praxion:implementer", "haiku", f"{STEP}7 attempt 1/2", "p")
+    assert call.model == "haiku"
+
+
+def test_the_agent_call_refuses_a_model_outside_the_routing_set():
+    with pytest.raises(ValueError, match="gpt-5"):
+        AgentCall("praxion:implementer", "gpt-5", f"{STEP}7 attempt 1/2", "p")
 
 
 def test_a_description_of_forty_characters_is_accepted():
@@ -309,6 +315,9 @@ def test_the_prompt_path_is_flat_under_the_task_directory():
         (STEP_HIGH, "implement", "opus"),
         (STEP_HIGH, "revise", "opus"),
         (STEP_HIGH, "review", "sonnet"),
+        (STEP_LOW, "implement", "haiku"),
+        (STEP_LOW, "revise", "haiku"),
+        (STEP_LOW, "review", "sonnet"),
     ],
 )
 def test_the_model_follows_the_routing_and_never_the_reviewer(step, kind, model):

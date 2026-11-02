@@ -1,7 +1,7 @@
 """The routing tier table leaves session start; the orchestrator's pre-spawn guidance stays there.
 
 A session opens holding a short routing text, delivered by the session-start rule injection, that
-states the resolution order with the kill switch first, the alias note with the Haiku 3.5 trap,
+states the resolution order with the per-spawn lever first, the alias note with what haiku is,
 and a restated spawn directive: a spawn passing no model runs at its definition's floor (held to
 the table by the parity gate), and a model is passed per spawn only for a closed list of
 deviations. The full rule, its tier table unchanged, loads by path when an agent definition or
@@ -119,11 +119,11 @@ def test_statements_kept_for_authors_stay_out_of_the_session_start_text(statemen
 
 
 @pytest.mark.parametrize("surface", [move.S, move.P])
-def test_the_resolution_order_names_the_kill_switch_first_and_the_session_model_last(
+def test_the_resolution_order_names_the_per_spawn_lever_first_and_the_session_model_last(
     surface, surfaces
 ):
     text = move.normalize(surfaces[surface]).lower()
-    layers = ("claude_code_subagent_model", "lever", "capability floor", "fallback")
+    layers = ("lever", "capability floor", "claude_code_subagent_model", "fallback")
 
     positions = [text.find(layer) for layer in layers]
 
@@ -211,16 +211,26 @@ def test_touching_an_agent_definition_or_the_policy_reference_loads_the_full_rul
     )
 
 
-def test_the_full_rules_tier_table_is_the_bases_unchanged(path_loaded_text):
-    assert move.tier_table(path_loaded_text) == move.tier_table(move.fixture_text("base_rule.md"))
+CORRECTED_ROWS = ("| `doc-engineer` |", "| `discipline-consultant` |")
+KEPT_PARAGRAPHS = ("## Agent Model Routing", "Governs subagent routing")
 
 
-def test_the_full_rule_differs_from_the_base_only_by_its_restated_directive(path_loaded_text):
+def _uncorrected_rows(text: str) -> list[str]:
+    return [row for row in move.tier_table(text).splitlines() if not row.startswith(CORRECTED_ROWS)]
+
+
+def test_the_full_rules_tier_table_is_the_bases_but_for_its_corrected_rows(path_loaded_text):
+    assert _uncorrected_rows(path_loaded_text) == _uncorrected_rows(
+        move.fixture_text("base_rule.md")
+    )
+
+
+def test_the_full_rule_differs_from_the_base_only_between_its_title_and_its_scope(path_loaded_text):
     before = move.paragraphs(move.body(move.fixture_text("base_rule.md")))
 
     dropped, added = move.replaced_paragraphs(before, move.paragraphs(move.body(path_loaded_text)))
 
-    assert [p[: len(move.DIRECTIVE_OPENING)] for p in dropped] == [move.DIRECTIVE_OPENING], dropped
+    assert [p for p in dropped if p.startswith(KEPT_PARAGRAPHS)] == [], dropped
     assert added, "the directive paragraph was removed, not restated"
 
 

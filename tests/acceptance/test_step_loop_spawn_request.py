@@ -71,12 +71,12 @@ def test_the_agent_call_carries_only_the_agent_tools_parameters_and_no_backgroun
     [
         (("tier: H",), "opus"),
         ((), "sonnet"),
-        (("tier: L",), "sonnet"),
+        (("tier: L",), "haiku"),
     ],
     ids=[
         "high-tier-step-routes-to-opus",
         "unannotated-step-routes-to-sonnet",
-        "low-tier-step-never-routes-to-haiku",
+        "low-tier-step-routes-to-haiku",
     ],
 )
 def test_the_model_follows_the_step_routing_annotation(tmp_path, annotations, model):

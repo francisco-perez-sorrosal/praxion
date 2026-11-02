@@ -9,8 +9,9 @@ them against each other, so this does.
 
 One difference is deliberate and declared here, never inferred: the discipline-consultant's
 frontmatter floor is ``sonnet`` while its row is ``opus``, so a routine consult can route down
-(the rule's one sanctioned downgrade). A declared floor that no longer differs from the row, or
-that the definition no longer carries, is reported too, so the exception cannot outlive its reason.
+(one of the rule's two sanctioned downgrades; the other, the verifier's light review, is per spawn
+and declares no floor). A declared floor that no longer differs from the row, or that the
+definition no longer carries, is reported too, so the exception cannot outlive its reason.
 
 Findings: ``mismatch`` (a definition's model is not its row's alias), ``no-row`` (an agent the
 table does not list), ``no-agent`` (a row naming no definition), ``stale-floor`` (a declared floor

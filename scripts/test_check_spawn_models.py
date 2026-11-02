@@ -17,7 +17,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_spawn_models as csm  # noqa: E402
-from spawn_transcripts import Spawn  # noqa: E402
+from spawn_transcripts import DriverRequest, Spawn  # noqa: E402
 
 REPO_ROOT = SCRIPT_DIR.parent
 SESSION = "5e55a1b2-0000-4000-8000-000000000001"
@@ -28,14 +28,22 @@ FLOORS = {
     "researcher": "sonnet",
     "test-engineer": "sonnet",
     "discipline-consultant": "sonnet",
-    "doc-engineer": "claude-haiku-4-5",
+    "doc-engineer": "haiku",
 }
 
 
 def spawn(
-    role, ran=None, requested=None, markers=(), agent_id="a1", session=SESSION, request=None
+    role,
+    ran=None,
+    requested=None,
+    markers=(),
+    agent_id="a1",
+    session=SESSION,
+    request=None,
+    implied=None,
 ) -> Spawn:
-    return Spawn(session, agent_id, role, requested, ran, frozenset(markers), request)
+    driver = DriverRequest(request, implied) if request else None
+    return Spawn(session, agent_id, role, requested, ran, frozenset(markers), driver)
 
 
 def verdict_of(target: Spawn, *others: Spawn) -> str:
@@ -88,8 +96,9 @@ def test_a_spawn_on_its_floor_family_is_floor():
     assert verdict_of(spawn("implementer", ran="claude-sonnet-5-5")) == "floor"
 
 
-def test_a_spawn_on_the_pinned_low_tier_floor_is_floor():
-    assert verdict_of(spawn("doc-engineer", ran="claude-haiku-4-5-20251001")) == "floor"
+@pytest.mark.parametrize("ran", ["claude-haiku-4-5-20251001", "claude-haiku-5-5"])
+def test_a_spawn_on_any_haiku_model_is_on_the_low_tier_floor(ran):
+    assert verdict_of(spawn("doc-engineer", ran=ran)) == "floor"
 
 
 def test_a_model_of_no_known_family_is_not_the_floors_family():
@@ -118,7 +127,7 @@ def test_a_request_that_contradicts_the_floor_blocks_floor_even_when_it_ran_ther
     "target",
     [
         spawn("researcher", ran="claude-opus-5-5", requested="opus"),
-        spawn("researcher", ran="claude-haiku-4-5-20251001", requested="claude-haiku-4-5"),
+        spawn("researcher", ran="claude-haiku-4-5-20251001", requested="haiku"),
         spawn(
             "discipline-consultant",
             ran="claude-opus-5-5",
@@ -138,7 +147,7 @@ def test_a_request_that_contradicts_the_floor_blocks_floor_even_when_it_ran_ther
         spawn(
             "implementer",
             ran="claude-haiku-4-5-20251001",
-            requested="claude-haiku-4-5",
+            requested="haiku",
             markers=["tier: L"],
         ),
     ],
@@ -159,6 +168,7 @@ def test_a_listed_deviation_that_ran_as_requested_is_an_override(target):
         spawn("implementer", ran="claude-opus-5-5", requested="opus"),
         spawn("implementer", ran="claude-opus-5-5", requested="opus", markers=["tier: L"]),
         spawn("systems-architect", ran="claude-sonnet-5-5", requested="sonnet"),
+        spawn("doc-engineer", ran="claude-sonnet-5-5", requested="sonnet"),
     ],
     ids=lambda s: f"{s.role}-{s.requested_model}-{sorted(s.prompt_markers)}",
 )
@@ -176,17 +186,27 @@ def test_the_lone_spawn_off_its_floor_is_unknown_not_unexplained():
     assert verdict_of(spawn("verifier", ran="claude-sonnet-5-5")) == "unknown"
 
 
-def test_a_session_on_one_model_with_differing_floors_is_the_kill_switch():
-    pinned = "claude-haiku-4-5-20251001"
+def test_a_session_on_one_model_with_differing_floors_reads_unknown_off_the_floor():
+    ran = "claude-sonnet-5-5"
     spawns = [
-        spawn("systems-architect", ran=pinned, agent_id="a1"),
-        spawn("implementer", ran=pinned, agent_id="a2"),
+        spawn("systems-architect", ran=ran, agent_id="a1"),
+        spawn("implementer", ran=ran, agent_id="a2"),
     ]
 
-    assert [csm.classify(s, spawns, FLOORS)[0] for s in spawns] == ["override", "override"]
+    assert [csm.classify(s, spawns, FLOORS)[0] for s in spawns] == ["unknown", "floor"]
 
 
-def test_a_session_on_one_model_whose_floors_agree_is_not_the_kill_switch():
+def test_an_unknown_one_model_spawns_reason_says_a_forced_model_cannot_be_excluded():
+    ran = "claude-sonnet-5-5"
+    off_floor = spawn("systems-architect", ran=ran, agent_id="a1")
+    on_floor = spawn("implementer", ran=ran, agent_id="a2")
+
+    reason = csm.classify(off_floor, [off_floor, on_floor], FLOORS)[1]
+
+    assert "forced model cannot be excluded" in reason
+
+
+def test_a_session_on_one_model_whose_floors_agree_is_judged_spawn_by_spawn():
     spawns = [
         spawn("systems-architect", ran="claude-sonnet-5-5", agent_id="a1"),
         spawn("verifier", ran="claude-sonnet-5-5", agent_id="a2"),
@@ -195,12 +215,18 @@ def test_a_session_on_one_model_whose_floors_agree_is_not_the_kill_switch():
     assert [csm.classify(s, spawns, FLOORS)[0] for s in spawns] == ["unexplained"] * 2
 
 
-def test_a_session_where_a_spawn_passed_a_model_is_not_the_kill_switch():
+def test_a_session_where_a_spawn_passed_a_model_is_judged_spawn_by_spawn():
     pinned = "claude-haiku-4-5-20251001"
-    asked = spawn("systems-architect", ran=pinned, requested="claude-haiku-4-5", agent_id="a1")
+    asked = spawn("systems-architect", ran=pinned, requested="haiku", agent_id="a1")
     silent = spawn("implementer", ran=pinned, agent_id="a2")
 
     assert csm.classify(asked, [asked, silent], FLOORS)[0] == "unexplained"
+
+
+def test_a_lone_spawn_that_passed_a_model_is_judged_on_its_own_not_unknown():
+    asked = spawn("systems-architect", ran="claude-sonnet-5-5", requested="sonnet")
+
+    assert verdict_of(asked) == "unexplained"
 
 
 def test_a_session_where_every_spawn_passed_the_same_model_is_judged_spawn_by_spawn():
@@ -213,16 +239,80 @@ def test_a_session_where_every_spawn_passed_the_same_model_is_judged_spawn_by_sp
     assert [csm.classify(s, spawns, FLOORS)[0] for s in spawns] == ["unexplained"] * 2
 
 
-def test_a_spawn_the_step_loop_driver_issued_is_an_override_naming_its_request():
+def test_a_driver_spawn_on_the_family_its_request_implies_is_an_override_naming_both():
     issued = spawn(
-        "verifier", ran="claude-sonnet-5-5", requested="sonnet", request="s7-a1-review-r1"
+        "verifier",
+        ran="claude-sonnet-5-5",
+        requested="sonnet",
+        request="s7-a1-review-r1",
+        implied="sonnet",
     )
 
     verdict, reason = csm.classify(issued, [issued, *steady_pair()], FLOORS)
 
-    assert (verdict, reason) == (
+    assert verdict == "override"
+    assert "s7-a1-review-r1" in reason
+    assert "claude-sonnet-5-5, the model its request implies" in reason
+
+
+@pytest.mark.parametrize(
+    ("ran", "implied"),
+    [
+        ("claude-haiku-5-5", "sonnet"),
+        ("claude-haiku-5-5", "opus"),
+        ("claude-opus-5-5", "haiku"),
+        ("claude-opus-5-5", "floor"),
+    ],
+)
+def test_a_driver_spawn_off_its_floor_on_another_family_than_its_request_implies_is_unexplained(
+    ran, implied
+):
+    issued = spawn("implementer", ran=ran, request="s7-a1", implied=implied)
+
+    verdict, reason = csm.classify(issued, [issued, *steady_pair()], FLOORS)
+
+    assert verdict == "unexplained"
+    assert f"request implies {implied}" in reason
+
+
+def test_a_driver_spawn_on_another_family_than_implied_in_a_possibly_forced_session_is_unknown():
+    issued = spawn("implementer", ran="claude-opus-5-5", request="s7-a1", implied="haiku")
+
+    verdict, reason = csm.classify(issued, [issued], FLOORS)
+
+    assert verdict == "unknown"
+    assert "a forced model cannot be excluded" in reason
+
+
+def test_a_driver_spawn_on_the_family_its_request_implies_stays_an_override_in_a_lone_session():
+    issued = spawn("implementer", ran="claude-haiku-5-5", request="s7-a1", implied="haiku")
+
+    assert csm.classify(issued, [issued], FLOORS)[0] == "override"
+
+
+def test_a_driver_spawn_off_its_floor_whose_request_is_not_shown_is_unknown():
+    issued = spawn("systems-architect", ran="claude-sonnet-5-5", request="s7-a1")
+
+    verdict, reason = csm.classify(issued, [issued, *steady_pair()], FLOORS)
+
+    assert verdict == "unknown"
+    assert "do not show" in reason
+
+
+def test_a_driver_spawn_on_its_floor_reads_floor_whatever_its_request_implies():
+    issued = spawn("implementer", ran="claude-sonnet-5-5", request="s7-a1", implied="opus")
+
+    assert verdict_of(issued, *steady_pair()) == "floor"
+
+
+def test_a_driver_spawn_on_its_floor_that_passed_another_model_stays_an_override():
+    issued = spawn(
+        "implementer", ran="claude-sonnet-5-5", requested="opus", request="s7-a1", implied="opus"
+    )
+
+    assert csm.classify(issued, [issued, *steady_pair()], FLOORS) == (
         "override",
-        "issued by the step-loop driver (s7-a1-review-r1)",
+        "issued by the step-loop driver (s7-a1)",
     )
 
 
@@ -238,7 +328,7 @@ def test_a_spawn_the_driver_did_not_issue_gets_no_such_sanction():
     assert verdict_of(plain, *steady_pair()) == "unexplained"
 
 
-def test_the_kill_switch_is_judged_per_session():
+def test_a_one_model_reading_is_judged_per_session():
     other = spawn("implementer", ran="claude-haiku-4-5-20251001", session="other", agent_id="b1")
     mine = spawn("verifier", ran="claude-haiku-4-5-20251001", agent_id="a1")
     steady = spawn("implementer", ran="claude-sonnet-5-5", agent_id="a2")
@@ -262,8 +352,8 @@ def _record(directory: Path, spawns: list[Spawn]) -> None:
     for item in spawns:
         use_id = f"toolu_{item.agent_id}"
         prompt = "Do the step."
-        if item.driver_request:
-            prompt = f"Task slug: x\nSpawn request: {item.driver_request}\nRead the prompt file."
+        if item.driver:
+            prompt = f"Task slug: x\nSpawn request: {item.driver.id}\nRead the prompt file."
         call = {"subagent_type": f"praxion:{item.role}", "prompt": prompt}
         if item.requested_model:
             call["model"] = item.requested_model
@@ -377,7 +467,9 @@ def test_a_call_recorded_twice_is_one_row_in_the_json(tmp_path):
     assert [row["agent_id"] for row in payload["spawns"]] == ["a1", "a2"]
 
 
-def test_a_driver_issued_verifier_on_sonnet_reads_override_on_the_command_line(tmp_path):
+def test_a_driver_issued_verifier_off_its_floor_with_no_recorded_read_reads_unknown_on_the_command_line(
+    tmp_path,
+):
     _record(
         tmp_path,
         [
@@ -396,7 +488,7 @@ def test_a_driver_issued_verifier_on_sonnet_reads_override_on_the_command_line(t
 
     assert result.returncode == 0, result.stdout
     assert (
-        "a2  verifier  override  issued by the step-loop driver (s7-a1-review-r1)" in result.stdout
+        "a2  verifier  unknown  issued by the step-loop driver (s7-a1-review-r1)" in result.stdout
     )
 
 

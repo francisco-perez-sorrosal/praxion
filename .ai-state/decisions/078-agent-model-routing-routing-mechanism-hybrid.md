@@ -19,6 +19,7 @@ affected_reqs:
   - AC1
   - AC3
   - AC4
+re_affirmed_by: [dec-draft-47003576]
 ---
 
 ## Context

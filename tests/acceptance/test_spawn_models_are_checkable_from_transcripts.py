@@ -5,8 +5,8 @@ parent session's transcript, and the model the spawn ran on from the spawn's own
 classifies each spawn as matching its definition's floor, a sanctioned override, unexplained, or
 unknown. Sanctioned: any per-spawn model on a researcher; a consultant on opus not marked
 routine, or on its sonnet floor; acceptance design, the implementer step hint and light review on
-their markers; and every spawn of a session holding two or more spawns whose floors differ, all
-run on one model (the kill switch). Unknown: a spawn whose model is missing, or the only spawn of
+their markers. Unknown: a spawn whose model is missing, an off-floor spawn of a session whose
+spawns, of differing floors, all ran on one model with no forcing recorded, or the only spawn of
 its session run off its floor with no sanctioning marker, where the kill switch cannot be told
 apart. It exits non-zero only on an unexplained spawn, exits zero when its only findings are
 unknown spawns, and starts no model session.
@@ -137,7 +137,7 @@ def test_a_spawn_that_ran_off_its_floor_without_a_per_spawn_model_is_unexplained
     assert result.exit_code != 0
 
 
-def test_every_spawn_of_a_session_on_one_model_reads_as_the_kill_switch(tmp_path):
+def test_every_off_floor_spawn_of_a_session_on_one_model_reads_unknown(tmp_path):
     pinned = "claude-haiku-4-5-20251001"
     spawns = [
         Spawn(role, ran_on=pinned) for role in ("systems-architect", "implementer", "verifier")
@@ -145,7 +145,7 @@ def test_every_spawn_of_a_session_on_one_model_reads_as_the_kill_switch(tmp_path
 
     result = _check(tmp_path, *spawns)
 
-    assert sorted(result.verdicts[s.agent_id] for s in spawns) == ["override"] * 3, result.verdicts
+    assert sorted(result.verdicts[s.agent_id] for s in spawns) == ["unknown"] * 3, result.verdicts
     assert result.exit_code == 0
 
 

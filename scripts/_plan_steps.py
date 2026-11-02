@@ -16,7 +16,7 @@ label optionally bold and case-insensitive; a line in a code fence is no field:
     **Iterations**: 5
 
 Any assignee but `implementer` (or none) is another assignee: the loop never runs
-the step. A `tier: H` line routes to `opus`, else `sonnet`, never `haiku`; a
+the step. A `tier: H` line routes to `opus`, a `tier: L` line to `haiku`, else `sonnet`; a
 `review:` line reads `force` or `off`, else absent. A dependency that names no step, or a cycle,
 is recorded as written: whoever selects a step reports it. An `Iterations:` line (a
 whole number of at least 1, grammar in `_loop_fields`) makes the step a goal step
@@ -66,7 +66,7 @@ from _step_schema import (
 DIGEST_LENGTH = 12
 UNASSIGNED = "unassigned"
 
-Routing = Literal["opus", "sonnet"]
+Routing = Literal["opus", "sonnet", "haiku"]
 ReviewOverride = Literal["force", "off", "absent"]
 
 
@@ -139,7 +139,7 @@ def _read_step(opening: StepBlock, label: str) -> PlanStep:
         depends_on=_read_depends_on(opening.title),
         parallel_group=_read_parallel_group(opening.title),
         assignee=_read_assignee(fields),
-        routing="opus" if _first_word(fields, "tier") == "h" else "sonnet",
+        routing=_TIER_ROUTING.get(_first_word(fields, "tier"), "sonnet"),
         review=_REVIEW_WORDS.get(_first_word(fields, "review"), "absent"),
         files=tuple(scan_step_files("\n".join(lines)).get(label, [])),
         read_only=tuple(
@@ -212,6 +212,7 @@ _FIELD_RE = re.compile(
     r"\s*:\s*\*{0,2}\s*(?P<value>.*)$",
     re.IGNORECASE,
 )
+_TIER_ROUTING: dict[str, Routing] = {"h": "opus", "l": "haiku"}
 _REVIEW_WORDS: dict[str, ReviewOverride] = {"force": "force", "off": "off"}
 # "contract: <path>::<symbol>, pinned by <test node>", with or without backticks.
 _CONTRACT_CLAUSE_RE = re.compile(

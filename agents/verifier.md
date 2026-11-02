@@ -176,6 +176,8 @@ Convention checks (derived from `coding-style` rule):
 
 **Milestone-scope reviews** (multi-step or pipeline-end): also run `skills/beautiful-code/references/beauty-review-checklist.md` on demand (that skill is not injected into this agent) — the judgment layer above these mechanical checks; anchor its findings per the checklist's own per-dimension anchors.
 
+**Model-routing changes.** When the change touches model routing, run `python3 scripts/check_spawn_models.py <transcripts-dir>` over the recorded sessions the change touches; it is advisory and costs nothing, and only an `unexplained` verdict is a finding.
+
 #### Specialist Design Review (conditional)
 
 When a specialist artifact exists in `.ai-work/<task-slug>/` — `INTERFACE_DESIGN.md` (task involved an interface surface: web UI, TUI/CLI output, API, MCP tools), `TRANSACTIONS_DESIGN.md` (task involved agentic payments or trading), `ARCHITECTURE_VALIDATION.md` (the architect-validator ran), or any `CONSULT_<discipline>.md` — or when `SYSTEMS_PLAN.md § Architecture` carries a populated `### Data Structures` section, or the diff introduces or alters domain types, state shapes, or component/agent schemas (representation surface):

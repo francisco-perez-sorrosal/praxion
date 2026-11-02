@@ -64,8 +64,36 @@ PATH_SCOPE_KEYS = {"path_globs", "scope", "keywords"}
 # -- The Codex pipeline adapter -------------------------------------------------------------------
 
 
-def test_the_codex_adapters_exports_equal_the_bases_once_the_root_is_normalised(tmp_path):
-    assert move.adapter_exports(tmp_path) == move.fixture_json("base_adapter.json")
+L_TIER_AGENT = "doc-engineer"
+RATIONALE_CORRECTED = {"doc-engineer", "discipline-consultant"}
+KEPT_PARAGRAPHS = ("## Agent Model Routing", "Governs subagent routing")
+
+
+def _set_aside_corrections(exports: dict) -> dict:
+    """The exports with the L-tier row's alias and the corrected rows' rationale set aside."""
+    routing = exports["model_routing.json"]
+    routes = [
+        {
+            k: v
+            for k, v in route.items()
+            if not (k == "canonical_alias" and route["agent"] == L_TIER_AGENT)
+            and not (k == "rationale" and route["agent"] in RATIONALE_CORRECTED)
+        }
+        for route in routing["agent_routes"]
+    ]
+    return {**exports, "model_routing.json": {**routing, "agent_routes": routes}}
+
+
+def test_the_codex_adapters_exports_equal_the_bases_but_for_the_corrected_rows(tmp_path):
+    exports = move.adapter_exports(tmp_path)
+    aliases = {
+        r["agent"]: r["canonical_alias"] for r in exports["model_routing.json"]["agent_routes"]
+    }
+
+    assert _set_aside_corrections(exports) == _set_aside_corrections(
+        move.fixture_json("base_adapter.json")
+    )
+    assert aliases[L_TIER_AGENT] == "haiku", aliases
 
 
 # -- The Codex rules bridge -----------------------------------------------------------------------
@@ -99,7 +127,8 @@ def test_the_routing_rules_bridge_entry_differs_from_the_bases_only_by_its_path_
         k for k in set(shipped.get("keywords", [])) - set(base["keywords"]) if k not in globs
     ]
 
-    assert set(differing) <= PATH_SCOPE_KEYS, differing
+    assert set(differing) - {"summary"} <= PATH_SCOPE_KEYS, differing
+    assert move.holds((REPO / move.RULE).read_text(encoding="utf-8"), shipped.get("summary", ""))
     assert move.AGENTS_SCOPE in (shipped.get("path_globs") or []), shipped.get("path_globs")
     assert foreign_keywords == [], f"keywords not drawn from the path scope: {foreign_keywords}"
 
@@ -128,13 +157,13 @@ def test_every_cursor_file_but_the_routing_rules_is_the_bases_byte_for_byte(curs
     assert changed == []
 
 
-def test_the_routing_rules_cursor_file_differs_only_by_the_restated_directive(cursor):
+def test_the_routing_rules_cursor_file_differs_only_between_its_title_and_its_scope(cursor):
     before = move.paragraphs(move.fixture_text("base_cursor_rule.md"))
     after = move.paragraphs(cursor[move.CURSOR_RULE].decode("utf-8"))
 
     dropped, added = move.replaced_paragraphs(before, after)
 
-    assert [p[: len(move.DIRECTIVE_OPENING)] for p in dropped] == [move.DIRECTIVE_OPENING], dropped
+    assert [p for p in dropped if p.startswith(KEPT_PARAGRAPHS)] == [], dropped
     assert added, "the directive paragraph was removed, not restated"
 
 

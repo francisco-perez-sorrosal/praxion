@@ -187,9 +187,11 @@ class Statement:
 PLACEMENT = (
     Statement("title", "the title names the routing rule", {S: (TITLE,), P: (TITLE,)}),
     Statement(
-        "kill-switch",
-        "the kill switch is the first resolution layer",
-        dict.fromkeys((S, P, R), ("CLAUDE_CODE_SUBAGENT_MODEL", "kill switch")),
+        "forcing",
+        "the subagent-model variable overrides every other layer only when forced",
+        dict.fromkeys(
+            (S, P, R), ("CLAUDE_CODE_SUBAGENT_MODEL", "CLAUDE_CODE_SUBAGENT_MODEL_FORCE")
+        ),
     ),
     Statement(
         "per-spawn",
@@ -212,9 +214,9 @@ PLACEMENT = (
         dict.fromkeys((S, P, R), ("newest generation",)),
     ),
     Statement(
-        "haiku-pin",
-        "the L tier pins claude-haiku-4-5 because bare haiku is Haiku 3.5",
-        dict.fromkeys((S, P, R), ("claude-haiku-4-5", "Haiku 3.5")),
+        "haiku-alias",
+        "haiku resolves to Haiku 5.5 on the Anthropic API and 4.5 elsewhere, never below 4.5",
+        {S: ("haiku", "4.5"), P: ("Haiku 5.5", "Haiku 4.5"), R: ("Haiku 5.5", "Haiku 4.5")},
     ),
     Statement(
         "version-lock",
@@ -254,8 +256,8 @@ PLACEMENT = (
     ),
     Statement(
         "doc-engineer-row",
-        "the doc-engineer row's pinned id stays in the table",
-        {P: ("| `doc-engineer` | L | `claude-haiku-4-5` |",)},
+        "the doc-engineer row reads the haiku alias",
+        {P: ("| `doc-engineer` | L | `haiku` |",)},
         absent_at_start=("| `doc-engineer` |",),
     ),
     Statement(
@@ -621,7 +623,7 @@ def manifest_rows(root: Path = REPO_ROOT) -> dict[str, dict]:
 MODEL_IDS = {
     "opus": "claude-opus-5-5",
     "sonnet": "claude-sonnet-5-5",
-    "claude-haiku-4-5": "claude-haiku-4-5-20251001",
+    "haiku": "claude-haiku-4-5-20251001",
 }
 VERDICTS = ("floor", "override", "unexplained", "unknown")
 

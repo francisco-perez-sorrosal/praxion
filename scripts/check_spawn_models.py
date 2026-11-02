@@ -7,17 +7,21 @@ classifies every ``praxion:`` spawn:
 
 - ``floor``: it ran on its floor's model family and nothing in its request contradicts that.
 - ``override``: it ran on a sanctioned deviation the routing rule's directive lists, or the
-  step-loop driver issued it.
+  step-loop driver issued it and it ran on the model the driver's request implies.
 - ``unexplained``: it ran off its floor with no sanctioned reason; the check fails on these.
 - ``unknown``: the transcripts cannot say (no recorded model, an unknown role, or a spawn off its
   floor in a session whose recorded models leave a forced model possible); reported, not failed.
 
 Rules that refine the reading of production transcripts:
 
-- A spawn the step-loop driver issued is sanctioned. Its prompt's first line is ``Task slug:
-  <slug>`` and a later line starts with ``Spawn request: <id>``; the driver applies the plan's
-  routing (step tier hints, light review at ``sonnet``), so the spawn reads ``override`` with the
-  reason "issued by the step-loop driver (<id>)".
+- A spawn the step-loop driver issued is judged against the routing its rendered request implies.
+  Its prompt's first line is ``Task slug: <slug>``, a later line starts with ``Spawn request: <id>``
+  and the third line names the rendered request, which the spawn's own transcript records it
+  reading. A light review implies ``sonnet``, a step hinted ``tier: H`` ``opus``, ``tier: L``
+  ``haiku``, anything else the floor. Off its floor, the spawn reads ``override`` on the family its
+  request implies, ``unexplained`` on any other (a request that implies the floor included), and
+  ``unknown`` when the transcripts record no read of the request. On its floor it reads as any
+  spawn does.
 - A prompt marker (``Mode: light-review``, ``tier: H``, ``routine``, ...) counts when it appears as
   a whole phrase anywhere in the prompt (mid-line, indented, negated or inside backticks); one held
   only inside a longer word (``tier: High``) never sanctions a deviation.
@@ -57,7 +61,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from _repo_root import resolve_repo_root  # noqa: E402
-from spawn_transcripts import Spawn, read_floors, read_spawns  # noqa: E402
+from spawn_transcripts import DriverRequest, Spawn, read_floors, read_spawns  # noqa: E402
 
 Verdict = Literal["floor", "override", "unexplained", "unknown"]
 VERDICTS: tuple[str, ...] = get_args(Verdict)
@@ -116,8 +120,8 @@ def classify(
     ran = model_family(spawn.ran_model)
     if ran == model_family(floor) and not _requested_other_than(spawn, floor):
         return "floor", f"ran on {spawn.ran_model}, the {floor} floor"
-    if spawn.driver_request is not None:
-        return "override", f"issued by the step-loop driver ({spawn.driver_request})"
+    if spawn.driver is not None:
+        return _driver_verdict(spawn.driver, spawn.ran_model, ran == model_family(floor))
     if _sanctioned(spawn):
         return "override", f"ran on {spawn.ran_model}, a listed deviation"
     if _forcing_cannot_be_excluded(session_spawns, floors):
@@ -129,6 +133,19 @@ def classify(
         "unexplained",
         f"ran on {spawn.ran_model}, off the {floor} floor, with no listed deviation",
     )
+
+
+def _driver_verdict(driver: DriverRequest, ran_model: str, on_floor: bool) -> tuple[Verdict, str]:
+    """A driver-issued spawn is judged against the routing its rendered request implies, which the
+    spawn's own transcript shows; on its floor it reads as any driver spawn always has."""
+    issued = f"issued by the step-loop driver ({driver.id})"
+    if on_floor:
+        return "override", issued
+    if driver.implied is None:
+        return "unknown", f"{issued}; its transcripts do not show the routing its request implies"
+    if driver.implied != "floor" and driver.implied == model_family(ran_model):
+        return "override", f"{issued}; ran on {ran_model}, the model its request implies"
+    return "unexplained", f"{issued}; ran on {ran_model}, but its request implies {driver.implied}"
 
 
 def _requested_other_than(spawn: Spawn, floor: str) -> bool:

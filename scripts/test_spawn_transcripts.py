@@ -181,7 +181,7 @@ def test_a_driver_pointer_prompt_names_the_request_it_answers(tmp_path):
 
     (spawn,) = st.read_spawns(tmp_path)
 
-    assert spawn.driver_request == "s7-a1-review-r1"
+    assert spawn.driver == st.DriverRequest("s7-a1-review-r1", None)
 
 
 @pytest.mark.parametrize(
@@ -199,7 +199,116 @@ def test_a_prompt_that_is_not_a_driver_pointer_names_no_request(tmp_path, prompt
 
     (spawn,) = st.read_spawns(tmp_path)
 
-    assert spawn.driver_request is None
+    assert spawn.driver is None
+
+
+RENDERED_PATH = "/sandbox/.ai-work/x/PROMPT_s7-a1-implement.md"
+DRIVER_PROMPT = (
+    f"Task slug: x\nSpawn request: s7-a1-implement\nRead {RENDERED_PATH} first and follow it."
+)
+STEP_BLOCK = "### Write the widget\n\n**Assignee**: implementer\n{hint}**Done when**: green."
+
+
+def _numbered(text: str) -> str:
+    return "".join(f"{n:>6}\t{line}\n" for n, line in enumerate(text.splitlines(), 1))
+
+
+def _read_of_rendered(text: str, *, raw: bool = True, path: str = RENDERED_PATH) -> list[dict]:
+    """The spawn's own records of reading its rendered request: the call, then the result with the
+    numbered lines in the message and, when `raw`, the file itself in `toolUseResult`."""
+    call = {
+        "type": "assistant",
+        "message": {
+            "role": "assistant",
+            "model": FLOOR_MODEL,
+            "content": [
+                {"type": "tool_use", "id": "toolu_r", "name": "Read", "input": {"file_path": path}}
+            ],
+        },
+    }
+    result_block = {"type": "tool_result", "tool_use_id": "toolu_r", "content": _numbered(text)}
+    result = {"type": "user", "message": {"role": "user", "content": [result_block]}}
+    if raw:
+        result["toolUseResult"] = {"type": "text", "file": {"filePath": path, "content": text}}
+    return [call, result]
+
+
+def _driver_spawn(directory: Path, own_records: list[dict]) -> st.Spawn:
+    _record(directory, SESSION, "implementer", "a1", prompt=DRIVER_PROMPT)
+    own = directory / SESSION / "subagents" / "agent-a1.jsonl"
+    _write_lines(own, [*_own_transcript(FLOOR_MODEL), *own_records])
+    (spawn,) = st.read_spawns(directory)
+    return spawn
+
+
+@pytest.mark.parametrize(
+    ("rendered", "implied"),
+    [
+        ("Mode: light-review\n\n" + STEP_BLOCK.format(hint=""), "sonnet"),
+        (STEP_BLOCK.format(hint="tier: H\n"), "opus"),
+        (STEP_BLOCK.format(hint="tier: L\n"), "haiku"),
+        (STEP_BLOCK.format(hint=""), "floor"),
+        (STEP_BLOCK.format(hint="tier: High\n"), "floor"),
+    ],
+)
+def test_a_driver_request_implies_the_routing_its_rendered_prompt_states(
+    tmp_path, rendered, implied
+):
+    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered))
+
+    assert spawn.driver == st.DriverRequest("s7-a1-implement", implied)
+
+
+def test_a_review_prompt_quoting_a_tier_h_step_block_still_implies_sonnet(tmp_path):
+    rendered = "Mode: light-review\n\n" + STEP_BLOCK.format(hint="tier: H\n")
+
+    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered))
+
+    assert spawn.driver.implied == "sonnet"
+
+
+def test_a_driver_request_read_back_only_as_numbered_lines_implies_the_same_routing(tmp_path):
+    rendered = STEP_BLOCK.format(hint="tier: H\n")
+
+    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered, raw=False))
+
+    assert spawn.driver.implied == "opus"
+
+
+def test_a_driver_request_the_spawn_never_read_implies_nothing(tmp_path):
+    spawn = _driver_spawn(tmp_path, [])
+
+    assert spawn.driver == st.DriverRequest("s7-a1-implement", None)
+
+
+def test_a_read_of_another_file_does_not_show_the_request(tmp_path):
+    rendered = STEP_BLOCK.format(hint="tier: H\n")
+
+    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered, path="/sandbox/other.md"))
+
+    assert spawn.driver.implied is None
+
+
+def test_a_read_that_errored_does_not_show_the_request(tmp_path):
+    records = _read_of_rendered("File does not exist.", raw=False)
+    records[1]["message"]["content"][0]["is_error"] = True
+
+    assert _driver_spawn(tmp_path, records).driver.implied is None
+
+
+def test_a_driver_prompt_with_no_third_line_names_no_file_to_read(tmp_path):
+    _record(tmp_path, SESSION, "implementer", "a1", prompt="Task slug: x\nSpawn request: s7-a1")
+
+    (spawn,) = st.read_spawns(tmp_path)
+
+    assert spawn.driver == st.DriverRequest("s7-a1", None)
+
+
+def test_a_driver_request_is_a_frozen_value():
+    request = st.DriverRequest("s7-a1", "opus")
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        request.implied = "floor"  # type: ignore[misc]
 
 
 def test_a_spawn_with_no_transcript_of_its_own_has_no_ran_model(tmp_path):

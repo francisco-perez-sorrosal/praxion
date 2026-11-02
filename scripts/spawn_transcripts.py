@@ -12,7 +12,8 @@ many records carry it. A prompt marker counts as a whole phrase anywhere in the 
 character or hyphen on either side ("tier: High" and "routinely" hold none): a prompt that writes a
 marker states that routing, and negation or quotation is not interpreted. A prompt whose first line is
 `Task slug: <slug>` and a later line starts with `Spawn request: <id>` was issued by the step-loop
-driver, and the spawn keeps that id.
+driver, and the spawn keeps that id together with the routing its rendered request implies: its
+third line names the request's file, and the spawn's own transcript records its `Read` of it.
 
 Stdlib only and Python 3.9-safe: the check runs under the ambient interpreter.
 """
@@ -24,6 +25,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -47,8 +49,22 @@ SYNTHETIC_MODEL = "<synthetic>"
 _MARKER_PATTERNS = {
     marker: re.compile(rf"(?<![\w-]){re.escape(marker)}(?![\w-])") for marker in PROMPT_MARKERS
 }
+_REQUEST_PATH = re.compile(r"\bRead (\S+)")
 _TASK_SLUG_LINE = re.compile(r"Task slug: \S")
 _SPAWN_REQUEST_LINE = re.compile(r"^Spawn request: (\S+)", re.MULTILINE)
+
+
+# The model family a driver request implies; `floor` is a request that asks for no deviation.
+ImpliedRouting = Literal["sonnet", "opus", "haiku", "floor"]
+
+
+@dataclass(frozen=True)
+class DriverRequest:
+    """The step-loop request a spawn answers. `implied` is None when the spawn recorded no read of
+    its rendered request, so what the request implies is not shown."""
+
+    id: str
+    implied: ImpliedRouting | None = None
 
 
 @dataclass(frozen=True)
@@ -62,7 +78,7 @@ class Spawn:
     requested_model: str | None
     ran_model: str | None
     prompt_markers: frozenset[str]
-    driver_request: str | None = None
+    driver: DriverRequest | None = None
 
 
 def read_spawns(transcripts_dir: Path) -> list[Spawn]:
@@ -99,15 +115,16 @@ def _session_spawns(transcripts_dir: Path, session_file: Path) -> list[Spawn]:
         own = transcripts_dir / session / "subagents" / f"agent-{agent_id}.jsonl"
         model = call.get("model")
         prompt = call.get("prompt")
+        own_records = _read_records(own)
         spawns.append(
             Spawn(
                 session=session,
                 agent_id=agent_id,
                 role=call["subagent_type"][len(ROLE_PREFIX) :],
                 requested_model=model if isinstance(model, str) else None,
-                ran_model=_ran_model(_read_records(own)),
+                ran_model=_ran_model(own_records),
                 prompt_markers=_prompt_markers(prompt),
-                driver_request=_driver_request(prompt),
+                driver=_driver_request(prompt, own_records),
             )
         )
     return spawns
@@ -156,12 +173,67 @@ def _prompt_markers(prompt: object) -> frozenset[str]:
     return frozenset(marker for marker, found in _MARKER_PATTERNS.items() if found.search(text))
 
 
-def _driver_request(prompt: object) -> str | None:
-    """The request id of a step-loop driver prompt, None for any other prompt."""
+def _driver_request(prompt: object, own_records: list[dict]) -> DriverRequest | None:
+    """The request a step-loop driver prompt answers, None for any other prompt."""
     text = prompt if isinstance(prompt, str) else ""
     first_line, _, rest = text.partition("\n")
     request = _SPAWN_REQUEST_LINE.search(rest)
-    return request.group(1) if request and _TASK_SLUG_LINE.match(first_line) else None
+    if not (request and _TASK_SLUG_LINE.match(first_line)):
+        return None
+    rendered = _rendered_request(own_records, _request_path(text))
+    return DriverRequest(request.group(1), _implied_routing(rendered))
+
+
+def _request_path(prompt: str) -> str | None:
+    """The file the pointer prompt's third line tells the spawn to read."""
+    lines = prompt.splitlines()
+    named = _REQUEST_PATH.search(lines[2]) if len(lines) > 2 else None
+    return named.group(1) if named else None
+
+
+def _rendered_request(own_records: list[dict], path: str | None) -> str | None:
+    """What the spawn's own transcript records it read from `path`: the file as Claude Code stores
+    it in `toolUseResult`, else the numbered lines of the result message. None when it read nothing."""
+    read_ids = {
+        block.get("id")
+        for block in _blocks(own_records, "tool_use")
+        if block.get("name") == "Read"
+        and isinstance(block.get("input"), dict)
+        and block["input"].get("file_path") == path
+    }
+    for record in own_records:
+        for block in _blocks([record], "tool_result"):
+            if block.get("tool_use_id") in read_ids and not block.get("is_error"):
+                text = _read_result_text(record, block)
+                if text:
+                    return text
+    return None
+
+
+def _read_result_text(record: dict, result_block: dict) -> str | None:
+    file_result = (record.get("toolUseResult") or {}).get("file")
+    content = file_result.get("content") if isinstance(file_result, dict) else None
+    if isinstance(content, str):
+        return content
+    content = result_block.get("content")
+    if isinstance(content, list):
+        content = "".join(b.get("text", "") for b in content if isinstance(b, dict))
+    return content if isinstance(content, str) else None
+
+
+def _implied_routing(rendered: str | None) -> ImpliedRouting | None:
+    """The routing a rendered request states, by the markers the routing rule names: a light review
+    outranks any step hint a review quotes."""
+    if rendered is None:
+        return None
+    markers = _prompt_markers(rendered)
+    if "Mode: light-review" in markers:
+        return "sonnet"
+    if "tier: H" in markers:
+        return "opus"
+    if "tier: L" in markers:
+        return "haiku"
+    return "floor"
 
 
 def _blocks(records: list[dict], block_type: str):

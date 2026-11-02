@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live import scenarios
 from praxion_evals.live.materialize import PathTarget, RefTarget, TargetIdentity
 from praxion_evals.live.results import compute_lowered, compute_pass_rate
@@ -154,7 +155,7 @@ def build_output(
             "k": args.k,
             # None = every scenario; a list marks a partial run, never a baseline.
             "scenarios": args.scenario,
-            "judge": {"model": "claude-haiku-4-5"} if args.judge else None,
+            "judge": {"model": JudgeClient.model} if args.judge else None,
             "spend_usd": ledger.spent_usd if ledger is not None else None,
         },
         "variants": list(variant_records),

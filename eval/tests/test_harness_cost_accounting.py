@@ -125,6 +125,17 @@ def test_estimate_cost_usd_unknown_model_returns_none():
     assert estimate_cost_usd("some-future-model", JudgeUsage()) is None
 
 
+def test_the_default_judge_model_is_priced_at_haiku_5_5_rates():
+    """1M input + 1M output tokens at $0.10/$0.50 per MTok = $0.60, so a judged run is never
+    'unpriced' on the model it judges with."""
+    from praxion_evals.harness.judge_client import JudgeClient, estimate_cost_usd
+    from praxion_evals.harness.schemas import JudgeUsage
+
+    usage = JudgeUsage(input_tokens=1_000_000, output_tokens=1_000_000)
+
+    assert estimate_cost_usd(JudgeClient.model, usage) == 0.60
+
+
 def test_estimate_cost_usd_zero_usage_on_known_model_is_zero_not_none():
     from praxion_evals.harness.judge_client import estimate_cost_usd
     from praxion_evals.harness.schemas import JudgeUsage

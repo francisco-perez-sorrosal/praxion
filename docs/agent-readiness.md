@@ -78,7 +78,7 @@ Pillar-9 sub-score, and the top failing criteria.
 | `… --require-readiness-ai` | Hard-fail (non-zero, no partial write) if the LLM tier cannot run — for CI that enforces full-fidelity scoring |
 
 Authentication reuses the eval harness's precedence (`ANTHROPIC_API_KEY`, then
-`CLAUDE_CODE_OAUTH_TOKEN`); the judge model defaults to `claude-haiku-4-5`.
+`CLAUDE_CODE_OAUTH_TOKEN`); the judge model defaults to `claude-haiku-5-5`.
 
 ### Remediation
 

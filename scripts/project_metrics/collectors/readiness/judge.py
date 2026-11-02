@@ -50,7 +50,7 @@ class JudgeUnavailableError(RuntimeError):
 
 _MESSAGES_ENDPOINT: str = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_VERSION: str = "2023-06-01"
-DEFAULT_MODEL: str = "claude-haiku-4-5"
+DEFAULT_MODEL: str = "claude-haiku-5-5"
 _MAX_TOKENS: int = 1024
 _DEFAULT_TIMEOUT_SECONDS: int = 30
 

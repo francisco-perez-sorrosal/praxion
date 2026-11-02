@@ -39,7 +39,7 @@ from praxion_evals.harness.schemas import JudgeUsage, JudgeVerdict
 _ENV_OAUTH = "CLAUDE_CODE_OAUTH_TOKEN"
 _ENV_API_KEY = "ANTHROPIC_API_KEY"
 
-_DEFAULT_MODEL = "claude-haiku-4-5"
+_DEFAULT_MODEL = "claude-haiku-5-5"
 _JUDGE_MAX_TOKENS = 1024
 _JUDGE_TIMEOUT_SECONDS = 120
 _NESTED_ENV = "CLAUDECODE"
@@ -49,10 +49,13 @@ _API_TIMEOUT_MS_MARGIN_MS = 5_000
 _JUDGE_WORKERS_ENV = "PRAXION_EVAL_JUDGE_WORKERS"
 _JUDGE_WORKERS_DEFAULT = 8
 
-# Anthropic first-party rates, skill table cached 2026-06-24 — USD per million
+# Anthropic first-party rates, skill table cached 2026-10-06 — USD per million
 # tokens (input, output). Estimate only, not a billing-accurate figure; a
 # model absent from this table is "unpriced" (see estimate_cost_usd()).
+# Haiku 5.5's row is its rate for prompts up to 100K tokens, which every judge
+# prompt is; longer prompts bill at five times that rate.
 _PRICE_USD_PER_MTOK: dict[str, tuple[float, float]] = {
+    "claude-haiku-5-5": (0.10, 0.50),
     "claude-haiku-4-5": (1.00, 5.00),
 }
 _CACHE_READ_DISCOUNT = 0.10  # cache reads bill at 10% of the input rate

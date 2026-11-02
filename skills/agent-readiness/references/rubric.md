@@ -124,7 +124,7 @@ The 4 LLM criteria use the Anthropic Messages API directly via `urllib.request`
 (no `anthropic` SDK import — consistent with the metrics package's stdlib-only
 constraint). The judge uses forced `tool_choice` to get a structured verdict.
 
-- **Default model**: `claude-haiku-4-5`
+- **Default model**: `claude-haiku-5-5`
 - **Timeout**: 30 seconds per criterion
 - **Grounding**: each call receives the prior run's verdict for that criterion
   (from the most-recent `METRICS_REPORT_*.json`) to reduce inter-run variance

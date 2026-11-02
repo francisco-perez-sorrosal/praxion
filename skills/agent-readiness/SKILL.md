@@ -119,7 +119,7 @@ are excluded from every denominator when `llm_skipped`.
 
 When LLM criteria are scored, the judge uses forced tool-calling to get a
 structured `{passed: bool, rationale: str}` verdict. The model is
-`claude-haiku-4-5` with a 30-second timeout.
+`claude-haiku-5-5` with a 30-second timeout.
 
 ## Reading the Readiness Block
 

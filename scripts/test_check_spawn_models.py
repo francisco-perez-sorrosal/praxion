@@ -215,6 +215,12 @@ def test_a_session_where_a_spawn_passed_a_model_is_judged_spawn_by_spawn():
     assert csm.classify(asked, [asked, silent], FLOORS)[0] == "unexplained"
 
 
+def test_a_lone_spawn_that_passed_a_model_is_judged_on_its_own_not_unknown():
+    asked = spawn("systems-architect", ran="claude-sonnet-5-5", requested="sonnet")
+
+    assert verdict_of(asked) == "unexplained"
+
+
 def test_a_session_where_every_spawn_passed_the_same_model_is_judged_spawn_by_spawn():
     pinned = "claude-haiku-4-5-20251001"
     spawns = [

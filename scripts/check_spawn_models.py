@@ -10,7 +10,7 @@ classifies every ``praxion:`` spawn:
   step-loop driver issued it.
 - ``unexplained``: it ran off its floor with no sanctioned reason; the check fails on these.
 - ``unknown``: the transcripts cannot say (no recorded model, an unknown role, or a spawn off its
-  floor in a session that ran on one model); reported, not failed.
+  floor in a session whose recorded models leave a forced model possible); reported, not failed.
 
 Rules that refine the reading of production transcripts:
 
@@ -21,12 +21,13 @@ Rules that refine the reading of production transcripts:
 - A prompt marker (``Mode: light-review``, ``tier: H``, ``routine``, ...) counts when it appears as
   a whole phrase anywhere in the prompt (mid-line, indented, negated or inside backticks); one held
   only inside a longer word (``tier: High``) never sanctions a deviation.
-- A session that ran on one model reads ``unknown`` off its floor and ``floor`` on it. The
-  transcripts do not record whether ``CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`` was set, and under it
-  Claude cannot pass a per-spawn ``model`` (code.claude.com/docs/en/sub-agents.md), so a forced
-  model cannot be excluded for a session's lone spawn, nor for one whose spawns' floors differ,
-  that ran all on one family and passed no ``model``. A session where any spawn passed a model is
-  judged spawn by spawn.
+- The transcripts do not record whether ``CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`` was set, and under
+  it Claude cannot pass a per-spawn ``model`` (code.claude.com/docs/en/sub-agents.md). So when no
+  spawn of a session passed a ``model`` and the session is a lone spawn, or its spawns' floors
+  differ while all ran on one family, a forced model cannot be excluded: a spawn off its floor
+  reads ``unknown`` and one on its floor reads ``floor``. Any other session, including one where
+  any spawn passed a ``model`` and one on a single model whose floors agree, is judged spawn by
+  spawn.
 - Aliases compare by family: ``haiku`` matches any ``claude-haiku-*``, ``sonnet`` any
   ``claude-sonnet-*``, ``opus`` any ``claude-opus-*`` and ``fable`` any ``claude-fable-*``. No alias
   maps to a single version: ``haiku`` is Haiku 5.5 on the Anthropic API and Haiku 4.5 elsewhere, and
@@ -136,12 +137,13 @@ def _requested_other_than(spawn: Spawn, floor: str) -> bool:
 
 
 def _forcing_cannot_be_excluded(session_spawns: list[Spawn], floors: dict[str, str]) -> bool:
-    """Whether the session's recorded models leave a forcing setting possible: its lone spawn, or
-    spawns whose floors differ that all ran on one family with none passing a model."""
-    if len(session_spawns) == 1:
-        return True
+    """Whether the session's recorded models leave a forcing setting possible: no spawn passed a
+    model, and either there is a lone spawn or the spawns' floors differ while all ran on one
+    family."""
     if any(s.requested_model is not None for s in session_spawns):
         return False
+    if len(session_spawns) == 1:
+        return True
     known = [s for s in session_spawns if s.ran_model is not None and s.role in floors]
     floor_families = {model_family(floors[s.role]) for s in known}
     ran_families = {model_family(s.ran_model) for s in known if s.ran_model is not None}

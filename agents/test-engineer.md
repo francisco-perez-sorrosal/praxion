@@ -272,7 +272,7 @@ Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under 
 - **Used by:** <test nodes>
 ## Spec Questions
 ### SQ-NN — <question>
-- **REQ / Raised by:** REQ-NN / acceptance design | implementer
+- **REQ / Raised by:** REQ-NN / acceptance design | implementer | orchestrator
 - **Ambiguity:** …
 - **Provisional:** <what the scenario assumes meanwhile> | withheld
 - **Resolution:** open | answered in REQ-NN (spec digest sha256:…) | escalated to user

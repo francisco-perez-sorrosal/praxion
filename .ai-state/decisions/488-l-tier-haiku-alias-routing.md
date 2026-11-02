@@ -1,7 +1,8 @@
 ---
-id: dec-draft-47003576
+id: dec-488
+draft_id: dec-draft-47003576
 title: "The L tier routes by the haiku alias, passable per spawn and through the step-loop driver"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-01
 summary: "The L tier is the haiku alias, not the pinned claude-haiku-4-5. The researcher's lookup mode and the implementer's tier: L hint pass haiku per spawn, and the step-loop driver requests haiku for a tier: L step. tier: L is reserved for short mechanical steps. The routing texts state the harness's current resolution order with the env var's FORCE condition."

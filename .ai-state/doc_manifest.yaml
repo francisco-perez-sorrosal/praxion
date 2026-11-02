@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-02T06:07:33Z'
+generated_at: '2026-11-02T15:20:51Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -654,7 +654,7 @@ surfaces:
   path: .ai-state/SYSTEM_DEPLOYMENT.md
   type: markdown
   title: System Deployment
-  last_modified: '2026-10-10'
+  last_modified: '2026-11-02'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-116-ai-training-results-schema-owner
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-02'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -682,7 +682,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-02'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -1168,7 +1168,7 @@ surfaces:
   path: .ai-state/decisions/078-agent-model-routing-routing-mechanism-hybrid.md
   type: markdown
   title: "Hybrid routing \u2014 central rule table with sparing per-spawn overrides"
-  last_modified: '2026-04-27'
+  last_modified: '2026-11-01'
   renderer: adr_card
 - id: ai-state-decisions-079-agent-model-routing-routing-placement-always-loaded-rule
   path: .ai-state/decisions/079-agent-model-routing-routing-placement-always-loaded-rule.md
@@ -2932,7 +2932,7 @@ surfaces:
   path: .ai-state/decisions/372-codex-model-routing-derives-from-tier.md
   type: markdown
   title: The Codex model adapter keys on the routing rule's Tier column, never on a Claude alias literal
-  last_modified: '2026-09-06'
+  last_modified: '2026-11-01'
   renderer: adr_card
 - id: ai-state-decisions-373-consult-cost-reconstructed-provenance
   path: .ai-state/decisions/373-consult-cost-reconstructed-provenance.md
@@ -3627,6 +3627,12 @@ surfaces:
   title: Confine the implementer and verifier kits' shell with the harness's OS sandbox
   last_modified: '2026-11-01'
   renderer: adr_card
+- id: ai-state-decisions-488-l-tier-haiku-alias-routing
+  path: .ai-state/decisions/488-l-tier-haiku-alias-routing.md
+  type: markdown
+  title: The L tier routes by the haiku alias, passable per spawn and through the step-loop driver
+  last_modified: '2026-11-02'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3972,6 +3978,13 @@ surfaces:
   type: markdown
   title: "Spec: ralph-lite (the step-loop driver's goal mode \u2014 Ralph-lite \u2014 built per dec-434)"
   last_modified: '2026-10-08'
+  renderer: default_markdown
+- id: ai-state-specs-spec-routing-facts-2026-11-02
+  path: .ai-state/specs/SPEC_routing-facts_2026-11-02.md
+  type: markdown
+  title: 'Spec: routing-facts (every routing surface states the harness''s current resolution order and alias facts, the L tier is the `haiku` alias, and the advisory spawn-model check reads real prompts
+    and driver requests correctly)'
+  last_modified: '2026-11-02'
   renderer: default_markdown
 - id: ai-state-specs-spec-sentinel-phase-b-2026-09-13
   path: .ai-state/specs/SPEC_sentinel-phase-b_2026-09-13.md
@@ -4549,6 +4562,7 @@ groups:
   - ai-state-decisions-485-spawn-model-transcript-check
   - ai-state-decisions-486-capped-report-finished-form
   - ai-state-decisions-487-confined-kits-os-sandbox-grant
+  - ai-state-decisions-488-l-tier-haiku-alias-routing
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4606,6 +4620,7 @@ groups:
   - ai-state-specs-spec-production-gate-cohort-2026-06-26
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-specs-spec-ralph-lite-2026-10-08
+  - ai-state-specs-spec-routing-facts-2026-11-02
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13
   - ai-state-specs-spec-sidecar-placement-2026-09-03
   - ai-state-specs-spec-step-loop-dogfood-2026-10-08

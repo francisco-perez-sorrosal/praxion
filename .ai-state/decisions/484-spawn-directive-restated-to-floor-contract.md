@@ -15,7 +15,7 @@ affected_files:
   - rules/swe/agent-model-routing.md
   - rules/swe/agent-model-routing-resident.md
   - skills/agent-crafting/references/model-routing-policy.md
-superseded_in_part_by: [dec-draft-47003576]
+superseded_in_part_by: [dec-488]
 ---
 ## Context
 

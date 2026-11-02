@@ -58,14 +58,14 @@ safety:
 
 provider:
   fixer: claude               # the only fixer wired in P1
-  fixer_model: claude-sonnet-5 # consumed by BOTH reusable-ci-autofix.yml and
-                               # issue-autofix.yml (the latter previously
-                               # hardcoded --model opus, ignoring this key --
-                               # fixed alongside this value change). Full
-                               # model id, not the bare "opus" alias -- an
-                               # alias resolved to an older point release
-                               # (claude-opus-4-7) rather than tracking
-                               # latest, so this key now pins explicitly.
+  fixer_model: sonnet         # consumed by BOTH reusable-ci-autofix.yml and
+                               # issue-autofix.yml. An alias: it resolves
+                               # through the Claude Code version the pinned
+                               # claude-code-action bundles, so it follows
+                               # the newest Sonnet as Dependabot moves that
+                               # pin. (A months-stale pin once resolved
+                               # "opus" to claude-opus-4-7, which is why this
+                               # key held full model ids for a while.)
   plugin_dir: "."              # CRITICAL for Praxion specifically: Praxion IS
                                # a Claude Code plugin, so the hub's
                                # --plugin-dir flag must load "." to preserve

@@ -36,6 +36,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_FILE = PROJECT_ROOT / ".github" / "workflows" / "issue-autofix.yml"
+P1_WORKFLOW_FILE = PROJECT_ROOT / ".github" / "workflows" / "reusable-ci-autofix.yml"
 
 SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
@@ -43,9 +44,9 @@ SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # character-for-character, never re-resolve to a newer/older SHA.
 CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # actions/checkout v7.0.1
 SETUP_UV_SHA = "c771a70e6277c0a99b617c7a806ffedaca235ff9"  # astral-sh/setup-uv v9.0.0
-CLAUDE_CODE_ACTION_SHA = (
-    "51ea8ea73a139f2a74ff649e3092c25a904aed7e"  # anthropics/claude-code-action v1
-)
+# The claude-code-action pin is read from P1 rather than named here: Dependabot moves it in
+# every workflow at once, and the action's bundled Claude Code resolves the model aliases.
+CLAUDE_CODE_ACTION = "anthropics/claude-code-action@"
 
 # The exact, minimal permission set the fixer job may hold — no more, no less.
 EXPECTED_JOB_PERMISSIONS = {
@@ -372,16 +373,17 @@ def test_setup_uv_pin_matches_p1_exact_commit() -> None:
     )
 
 
-def test_claude_code_action_pin_matches_p1_exact_commit() -> None:
-    parsed = _parsed()
-    refs = _uses_refs(parsed)
-    matching = [ref for ref in refs if ref.startswith("anthropics/claude-code-action@")]
-    assert matching, "Expected an `anthropics/claude-code-action` step"
-    assert any(
-        ref == f"anthropics/claude-code-action@{CLAUDE_CODE_ACTION_SHA}" for ref in matching
-    ), (
-        f"anthropics/claude-code-action must pin to P1's exact commit "
-        f"{CLAUDE_CODE_ACTION_SHA} (got {matching})"
+def _claude_code_action_refs(parsed: dict) -> set[str]:
+    return {ref for ref in _uses_refs(parsed) if ref.startswith(CLAUDE_CODE_ACTION)}
+
+
+def test_claude_code_action_pin_matches_p1s_one_commit() -> None:
+    p1 = _claude_code_action_refs(yaml.safe_load(P1_WORKFLOW_FILE.read_text()))
+    mine = _claude_code_action_refs(_parsed())
+
+    assert len(p1) == 1, f"P1 must pin claude-code-action to one commit (got {sorted(p1)})"
+    assert mine == p1, (
+        f"claude-code-action must pin to P1's commit {sorted(p1)} (got {sorted(mine)})"
     )
 
 

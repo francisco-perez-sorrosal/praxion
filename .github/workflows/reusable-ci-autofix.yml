@@ -261,7 +261,7 @@ jobs:
         # id-token:write. A mutable tag here would let a compromised tag push
         # run arbitrary code with those grants. Matches the SHA discipline
         # already applied to checkout and setup-uv above. Bump deliberately.
-        uses: anthropics/claude-code-action@51ea8ea73a139f2a74ff649e3092c25a904aed7e  # v1
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d  # v1.0.266
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -847,7 +847,7 @@ jobs:
         # the non-agent step below owns the push. `--allowedTools` stays on one
         # physical line (an embedded newline yields whitespace-prefixed tokens
         # that fail the runtime comma-split match).
-        uses: anthropics/claude-code-action@51ea8ea73a139f2a74ff649e3092c25a904aed7e  # v1
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d  # v1.0.266
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Lift claude-code-action's default bot-actor guard for Dependabot ONLY.
@@ -1121,7 +1121,7 @@ jobs:
         # Bash pattern scoped to ./pr-head — so untrusted fork content can be
         # read but never executed or committed. `--allowedTools` stays on one
         # physical line.
-        uses: anthropics/claude-code-action@51ea8ea73a139f2a74ff649e3092c25a904aed7e  # v1
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d  # v1.0.266
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |

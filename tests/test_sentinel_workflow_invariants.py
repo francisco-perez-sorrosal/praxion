@@ -33,6 +33,10 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_FILE = PROJECT_ROOT / ".github" / "workflows" / "sentinel.yml"
+AUTOFIX_WORKFLOW_FILES = (
+    PROJECT_ROOT / ".github" / "workflows" / "reusable-ci-autofix.yml",
+    PROJECT_ROOT / ".github" / "workflows" / "issue-autofix.yml",
+)
 SENTINEL_AGENT_FILE = PROJECT_ROOT / "agents" / "sentinel.md"
 
 SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -42,9 +46,10 @@ SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # newer/older SHA of its own.
 CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # actions/checkout v7.0.1
 SETUP_UV_SHA = "c771a70e6277c0a99b617c7a806ffedaca235ff9"  # astral-sh/setup-uv v9.0.0
-CLAUDE_CODE_ACTION_SHA = (
-    "51ea8ea73a139f2a74ff649e3092c25a904aed7e"  # anthropics/claude-code-action v1
-)
+# The claude-code-action pin is read from the autofix workflows rather than named here:
+# Dependabot moves it in every workflow at once, and the action's bundled Claude Code resolves
+# the `--model` alias.
+CLAUDE_CODE_ACTION = "anthropics/claude-code-action@"
 
 # Permission keys that must never appear on any permissions block anywhere in
 # this workflow — `contents` is checked separately because `contents: read`
@@ -384,15 +389,19 @@ def test_every_uses_reference_is_sha_pinned_with_a_version_comment() -> None:
         )
 
 
-def test_claude_code_action_pin_matches_the_autofix_workflows_pin() -> None:
-    refs = _uses_refs(_parsed())
-    matching = [ref for ref in refs if ref.startswith("anthropics/claude-code-action@")]
-    assert matching, "Expected an `anthropics/claude-code-action` step"
-    assert any(
-        ref == f"anthropics/claude-code-action@{CLAUDE_CODE_ACTION_SHA}" for ref in matching
-    ), (
-        f"anthropics/claude-code-action must pin to the same commit already used "
-        f"by the autofix workflows, {CLAUDE_CODE_ACTION_SHA} (got {matching})"
+def _claude_code_action_refs(parsed: dict) -> set[str]:
+    return {ref for ref in _uses_refs(parsed) if ref.startswith(CLAUDE_CODE_ACTION)}
+
+
+def test_claude_code_action_pin_matches_the_autofix_workflows_one_commit() -> None:
+    autofix = set().union(
+        *(_claude_code_action_refs(yaml.safe_load(f.read_text())) for f in AUTOFIX_WORKFLOW_FILES)
+    )
+    mine = _claude_code_action_refs(_parsed())
+
+    assert len(autofix) == 1, f"the autofix workflows must share one pin (got {sorted(autofix)})"
+    assert mine == autofix, (
+        f"must pin to the autofix workflows' commit {sorted(autofix)} (got {sorted(mine)})"
     )
 
 

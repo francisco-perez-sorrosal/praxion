@@ -36,6 +36,10 @@
 #     claude-code-action pin is the same one the autofix workflows already
 #     use (td-057 lockstep), and the checkout/setup-uv pins match
 #     audits.yml's.
+#   - `--model sonnet` is an alias: it resolves through the Claude Code
+#     version the pinned action bundles, so the job follows the newest
+#     Sonnet as Dependabot moves the pin (its `# v1.0.N` comment is what
+#     Dependabot reads).
 #   - `actions/checkout` sets `persist-credentials: false`, but in agent mode
 #     the pinned action rewrites `remote.origin.url` with the job token, so
 #     the agent's Bash can read a `contents: read` token. That token can
@@ -140,7 +144,7 @@ jobs:
         timeout-minutes: 40
         env:
           CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
-        uses: anthropics/claude-code-action@51ea8ea73a139f2a74ff649e3092c25a904aed7e  # v1
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d  # v1.0.266
         with:
           github_token: ${{ github.token }}
           path_to_bun_executable: ${{ steps.bun.outputs.bun-path }}
@@ -166,7 +170,7 @@ jobs:
           claude_args: |
             --plugin-dir .
             --agent praxion:sentinel
-            --model claude-sonnet-5
+            --model sonnet
             --max-turns 150
             --strict-mcp-config
             --settings '{"env":{"PRAXION_DISABLE_OBSERVABILITY":"1","PRAXION_DISABLE_EVENT_POSTING":"1","PRAXION_DISABLE_AUTO_COMPLETE":"1","PRAXION_DISABLE_HOOK_CHAIN_HEAL":"1","PRAXION_DISABLE_RULE_INJECTION":"1","PRAXION_DISABLE_DECISION_INJECTION":"1","PRAXION_DISABLE_PROCESS_INJECT":"1","PRAXION_DISABLE_FEEDBACK_SURFACING":"1","PRAXION_DISABLE_SIDECAR_BANNER":"1","PRAXION_DISABLE_SIDECAR_AUTOCOMMIT":"1"}}'

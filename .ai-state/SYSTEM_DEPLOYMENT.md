@@ -77,7 +77,7 @@ Praxion's runtime splits into session-scoped and long-lived surfaces. **Session-
 |---|---|---|---|---|
 | `PRAXION_DISABLE_CHRONOGRAPH_MCP` | No | unset | Skip span emission in this project | No |
 | `PRAXION_INJECT_NATIVE_SUBAGENTS` | No | `0` | Inject Praxion-process preamble into Praxion-native subagents (default off) | No |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | No | unset | Operator kill switch for subagent model routing | No |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | No | unset | Overrides subagent frontmatter and per-spawn models only with `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` (the operator kill switch) | No |
 
 ### Compute backend env vars (taught)
 

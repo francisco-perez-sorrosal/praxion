@@ -126,16 +126,9 @@ def test_prompt_markers_are_the_closed_phrases_the_prompt_states(tmp_path):
 
 @pytest.mark.parametrize(
     "prompt",
-    [
-        "a tier: High hint",
-        "routinely",
-        "Mode: acceptance-designs",
-        "This is not Mode: light-review work.",
-        "The step is tier: H and a routine one.",
-        "Task slug: x\n  Mode: light-review",
-    ],
+    ["a tier: High hint", "routinely", "Mode: acceptance-designs"],
 )
-def test_a_marker_is_matched_as_a_whole_phrase_only(tmp_path, prompt):
+def test_a_marker_inside_a_longer_word_is_no_marker(tmp_path, prompt):
     _record(tmp_path, SESSION, "implementer", "a1", prompt=prompt)
 
     (spawn,) = st.read_spawns(tmp_path)
@@ -143,12 +136,23 @@ def test_a_marker_is_matched_as_a_whole_phrase_only(tmp_path, prompt):
     assert spawn.prompt_markers == frozenset()
 
 
-def test_a_parenthesised_hint_at_the_end_of_a_line_is_a_marker(tmp_path):
-    _record(tmp_path, SESSION, "implementer", "a1", prompt="Implement the refactor (tier: H)")
+@pytest.mark.parametrize(
+    ("prompt", "markers"),
+    [
+        ("This is not Mode: light-review work.", {"Mode: light-review"}),
+        ("The step is tier: H and a routine one.", {"tier: H", "routine"}),
+        ("Task slug: x\n  Mode: light-review", {"Mode: light-review"}),
+        ("Implement the refactor (tier: H)", {"tier: H"}),
+    ],
+)
+def test_a_marker_written_as_a_whole_phrase_is_a_marker_wherever_it_stands(
+    tmp_path, prompt, markers
+):
+    _record(tmp_path, SESSION, "implementer", "a1", prompt=prompt)
 
     (spawn,) = st.read_spawns(tmp_path)
 
-    assert spawn.prompt_markers == {"tier: H"}
+    assert spawn.prompt_markers == markers
 
 
 def test_one_agent_call_is_one_spawn_whatever_record_kinds_carry_a_copy_of_it(tmp_path):

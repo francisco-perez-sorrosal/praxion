@@ -8,9 +8,9 @@ entries carry the model it ran on).
 
 Claude Code also records a call's message in other record kinds (an `api-request-blob` repeats the
 Agent `tool_use` block), so a spawn is keyed on the `tool_use` id: one Agent call is one spawn, however
-many records carry it. A prompt marker counts only at the start of a line, or as a parenthesised
-hint such as "(tier: H)", so a sentence that mentions one ("not Mode: light-review") sanctions
-nothing. A prompt whose first line is
+many records carry it. A prompt marker counts as a whole phrase anywhere in the prompt, with no word
+character or hyphen on either side ("tier: High" and "routinely" hold none): a prompt that writes a
+marker states that routing, and negation or quotation is not interpreted. A prompt whose first line is
 `Task slug: <slug>` and a later line starts with `Spawn request: <id>` was issued by the step-loop
 driver, and the spawn keeps that id.
 
@@ -45,8 +45,7 @@ PROMPT_MARKERS = (
 SYNTHETIC_MODEL = "<synthetic>"
 
 _MARKER_PATTERNS = {
-    marker: re.compile(rf"(?:^|\()(?:{re.escape(marker)})\b", re.MULTILINE)
-    for marker in PROMPT_MARKERS
+    marker: re.compile(rf"(?<![\w-]){re.escape(marker)}(?![\w-])") for marker in PROMPT_MARKERS
 }
 _TASK_SLUG_LINE = re.compile(r"Task slug: \S")
 _SPAWN_REQUEST_LINE = re.compile(r"^Spawn request: (\S+)", re.MULTILINE)

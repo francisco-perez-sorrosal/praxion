@@ -275,6 +275,21 @@ def test_a_driver_spawn_off_its_floor_on_another_family_than_its_request_implies
     assert f"request implies {implied}" in reason
 
 
+def test_a_driver_spawn_on_another_family_than_implied_in_a_possibly_forced_session_is_unknown():
+    issued = spawn("implementer", ran="claude-opus-5-5", request="s7-a1", implied="haiku")
+
+    verdict, reason = csm.classify(issued, [issued], FLOORS)
+
+    assert verdict == "unknown"
+    assert "a forced model cannot be excluded" in reason
+
+
+def test_a_driver_spawn_on_the_family_its_request_implies_stays_an_override_in_a_lone_session():
+    issued = spawn("implementer", ran="claude-haiku-5-5", request="s7-a1", implied="haiku")
+
+    assert csm.classify(issued, [issued], FLOORS)[0] == "override"
+
+
 def test_a_driver_spawn_off_its_floor_whose_request_is_not_shown_is_unknown():
     issued = spawn("systems-architect", ran="claude-sonnet-5-5", request="s7-a1")
 

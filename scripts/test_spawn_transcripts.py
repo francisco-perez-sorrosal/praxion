@@ -213,28 +213,50 @@ def _numbered(text: str) -> str:
     return "".join(f"{n:>6}\t{line}\n" for n, line in enumerate(text.splitlines(), 1))
 
 
-def _read_of_rendered(text: str, *, raw: bool = True, path: str = RENDERED_PATH) -> list[dict]:
+REVIEW_DRIVER_PROMPT = DRIVER_PROMPT.replace("Read ", "Mode: light-review. Read ")
+
+
+def _read_of_rendered(
+    text: str,
+    *,
+    raw: bool = True,
+    path: str = RENDERED_PATH,
+    total_lines: int | None = None,
+    use_id: str = "toolu_r",
+) -> list[dict]:
     """The spawn's own records of reading its rendered request: the call, then the result with the
-    numbered lines in the message and, when `raw`, the file itself in `toolUseResult`."""
+    numbered lines in the message and, when `raw`, the file itself in `toolUseResult`;
+    `total_lines` above the lines read makes it a part of a longer file."""
     call = {
         "type": "assistant",
         "message": {
             "role": "assistant",
             "model": FLOOR_MODEL,
             "content": [
-                {"type": "tool_use", "id": "toolu_r", "name": "Read", "input": {"file_path": path}}
+                {"type": "tool_use", "id": use_id, "name": "Read", "input": {"file_path": path}}
             ],
         },
     }
-    result_block = {"type": "tool_result", "tool_use_id": "toolu_r", "content": _numbered(text)}
+    result_block = {"type": "tool_result", "tool_use_id": use_id, "content": _numbered(text)}
     result = {"type": "user", "message": {"role": "user", "content": [result_block]}}
     if raw:
-        result["toolUseResult"] = {"type": "text", "file": {"filePath": path, "content": text}}
+        lines_read = len(text.splitlines())
+        result["toolUseResult"] = {
+            "type": "text",
+            "file": {
+                "filePath": path,
+                "content": text,
+                "numLines": lines_read,
+                "totalLines": total_lines or lines_read,
+            },
+        }
     return [call, result]
 
 
-def _driver_spawn(directory: Path, own_records: list[dict]) -> st.Spawn:
-    _record(directory, SESSION, "implementer", "a1", prompt=DRIVER_PROMPT)
+def _driver_spawn(
+    directory: Path, own_records: list[dict], prompt: str = DRIVER_PROMPT
+) -> st.Spawn:
+    _record(directory, SESSION, "implementer", "a1", prompt=prompt)
     own = directory / SESSION / "subagents" / "agent-a1.jsonl"
     _write_lines(own, [*_own_transcript(FLOOR_MODEL), *own_records])
     (spawn,) = st.read_spawns(directory)
@@ -265,6 +287,49 @@ def test_a_review_prompt_quoting_a_tier_h_step_block_still_implies_sonnet(tmp_pa
     spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered))
 
     assert spawn.driver.implied == "sonnet"
+
+
+def test_a_review_stated_only_on_the_pointers_third_line_implies_sonnet(tmp_path):
+    rendered = STEP_BLOCK.format(hint="tier: H\n")
+
+    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered), REVIEW_DRIVER_PROMPT)
+
+    assert spawn.driver.implied == "sonnet"
+
+
+def test_a_review_the_spawn_never_read_still_implies_sonnet_from_its_pointer(tmp_path):
+    spawn = _driver_spawn(tmp_path, [], REVIEW_DRIVER_PROMPT)
+
+    assert spawn.driver == st.DriverRequest("s7-a1-implement", "sonnet")
+
+
+def test_step_prose_quoting_a_marker_sets_the_routing_like_the_marker_itself(tmp_path):
+    rendered = "The step says to treat `tier: H` as a hint.\n" + STEP_BLOCK.format(hint="")
+
+    spawn = _driver_spawn(tmp_path, _read_of_rendered(rendered))
+
+    assert spawn.driver.implied == "opus"
+
+
+def test_a_first_part_of_a_longer_request_with_no_marker_does_not_show_the_request(tmp_path):
+    first_part = _read_of_rendered("# Widget\n\nWrite it.", total_lines=40)
+
+    assert _driver_spawn(tmp_path, first_part).driver.implied is None
+
+
+def test_a_part_of_a_longer_request_that_holds_a_marker_shows_it(tmp_path):
+    part = _read_of_rendered("**Assignee**: implementer\ntier: L", total_lines=40)
+
+    assert _driver_spawn(tmp_path, part).driver.implied == "haiku"
+
+
+def test_the_marker_in_a_later_part_of_the_request_is_found_across_reads(tmp_path):
+    records = [
+        *_read_of_rendered("# Widget\n\nWrite it.", total_lines=40, use_id="toolu_1"),
+        *_read_of_rendered("**Assignee**: implementer\ntier: H", total_lines=40, use_id="toolu_2"),
+    ]
+
+    assert _driver_spawn(tmp_path, records).driver.implied == "opus"
 
 
 def test_a_driver_request_read_back_only_as_numbered_lines_implies_the_same_routing(tmp_path):

@@ -17,11 +17,13 @@ Rules that refine the reading of production transcripts:
 - A spawn the step-loop driver issued is judged against the routing its rendered request implies.
   Its prompt's first line is ``Task slug: <slug>``, a later line starts with ``Spawn request: <id>``
   and the third line names the rendered request, which the spawn's own transcript records it
-  reading. A light review implies ``sonnet``, a step hinted ``tier: H`` ``opus``, ``tier: L``
+  reading; the third line may itself open with ``Mode: light-review``. A light review (stated by
+  either) implies ``sonnet``, a step hinted ``tier: H`` ``opus``, ``tier: L``
   ``haiku``, anything else the floor. Off its floor, the spawn reads ``override`` on the family its
   request implies, ``unexplained`` on any other (a request that implies the floor included), and
-  ``unknown`` when the transcripts record no read of the request. On its floor it reads as any
-  spawn does.
+  ``unknown`` when the transcripts do not show the request and the prompt states no light review,
+  or (for ``unexplained``) when a forced model cannot be excluded, as below. A driver spawn on its
+  floor family is an ``override`` even when it passed another model, as a driver spawn always has.
 - A prompt marker (``Mode: light-review``, ``tier: H``, ``routine``, ...) counts when it appears as
   a whole phrase anywhere in the prompt (mid-line, indented, negated or inside backticks); one held
   only inside a longer word (``tier: High``) never sanctions a deviation.
@@ -121,7 +123,10 @@ def classify(
     if ran == model_family(floor) and not _requested_other_than(spawn, floor):
         return "floor", f"ran on {spawn.ran_model}, the {floor} floor"
     if spawn.driver is not None:
-        return _driver_verdict(spawn.driver, spawn.ran_model, ran == model_family(floor))
+        verdict, reason = _driver_verdict(spawn.driver, spawn.ran_model, ran == model_family(floor))
+        if verdict == "unexplained" and _forcing_cannot_be_excluded(session_spawns, floors):
+            return "unknown", f"{reason}; a forced model cannot be excluded"
+        return verdict, reason
     if _sanctioned(spawn):
         return "override", f"ran on {spawn.ran_model}, a listed deviation"
     if _forcing_cannot_be_excluded(session_spawns, floors):

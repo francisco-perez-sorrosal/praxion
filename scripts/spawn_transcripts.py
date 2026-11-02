@@ -12,8 +12,12 @@ many records carry it. A prompt marker counts as a whole phrase anywhere in the 
 character or hyphen on either side ("tier: High" and "routinely" hold none): a prompt that writes a
 marker states that routing, and negation or quotation is not interpreted. A prompt whose first line is
 `Task slug: <slug>` and a later line starts with `Spawn request: <id>` was issued by the step-loop
-driver, and the spawn keeps that id together with the routing its rendered request implies: its
-third line names the request's file, and the spawn's own transcript records its `Read` of it.
+driver, and the spawn keeps that id together with the routing its prompt and rendered request
+imply: its third line names the request's file (and may open with `Mode: light-review`, which the
+renderer writes there and nowhere in the file), and the spawn's own transcript records its `Read`s of
+it. A request is shown only when a read held a marker or the whole file; a first part of a longer
+file that stops short of the step's hint shows nothing. Markers in the request are read as anywhere
+else, so step prose that quotes one (`tier: H` inside a sentence) sets the routing too.
 
 Stdlib only and Python 3.9-safe: the check runs under the ambient interpreter.
 """
@@ -42,6 +46,7 @@ PROMPT_MARKERS = (
     "tier: L",
     "routine",
 )
+LIGHT_REVIEW = "Mode: light-review"
 # The model Claude Code records on entries it wrote itself (an interrupt, an API error), not on a
 # model's reply.
 SYNTHETIC_MODEL = "<synthetic>"
@@ -180,8 +185,8 @@ def _driver_request(prompt: object, own_records: list[dict]) -> DriverRequest | 
     request = _SPAWN_REQUEST_LINE.search(rest)
     if not (request and _TASK_SLUG_LINE.match(first_line)):
         return None
-    rendered = _rendered_request(own_records, _request_path(text))
-    return DriverRequest(request.group(1), _implied_routing(rendered))
+    request_markers = _request_markers(own_records, _request_path(text))
+    return DriverRequest(request.group(1), _implied_routing(_prompt_markers(text), request_markers))
 
 
 def _request_path(prompt: str) -> str | None:
@@ -191,9 +196,10 @@ def _request_path(prompt: str) -> str | None:
     return named.group(1) if named else None
 
 
-def _rendered_request(own_records: list[dict], path: str | None) -> str | None:
-    """What the spawn's own transcript records it read from `path`: the file as Claude Code stores
-    it in `toolUseResult`, else the numbered lines of the result message. None when it read nothing."""
+def _request_markers(own_records: list[dict], path: str | None) -> frozenset[str] | None:
+    """The markers of what the spawn's own transcript records it read from `path`, across all its
+    reads. None when it read nothing, or only parts of the file that held no marker: the transcripts
+    then do not show the request."""
     read_ids = {
         block.get("id")
         for block in _blocks(own_records, "tool_use")
@@ -201,18 +207,23 @@ def _rendered_request(own_records: list[dict], path: str | None) -> str | None:
         and isinstance(block.get("input"), dict)
         and block["input"].get("file_path") == path
     }
+    markers: set[str] = set()
+    whole_file_read = False
     for record in own_records:
         for block in _blocks([record], "tool_result"):
-            if block.get("tool_use_id") in read_ids and not block.get("is_error"):
-                text = _read_result_text(record, block)
-                if text:
-                    return text
-    return None
+            if block.get("tool_use_id") not in read_ids or block.get("is_error"):
+                continue
+            text = _read_result_text(record, block)
+            if text:
+                markers |= _prompt_markers(text)
+                whole_file_read = whole_file_read or _is_whole_file(record)
+    return frozenset(markers) if markers or whole_file_read else None
 
 
 def _read_result_text(record: dict, result_block: dict) -> str | None:
-    file_result = (record.get("toolUseResult") or {}).get("file")
-    content = file_result.get("content") if isinstance(file_result, dict) else None
+    """The file as Claude Code stores it in `toolUseResult`, else the numbered lines of the result."""
+    file_result = _file_result(record)
+    content = file_result.get("content") if file_result else None
     if isinstance(content, str):
         return content
     content = result_block.get("content")
@@ -221,13 +232,29 @@ def _read_result_text(record: dict, result_block: dict) -> str | None:
     return content if isinstance(content, str) else None
 
 
-def _implied_routing(rendered: str | None) -> ImpliedRouting | None:
-    """The routing a rendered request states, by the markers the routing rule names: a light review
-    outranks any step hint a review quotes."""
-    if rendered is None:
+def _is_whole_file(record: dict) -> bool:
+    """Whether a read result holds the whole file; one that records no line counts is taken whole."""
+    file_result = _file_result(record) or {}
+    lines, total = file_result.get("numLines"), file_result.get("totalLines")
+    return not (isinstance(lines, int) and isinstance(total, int) and lines < total)
+
+
+def _file_result(record: dict) -> dict | None:
+    result = record.get("toolUseResult")
+    file_result = result.get("file") if isinstance(result, dict) else None
+    return file_result if isinstance(file_result, dict) else None
+
+
+def _implied_routing(
+    pointer_markers: frozenset[str], request_markers: frozenset[str] | None
+) -> ImpliedRouting | None:
+    """The routing a driver spawn's prompt and rendered request state, by the markers the routing
+    rule names: a light review outranks any step hint, and the pointer states it even when the
+    request was not read. None when the request is not shown and the pointer states no review."""
+    if request_markers is None and LIGHT_REVIEW not in pointer_markers:
         return None
-    markers = _prompt_markers(rendered)
-    if "Mode: light-review" in markers:
+    markers = pointer_markers | (request_markers or frozenset())
+    if LIGHT_REVIEW in markers:
         return "sonnet"
     if "tier: H" in markers:
         return "opus"

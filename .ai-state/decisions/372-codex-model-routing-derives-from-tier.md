@@ -17,6 +17,7 @@ affected_files:
   - scripts/test_export_codex_pipeline_adapter.py
   - rules/swe/agent-model-routing.md
 affected_reqs: [REQ-01, REQ-02]
+re_affirmed_by: [dec-draft-47003576]
 ---
 
 ## Context

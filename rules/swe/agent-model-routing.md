@@ -39,7 +39,7 @@ Aliases: `opus`/`sonnet` track the newest generation (Opus 5 / Sonnet 5 today); 
 | `architect-validator` | H | `opus` | Structural reasoning across DSL + code graph + ADR set; pre-merge gate |
 | `interface-designer` | H | `opus` | Design taste under trade-offs across web/TUI/API/agentic surfaces; like systems-architect/verifier, value is quality judgement across a broad space |
 | `agentic-transactions-architect` | H | `opus` | Domain-expert shadow sub-architect: mandate/finality/ToS/HITL judgment in a regulated, high-stakes, fast-moving domain; peers with systems-architect and interface-designer |
-| `discipline-consultant` | H | `opus` | Adversarial specialist judgment against a draft; frontmatter floor is `sonnet` so a `routine` consult and the verifier's light review each route down |
+| `discipline-consultant` | H | `opus` | Adversarial specialist judgment against a draft; frontmatter floor is `sonnet` so a `routine` consult routes down, one of two sanctioned downgrades with the verifier's light review |
 | `implementation-planner` | M | `sonnet` | Feature-scoped decomposition |
 | `implementer` | M | `sonnet` | Single-step execution; step-H/L override |
 | `test-engineer` | M | `sonnet` | Outer-loop test judgment; acceptance-design mode spawns at `opus` |

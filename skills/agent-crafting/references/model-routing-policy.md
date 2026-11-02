@@ -49,7 +49,7 @@ Without `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, the `CLAUDE_CODE_SUBAGENT_MODEL` var
 
 ## Re-Checking the Claim
 
-The claim that a spawn passing no `model` runs at its definition's floor is re-checked from recorded transcripts, at no model cost: `python3 scripts/check_spawn_models.py <transcripts-dir> [--repo-root DIR] [--json]` (a local `~/.claude/projects/<project>/` directory). It reads each spawn as `floor`, `override` (a listed deviation, a spawn the step-loop driver issued, or a session on one model), `unexplained` or `unknown`, and exits 1 only on `unexplained`. It is advisory, not a commit gate, and has one named reader: the verifier of any routing change, which runs it over the recorded sessions the change touches. Its sanctioned set mirrors the directive's deviation list, so a new deviation lands in both.
+The claim that a spawn passing no `model` runs at its definition's floor is re-checked from recorded transcripts, at no model cost: `python3 scripts/check_spawn_models.py <transcripts-dir> [--repo-root DIR] [--json]` (a local `~/.claude/projects/<project>/` directory). It reads each spawn as `floor`, `override` (a listed deviation, or a spawn the step-loop driver issued on the model its request implies), `unexplained` or `unknown`, and exits 1 only on `unexplained`. It is advisory, not a commit gate, and has one named reader: the verifier of any routing change, which runs it over the recorded sessions the change touches. Its sanctioned set mirrors the directive's deviation list, so a new deviation lands in both.
 
 Three readings are worth knowing:
 

@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-11-02T08:21:02Z'
+generated_at: '2026-11-02T12:05:50Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -123,7 +123,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 3833
+  chars: 3864
   paths:
   - agents/**
   - skills/agent-crafting/references/model-routing-policy.md

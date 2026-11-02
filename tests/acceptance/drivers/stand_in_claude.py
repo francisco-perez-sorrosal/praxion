@@ -248,6 +248,8 @@ def serve(config_path: str) -> int:
     if "--version" in argv or argv == ["-v"]:
         print(f"{config['version']} (Claude Code)")
         return 0
+    if argv[:1] == ["doctor"]:
+        return _doctor()
     session = _session_of(config, argv)
     log_dir = Path(config["log_dir"])
     previous = _logged_launches(log_dir)
@@ -259,6 +261,14 @@ def serve(config_path: str) -> int:
     ending = _ending_of(config, session, previous)
     _log_launch(log_dir, session, attempt, ending["kind"], len(previous))
     return _play(session, ending)
+
+
+def _doctor() -> int:
+    """Answer `claude doctor` as the harness does: see `harness_doctor.py` beside this file."""
+    sys.path.insert(0, str(Path(__file__).parent))
+    import harness_doctor
+
+    return harness_doctor.answer()
 
 
 def _session_of(config: Mapping[str, Any], argv: Sequence[str]) -> Session:

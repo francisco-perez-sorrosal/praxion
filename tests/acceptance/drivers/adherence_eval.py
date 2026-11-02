@@ -559,6 +559,10 @@ if "--version" in argv or argv == ["-v"]:
     (LOG / f"version-{{stamp}}.json").write_text(json.dumps({{"argv": argv}}))
     print(CONFIG["version"] + " (Claude Code)")
     sys.exit(0)
+if argv[:1] == ["doctor"]:  # no session: the harness's settings check, never logged
+    sys.path.insert(0, {drivers!r})
+    import harness_doctor
+    sys.exit(harness_doctor.answer())
 
 plugin_dir = value("--plugin-dir")
 agents, hooks = {{}}, None
@@ -664,7 +668,11 @@ def install_fake_claude(workspace: Path, *, cost_usd: float | None = 0.01) -> Fa
         )
     )
     script = fake.bin_dir / "claude"
-    script.write_text(_FAKE_CLAUDE.format(python=sys.executable, config=str(config)))
+    script.write_text(
+        _FAKE_CLAUDE.format(
+            python=sys.executable, config=str(config), drivers=str(Path(__file__).parent)
+        )
+    )
     script.chmod(0o755)
     return fake
 

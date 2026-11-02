@@ -79,6 +79,7 @@ from praxion_evals.adherence.session_launch import (
     injection_of,
     task_session,
 )
+from praxion_evals.adherence.settings_acceptance import refuse_unaccepted_settings
 from praxion_evals.harness.judge_client import JudgeClient, select_judge_client
 from praxion_evals.live.materialize import (
     Materialization,
@@ -262,11 +263,13 @@ def begin(
 
     ``planned`` is what this run launches; a ``continuation`` is a later part of a stopped run,
     which launches again only the tasks no earlier part finished and records the whole plan.
+    A confined kit's sandbox settings must be taken as written before anything is written.
     """
     require_credential(os.environ, config.session_oauth_token_file)
     settings = declare(config, checkout, planned)
     judge = _open_judge(config)
     version = query_claude_version()
+    refuse_unaccepted_settings(planned, config.session_oauth_token_file)
     started = datetime.now(UTC)
     run_id = results.new_run_id(started)
     output = config.output or _default_output(run_id)

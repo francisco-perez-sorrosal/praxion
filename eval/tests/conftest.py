@@ -295,6 +295,7 @@ def use_paid_script(monkeypatch: pytest.MonkeyPatch, script: Script) -> None:
     """Installs ``script`` as the one function that starts ``claude``, with a dummy credential."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-credential")
     monkeypatch.setattr(session_loop, "query_claude_version", lambda: "9.9.9-test")
+    monkeypatch.setattr(session_loop, "refuse_unaccepted_settings", lambda roles, token_file: None)
     monkeypatch.setattr(session_launch, "run_session", script)
 
 

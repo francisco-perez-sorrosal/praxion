@@ -126,7 +126,15 @@ def test_prompt_markers_are_the_closed_phrases_the_prompt_states(tmp_path):
 
 @pytest.mark.parametrize(
     "prompt",
-    ["a tier: High hint", "routinely", "Mode: acceptance-designs"],
+    [
+        "a tier: High hint",
+        "routinely",
+        "Mode: acceptance-designs",
+        "frontier: H step",
+        "non-routine work",
+        "routine-check",
+        "Mode: light-review-r2",
+    ],
 )
 def test_a_marker_inside_a_longer_word_is_no_marker(tmp_path, prompt):
     _record(tmp_path, SESSION, "implementer", "a1", prompt=prompt)

@@ -13,6 +13,7 @@ import dataclasses
 import hashlib
 import sys
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -20,7 +21,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from _loop_fields import Check, Expectation, UnreadableCheck  # noqa: E402
-from _plan_steps import Implementer, OtherAssignee, PlanStep, parse_plan_steps  # noqa: E402
+from _plan_steps import (  # noqa: E402
+    Implementer,
+    OtherAssignee,
+    PlanStep,
+    Routing,
+    parse_plan_steps,
+)
 from _step_schema import STEP_ID_RE, checklist_step_id  # noqa: E402
 
 STEP = "Step "
@@ -297,15 +304,17 @@ def test_only_the_implementer_is_the_implementer(lines, expected):
         (["tier: H"], "opus"),
         (["**tier**: h"], "opus"),
         (["tier: H   # cross-cutting"], "opus"),
-        (["tier: L"], "sonnet"),
+        (["tier: L"], "haiku"),
+        (["**tier**: l"], "haiku"),
         (["tier: High"], "sonnet"),
         (["tier:"], "sonnet"),
         ([], "sonnet"),
         (["```", "tier: H", "```"], "sonnet"),
+        (["```", "tier: L", "```"], "sonnet"),
         (["The tier: H label routes to opus"], "sonnet"),
     ],
 )
-def test_tier_h_routes_to_opus_and_nothing_else_does(lines, expected):
+def test_tier_h_routes_to_opus_tier_l_to_haiku_and_anything_else_to_sonnet(lines, expected):
     assert only(*lines).routing == expected
 
 
@@ -326,9 +335,10 @@ def test_review_reads_force_or_off_and_otherwise_is_absent(lines, expected):
     assert only(*lines).review == expected
 
 
-def test_no_step_of_any_plan_here_routes_to_haiku():
+def test_every_routing_the_reader_yields_is_in_the_closed_set():
     routings = {s.routing for s in FIXTURE_STEPS + parse_plan_steps(CHAIN_PLAN)}
-    assert routings <= {"opus", "sonnet"}
+    assert routings <= set(get_args(Routing))
+    assert set(get_args(Routing)) == {"opus", "sonnet", "haiku"}
 
 
 @pytest.mark.parametrize(

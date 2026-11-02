@@ -21,7 +21,7 @@ from typing import Literal, NamedTuple, cast, get_args
 
 from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
-from _plan_steps import PlanStep
+from _plan_steps import PlanStep, Routing
 from _step_loop_gate import GateEvidence
 from _step_schema import STEP_ID_RE
 
@@ -41,7 +41,7 @@ PROGRESS_BOUND = 2_500  # a goal prompt keeps the newest progress lines within t
 GATE_EVIDENCE_BOUND = 1_500  # an implement prompt keeps the newest lines of the last red gate
 
 Kind = Literal["implement", "revise", "review"]
-Model = Literal["opus", "sonnet"]
+Model = Routing
 
 
 @dataclass(frozen=True)

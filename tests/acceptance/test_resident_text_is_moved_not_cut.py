@@ -12,17 +12,26 @@ from tests.acceptance.drivers.kernel_sandbox import REPO_ROOT, frontmatter
 
 # Paragraphs a ratified declaration rewords on purpose, each held by its move's own scenarios.
 # The ADR-rule move reworded the reading order; the model-routing move rewords it again (it stops
-# listing model routing as always-on) and restates the routing rule's spawn directive.
+# listing model routing as always-on) and restates the routing rule's spawn directive. The
+# routing-facts change restates the resolution order and the alias paragraph to the harness's
+# current behaviour, and the tier table and its pointer line for the L tier's alias. Each index is
+# the paragraph's position in the frozen fixture.
 DECLARED_REWORDINGS = {
     ("CLAUDE.md", "## Agent reading order [1]", 0),
+    ("rules/swe/agent-model-routing.md", "## Agent Model Routing [1]", 1),
+    ("rules/swe/agent-model-routing.md", "## Agent Model Routing [1]", 2),
     ("rules/swe/agent-model-routing.md", "## Agent Model Routing [1]", 3),
+    ("rules/swe/agent-model-routing.md", "### Tier Table [1]", 0),
+    ("rules/swe/agent-model-routing.md", "### Tier Table [1]", 1),
 }
 
 
 def _frozen_with_declared_rewordings() -> dict[str, dict[str, list[str]]]:
     frozen = resident_sections.load("instruction_sections.json")
-    for rel, key, index in DECLARED_REWORDINGS:
-        frozen[rel][key] = [p for i, p in enumerate(frozen[rel][key]) if i != index]
+    for rel, sections in frozen.items():
+        for key, prints in sections.items():
+            declared = {index for r, k, index in DECLARED_REWORDINGS if (r, k) == (rel, key)}
+            sections[key] = [p for i, p in enumerate(prints) if i not in declared]
     return frozen
 
 

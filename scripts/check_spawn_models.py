@@ -6,36 +6,36 @@ holds equal to the routing rule's tier table. This reads Claude Code's recorded 
 classifies every ``praxion:`` spawn:
 
 - ``floor``: it ran on its floor's model family and nothing in its request contradicts that.
-- ``override``: it ran on a sanctioned deviation the routing rule's directive lists, the step-loop
-  driver issued it, or the whole session ran on one model while its spawns' floors differ (the
-  operator kill switch).
+- ``override``: it ran on a sanctioned deviation the routing rule's directive lists, or the
+  step-loop driver issued it.
 - ``unexplained``: it ran off its floor with no sanctioned reason; the check fails on these.
-- ``unknown``: the transcripts cannot say (no recorded model, an unknown role, or the lone spawn
-  of its session off its floor, where the kill switch cannot be told apart); reported, not failed.
+- ``unknown``: the transcripts cannot say (no recorded model, an unknown role, or a spawn off its
+  floor in a session that ran on one model); reported, not failed.
 
-Four rules refine the reading of production transcripts:
+Rules that refine the reading of production transcripts:
 
 - A spawn the step-loop driver issued is sanctioned. Its prompt's first line is ``Task slug:
   <slug>`` and a later line starts with ``Spawn request: <id>``; the driver applies the plan's
   routing (step tier hints, light review at ``sonnet``), so the spawn reads ``override`` with the
   reason "issued by the step-loop driver (<id>)".
-- A prompt marker (``Mode: light-review``, ``tier: H``, ``routine``, ...) counts only at the start
-  of a line or as a parenthesised hint such as ``(tier: H)``, so a sentence that merely mentions
-  one ("not Mode: light-review") never sanctions a deviation.
-- A session reads as the kill switch only when it holds at least two spawns whose floors differ,
-  all on one model, and none of its spawns passed a per-spawn ``model``: with
-  ``CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`` Claude cannot pass one (code.claude.com/docs/en/sub-agents.md).
-  A session where every spawn passed the same model is judged spawn by spawn.
+- A prompt marker (``Mode: light-review``, ``tier: H``, ``routine``, ...) counts when it appears as
+  a whole phrase anywhere in the prompt (mid-line, indented, negated or inside backticks); one held
+  only inside a longer word (``tier: High``) never sanctions a deviation.
+- A session that ran on one model reads ``unknown`` off its floor and ``floor`` on it. The
+  transcripts do not record whether ``CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`` was set, and under it
+  Claude cannot pass a per-spawn ``model`` (code.claude.com/docs/en/sub-agents.md), so a forced
+  model cannot be excluded for a session's lone spawn, nor for one whose spawns' floors differ,
+  that ran all on one family and passed no ``model``. A session where any spawn passed a model is
+  judged spawn by spawn.
 - Aliases compare by family: ``haiku`` matches any ``claude-haiku-*``, ``sonnet`` any
   ``claude-sonnet-*``, ``opus`` any ``claude-opus-*`` and ``fable`` any ``claude-fable-*``. No alias
-  maps to a single version (the docs resolve ``haiku`` to Haiku 5.5 on the Anthropic API and 4.5
-  elsewhere; td-547).
+  maps to a single version: ``haiku`` is Haiku 5.5 on the Anthropic API and Haiku 4.5 elsewhere, and
+  it is the model the L tier passes.
 
 Each Agent call is one spawn, keyed on its ``tool_use`` id (``spawn_transcripts.py``).
 
-Advisory and re-runnable, not a commit gate (transcripts are local and unversioned). Its readers
-are the verifier of any routing change and the sentinel's routing audit. It starts no model
-session.
+Advisory and re-runnable, not a commit gate (transcripts are local and unversioned). Its reader is
+the verifier of any routing change. It starts no model session.
 
 Usage: python3 scripts/check_spawn_models.py <transcripts-dir> [--repo-root DIR] [--json]
 Exit codes: 0 no spawn unexplained, 1 some spawn unexplained, 2 input error (the transcripts
@@ -63,7 +63,6 @@ VERDICTS: tuple[str, ...] = get_args(Verdict)
 SCHEMA_VERSION = 1
 INPUT_ERROR = 2
 
-LOW_TIER_PIN = "claude-haiku-4-5"
 # A family is an alias; its models are the `claude-<alias>-*` names.
 FAMILIES = ("opus", "sonnet", "haiku", "fable")
 
@@ -89,7 +88,7 @@ SANCTIONED: dict[str, tuple[Deviation, ...]] = {
     "verifier": (Deviation("sonnet", requires="Mode: light-review"),),
     "implementer": (
         Deviation("opus", requires="tier: H"),
-        Deviation(LOW_TIER_PIN, requires="tier: L"),
+        Deviation("haiku", requires="tier: L"),
     ),
 }
 
@@ -114,18 +113,16 @@ def classify(
     if floor is None:
         return "unknown", f"no definition declares a model for role {spawn.role}"
     ran = model_family(spawn.ran_model)
-    if _runs_under_kill_switch(session_spawns, floors):
-        return "override", f"every spawn of the session ran on {ran} (operator kill switch)"
     if ran == model_family(floor) and not _requested_other_than(spawn, floor):
         return "floor", f"ran on {spawn.ran_model}, the {floor} floor"
     if spawn.driver_request is not None:
         return "override", f"issued by the step-loop driver ({spawn.driver_request})"
     if _sanctioned(spawn):
         return "override", f"ran on {spawn.ran_model}, a listed deviation"
-    if len(session_spawns) == 1:
+    if _forcing_cannot_be_excluded(session_spawns, floors):
         return (
             "unknown",
-            f"ran on {spawn.ran_model}, off the {floor} floor; kill switch not excluded",
+            f"ran on {spawn.ran_model}, off the {floor} floor; a forced model cannot be excluded",
         )
     return (
         "unexplained",
@@ -138,9 +135,11 @@ def _requested_other_than(spawn: Spawn, floor: str) -> bool:
     return requested is not None and model_family(requested) != model_family(floor)
 
 
-def _runs_under_kill_switch(session_spawns: list[Spawn], floors: dict[str, str]) -> bool:
-    """Two or more spawns whose floors differ that all ran on one family, none of which passed a
-    model: no routing explains that, an operator pin does (it also stops a spawn passing one)."""
+def _forcing_cannot_be_excluded(session_spawns: list[Spawn], floors: dict[str, str]) -> bool:
+    """Whether the session's recorded models leave a forcing setting possible: its lone spawn, or
+    spawns whose floors differ that all ran on one family with none passing a model."""
+    if len(session_spawns) == 1:
+        return True
     if any(s.requested_model is not None for s in session_spawns):
         return False
     known = [s for s in session_spawns if s.ran_model is not None and s.role in floors]

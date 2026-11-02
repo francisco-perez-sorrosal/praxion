@@ -267,6 +267,7 @@ Each warning reads `<hazard> — <fix>`. The skill still loads; the hazard is on
 | `argument-hint` value not quoted (YAML reads an unquoted `[path]` as a list) | `unquoted argument-hint — quote the value` |
 | `disable-model-invocation: true` with a `description` spanning several lines | `user-only skill's description spans N lines — write it on one line` |
 | `arguments` declared but the body has no `$ARGUMENTS`, `$N` or `$<name>` placeholder | `arguments declared but the body has no placeholder — add $ARGUMENTS or $<name>` |
+| An exclamation mark at a line start or after whitespace directly before a backtick-quoted command, which Claude Code runs as a shell command when the skill loads (a failing one aborts the skill; its docs exempt no code fence) | `<the placeholder> runs as a shell command when the skill loads — if it is an example, put a non-space character right before the exclamation mark` |
 
 ## Complete Example
 

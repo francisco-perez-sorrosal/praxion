@@ -177,7 +177,7 @@ python scripts/validate.py --all                    # every skills/<name>/ under
 python scripts/package_skill.py <path/to/skill-folder> [output-directory]
 ```
 
-The validator reports **errors** (the skill is malformed: missing or invalid `name` or `description`, a field outside the accepted set) and **warnings** (an authoring hazard: a body over 500 lines, an empty or unquoted `argument-hint`, a multi-line user-only description, declared `arguments` with no placeholder). Only errors fail the run. The packager validates first and builds a distributable `.skill` file.
+The validator reports **errors** (the skill is malformed: missing or invalid `name` or `description`, a field outside the accepted set) and **warnings** (an authoring hazard: a body over 500 lines, an empty or unquoted `argument-hint`, a multi-line user-only description, declared `arguments` with no placeholder, an exclamation mark at a line start or after whitespace directly before a backtick-quoted command, which Claude Code runs as a shell command when the skill loads). Only errors fail the run. The packager validates first and builds a distributable `.skill` file.
 
 `scripts/validate_references.py --all` checks intra-repo Markdown links and anchors across skills, agents, rules and docs (stdlib only); `--help` lists its modes (`--all`, `--file`, `--strict`, `--warn-only`), and the skill's [README.md](README.md) its per-class severities, exit codes and ignore markers.
 

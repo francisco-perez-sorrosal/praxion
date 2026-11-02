@@ -108,6 +108,11 @@ HAZARDS = {
         skill_text(extra="arguments: [target]", body="# Probe\n\nNo placeholder.\n"),
         "placeholder",
     ),
+    "shell placeholder at a line start": (skill_text(body="!`git status`\n"), "shell command"),
+    "shell placeholder after whitespace in a code fence": (
+        skill_text(body="```\nrun !`git status`\n```\n"),
+        "shell command",
+    ),
 }
 
 CLEAN = {
@@ -126,6 +131,11 @@ CLEAN = {
     "arguments read by index": skill_text(extra="arguments: [target]", body="Runs on $0.\n"),
     "arguments listed on separate lines": skill_text(
         extra="arguments:\n  - first\n  - second", body="Runs on $second.\n"
+    ),
+    "shell placeholder glued to the character before it": skill_text(body="KEY=!`cmd`\n"),
+    "shell placeholder opened by a code span": skill_text(body="Write `!`cmd`` to run it.\n"),
+    "exclamation mark then a space before a code span": skill_text(
+        body="Done! `git status` shows it.\n"
     ),
 }
 

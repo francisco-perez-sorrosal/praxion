@@ -264,6 +264,22 @@ def _arguments_without_placeholder(skill: SkillText) -> str | None:
     return "arguments declared but the body has no placeholder — add $ARGUMENTS or $<name>"
 
 
+# Claude Code runs a `!` followed by a backtick-quoted command as a shell command when the skill
+# loads, if the `!` starts a line or follows whitespace, and a failing command aborts the whole
+# skill. Its docs name no exemption for code fences, so a fenced example fires too.
+_SHELL_PLACEHOLDER = re.compile(r"(?:^|(?<=\s))!`[^`\n]+`", re.MULTILINE)
+
+
+def _shell_placeholder(skill: SkillText) -> str | None:
+    found = _SHELL_PLACEHOLDER.search(skill.body)
+    if found is None:
+        return None
+    return (
+        f"{found.group(0)} runs as a shell command when the skill loads — "
+        "if it is an example, put a non-space character right before the exclamation mark"
+    )
+
+
 # The closed set of hazards; one warning per hazard present, none for a skill without any.
 HAZARDS: tuple[Hazard, ...] = (
     _long_entry_page,
@@ -271,6 +287,7 @@ HAZARDS: tuple[Hazard, ...] = (
     _unquoted_argument_hint,
     _multiline_user_only_description,
     _arguments_without_placeholder,
+    _shell_placeholder,
 )
 
 

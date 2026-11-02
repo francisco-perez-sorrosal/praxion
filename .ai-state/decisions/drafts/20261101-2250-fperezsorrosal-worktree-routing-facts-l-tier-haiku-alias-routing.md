@@ -91,6 +91,15 @@ This leaves the driver as it is and avoids Haiku on implementer steps. It contra
 - dec-078: the central table with sparing per-spawn overrides for researcher modes and the implementer hint.
 - dec-372: its Tier-keyed Codex adapter, whose stated motivation (the Haiku 3.5 claim) is corrected here while the decision itself stands.
 
+## Disconfirmation
+
+**Reversal trigger.** The L tier moves back up to `sonnet` (the doc-engineer floor, and `tier: L` implementer and goal-step routing) if either of these holds over a window of 20 `tier: L` steps or 90 days, whichever comes first.
+
+- **Implementer and goal steps.** Steps routed at `haiku` show a worse verifier FAIL rate, or a worse `revise` rate in intra-step light review, than `sonnet` steps in the same window. Worse means an excess of more than 10 percentage points on either rate.
+- **Doc-engineer.** Its runs on `haiku` produce verifier findings against its documentation output at a higher rate than its last 20 runs on the Haiku 4.5 pin.
+
+**Who reads it.** The verifier records the step's routing beside each FAIL. The sentinel's routing audit compares the rates. Each run's verdicts are read with the spawn-model check, so that only spawns that ran at the routed model are counted. A sustained breach opens a ledger row proposing the reversal, and that row then goes to the systems-architect, who decides it.
+
 ## Prior Decision
 
 **dec-484 (partially superseded).** It restated the spawn directive as a floor contract, and that contract stands. What changes is its researcher and implementer bullets. They identified the L tier by the pin `claude-haiku-4-5` as "not a value to pass". They now pass `haiku`, because the Agent tool accepts the alias and the alias never resolves below Haiku 4.5. dec-484 stays accepted.

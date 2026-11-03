@@ -772,11 +772,16 @@ def test_a_refused_command_with_an_unknown_source_is_refused_on_load(tmp_path: P
         results.load(path)
 
 
-def test_the_committed_results_files_still_decode_and_render_with_no_refused_commands():
+def test_the_committed_results_files_still_decode_and_render_and_older_sessions_read_no_refusals():
+    # A session written before the refused-command field read back with none; a later session
+    # may carry the harness's refusals (a confinement-broken stop keeps them as its evidence).
     files = [p for p in RECORDED_RESULTS.glob("*.json") if p.name != RUN_INDEX_NAME]
     assert files
 
     for path in files:
+        written = json.loads(path.read_text(encoding="utf-8"))["sessions"]
         loaded = results.load(path)
-        assert all(record.refused_commands == () for record in loaded.sessions)
+        paired = zip(loaded.sessions, written, strict=True)
+        older = [r for r, raw in paired if "refused_commands" not in raw]
+        assert all(record.refused_commands == () for record in older), path.name
         assert report.render(loaded)

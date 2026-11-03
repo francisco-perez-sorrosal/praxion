@@ -38,12 +38,27 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
 
 
-@pytest.mark.parametrize("relpath", sorted(LEDGER_BEFORE["files"]))
+# A directory's run index is derived from its results files and gains an entry whenever a later
+# run is recorded, so its bytes are not frozen; what it held is (every run it named stays named).
+RUN_INDEX = "index.json"
+RECORDS_BEFORE = sorted(p for p in LEDGER_BEFORE["files"] if Path(p).name != RUN_INDEX)
+INDEXED_BEFORE = {Path(p).parent for p in LEDGER_BEFORE["files"] if Path(p).name == RUN_INDEX}
+RESULTS_BEFORE = [p for p in RECORDS_BEFORE if Path(p).parent in INDEXED_BEFORE]
+
+
+@pytest.mark.parametrize("relpath", RECORDS_BEFORE)
 def test_every_file_the_eval_ledger_held_keeps_its_bytes(relpath):
     path = LEDGER / relpath
 
     assert path.is_file(), f"{relpath} is gone from the eval ledger"
     assert digest(path) == LEDGER_BEFORE["files"][relpath], f"{relpath} was rewritten"
+
+
+@pytest.mark.parametrize("relpath", RESULTS_BEFORE)
+def test_every_run_the_eval_ledger_held_is_still_named_by_its_run_index(relpath):
+    index = json.loads((LEDGER / Path(relpath).parent / RUN_INDEX).read_text(encoding="utf-8"))
+
+    assert Path(relpath).stem in index["runs"], f"{relpath} was dropped from its run index"
 
 
 @pytest.mark.parametrize("run_id", sorted(TRIALS_BEFORE))

@@ -15,7 +15,8 @@ Bound here, because the specification or the base commit fixes them:
   `tests/acceptance/fixtures/implementer_kit_before.json` (`snapshot()` at that commit):
   every task's identity, prompt, template, fixture and variant, each fixture file's
   digest, and the catalog's checks. The fixture's own `CLAUDE.md` is kept apart, since the
-  convention is stated there.
+  convention is stated there. Two later changes are admitted exactly: the fixtures'
+  test-collection block and two enlarged plans (`COLLECTION_BLOCK`, `ENLARGED_PLANS`).
 """
 
 from __future__ import annotations
@@ -36,6 +37,21 @@ PROJECT_CONFIG = "pyproject.toml"
 # The one change admitted to a fixture's `pyproject.toml` since the kit was frozen: the
 # block that lets the fixture repository collect its own tests, appended after a blank line.
 COLLECTION_BLOCK = '\n[tool.pytest.ini_options]\npythonpath = ["src"]\n'
+# The one change admitted to a task's plan since the kit was frozen: two templates' steps were
+# enlarged so their early-stop tasks cannot end inside the turn cap (td-461). Each maps the
+# digest of its enlarged plan, admitted only byte for byte, to the digest of the plan it
+# replaced; any other change to a plan still reads as changed.
+ENLARGED_PLANS: dict[str, tuple[str, str]] = {
+    "changelog": (
+        "d7a1557596c556a741650c54036d0825e2f8a784fa5540b3e93879520277bfff",
+        "5d19627930313095c5e67672dfc9c39e006115e0be4fb95907edb74cb809a769",
+    ),
+    "new-module": (
+        "66ae18561ac4edfa038b3b3200f6a4619214501949e9fa9f7c1e4d3465cae2b4",
+        "4ac147b2bd4b61c035c87439c94eb60c5ce0d94bf6bae6576e619159420fc035",
+    ),
+}
+PLAN_FILE = "IMPLEMENTATION_PLAN.md"
 FROZEN = Path(__file__).resolve().parents[1] / "fixtures" / "implementer_kit_before.json"
 
 _SNAPSHOT_CODE = """
@@ -80,13 +96,18 @@ def frozen() -> dict:
 
 
 def without_instruction_file(task: dict) -> dict:
-    """A task's identity and fixture with its `CLAUDE.md` and convention left out, and its
-    `pyproject.toml` as it was before the fixture gained the test-collection block."""
+    """A task's identity and fixture with its `CLAUDE.md` and convention left out, its
+    `pyproject.toml` as it was before the fixture gained the test-collection block, and an
+    enlarged template's plan as the plan it replaced."""
     files = {k: v for k, v in task["files"].items() if k != INSTRUCTION_FILE}
     config = (task.get("texts") or {}).get(PROJECT_CONFIG)
     if config is not None and config.endswith(COLLECTION_BLOCK):
         before = config[: -len(COLLECTION_BLOCK)]
         files[PROJECT_CONFIG] = hashlib.sha256(before.encode("utf-8")).hexdigest()
+    plan = f".ai-work/{task['slug']}/{PLAN_FILE}"
+    enlarged = ENLARGED_PLANS.get(task["template_id"])
+    if enlarged is not None and files.get(plan) == enlarged[0]:
+        files[plan] = enlarged[1]
     kept = ("task_id", "template_id", "fixture_id", "variant", "slug", "main_prompt")
     return {**{k: task[k] for k in kept}, "files": files}
 

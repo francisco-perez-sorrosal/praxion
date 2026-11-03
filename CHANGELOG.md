@@ -1,3 +1,16 @@
+## v0.57.0 (2026-11-03)
+
+### Feat
+
+- Warn on a shell placeholder in a skill body
+- Judge with Haiku 5.5
+- Check confined kits' settings before a run
+
+### Fix
+
+- Read a driver request's routing from its tier field
+- Correct two routing descriptions the verifier flagged
+
 ## v0.56.0 (2026-11-01)
 
 ### Feat

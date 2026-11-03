@@ -16,6 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from tests.acceptance.drivers import gating_readings as readings
+from tests.acceptance.drivers import process_text_oracles as oracles
+from tests.acceptance.drivers import scratch_projects as places
 from tests.acceptance.drivers import session_start_text as gate
 
 ROOT_MARKER = "root gating fixture"
@@ -24,7 +27,7 @@ BUDGET_CEILING = 25_000
 
 @pytest.fixture(scope="module")
 def template(tmp_path_factory) -> Path:
-    return gate.installed_home(tmp_path_factory.mktemp("install"))
+    return places.installed_home(tmp_path_factory.mktemp("install"))
 
 
 @pytest.fixture
@@ -35,15 +38,15 @@ def machine(template, tmp_path) -> gate.Machine:
 @pytest.fixture
 def project(machine) -> Path:
     """A managed project nobody has opened a session in, with two recorded decisions."""
-    return gate.repository(machine.sandbox / "project", state_marker=ROOT_MARKER)
+    return places.repository(machine.sandbox / "project", state_marker=ROOT_MARKER)
 
 
 def _today(name: str) -> str:
-    return gate.base_reading(name)
+    return oracles.base_reading(name)
 
 
 def _now(started: gate.Start, machine: gate.Machine) -> str:
-    return gate.mask(started.process_text, machine.tokens())
+    return oracles.mask(started.process_text, machine.tokens())
 
 
 # -- The main session -----------------------------------------------------------------------------
@@ -53,7 +56,9 @@ def _now(started: gate.Start, machine: gate.Machine) -> str:
 def test_a_managed_session_receives_todays_process_text(machine, project, entrypoint):
     started = gate.session_start(machine, project, entrypoint=entrypoint)
 
-    changes = gate.unexplained_changes(_today(f"managed-main-{entrypoint}"), _now(started, machine))
+    changes = oracles.unexplained_changes(
+        _today(f"managed-main-{entrypoint}"), _now(started, machine)
+    )
 
     assert changes.none, f"missing: {changes.missing[:5]}\nadded: {changes.added[:5]}"
 
@@ -61,26 +66,26 @@ def test_a_managed_session_receives_todays_process_text(machine, project, entryp
 def test_a_managed_session_receives_its_projects_decision_context(machine, project):
     text = gate.session_start(machine, project).process_text
 
-    assert gate.holds_decision_context(text, ROOT_MARKER), "the decision context is missing"
+    assert oracles.holds_decision_context(text, ROOT_MARKER), "the decision context is missing"
 
 
 def test_a_managed_project_whose_instructions_predate_the_change_receives_todays_process_text(
     machine,
 ):
-    project = gate.project_with_old_instructions(machine.sandbox / "older-project")
+    project = places.project_with_old_instructions(machine.sandbox / "older-project")
 
     started = gate.session_start(machine, project)
 
-    changes = gate.unexplained_changes(_today("managed-main-onboarded"), _now(started, machine))
+    changes = oracles.unexplained_changes(_today("managed-main-onboarded"), _now(started, machine))
     assert changes.none, f"missing: {changes.missing[:5]}\nadded: {changes.added[:5]}"
 
 
 def test_a_managed_project_with_current_instructions_receives_todays_process_text(machine):
-    project = gate.project_with_current_instructions(machine.sandbox / "current-project")
+    project = places.project_with_current_instructions(machine.sandbox / "current-project")
 
     started = gate.session_start(machine, project)
 
-    changes = gate.unexplained_changes(_today("managed-main-onboarded"), _now(started, machine))
+    changes = oracles.unexplained_changes(_today("managed-main-onboarded"), _now(started, machine))
     assert changes.none, f"missing: {changes.missing[:5]}\nadded: {changes.added[:5]}"
 
 
@@ -93,7 +98,7 @@ def test_an_inheriting_spawn_in_a_managed_project_receives_todays_process_text(
 ):
     spawned = gate.spawn_start(machine, project, agent)
 
-    changes = gate.unexplained_changes(_today(f"managed-spawn-{agent}"), _now(spawned, machine))
+    changes = oracles.unexplained_changes(_today(f"managed-spawn-{agent}"), _now(spawned, machine))
 
     assert changes.none, f"missing: {changes.missing[:5]}\nadded: {changes.added[:5]}"
 
@@ -105,25 +110,26 @@ def test_a_lean_spawn_in_a_managed_project_receives_exactly_todays_delivery(mach
 
 
 def test_the_kernels_lean_spawns_receive_are_unchanged():
-    assert gate.kernel_digests() == gate.fixture_json("base_kernels.json")
+    assert readings.kernel_digests() == oracles.fixture_json("base_kernels.json")
 
 
 # -- The budget reading ---------------------------------------------------------------------------
 
 
 def test_the_budget_reading_of_a_managed_directory_counts_todays_composition(machine):
-    directory = gate.repository(machine.sandbox / "budget-project", managed=True)
+    directory = places.repository(machine.sandbox / "budget-project", managed=True)
 
-    _, reading = gate.budget_reading(machine, directory)
+    _, reading = readings.budget_reading(machine, directory)
 
-    changes = gate.unexplained_changes(
-        _today("managed-budget-text"), gate.mask(gate.counted_text(reading), machine.tokens())
+    changes = oracles.unexplained_changes(
+        _today("managed-budget-text"),
+        oracles.mask(readings.counted_text(reading), machine.tokens()),
     )
     assert changes.none, f"missing: {changes.missing[:5]}\nadded: {changes.added[:5]}"
 
 
 def test_the_budget_reading_of_praxions_checkout_stays_under_the_ceiling(machine):
-    _, reading = gate.budget_reading(machine, gate.REPO_ROOT)
+    _, reading = readings.budget_reading(machine, oracles.REPO_ROOT)
 
     assert reading["budget"] == BUDGET_CEILING
     assert reading["over_by"] == 0, f"the managed reading is {reading['tokens']} tokens"

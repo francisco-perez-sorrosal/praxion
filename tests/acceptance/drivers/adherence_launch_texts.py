@@ -2,7 +2,7 @@
 
 Unbound until its binding step. The binding runs the eval through `adherence_runs` with every
 launch answered by `stand_in_claude` and, at each launch before answering, reads what that
-session would receive with `session_start_text`: the instruction files of the launch's
+session would receive with `session_start_text` (and `process_text_oracles` for the comparison): the instruction files of the launch's
 configuration directory (`CLAUDE_CONFIG_DIR`, else its HOME's `.claude`) and of its working
 directory, plus the `SessionStart` hooks of its `--plugin-dir` copy run in that directory; and
 what the role it spawns would receive, by `session_start_text.spawn_start` against the same

@@ -7,7 +7,7 @@ conventions), and none of the five managed-only procedures: the coordination pro
 intermediate-documents rule, the ADR resident, the routing resident and the decision context.
 The always-loaded budget reading for such a directory counts the same composition.
 
-The managed-only texts and the constitution were frozen from the base (`session_start_text`).
+The managed-only texts and the constitution were frozen from the base (`gating_readings.freeze`).
 """
 
 from __future__ import annotations
@@ -16,14 +16,17 @@ from pathlib import Path
 
 import pytest
 
+from tests.acceptance.drivers import gating_readings as readings
+from tests.acceptance.drivers import process_text_oracles as oracles
+from tests.acceptance.drivers import scratch_projects as places
 from tests.acceptance.drivers import session_start_text as gate
 
-TEXT_UNITS = tuple(gate.MANAGED_ONLY_TEXTS)
+TEXT_UNITS = tuple(oracles.MANAGED_ONLY_TEXTS)
 
 
 @pytest.fixture(scope="module")
 def template(tmp_path_factory) -> Path:
-    return gate.installed_home(tmp_path_factory.mktemp("install"))
+    return places.installed_home(tmp_path_factory.mktemp("install"))
 
 
 @pytest.fixture
@@ -38,7 +41,7 @@ def _plain_directory(machine: gate.Machine) -> Path:
 
 
 def _repository_without_state(machine: gate.Machine) -> Path:
-    return gate.repository(machine.sandbox / "unmanaged-repo")
+    return places.repository(machine.sandbox / "unmanaged-repo")
 
 
 UNMANAGED_PLACES = {
@@ -59,18 +62,18 @@ def unmanaged(request, machine) -> Path:
 def test_an_unmanaged_session_receives_no_managed_only_procedure(machine, unmanaged, unit):
     started = gate.session_start(machine, unmanaged)
 
-    held = gate.held_statements(unit, started.process_text)
+    held = oracles.held_statements(unit, started.process_text)
 
     assert held == [], f"an unmanaged session receives {len(held)} statements of the {unit}"
 
 
 @pytest.mark.parametrize(
-    "unit", [gate.BEHAVIOURAL_CONTRACT, gate.USER_INSTRUCTIONS, gate.GIT_CONVENTIONS]
+    "unit", [oracles.BEHAVIOURAL_CONTRACT, oracles.USER_INSTRUCTIONS, oracles.GIT_CONVENTIONS]
 )
 def test_an_unmanaged_session_keeps_each_constitution_text(machine, unmanaged, unit):
     started = gate.session_start(machine, unmanaged)
 
-    missing = gate.missing_statements(unit, started.process_text)
+    missing = oracles.missing_statements(unit, started.process_text)
 
     assert missing == [], f"an unmanaged session lost {len(missing)} statements of the {unit}"
 
@@ -78,8 +81,8 @@ def test_an_unmanaged_session_keeps_each_constitution_text(machine, unmanaged, u
 def test_an_unmanaged_session_keeps_both_constitutional_sentences(machine, unmanaged):
     text = gate.session_start(machine, unmanaged).process_text
 
-    assert gate.holds_external_docs_sentence(text), "the external-documentation sentence is gone"
-    assert gate.holds_delegation_depth_sentence(text), "the delegation-depth sentence is gone"
+    assert oracles.holds_external_docs_sentence(text), "the external-documentation sentence is gone"
+    assert oracles.holds_delegation_depth_sentence(text), "the delegation-depth sentence is gone"
 
 
 # -- Its inheriting spawns ------------------------------------------------------------------------
@@ -94,7 +97,7 @@ def test_an_inheriting_spawn_in_an_unmanaged_directory_receives_no_managed_only_
 ):
     spawned = gate.spawn_start(machine, unmanaged, agent)
 
-    held = gate.held_statements(unit, spawned.process_text)
+    held = oracles.held_statements(unit, spawned.process_text)
 
     assert held == [], f"{agent} receives {len(held)} statements of the {unit} unmanaged"
 
@@ -105,10 +108,10 @@ def test_an_inheriting_spawn_in_an_unmanaged_directory_keeps_the_constitution(
 ):
     text = gate.spawn_start(machine, unmanaged, agent).process_text
 
-    assert gate.missing_statements(gate.BEHAVIOURAL_CONTRACT, text) == []
-    assert gate.missing_statements(gate.USER_INSTRUCTIONS, text) == []
-    assert gate.holds_external_docs_sentence(text), f"{agent} lost the documentation sentence"
-    assert gate.holds_delegation_depth_sentence(text), f"{agent} lost the delegation sentence"
+    assert oracles.missing_statements(oracles.BEHAVIOURAL_CONTRACT, text) == []
+    assert oracles.missing_statements(oracles.USER_INSTRUCTIONS, text) == []
+    assert oracles.holds_external_docs_sentence(text), f"{agent} lost the documentation sentence"
+    assert oracles.holds_delegation_depth_sentence(text), f"{agent} lost the delegation sentence"
 
 
 # -- The budget reading ---------------------------------------------------------------------------
@@ -118,18 +121,18 @@ def test_an_inheriting_spawn_in_an_unmanaged_directory_keeps_the_constitution(
 def test_the_budget_reading_of_an_unmanaged_directory_counts_no_managed_only_procedure(
     machine, unit
 ):
-    _, reading = gate.budget_reading(machine, _repository_without_state(machine))
+    _, reading = readings.budget_reading(machine, _repository_without_state(machine))
 
-    held = gate.held_statements(unit, gate.counted_text(reading))
+    held = oracles.held_statements(unit, readings.counted_text(reading))
 
     assert held == [], f"the unmanaged reading counts {len(held)} statements of the {unit}"
 
 
 def test_the_budget_reading_of_an_unmanaged_directory_counts_the_constitution(machine):
-    _, reading = gate.budget_reading(machine, _repository_without_state(machine))
-    text = gate.counted_text(reading)
+    _, reading = readings.budget_reading(machine, _repository_without_state(machine))
+    text = readings.counted_text(reading)
 
-    assert gate.missing_statements(gate.BEHAVIOURAL_CONTRACT, text) == []
-    assert gate.missing_statements(gate.USER_INSTRUCTIONS, text) == []
-    assert gate.holds_external_docs_sentence(text)
-    assert gate.holds_delegation_depth_sentence(text)
+    assert oracles.missing_statements(oracles.BEHAVIOURAL_CONTRACT, text) == []
+    assert oracles.missing_statements(oracles.USER_INSTRUCTIONS, text) == []
+    assert oracles.holds_external_docs_sentence(text)
+    assert oracles.holds_delegation_depth_sentence(text)

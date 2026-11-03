@@ -19,14 +19,16 @@ from pathlib import Path
 
 import pytest
 
+from tests.acceptance.drivers import process_text_oracles as oracles
+from tests.acceptance.drivers import scratch_projects as places
 from tests.acceptance.drivers import session_start_text as gate
 
-TEXT_UNITS = tuple(gate.MANAGED_ONLY_TEXTS)
+TEXT_UNITS = tuple(oracles.MANAGED_ONLY_TEXTS)
 
 
 @pytest.fixture(scope="module")
 def template(tmp_path_factory) -> Path:
-    return gate.installed_home(tmp_path_factory.mktemp("install"))
+    return places.installed_home(tmp_path_factory.mktemp("install"))
 
 
 @pytest.fixture
@@ -42,51 +44,51 @@ class Place:
 
 
 def _subdirectory(sandbox: Path) -> Place:
-    root = gate.repository(sandbox / "monorepo", state_marker="monorepo gating fixture")
+    root = places.repository(sandbox / "monorepo", state_marker="monorepo gating fixture")
     start = root / "packages" / "billing"
     start.mkdir(parents=True)
     return Place(start, "monorepo gating fixture", root)
 
 
 def _linked_worktree(sandbox: Path) -> Place:
-    main = gate.repository(sandbox / "main-checkout", state_marker="worktree gating fixture")
-    start = gate.linked_worktree(main, sandbox / "linked")
+    main = places.repository(sandbox / "main-checkout", state_marker="worktree gating fixture")
+    start = places.linked_worktree(main, sandbox / "linked")
     return Place(start, "worktree gating fixture", start)
 
 
 def _linked_state(sandbox: Path) -> Place:
-    elsewhere = gate.plant_state(sandbox / "kept-state", "linked-state gating fixture")
-    start = gate.repository(sandbox / "linked-state-project")
+    elsewhere = places.plant_state(sandbox / "kept-state", "linked-state gating fixture")
+    start = places.repository(sandbox / "linked-state-project")
     (start / ".ai-state").symlink_to(elsewhere / ".ai-state", target_is_directory=True)
     return Place(start, "linked-state gating fixture", start)
 
 
 def _nested_repository_with_state(sandbox: Path) -> Place:
-    outer = gate.repository(sandbox / "outer", state_marker="outer gating fixture")
-    start = gate.repository(outer / "vendor" / "inner", state_marker="inner gating fixture")
+    outer = places.repository(sandbox / "outer", state_marker="outer gating fixture")
+    start = places.repository(outer / "vendor" / "inner", state_marker="inner gating fixture")
     return Place(start, "inner gating fixture", start)
 
 
 def _state_outside_a_repository(sandbox: Path) -> Place:
-    start = gate.plant_state(sandbox / "loose-project", "loose gating fixture")
+    start = places.plant_state(sandbox / "loose-project", "loose gating fixture")
     return Place(start, "loose gating fixture", start)
 
 
 def _nested_repository_without_state(sandbox: Path) -> Place:
-    outer = gate.repository(sandbox / "outer", state_marker="outer gating fixture")
-    return Place(gate.repository(outer / "vendor" / "inner"), None)
+    outer = places.repository(sandbox / "outer", state_marker="outer gating fixture")
+    return Place(places.repository(outer / "vendor" / "inner"), None)
 
 
 def _below_state_outside_a_repository(sandbox: Path) -> Place:
-    holder = gate.plant_state(sandbox / "loose-holder", "loose gating fixture")
+    holder = places.plant_state(sandbox / "loose-holder", "loose gating fixture")
     start = holder / "child"
     start.mkdir()
     return Place(start, None)
 
 
 def _repository_below_state_outside_it(sandbox: Path) -> Place:
-    holder = gate.plant_state(sandbox / "state-holder", "holder gating fixture")
-    return Place(gate.repository(holder / "repo"), None)
+    holder = places.plant_state(sandbox / "state-holder", "holder gating fixture")
+    return Place(places.repository(holder / "repo"), None)
 
 
 MANAGED_PLACES: dict[str, Callable[[Path], Place]] = {
@@ -121,13 +123,13 @@ def unmanaged_place(request, machine) -> Place:
 def test_a_managed_start_receives_each_managed_only_text(machine, managed_place, unit):
     text = gate.session_start(machine, managed_place.start).process_text
 
-    assert gate.missing_statements(unit, text) == [], f"the {unit} is missing or cut"
+    assert oracles.missing_statements(unit, text) == [], f"the {unit} is missing or cut"
 
 
 def test_a_managed_start_receives_its_projects_decision_context(machine, managed_place):
     text = gate.session_start(machine, managed_place.start).process_text
 
-    assert gate.holds_decision_context(text, managed_place.marker), (
+    assert oracles.holds_decision_context(text, managed_place.marker), (
         "the governing project's decision context did not reach the session"
     )
 
@@ -136,7 +138,7 @@ def test_a_managed_start_receives_its_projects_decision_context(machine, managed
 def test_an_unmanaged_start_receives_no_managed_only_text(machine, unmanaged_place, unit):
     text = gate.session_start(machine, unmanaged_place.start).process_text
 
-    assert gate.held_statements(unit, text) == [], f"the {unit} reached an unmanaged start"
+    assert oracles.held_statements(unit, text) == [], f"the {unit} reached an unmanaged start"
 
 
 def test_an_unmanaged_start_receives_no_decision_context_from_a_directory_above(
@@ -144,7 +146,7 @@ def test_an_unmanaged_start_receives_no_decision_context_from_a_directory_above(
 ):
     text = gate.session_start(machine, unmanaged_place.start).process_text
 
-    held = [m for m in OUTER_MARKERS if gate.holds_decision_context(text, m)]
+    held = [m for m in OUTER_MARKERS if oracles.holds_decision_context(text, m)]
 
     assert held == [], f"an unmanaged start received decisions recorded above it: {held}"
 
@@ -167,16 +169,16 @@ def _behaviours(machine: gate.Machine, place: Place) -> Behaviours:
     template_root = place.root or place.start
     preamble = gate.spawn_start(machine, place.start, gate.HOST_NATIVE).hook_text
     return Behaviours(
-        procedures=any(gate.held_statements(u, text) for u in TEXT_UNITS),
+        procedures=any(oracles.held_statements(u, text) for u in TEXT_UNITS),
         decision_context=any(
-            gate.holds_decision_context(text, m)
+            oracles.holds_decision_context(text, m)
             for m in (place.marker, *OUTER_MARKERS)
             if m is not None
         ),
         prompt_reminder=bool(gate.prompt_reminder(machine, place.start).strip()),
         host_native_preamble=bool(preamble.strip()),
-        blacklist_template=(template_root / gate.TEMPLATE).exists()
-        or (place.start / gate.TEMPLATE).exists(),
+        blacklist_template=(template_root / places.TEMPLATE).exists()
+        or (place.start / places.TEMPLATE).exists(),
     )
 
 
@@ -200,8 +202,8 @@ def test_a_subdirectory_session_receives_what_a_root_session_receives(machine):
 
     in_subdirectory = gate.session_start(machine, place.start).process_text
 
-    assert gate.statements(gate.mask(in_subdirectory, tokens)) == gate.statements(
-        gate.mask(at_root, tokens)
+    assert oracles.statements(oracles.mask(in_subdirectory, tokens)) == oracles.statements(
+        oracles.mask(at_root, tokens)
     )
 
 
@@ -209,23 +211,25 @@ def test_a_subdirectory_session_receives_what_a_root_session_receives(machine):
 
 
 def test_a_directory_that_becomes_managed_gives_the_next_session_the_managed_set(machine):
-    directory = gate.repository(machine.sandbox / "adopting")
+    directory = places.repository(machine.sandbox / "adopting")
     before = gate.session_start(machine, directory).process_text
-    gate.plant_state(directory, "adopted gating fixture")
+    places.plant_state(directory, "adopted gating fixture")
 
     after = gate.session_start(machine, directory).process_text
 
-    assert not any(gate.held_statements(u, before) for u in TEXT_UNITS), "unmanaged set first"
-    assert all(gate.missing_statements(u, after) == [] for u in TEXT_UNITS), "managed set next"
-    assert gate.holds_decision_context(after, "adopted gating fixture")
+    assert not any(oracles.held_statements(u, before) for u in TEXT_UNITS), "unmanaged set first"
+    assert all(oracles.missing_statements(u, after) == [] for u in TEXT_UNITS), "managed set next"
+    assert oracles.holds_decision_context(after, "adopted gating fixture")
 
 
 def test_a_directory_that_stops_being_managed_gives_the_next_session_the_unmanaged_set(machine):
-    directory = gate.repository(machine.sandbox / "leaving", state_marker="leaving gating fixture")
+    directory = places.repository(
+        machine.sandbox / "leaving", state_marker="leaving gating fixture"
+    )
     before = gate.session_start(machine, directory).process_text
     shutil.rmtree(directory / ".ai-state")
 
     after = gate.session_start(machine, directory).process_text
 
-    assert gate.holds_decision_context(before, "leaving gating fixture"), "managed set first"
-    assert not any(gate.held_statements(u, after) for u in TEXT_UNITS), "unmanaged set next"
+    assert oracles.holds_decision_context(before, "leaving gating fixture"), "managed set first"
+    assert not any(oracles.held_statements(u, after) for u in TEXT_UNITS), "unmanaged set next"

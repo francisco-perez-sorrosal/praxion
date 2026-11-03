@@ -158,7 +158,24 @@ def test_the_file_tools_are_blocked_from_reading_outside_the_working_directories
     settings = settings_of(confinement_for("verifier", world.places, world.operator))
 
     assert set(settings) == {"sandbox", "permissions"}
-    assert settings["permissions"] == {"blockReadsOutsideWorkingDirectories": True}
+    assert settings["permissions"]["blockReadsOutsideWorkingDirectories"] is True
+
+
+def test_every_shell_command_is_approved_because_the_sandbox_bounds_it(world):
+    # A subshell, a `$?` expansion or an env prefix goes through the permission flow even when
+    # sandboxed, and `-p` refuses whatever needs approval; the allow rule approves it, and the
+    # sandbox still confines it.
+    settings = settings_of(confinement_for("implementer", world.places, world.operator))
+
+    assert settings["permissions"]["allow"] == ["Bash"]
+
+
+def test_the_shell_allow_rule_rides_only_with_a_sandbox_no_command_can_leave(world):
+    settings = settings_of(confinement_for("implementer", world.places, world.operator))
+    sandbox = settings["sandbox"]
+
+    assert (sandbox["allowUnsandboxedCommands"], sandbox["failIfUnavailable"]) == (False, True)
+    assert "excludedCommands" not in sandbox, "an excluded command would run unconfined, approved"
 
 
 def test_the_settings_serialize_to_json(world):

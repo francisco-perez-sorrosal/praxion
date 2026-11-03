@@ -26,10 +26,11 @@ The same module reads a broken confinement back from a session's record
 refused command the role's definition prescribes, or a prescribed command the sandbox blocked
 (``Operation not permitted``). Each means the grant, not the role, failed. A refused command
 that starts with a variable assignment is the exception: the harness sends it through the
-regular permission flow by design, so its refusal says nothing of the grant.
+regular permission flow by design, so its refusal says nothing of the grant (the shell allow
+rule approves such a command, so one is no longer expected).
 
 The settings keys were last checked against code.claude.com/docs/en/sandboxing.md and
-code.claude.com/docs/en/settings-reference.md.
+code.claude.com/docs/en/settings-reference.md (2026-11-03).
 """
 
 from __future__ import annotations
@@ -91,6 +92,14 @@ _NETWORK = {"strictAllowlist": True}
 # file. The working directories are the session's own (the run's scratch) and its `--add-dir`
 # (the plugin copy).
 _PERMISSIONS = {"blockReadsOutsideWorkingDirectories": True}
+# sandboxing.md § Auto-allow mode: a sandboxed command is approved without a prompt, except the
+# forms the harness sends through the regular permission flow (an env prefix, `eval`; probed on
+# 2.1.317: a `( ... )` subshell and a `$?` expansion too), which `-p` then refuses. The sandbox,
+# not a command pattern, bounds a confined session, so every shell command is approved and still
+# runs inside it: with `allowUnsandboxedCommands` false and no `excludedCommands`, none can
+# leave (probed: a subshell, a `$?` and an env-prefixed write outside the scratch each met
+# `Operation not permitted`).
+_SHELL_ALLOW = ("Bash",)
 
 
 @dataclass(frozen=True)
@@ -183,13 +192,14 @@ def confinement_for(role: Role, places: Places, operator: Operator) -> Confineme
 
 
 def settings_of(confinement: Confinement) -> dict[str, Any]:
-    """The settings that put `confinement` into force: the `sandbox` block and the one
-    `permissions` key that holds the file tools to the working directories.
+    """The settings that put `confinement` into force: the `sandbox` block, the `permissions`
+    key that holds the file tools to the working directories, and the rule that approves every
+    shell command the sandbox confines.
 
     No `network.allowedDomains`: a confined command opens no connection.
     """
     return {
-        "permissions": dict(_PERMISSIONS),
+        "permissions": {**_PERMISSIONS, "allow": list(_SHELL_ALLOW)},
         "sandbox": {
             **dict(_FIXED_FLAGS),
             "network": dict(_NETWORK),

@@ -8,7 +8,9 @@ answered `doctor` as a session launch would log a launch that never happened, so
 hand the call here, and it is never logged.
 
 The known settings are the ones the real doctor recognized on Claude Code 2.1.316: every key a
-confined kit's sandbox block uses. Loaded by path from a stand-in, so stdlib only.
+confined kit's sandbox block uses; and `permissions.allow`, which the kits' settings gained on
+2026-11-03 and the real doctor recognized on 2.1.317. Loaded by path from a stand-in, so stdlib
+only.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from typing import Any
 # Each setting the harness knows (a list index read as `N`) and the JSON type it takes.
 KNOWN_SETTINGS: Mapping[str, type] = {
     "permissions.blockReadsOutsideWorkingDirectories": bool,
+    "permissions.allow": list,
     "sandbox.enabled": bool,
     "sandbox.failIfUnavailable": bool,
     "sandbox.allowUnsandboxedCommands": bool,

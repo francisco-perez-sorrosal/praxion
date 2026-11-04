@@ -216,9 +216,10 @@ def declared_edits() -> list[dict[str, str]]:
     """The change's declared edits, each `{"before": ..., "after": ...}` in its recorded wording
     (an insertion's `before`, or a removal's `after`, is empty)."""
     raise UnboundDriverError(
-        "the record of the declared edits (the two constitutional sentences relocated into "
-        "every-project text, and every-project sentences reworded where a managed-only "
-        "procedure is absent), each with its before and after wording, is not bound yet"
+        "the record of the declared edits (one paragraph added to the user's personal "
+        "instructions carrying compact wordings of the two constitutional sentences and saying "
+        "where the pipeline procedures load), each with its before and after wording, is not "
+        "bound yet"
     )
 
 

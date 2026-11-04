@@ -26,7 +26,10 @@ The project's own instruction files are the project's, not process text: `proces
 their literal text out and keeps what they import from outside the project.
 
 Hooks absent comes in three forms: `hooks="on"` (today's install), `hooks="off"` (no hook runs)
-and `hooks="injection-off"` (every hook runs with `PRAXION_DISABLE_RULE_INJECTION=1`).
+and `hooks="injection-off"` (every hook runs with `PRAXION_DISABLE_RULE_INJECTION=1`). An
+`impaired_machine` keeps every hook running but takes away what the injector reads: its YAML
+reader (an importable `yaml` that refuses to load, first on the hooks' `PYTHONPATH`) or its rules
+manifest (missing, unreadable, or not YAML).
 
 Bound here, from the specification and Claude Code's documentation: the delivery channels
 above; `CLAUDE_PROJECT_DIR` is the directory the session started in; a headless session
@@ -51,7 +54,7 @@ import yaml
 
 from tests.acceptance.drivers.kernel_sandbox import isolated_env
 from tests.acceptance.drivers.process_text_oracles import REPO_ROOT
-from tests.acceptance.drivers.scratch_projects import copy_home, plugin_root
+from tests.acceptance.drivers.scratch_projects import copy_home, impair_manifest, plugin_root
 
 KILL_SWITCH = "PRAXION_DISABLE_RULE_INJECTION"
 HEADLESS, INTERACTIVE = "sdk-cli", "cli"
@@ -208,13 +211,22 @@ def _context_of(stdout: str) -> str:
     return ""
 
 
-def _env(plugin: Path, start: Path, home: Path, scratch: Path, hooks: str, **extra: str) -> dict:
+def _env(
+    plugin: Path,
+    start: Path,
+    home: Path,
+    scratch: Path,
+    hooks: str,
+    machine_env: tuple[tuple[str, str], ...] = (),
+    **extra: str,
+) -> dict:
     env = isolated_env(
         scratch, CLAUDE_PLUGIN_ROOT=str(plugin), CLAUDE_PROJECT_DIR=str(start), **extra
     )
     env["HOME"] = str(home)
     if hooks == "injection-off":
         env[KILL_SWITCH] = "1"
+    env.update(machine_env)
     return env
 
 
@@ -303,6 +315,7 @@ class Machine:
     home: Path
     plugin: Path
     sandbox: Path
+    env: tuple[tuple[str, str], ...] = ()  # set for every hook this machine runs
 
     def tokens(self) -> dict[Path, str]:
         return {
@@ -319,6 +332,30 @@ def new_machine(template: Path, sandbox: Path) -> Machine:
     return Machine(
         copy_home(template, sandbox / "home"), plugin_root(sandbox / "plugin"), sandbox.resolve()
     )
+
+
+IMPAIRMENTS = (
+    "yaml-reader-unavailable",
+    "manifest-missing",
+    "manifest-unreadable",
+    "manifest-not-yaml",
+)
+
+
+def impaired_machine(template: Path, sandbox: Path, how: str) -> Machine:
+    """A machine whose hooks all run, the rule injector's inputs impaired as `how` names."""
+    machine = new_machine(template, sandbox)
+    if how == "yaml-reader-unavailable":
+        blocker = sandbox / "no-yaml" / "yaml"
+        blocker.mkdir(parents=True)
+        (blocker / "__init__.py").write_text(
+            'raise ImportError("the YAML reader is unavailable in this scenario")\n'
+        )
+        return Machine(
+            machine.home, machine.plugin, machine.sandbox, (("PYTHONPATH", str(blocker.parent)),)
+        )
+    impair_manifest(machine.plugin, how)
+    return machine
 
 
 _counter = iter(range(1, 1_000_000))
@@ -339,6 +376,7 @@ def session_start(
             machine.home,
             machine.sandbox / f".hooks-{number}",
             hooks,
+            machine.env,
             CLAUDE_CODE_ENTRYPOINT=entrypoint,
         )
         payload = {
@@ -368,7 +406,14 @@ def spawn_start(machine: Machine, start: Path, agent_type: str, *, hooks: str = 
     parts = [] if without_files else instruction_files(start, machine.home, machine.sandbox)
     if hooks == "off":
         return Start(parts)
-    env = _env(machine.plugin, start, machine.home, machine.sandbox / f".spawn-{number}", hooks)
+    env = _env(
+        machine.plugin,
+        start,
+        machine.home,
+        machine.sandbox / f".spawn-{number}",
+        hooks,
+        machine.env,
+    )
     runs: list[HookRun] = []
     if role is None:
         original = "ORIGINAL-PROMPT: map the repository layout."
@@ -414,7 +459,14 @@ def spawn_start(machine: Machine, start: Path, agent_type: str, *, hooks: str = 
 def prompt_reminder(machine: Machine, start: Path) -> str:
     """What the prompt-submit hooks add to a non-trivial prompt in a session started in `start`."""
     number = next(_counter)
-    env = _env(machine.plugin, start, machine.home, machine.sandbox / f".prompt-{number}", "on")
+    env = _env(
+        machine.plugin,
+        start,
+        machine.home,
+        machine.sandbox / f".prompt-{number}",
+        "on",
+        machine.env,
+    )
     payload = {
         "session_id": f"gating-prompt-{number}",
         "transcript_path": str(machine.sandbox / f".transcripts/prompt-{number}.jsonl"),

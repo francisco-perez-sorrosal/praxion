@@ -135,3 +135,28 @@ def plugin_root(dest: Path) -> Path:
     (dest / ".ai-state").mkdir()
     shutil.copy(FIXTURES / "kernel_adoption.yaml", dest / ".ai-state" / "kernel_adoption.yaml")
     return dest
+
+
+MANIFEST = "_manifest.yaml"
+
+
+def impair_manifest(plugin: Path, how: str) -> None:
+    """Replace the plugin's rules link by a directory of links to every rule, its manifest
+    missing (`manifest-missing`), present but unreadable (`manifest-unreadable`) or not YAML
+    (`manifest-not-yaml`)."""
+    rules = plugin / "rules"
+    rules.unlink()
+    rules.mkdir()
+    for entry in (REPO_ROOT / "rules").iterdir():
+        if entry.name != MANIFEST:
+            (rules / entry.name).symlink_to(entry)
+    if how == "manifest-missing":
+        return
+    manifest = rules / MANIFEST
+    if how == "manifest-not-yaml":
+        manifest.write_text("rules: [unterminated\n  - {id: : :\n", encoding="utf-8")
+    elif how == "manifest-unreadable":
+        manifest.write_bytes((REPO_ROOT / "rules" / MANIFEST).read_bytes())
+        manifest.chmod(0)
+    else:
+        raise ValueError(f"no such impairment: {how}")

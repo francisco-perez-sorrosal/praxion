@@ -177,11 +177,20 @@ def commit_unreadable_parent_ledger(root: Path) -> str:
 
 
 def commit_without_ledger(sandbox: Sandbox) -> None:
-    """A parent commit holding no ledger, and no role that relies on one."""
+    """A parent commit holding no ledger, and no role that relies on one: every definition that
+    carries the flag (the roles a switched record backs, read from the tree) loses it."""
     (sandbox.root / ADOPTION_LEDGER).unlink()
-    for name in ("researcher",):
+    flagged = flagged_roles(sandbox.root)
+    for name in flagged:
         sandbox.replace(agent_path(name), f"{OMIT}\n", "")
-    commit_paths(sandbox.root, "no ledger", ADOPTION_LEDGER, agent_path("researcher"))
+    commit_paths(sandbox.root, "no ledger", ADOPTION_LEDGER, *(agent_path(n) for n in flagged))
+
+
+def flagged_roles(root: Path) -> tuple[str, ...]:
+    """The roles whose definition carries the literal flag line, sorted."""
+    return tuple(
+        sorted(p.stem for p in (root / "agents").glob("*.md") if f"\n{OMIT}\n" in p.read_text())
+    )
 
 
 # -- The eligible roles ---------------------------------------------------------------------------

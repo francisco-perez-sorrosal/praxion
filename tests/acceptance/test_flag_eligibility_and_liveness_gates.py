@@ -2,9 +2,10 @@
 
 `omitClaudeMd` is accepted only as a literal true. The eligible roles live apart from the
 adoption records and the definitions; a commit that changes them together with a record
-or a flag is refused, naming both. The implementer is eligible, at no status, and ready
-for a trial: under a ledger holding it at trial its spawn receives its kernel and the
-project's instruction file and leaves one row the liveness check judges clean. A
+or a flag is refused, naming both. The implementer is eligible; its definition carries the
+flag exactly when its committed record is switched, and under a ledger holding it at trial its
+spawn receives its kernel and the project's instruction file and leaves one row the liveness
+check judges clean. A
 missing or unreadable log segment inside the judged window makes the liveness result
 unknown; the same segment outside the window changes nothing.
 """
@@ -148,17 +149,12 @@ def test_the_implementer_is_eligible_beside_the_five_pilot_roles_and_no_other(
 # -- The implementer, ready for a trial ---------------------------------------------------------------
 
 
-def test_the_committed_adoption_ledger_never_records_the_implementer_switched() -> None:
+def test_the_implementer_carries_the_flag_exactly_when_its_committed_record_is_switched() -> None:
     ledger = yaml.safe_load((REPO_ROOT / ADOPTION_LEDGER).read_text(encoding="utf-8"))
     record = (ledger.get("roles") or {}).get("implementer") or {}
-
-    assert record.get("status") != "switched"
-
-
-def test_the_implementers_definition_still_inherits_its_instruction_files() -> None:
     definition = frontmatter((REPO_ROOT / agent_path("implementer")).read_text(encoding="utf-8"))
 
-    assert "omitClaudeMd" not in definition
+    assert ("omitClaudeMd" in definition) == (record.get("status") == "switched")
 
 
 def test_an_implementer_at_trial_receives_its_kernel_and_the_projects_instructions_in_one_row(

@@ -46,7 +46,7 @@ RULES_MANIFEST = "rules/_manifest.yaml"
 SESSION_START = "SessionStart"
 ALL_MATCHERS = ("", "*")
 RULE_INJECTION_HOOK = "inject_rules.py"
-# Checklist: mirrors the header `_report_unavailable` prints in hooks/inject_rules.py; a canary
+# Checklist: mirrors the header `_unavailable_notice` writes in hooks/inject_rules.py; a canary
 # test reads that file for it, so change both together.
 RULE_INJECTION_SKIPPED = "## Praxion rule injection skipped"
 COMMAND_HOOK = "command"

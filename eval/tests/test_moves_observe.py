@@ -92,7 +92,13 @@ def full_copy(tmp_path: Path) -> Path:
     """A minimal plugin copy: the real linker, rule injection and kit hook, one injected rule."""
     root = tmp_path / "copy"
     _write(root, "lib/install_shared.sh", (REPO_ROOT / "lib/install_shared.sh").read_text())
-    for hook in ("inject_rules.py", "_hook_utils.py", "_project_scope.py", "_rule_delivery.py"):
+    for hook in (
+        "inject_rules.py",
+        "_hook_utils.py",
+        "_project_scope.py",
+        "_rule_delivery.py",
+        "_rule_blacklist.py",
+    ):
         _write(root, f"hooks/{hook}", (REPO_ROOT / "hooks" / hook).read_text())
     _write(root, f"hooks/{KIT_HOOK}", (KITS_ROOT / "git-conventions" / KIT_HOOK).read_text())
     _write(root, RULE_PATH, _rule_text(RULE_BODY, "core: false\nload: always_on"))

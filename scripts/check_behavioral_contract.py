@@ -61,8 +61,10 @@ matcher that would need an allowlist of its own:
   through its live entries.
 - anything under the out-of-scope prefixes in `_BC05_OUT_OF_SCOPE`: the
   pipeline and report trees (`.ai-state/`, `.ai-work/`), the eval corpus
-  (`eval/`) whose fixtures quote the contract on purpose, two analysis
-  document trees, and the two gitignored scratch trees (`tmp/`,
+  (`eval/`) whose fixtures quote the contract on purpose, the frozen copies of
+  today's shipped texts that project gating's acceptance oracles compare with
+  (`tests/acceptance/fixtures/project_gating/`), two analysis document trees,
+  and the two gitignored scratch trees (`tmp/`,
   `.claude/worktrees/`) that are not part of the tree BC05 governs. The scan
   walks the working tree minus those prefixes, not the index of tracked
   files: an untracked scratch copy outside them reddens the check locally
@@ -192,15 +194,17 @@ _BC05_ALLOWLIST: frozenset[str] = frozenset(
     }
 )
 
-# Path prefixes BC05 does not govern. The first five are the declared policy scope
+# Path prefixes BC05 does not govern. The first six are the declared policy scope
 # (pipeline state, report trees, the eval corpus whose fixtures quote the contract on
-# purpose, and two analysis document trees); the last two are gitignored scratch trees
+# purpose, project gating's frozen copies of the shipped texts its oracles compare with,
+# and two analysis document trees); the last two are gitignored scratch trees
 # that are not part of the working tree BC05 reasons about -- without them the scan
 # reports every nested worktree's own copies as unregistered wordings.
 _BC05_OUT_OF_SCOPE: tuple[str, ...] = (
     ".ai-state/",
     ".ai-work/",
     "eval/",
+    "tests/acceptance/fixtures/project_gating/",
     "docs/context-prj-comparison-",
     "docs/independent-analysis/",
     "tmp/",

@@ -1249,3 +1249,127 @@ def test_an_unreadable_resident_file_is_kept_and_reported(
     warning = capsys.readouterr().err
     assert "[inject_rules] WARNING: could not read rule file" in warning
     assert str(tmp_path / "rules" / "a" / "missing.md") in warning
+
+
+# ===========================================================================
+# Project scope: template placement, blacklist reach and managed-only rows
+# ===========================================================================
+
+_TEMPLATE_RELATIVE = Path(".claude") / "praxion-rules.yaml.example"
+_GIT_CONVENTIONS_MARKER = "This is the git conventions rule body."
+_ROUTING_MARKER = "This is the model routing rule body."
+_MANAGED_ONLY_MARKER = "This is the managed-only rule body."
+
+
+@pytest.fixture
+def with_template(plugin_root: Path) -> Path:
+    """The plugin root, now also shipping the blacklist template."""
+    source = plugin_root / "claude" / "config" / "praxion-rules.yaml.example"
+    source.parent.mkdir(parents=True)
+    source.write_text("version: 1\ndisable: []\n", encoding="utf-8")
+    return plugin_root
+
+
+def _managed_root(tmp_path: Path) -> tuple[Path, Path]:
+    """A managed project root and a subdirectory of it, both existing."""
+    root = tmp_path / "managed"
+    subdirectory = root / "services" / "api"
+    subdirectory.mkdir(parents=True)
+    (root / ".ai-state").mkdir()
+    (root / ".git").mkdir()  # a subdirectory is served only inside a checkout
+    return root, subdirectory
+
+
+def test_an_unmanaged_start_writes_no_template(with_template: Path, project_dir: Path) -> None:
+    _run_hook(with_template, project_dir)
+
+    assert not (project_dir / ".claude").exists()
+
+
+def test_a_root_start_writes_the_template_at_the_root(with_template: Path, tmp_path: Path) -> None:
+    root, _ = _managed_root(tmp_path)
+
+    _run_hook(with_template, root)
+
+    assert (root / _TEMPLATE_RELATIVE).is_file()
+
+
+def test_a_subdirectory_start_writes_the_template_at_the_root_only(
+    with_template: Path, tmp_path: Path
+) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+
+    _run_hook(with_template, subdirectory)
+
+    assert (root / _TEMPLATE_RELATIVE).is_file()
+    assert not (subdirectory / ".claude").exists()
+
+
+def test_a_root_with_a_user_blacklist_gets_no_template(with_template: Path, tmp_path: Path) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+    _write_project_config(root, "version: 1\ndisable: []\n")
+
+    _run_hook(with_template, subdirectory)
+
+    assert not (root / _TEMPLATE_RELATIVE).exists()
+
+
+def test_a_subdirectory_start_honours_the_roots_blacklist(
+    plugin_root: Path, tmp_path: Path
+) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+    _disable(root, "swe/vcs/git-conventions")
+
+    context = _additional_context(_run_hook(plugin_root, subdirectory))
+
+    assert _GIT_CONVENTIONS_MARKER not in context
+    assert _ROUTING_MARKER in context
+
+
+def test_a_subdirectorys_own_blacklist_wins_over_the_roots(
+    plugin_root: Path, tmp_path: Path
+) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+    _disable(root, "swe/vcs/git-conventions")
+    _disable(subdirectory, "swe/agent-model-routing")
+
+    context = _additional_context(_run_hook(plugin_root, subdirectory))
+
+    assert _GIT_CONVENTIONS_MARKER in context
+    assert _ROUTING_MARKER not in context
+
+
+def _add_scoped_row(plugin_root: Path, project_scope: str) -> None:
+    """Append a hook-deliver row carrying the given `project_scope` value to the manifest."""
+    body = plugin_root / "rules" / "swe" / "scoped.md"
+    body.write_text(f"{_MANAGED_ONLY_MARKER}\n", encoding="utf-8")
+    manifest = plugin_root / "rules" / "_manifest.yaml"
+    row = (
+        "- id: swe/scoped\n  path: rules/swe/scoped.md\n  load: always_on\n  core: false\n"
+        f"  install: hook-deliver\n  chars: 10\n  project_scope: {project_scope}\n"
+    )
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("categories:", row + "categories:"),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.parametrize(
+    ("project_scope", "delivered_unmanaged"),
+    [("managed", False), ("every", True), ("somewhere-else", True), ("[managed]", True)],
+)
+def test_a_managed_row_reaches_only_a_managed_scope(
+    plugin_root: Path,
+    tmp_path: Path,
+    project_dir: Path,
+    project_scope: str,
+    delivered_unmanaged: bool,
+) -> None:
+    _add_scoped_row(plugin_root, project_scope)
+    root, _ = _managed_root(tmp_path)
+
+    unmanaged = _additional_context(_run_hook(plugin_root, project_dir))
+    managed = _additional_context(_run_hook(plugin_root, root))
+
+    assert (_MANAGED_ONLY_MARKER in unmanaged) is delivered_unmanaged
+    assert _MANAGED_ONLY_MARKER in managed

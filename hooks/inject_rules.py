@@ -40,10 +40,17 @@ Behavior contract:
 - Schema-guarded: version > 1 in project config → log warning and load all.
 - Idempotent: settings.json is rewritten only when its `claudeMdExcludes`
   would actually change; otherwise no write happens.
-- Auto-template: when Praxion is active in a project but neither
-  `.claude/praxion-rules.yaml` nor `.claude/praxion-rules.yaml.example`
-  exists, the shipped template is copied to `.claude/praxion-rules.yaml.example`
-  so projects discover the mechanism without manual `cp`. Idempotent.
+- Auto-template: when the start directory belongs to a managed project (see
+  `_project_scope.scope_of`) whose root has neither `.claude/praxion-rules.yaml`
+  nor `.claude/praxion-rules.yaml.example`, the shipped template is copied to the
+  root's `.claude/praxion-rules.yaml.example` so projects discover the mechanism
+  without manual `cp`. Nothing is written in an unmanaged directory or into a
+  subdirectory of a managed project. Idempotent.
+- Blacklist reach: a user-written `.claude/praxion-rules.yaml` is read from the
+  start directory, else from the managed root; a subdirectory's own list wins.
+- Project scope: a hook-deliver rule whose manifest row says
+  `project_scope: managed` is delivered only in a managed scope; any other
+  value, or none, reads as `every`.
 
 Visibility of misuse (turned silent no-ops into stderr warnings):
 - `disable:` provided as a scalar (not a list) → warning, treated as empty.
@@ -71,11 +78,15 @@ except ImportError:
     yaml = None  # type: ignore[assignment]
 
 from _hook_utils import is_disabled
+from _project_scope import Managed, ProjectScope, scope_of
 
 # -- Constants -----------------------------------------------------------------
 
 DISABLE_FLAG = "PRAXION_DISABLE_RULE_INJECTION"
 SUPPORTED_SCHEMA_VERSION = 1
+
+# `project_scope` manifest value delivered only inside a managed project.
+_MANAGED_ONLY = "managed"
 
 _INJECT_HEADER = "## Praxion Rules (auto-injected)\n\n"
 
@@ -187,13 +198,25 @@ def _report_unavailable(exc: ManifestUnavailableError) -> None:
 # -- Project blacklist loading -------------------------------------------------
 
 
-def _load_project_config(cwd: Path) -> dict | None:
-    """Read .claude/praxion-rules.yaml from the project directory.
+def _blacklist_path(directory: Path) -> Path:
+    return directory / ".claude" / "praxion-rules.yaml"
+
+
+def _blacklist_directory(cwd: Path, scope: ProjectScope) -> Path:
+    """The directory whose user-written blacklist applies: the start directory when
+    it has one, else the managed root (a subdirectory's own list wins)."""
+    if isinstance(scope, Managed) and not _blacklist_path(cwd).exists():
+        return scope.root
+    return cwd
+
+
+def _load_project_config(directory: Path) -> dict | None:
+    """Read .claude/praxion-rules.yaml from a directory.
 
     Returns parsed dict, or None if the file is missing (empty disable list).
     Raises ValueError on malformed YAML (caller handles fail-open).
     """
-    config_path = cwd / ".claude" / "praxion-rules.yaml"
+    config_path = _blacklist_path(directory)
     if not config_path.exists():
         return None
     try:
@@ -387,19 +410,22 @@ def _read_rule_body(plugin_root: Path, rule: dict) -> str:
 # -- additionalContext emitter -------------------------------------------------
 
 
-def _ensure_template_present(cwd: Path, plugin_root: Path) -> None:
-    """Copy the shipped blacklist template into the project's .claude/ if absent.
+def _ensure_template_present(scope: ProjectScope, plugin_root: Path) -> None:
+    """Copy the shipped blacklist template into the managed root's .claude/ if absent.
 
-    Idempotent. Skips when EITHER `.claude/praxion-rules.yaml.example` OR
-    `.claude/praxion-rules.yaml` already exists. Fail-safe: any exception
-    is logged and swallowed (template placement is auxiliary; never breaks
-    SessionStart).
+    Idempotent. Writes only at `Managed.root`: nothing happens in an unmanaged
+    directory, and a subdirectory session leaves the subdirectory alone. Skips
+    when EITHER `.claude/praxion-rules.yaml.example` OR
+    `.claude/praxion-rules.yaml` already exists at the root. Fail-safe: any
+    exception is logged and swallowed (template placement is auxiliary; never
+    breaks SessionStart).
     """
+    if not isinstance(scope, Managed):
+        return
     try:
-        claude_dir = cwd / ".claude"
+        claude_dir = scope.root / ".claude"
         example_path = claude_dir / "praxion-rules.yaml.example"
-        live_path = claude_dir / "praxion-rules.yaml"
-        if example_path.exists() or live_path.exists():
+        if example_path.exists() or _blacklist_path(scope.root).exists():
             return
         template_src = plugin_root / "claude" / "config" / "praxion-rules.yaml.example"
         if not template_src.is_file():
@@ -469,7 +495,7 @@ def _resolve_schema_version(project_cfg: dict) -> int:
     return 1
 
 
-def _resolve_disable_patterns(cwd: Path) -> list[str]:
+def _resolve_disable_patterns(config_dir: Path) -> list[str]:
     """Load the project's raw `disable:` patterns, failing open on any malformed input.
 
     Returns an empty list for: missing config, malformed YAML, an unsupported
@@ -477,7 +503,7 @@ def _resolve_disable_patterns(cwd: Path) -> list[str]:
     a stderr warning except the plain-missing-config case (backward compat).
     """
     try:
-        project_cfg = _load_project_config(cwd)
+        project_cfg = _load_project_config(config_dir)
     except ValueError as exc:
         print(
             f"[inject_rules] WARNING: {exc}; injecting all rules (fail open)",
@@ -596,12 +622,23 @@ def _add_residents_of_disabled(
     return disable_set | residents
 
 
+def _delivers_in(rule: dict, scope: ProjectScope) -> bool:
+    """Whether the rule's `project_scope` lets it reach a session in this scope.
+
+    Only the exact value `managed` restricts delivery; an unreadable or unknown
+    value reads as `every`, so a damaged row never silently drops a rule.
+    """
+    return rule.get("project_scope") != _MANAGED_ONLY or isinstance(scope, Managed)
+
+
 def _select_hook_deliver_rules(
-    rules: list[dict], disable_set: set[str]
+    rules: list[dict], disable_set: set[str], scope: ProjectScope
 ) -> tuple[list[dict], list[dict], list[str]]:
     """Split hook-deliver rules into (rules to inject, all hook-deliver rules, suppressed IDs)."""
     hook_deliver_rules = [r for r in rules if r.get("install") == "hook-deliver"]
-    inject_rules = [r for r in hook_deliver_rules if r.get("id") not in disable_set]
+    inject_rules = [
+        r for r in hook_deliver_rules if r.get("id") not in disable_set and _delivers_in(r, scope)
+    ]
     suppressed_hd_ids = [r["id"] for r in hook_deliver_rules if r.get("id") in disable_set]
     return inject_rules, hook_deliver_rules, suppressed_hd_ids
 
@@ -654,6 +691,7 @@ def main() -> None:
 
     plugin_root = _resolve_plugin_root()
     cwd = _resolve_cwd(raw)
+    scope = scope_of(str(cwd))
 
     # Locate and parse manifest; an unavailable manifest is non-fatal but never silent.
     try:
@@ -662,16 +700,16 @@ def main() -> None:
         _report_unavailable(exc)
         return
 
-    # Praxion is active in this project — ensure the user-facing template
-    # exists in .claude/ so projects discover the blacklist mechanism
-    # without manual cp or running /onboard-project. Idempotent.
-    _ensure_template_present(cwd, plugin_root)
+    # A managed project's root gets the user-facing template in .claude/ so
+    # projects discover the blacklist mechanism without manual cp or running
+    # /onboard-project. Idempotent; writes nothing elsewhere.
+    _ensure_template_present(scope, plugin_root)
 
     all_rule_ids = [r["id"] for r in rules if "id" in r]
 
     # Read project blacklist; missing = empty disable list (backward compat).
     # Malformed YAML is fail-open; schema version > 1 is fail-open.
-    disable_patterns = _resolve_disable_patterns(cwd)
+    disable_patterns = _resolve_disable_patterns(_blacklist_directory(cwd, scope))
     disable_set = _compute_disable_set(disable_patterns, rules, all_rule_ids)
     disable_set = _add_residents_of_disabled(disable_set, rules, plugin_root)
 
@@ -683,7 +721,7 @@ def main() -> None:
     _apply_symlink_exclusions(cwd, symlink_exclusions)
 
     inject_rules, hook_deliver_rules, suppressed_hd_ids = _select_hook_deliver_rules(
-        rules, disable_set
+        rules, disable_set, scope
     )
     _log_injection_summary(rules, inject_rules, hook_deliver_rules, suppressed_hd_ids, disable_set)
 

@@ -50,6 +50,7 @@ def session_start_text(installed, tmp_path_factory) -> str:
         if "paths" not in move.frontmatter(path.read_text(encoding="utf-8"))
     ]
     project = tmp_path_factory.mktemp("project")
+    (project / ".ai-state").mkdir()  # a managed project: the managed-only text arrives
     injected = move.session_start_rules(project, project.parent / f".{project.name}-scratch")
     context = json.loads(injected.stdout or "{}").get("hookSpecificOutput", {})
     return "\n".join([*resident, str(context.get("additionalContext", ""))])
@@ -138,7 +139,10 @@ def test_the_shipped_resident_differs_from_the_measured_one_only_by_a_frontmatte
     assert body == measured_body
 
 
-@pytest.mark.parametrize("rule_id", move.RULE_IDS)
+# The resident is left out of the two checks below: project gating made it managed-only, hook-delivered
+# and never linked, so its manifest row and its install are that design's; its delivery to managed
+# sessions is pinned by the gating scenarios.
+@pytest.mark.parametrize("rule_id", [move.RULE_IDS[0]])
 def test_the_manifest_row_carries_the_measured_arms_values(rule_id):
     row = move.manifest_rows(REPO).get(rule_id, {})
 
@@ -150,7 +154,7 @@ def test_the_manifest_row_carries_the_measured_arms_values(rule_id):
 # -- Installed, and never disabled ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize("rule_file", [move.MOVED_RULE, move.RESIDENT])
+@pytest.mark.parametrize("rule_file", [move.MOVED_RULE])
 def test_the_installer_links_the_file_into_the_rules_directory(installed, rule_file):
     linked = installed / Path(rule_file).relative_to("rules")
 

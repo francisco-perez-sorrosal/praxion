@@ -95,7 +95,7 @@ roles:
     runs: []
     reason: "not measured: the role's eval kit is a smoke kit (4 templates, 3 runnable tasks), so no run reaches 20 complete pairs; a full kit comes before any new trial"
   implementer:
-    status: trial
+    status: switched
     since: 2026-11-03T07:21:32Z
     runs:
       - id: 20261031T194025Z-257479
@@ -110,6 +110,39 @@ roles:
         # their no-regression is vacuous. Lean first-request median 33,275 vs full 47,154; estimated session cost 25.52
         # (subscription, not charged; cap 110).
         entry: praxion-evals-adherence
+      - id: 20261103T072249Z-355825
+        complete_pairs: 0
+        passes_flip_rule: false
+        # .ai-state/eval_ledger/adherence/20261103T072249Z-355825.json: stopped at its first session on confinement_broken
+        # (the harness refused the role's own verification command: a subshell and a $? go through the permission flow);
+        # closed with its reason, fixed in 7830359c; no pair completed.
+        entry: praxion-evals-adherence
+      - id: 20261103T171327Z-bded9b
+        complete_pairs: 24
+        passes_flip_rule: true
+        # .ai-state/eval_ledger/adherence/20261103T171327Z-bded9b.json: part 1 of the passing lineage, from the freeze at
+        # e72b5e60, Claude Code 2.1.317, 11 sessions, stopped on a git warning read as a blocked command (fixed in
+        # 5ad1785c, a confined kit's repository sets core.excludesFile); the lineage's standing is the tip's.
+        entry: praxion-evals-adherence
+      - id: 20261104T035620Z-390777
+        complete_pairs: 24
+        passes_flip_rule: true
+        # .ai-state/eval_ledger/adherence/20261103T171327Z-bded9b-part2.json: part 2 (--continue), same freeze, runner at
+        # 5ad1785c (differs only in tasks.py; grading sources and fixtures identical), Claude Code 2.1.318, 38 sessions.
+        # Lineage: 24 complete pairs, flip verdict clear; no regression on C1, C4 (lean 23 of 24, allowance 1), the
+        # convention, IN-PROGRESS, boundary and id-citation checks; C3 non-inferior (14 of 18 each). C2, C5 and the 5-line
+        # return fail in every pair of both arms (td-572, td-566), so their no-regression is vacuous; TEST_RESULTS.md shape
+        # and sibling-read not covered (allowance over the margin; lean ahead on both). Lean first-request median 40,574
+        # vs full 54,442. $31.69 on the subscription over both parts, judge on the key.
+        entry: praxion-evals-adherence
+    passing_run: 20261104T035620Z-390777
+    probe_before_tokens: 60258
+    probe_after_tokens: 35727
+    flip_rule_ratified: true
+    flip_ratified: true
+    # Probe readings on 2026-11-04, Claude Code 2.1.318, profile praxion-repo|sonnet|default|no-mcp|plugin-dir|subscription
+    # (scripts/measure_startup_payload.py agent:implementer --strict-mcp-config --plugin-dir .). The user ratified the flip
+    # on 2026-11-04 after the lineage's report.
     # Trial opened for one paired run on the subscription (48 opus sessions, cap USD 110 of
     # estimated usage, session cap USD 3); close it (switched or held) before any release so no
     # trial reaches managed projects. Forced-stop check C5 (td-461): the kit has 6 early-stop
@@ -121,4 +154,3 @@ roles:
     # from a checkout frozen at this commit, whose agents, rules, hooks and kernels equal v0.57.0's.
     # 48 opus sessions on the subscription, cap USD 110 of estimated usage, session cap USD 3. C5 stays
     # uninformative for this role while the full arm never marks a capped output partial (td-566).
-    # Close it (switched or held) before any release.

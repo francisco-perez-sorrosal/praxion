@@ -11,6 +11,7 @@ skills: [software-planning, code-review, refactoring]
 background: true
 model: sonnet
 effort: high
+omitClaudeMd: true
 maxTurns: 100
 ---
 

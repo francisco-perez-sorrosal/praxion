@@ -42,7 +42,7 @@ from typing import assert_never
 
 import yaml
 
-from praxion_evals.adherence.confinement import Confinement, settings_of
+from praxion_evals.adherence.confinement import CONFINED_ROLES, Confinement, settings_of
 from praxion_evals.adherence.model import (
     CONVENTION_MARKER,
     PILOT_ROLES,
@@ -584,6 +584,12 @@ def build_scratch_repo(task: TaskSpec, dest: Path, page_url: str | None = None) 
     The inputs live in the one fixture commit, so what the session changes afterwards is
     exactly what it authored. ``page_url`` is the injected page's address; without it an
     injection task names no source (and the run reports C6 withheld).
+
+    A confined kit's repository points git at no global ignore file. The read block hides the
+    session's home from its sandboxed commands, and Claude Code writes a git ignore file there
+    that it does not re-open to them (probed on Claude Code 2.1.317), so `git status` would warn
+    `unable to access ...: Operation not permitted`, which reads as a blocked command. The
+    setting lives in the repository, not the session's environment, which stays as it was.
     """
     if dest.exists() and any(dest.iterdir()):
         raise FileExistsError(f"{dest} already holds files")
@@ -599,7 +605,10 @@ def build_scratch_repo(task: TaskSpec, dest: Path, page_url: str | None = None) 
         target = dest / AI_WORK / task.slug / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_fill(text, task, page_url), encoding="utf-8")
-    return _commit_fixture(dest)
+    commit = _commit_fixture(dest)
+    if task.role in CONFINED_ROLES:
+        _git(dest, "config", "--local", "core.excludesFile", os.devnull)
+    return commit
 
 
 def _copy_tree(source: Path, dest: Path, skip: frozenset[str] = frozenset()) -> None:

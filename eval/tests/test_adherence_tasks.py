@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -300,6 +301,23 @@ def test_the_verifier_gets_the_plan_the_spec_and_the_progress_file(tmp_path):
 
     held = {p.name for p in (dest / ".ai-work" / task.slug).iterdir() if p.read_text().strip()}
     assert {"SYSTEMS_PLAN.md", "IMPLEMENTATION_PLAN.md", "WIP.md"} <= held
+
+
+@pytest.mark.parametrize(("role", "confined"), [("implementer", True), ("researcher", False)])
+def test_a_confined_kits_repository_points_git_at_no_global_ignore_file(role, confined, tmp_path):
+    # A confined session's home is hidden from its sandboxed commands, so git must not reach
+    # for the global ignore file Claude Code writes there; other kits keep git's defaults.
+    dest = tmp_path / "scratch"
+    tasks.build_scratch_repo(_find(role, label="ambiguity"), dest)
+
+    local = subprocess.run(
+        ["git", "-C", str(dest), "config", "--local", "--get", "core.excludesFile"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert local.stdout.strip() == (os.devnull if confined else "")
 
 
 def test_the_brief_carries_the_plant_unless_the_task_stops_early(tmp_path):

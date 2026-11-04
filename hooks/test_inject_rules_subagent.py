@@ -15,6 +15,7 @@ managed-only hook-deliver rows) unless a test needs today's.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -31,6 +32,7 @@ from test_inject_rules import (  # noqa: E402
     _import_hook_module,
     _make_manifest,
     _managed_root,
+    _run_hook,
     _write_project_config,
 )
 from test_rule_delivery_slots import (  # noqa: E402
@@ -48,6 +50,8 @@ _CUSTOM = "custom-reviewer"
 _LEAN_FRONTMATTER = "---\nname: {name}\ndescription: x\nomitClaudeMd: true\n---\n\nBody.\n"
 _INHERITING_FRONTMATTER = "---\nname: {name}\ndescription: x\n---\n\nBody.\n"
 _BIG_UNIT_MARKER = "## Big 0"
+_SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
+_TEMPLATE = Path(".claude") / "praxion-rules.yaml.example"
 
 
 @pytest.fixture
@@ -194,6 +198,35 @@ def test_the_projects_definition_wins_over_the_users(plugin_root: Path, managed:
     assert _core_units_in(_received(plugin_root, managed, _CUSTOM)) == [True] * 3
 
 
+def test_a_subdirectory_spawn_reads_the_managed_roots_definition_after_its_own(
+    plugin_root: Path, tmp_path: Path
+) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+    _write_definition(root / ".claude", _CUSTOM, _LEAN_FRONTMATTER.format(name=_CUSTOM))
+    lean_from_the_root = _received(plugin_root, subdirectory, _CUSTOM)
+    _write_definition(
+        subdirectory / ".claude", _CUSTOM, _INHERITING_FRONTMATTER.format(name=_CUSTOM)
+    )
+
+    assert lean_from_the_root.strip() == ""
+    assert _core_units_in(_received(plugin_root, subdirectory, _CUSTOM)) == [True] * 3
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads through a 0-mode directory")
+def test_a_definition_behind_an_unreadable_directory_counts_as_inheriting(
+    plugin_root: Path, managed: Path
+) -> None:
+    agents = managed / ".claude" / "agents"
+    _write_definition(managed / ".claude", _CUSTOM, _LEAN_FRONTMATTER.format(name=_CUSTOM))
+    agents.chmod(0)
+    try:
+        received = _received(plugin_root, managed, _CUSTOM)
+    finally:
+        agents.chmod(0o755)
+
+    assert _core_units_in(received) == [True] * 3
+
+
 def test_another_plugins_agent_is_never_read_from_this_plugins_definitions(
     plugin_root: Path, managed: Path
 ) -> None:
@@ -227,8 +260,22 @@ def test_a_spawn_writes_nothing_and_logs_no_summary(plugin_root: Path, managed: 
     result = _spawn(plugin_root, managed, _INHERITING_ROLE, "--slot", "1")
 
     assert not (managed / ".claude" / "settings.json").exists()
-    assert not (managed / ".claude" / "praxion-rules.yaml.example").exists()
     assert "injected" not in result.stderr
+
+
+def test_a_spawn_places_no_template_where_its_session_would(
+    plugin_root: Path, managed: Path
+) -> None:
+    source = plugin_root / "claude" / "config" / _TEMPLATE.name
+    source.parent.mkdir(parents=True)
+    source.write_text("version: 1\ndisable: []\n", encoding="utf-8")
+
+    _spawn(plugin_root, managed, _INHERITING_ROLE, "--slot", "1")
+    placed_by_the_spawn = (managed / _TEMPLATE).exists()
+    _run_hook(plugin_root, managed)
+
+    assert not placed_by_the_spawn
+    assert (managed / _TEMPLATE).exists()  # the control: the session does place it
 
 
 # -- The impaired floor -----------------------------------------------------------------
@@ -257,22 +304,43 @@ def test_an_impaired_injection_still_gives_an_inheriting_managed_spawn_its_core_
     ("frontmatter", "expected"),
     [
         ("omitClaudeMd: true", True),
-        ("omitClaudeMd: True", True),
-        ("omitClaudeMd: TRUE", True),
         ("omitClaudeMd: true  # lean since the trial", True),
+        ("omitClaudeMd: True", False),
+        ("omitClaudeMd: TRUE", False),
+        ("omitClaudeMd: yes", False),
         ("omitClaudeMd: false", False),
         ('omitClaudeMd: "true"', False),
+        ("omitClaudeMd: true\nomitClaudeMd: false", False),
+        ("omitClaudeMd: false\nomitClaudeMd: true", True),
         ("description: omitClaudeMd: true", False),
         ("model: sonnet", False),
     ],
 )
-def test_the_flag_is_read_from_the_frontmatter_as_yaml_spells_true(
+def test_the_flag_is_set_only_by_the_literal_true_the_last_duplicate_winning(
     tmp_path: Path, frontmatter: str, expected: bool
 ) -> None:
     definition = tmp_path / "agent.md"
     definition.write_text(f"---\nname: agent\n{frontmatter}\n---\n\nBody.\n")
 
-    assert _import_hook_module()._omits_claude_md(definition) is expected
+    assert _import_hook_module()._omits_claude_md((definition,)) is expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["true", "true  # lean", "True", "TRUE", "yes", "false", '"true"', "true\nomitClaudeMd: no"],
+)
+def test_the_hook_and_the_commit_gate_read_the_flag_alike(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.syspath_prepend(str(_SCRIPTS))
+    import kernel_ledger_checks as gate
+
+    text = f"---\nname: agent\nomitClaudeMd: {value}\n---\n\nBody.\n"
+    definition = tmp_path / "agent.md"
+    definition.write_text(text)
+
+    gate_sets = gate.omit_flags({"agent": text}).get("agent") == gate.OMIT_SET
+    assert _import_hook_module()._omits_claude_md((definition,)) is gate_sets
 
 
 def test_a_flag_outside_the_frontmatter_or_no_frontmatter_is_not_a_reading(
@@ -284,8 +352,8 @@ def test_a_flag_outside_the_frontmatter_or_no_frontmatter_is_not_a_reading(
     bare.write_text("omitClaudeMd: true\n")
     module = _import_hook_module()
 
-    assert module._omits_claude_md(in_body) is False
-    assert module._omits_claude_md(bare) is None
+    assert module._omits_claude_md((in_body,)) is False
+    assert module._omits_claude_md((bare,)) is None
 
 
 @pytest.mark.parametrize("agent_type", ["../researcher", "praxion:../researcher", "praxion:", ""])
@@ -294,4 +362,6 @@ def test_a_name_that_is_not_a_file_name_has_no_definition(
 ) -> None:
     module = _import_hook_module()
 
-    assert module._definition_path(agent_type, plugin_root, plugin_root) is None
+    scope = module.scope_of(str(plugin_root))
+
+    assert module._definition_candidates(agent_type, plugin_root, plugin_root, scope) == ()

@@ -65,9 +65,11 @@ Behavior contract:
   spawn in a managed scope receives the managed core units, impaired floor
   included, and never the session's other units; `Explore`, `Plan` and a spawn
   whose definition sets `omitClaudeMd` (this plugin's `agents/<role>.md` for
-  `praxion:<role>`, else the project's or the user's `agents/<name>.md`) receive
-  nothing, and a definition that cannot be read counts as inheriting. A spawn
-  writes no file, logs no summary and gets no notice: its session did all three.
+  `praxion:<role>`, else the project's `.claude/agents/<name>.md`, the start
+  directory's before the managed root's, then the user's) receive nothing, and a
+  definition that cannot be read, or that spells the flag other than the literal
+  `true`, counts as inheriting. A spawn writes no file, logs no summary and gets
+  no notice: its session did all three.
 
 Visibility of misuse (turned silent no-ops into stderr warnings):
 - `disable:` provided as a scalar (not a list) → warning, treated as empty.
@@ -129,8 +131,9 @@ REINSTALL_FIX = "Reinstall the Praxion plugin, then start a new session."
 EVENT_NAMES = {Event.SESSION: "SessionStart", Event.SUBAGENT: "SubagentStart"}
 # `<namespace>:<role>` names an agent of this plugin, defined in its `agents/<role>.md`.
 PLUGIN_NAMESPACE = "praxion"
-# YAML's spellings of true (the harness reads definitions as YAML 1.2).
-_TRUE_SPELLINGS = frozenset({"true", "True", "TRUE"})
+# The only text that sets the flag, as the commit gate reads it (`kernel_ledger_checks.OMIT_SET`):
+# one reading of one fact, and any other spelling reads as inheriting, the safe direction.
+_OMIT_SET = "true"
 _OMIT_FLAG = re.compile(r"^omitClaudeMd:[ \t]*([^\s#]*)", re.MULTILINE)
 # An agent name is a file name in an `agents/` directory, never a path out of it.
 _AGENT_NAME = re.compile(r"\w[\w.-]*")
@@ -318,39 +321,54 @@ def _links_to_rule(user_rules: Path, unit_id: str) -> bool:
 # -- Spawns: whether a spawn inherits the instruction files ---------------------
 
 
-def _agent_kind(agent_type: object, plugin_root: Path, cwd: Path) -> AgentKind:
+def _agent_kind(agent_type: object, plugin_root: Path, cwd: Path, scope: ProjectScope) -> AgentKind:
     """The spawn's kind; a definition that is absent or cannot be read counts as inheriting."""
     name = agent_type if isinstance(agent_type, str) else None
-    definition = _definition_path(name, plugin_root, cwd) if name else None
-    return parse_agent_kind(name, _omits_claude_md(definition))
+    candidates = _definition_candidates(name, plugin_root, cwd, scope) if name else ()
+    return parse_agent_kind(name, _omits_claude_md(candidates))
 
 
-def _definition_path(agent_type: str, plugin_root: Path, cwd: Path) -> Path | None:
-    """This plugin's `agents/<role>.md` for `praxion:<role>`; for a bare name the project's
-    `.claude/agents/<name>.md`, else the user's; None for another plugin's or a host-native agent."""
+def _definition_candidates(
+    agent_type: str, plugin_root: Path, cwd: Path, scope: ProjectScope
+) -> tuple[Path, ...]:
+    """Where the spawn's definition may be, first match winning: this plugin's
+    `agents/<role>.md` for `praxion:<role>`; for a bare name the project's
+    `.claude/agents/<name>.md` (the start directory's, then the managed root's), then the
+    user's; none for another plugin's agent, a host-native one, or a name that is no file name."""
     namespace, separator, name = agent_type.rpartition(":")
     if not _AGENT_NAME.fullmatch(name):
-        return None
+        return ()
     if separator:
-        return plugin_root / "agents" / f"{name}.md" if namespace == PLUGIN_NAMESPACE else None
+        return (plugin_root / "agents" / f"{name}.md",) if namespace == PLUGIN_NAMESPACE else ()
+    roots = [cwd, *([scope.root] if isinstance(scope, Managed) and scope.root != cwd else [])]
     user_dir = _user_config_dir()
-    homes = [cwd / ".claude", *([user_dir] if user_dir else [])]
-    candidates = [home / "agents" / f"{name}.md" for home in homes]
-    return next((path for path in candidates if path.exists()), None)
+    homes = [*(root / ".claude" for root in roots), *([user_dir] if user_dir else [])]
+    return tuple(home / "agents" / f"{name}.md" for home in homes)
 
 
-def _omits_claude_md(definition: Path | None) -> bool | None:
-    """Whether the definition's frontmatter sets `omitClaudeMd` true; None when unreadable."""
-    if definition is None:
-        return None
-    try:
-        frontmatter = _FRONTMATTER_RE.match(definition.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError):
-        return None
+def _omits_claude_md(candidates: tuple[Path, ...]) -> bool | None:
+    """Whether the first definition present sets `omitClaudeMd`; None when none is present or
+    the first one that may be cannot be read. Reading is the existence test: a stat that fails
+    on an unreadable parent is then an unreadable definition, never an escaping error."""
+    for definition in candidates:
+        try:
+            text = definition.read_text(encoding="utf-8")
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        except (OSError, UnicodeDecodeError):
+            return None
+        return _sets_omit_flag(text)
+    return None
+
+
+def _sets_omit_flag(definition: str) -> bool | None:
+    """Whether the frontmatter's `omitClaudeMd` is the literal true, the last duplicate
+    winning as in YAML; None with no frontmatter."""
+    frontmatter = _FRONTMATTER_RE.match(definition)
     if frontmatter is None:
         return None
-    flag = _OMIT_FLAG.search(frontmatter.group(0))
-    return flag is not None and flag.group(1) in _TRUE_SPELLINGS
+    written = _OMIT_FLAG.findall(frontmatter.group(0))
+    return bool(written) and written[-1] == _OMIT_SET
 
 
 # -- additionalContext emitter -------------------------------------------------
@@ -543,7 +561,9 @@ def _requested_delivery(payload: dict, slot: int | None) -> tuple[Event, Deliver
     if payload.get("hook_event_name") != EVENT_NAMES[Event.SUBAGENT]:
         effects = slot in (None, EFFECTS_SLOT)
         return Event.SESSION, _planned_delivery(plugin_root, cwd, scope, SESSION, effects=effects)
-    spawn = Audience(Event.SUBAGENT, _agent_kind(payload.get("agent_type"), plugin_root, cwd))
+    spawn = Audience(
+        Event.SUBAGENT, _agent_kind(payload.get("agent_type"), plugin_root, cwd, scope)
+    )
     delivery = _planned_delivery(plugin_root, cwd, scope, spawn, effects=False)
     return Event.SUBAGENT, replace(delivery, notice=None)
 

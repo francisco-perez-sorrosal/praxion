@@ -7,8 +7,8 @@ characters that is not a heading; process text is compared as a multiset of stat
 statement that arrives twice counts twice. The two constitutional sentences are recognised by
 meaning, each within one paragraph.
 
-Unbound until its binding step: `declared_edits`, the record of the change's declared edits,
-each with its before and after wording. It is read only when a reading differs from today.
+`declared_edits` reads the record of the change's declared edits (`declared_edits.json`), each
+with its before and after wording. It is read only when a reading differs from today.
 """
 
 from __future__ import annotations
@@ -18,8 +18,6 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-
-from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "project_gating"
@@ -214,13 +212,10 @@ def _unexcused(found: list[str], side: str) -> list[str]:
 
 def declared_edits() -> list[dict[str, str]]:
     """The change's declared edits, each `{"before": ..., "after": ...}` in its recorded wording
-    (an insertion's `before`, or a removal's `after`, is empty)."""
-    raise UnboundDriverError(
-        "the record of the declared edits (one paragraph added to the user's personal "
-        "instructions carrying compact wordings of the two constitutional sentences and saying "
-        "where the pipeline procedures load), each with its before and after wording, is not "
-        "bound yet"
-    )
+    (an insertion's `before`, or a removal's `after`, is empty). The one edit is the paragraph
+    added to the user's personal instructions: compact wordings of the two constitutional
+    sentences and where the pipeline procedures load."""
+    return fixture_json("declared_edits.json")
 
 
 def base_reading(name: str) -> str:

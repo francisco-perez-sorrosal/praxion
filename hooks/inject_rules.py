@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SessionStart hook: apply the per-project Praxion rules blacklist.
+"""SessionStart and SubagentStart hook: apply the per-project Praxion rules blacklist.
 
 Reads `rules/_manifest.yaml` to determine each rule's delivery type
 (`install: hook-deliver` vs `install: symlink`), reads the optional
@@ -61,6 +61,13 @@ Behavior contract:
 - Project scope: a hook-deliver rule whose manifest row says
   `project_scope: managed` is delivered only in a managed scope; any other
   value, or none, reads as `every`.
+- Spawns: a `SubagentStart` payload plans for the spawn instead. An inheriting
+  spawn in a managed scope receives the managed core units, impaired floor
+  included, and never the session's other units; `Explore`, `Plan` and a spawn
+  whose definition sets `omitClaudeMd` (this plugin's `agents/<role>.md` for
+  `praxion:<role>`, else the project's or the user's `agents/<name>.md`) receive
+  nothing, and a definition that cannot be read counts as inheriting. A spawn
+  writes no file, logs no summary and gets no notice: its session did all three.
 
 Visibility of misuse (turned silent no-ops into stderr warnings):
 - `disable:` provided as a scalar (not a list) → warning, treated as empty.
@@ -78,6 +85,7 @@ import re
 import sys
 import sysconfig
 from collections.abc import Collection, Mapping
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +112,7 @@ from _rule_delivery import (
     Delivery,
     DeliveryPart,
     Event,
+    parse_agent_kind,
     plan_delivery,
 )
 
@@ -116,6 +125,15 @@ EFFECTS_SLOT = 1
 # Claude Code's user configuration directory: this variable, else ~/.claude.
 CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
 REINSTALL_FIX = "Reinstall the Praxion plugin, then start a new session."
+# The harness's name for each event, as the payload carries it and the output must echo it.
+EVENT_NAMES = {Event.SESSION: "SessionStart", Event.SUBAGENT: "SubagentStart"}
+# `<namespace>:<role>` names an agent of this plugin, defined in its `agents/<role>.md`.
+PLUGIN_NAMESPACE = "praxion"
+# YAML's spellings of true (the harness reads definitions as YAML 1.2).
+_TRUE_SPELLINGS = frozenset({"true", "True", "TRUE"})
+_OMIT_FLAG = re.compile(r"^omitClaudeMd:[ \t]*([^\s#]*)", re.MULTILINE)
+# An agent name is a file name in an `agents/` directory, never a path out of it.
+_AGENT_NAME = re.compile(r"\w[\w.-]*")
 
 # `project_scope` manifest value delivered only inside a managed project.
 _MANAGED_ONLY = "managed"
@@ -267,15 +285,20 @@ def _read_rule_body(plugin_root: Path, rel_path: str) -> str:
 def _natively_installed(unit_ids: Collection[str]) -> frozenset[str]:
     """The units Claude Code still loads from a user-scope rule link, so a hook copy
     would arrive twice: a link left from before the unit moved to hook delivery."""
-    if not unit_ids:
-        return frozenset()
-    try:
-        config_dir = Path(os.environ.get(CONFIG_DIR_VARIABLE) or Path.home() / ".claude")
-    except (RuntimeError, KeyError):  # no HOME and no passwd entry: no user scope to link from
+    config_dir = _user_config_dir() if unit_ids else None
+    if config_dir is None:
         return frozenset()
     return frozenset(
         unit_id for unit_id in unit_ids if _links_to_rule(config_dir / "rules", unit_id)
     )
+
+
+def _user_config_dir() -> Path | None:
+    """Claude Code's user configuration directory; None with no HOME and no passwd entry."""
+    try:
+        return Path(os.environ.get(CONFIG_DIR_VARIABLE) or Path.home() / ".claude")
+    except (RuntimeError, KeyError):
+        return None
 
 
 def _links_to_rule(user_rules: Path, unit_id: str) -> bool:
@@ -292,14 +315,52 @@ def _links_to_rule(user_rules: Path, unit_id: str) -> bool:
         return False
 
 
+# -- Spawns: whether a spawn inherits the instruction files ---------------------
+
+
+def _agent_kind(agent_type: object, plugin_root: Path, cwd: Path) -> AgentKind:
+    """The spawn's kind; a definition that is absent or cannot be read counts as inheriting."""
+    name = agent_type if isinstance(agent_type, str) else None
+    definition = _definition_path(name, plugin_root, cwd) if name else None
+    return parse_agent_kind(name, _omits_claude_md(definition))
+
+
+def _definition_path(agent_type: str, plugin_root: Path, cwd: Path) -> Path | None:
+    """This plugin's `agents/<role>.md` for `praxion:<role>`; for a bare name the project's
+    `.claude/agents/<name>.md`, else the user's; None for another plugin's or a host-native agent."""
+    namespace, separator, name = agent_type.rpartition(":")
+    if not _AGENT_NAME.fullmatch(name):
+        return None
+    if separator:
+        return plugin_root / "agents" / f"{name}.md" if namespace == PLUGIN_NAMESPACE else None
+    user_dir = _user_config_dir()
+    homes = [cwd / ".claude", *([user_dir] if user_dir else [])]
+    candidates = [home / "agents" / f"{name}.md" for home in homes]
+    return next((path for path in candidates if path.exists()), None)
+
+
+def _omits_claude_md(definition: Path | None) -> bool | None:
+    """Whether the definition's frontmatter sets `omitClaudeMd` true; None when unreadable."""
+    if definition is None:
+        return None
+    try:
+        frontmatter = _FRONTMATTER_RE.match(definition.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return None
+    if frontmatter is None:
+        return None
+    flag = _OMIT_FLAG.search(frontmatter.group(0))
+    return flag is not None and flag.group(1) in _TRUE_SPELLINGS
+
+
 # -- additionalContext emitter -------------------------------------------------
 
 
-def _emit_additional_context(context: str) -> None:
-    """Emit additionalContext JSON for the SessionStart hook contract."""
+def _emit_additional_context(context: str, event: Event) -> None:
+    """Emit additionalContext JSON for the event's hook contract."""
     output = {
         "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
+            "hookEventName": EVENT_NAMES[event],
             "additionalContext": context,
         }
     }
@@ -325,13 +386,13 @@ def _resolve_plugin_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _resolve_cwd(raw_payload: str) -> Path:
-    """Parse the SessionStart JSON payload on stdin and resolve the working directory."""
+def _parse_payload(raw_payload: str) -> dict:
+    """The hook's JSON payload on stdin; anything that is not a JSON object reads as empty."""
     try:
         payload = json.loads(raw_payload) if raw_payload.strip() else {}
     except (json.JSONDecodeError, TypeError):
         payload = {}
-    return Path(payload.get("cwd") or os.getcwd())
+    return payload if isinstance(payload, dict) else {}
 
 
 def _resolve_disable_patterns(config_dir: Path) -> list[str]:
@@ -383,22 +444,46 @@ def _log_injection_summary(
 # -- Delivery: one plan, printed whole or one slot at a time --------------------
 
 
-def _floor_delivery(plugin_root: Path, scope: ProjectScope, notice: str | None) -> Delivery:
+@dataclass(frozen=True)
+class Audience:
+    """Who a delivery is planned for: the main session, or a spawn of one kind."""
+
+    event: Event
+    agent: AgentKind = AgentKind.INHERITING  # a session's agent kind is moot
+
+
+SESSION = Audience(Event.SESSION)
+
+
+def _floor_delivery(
+    plugin_root: Path, scope: ProjectScope, audience: Audience, notice: str | None
+) -> Delivery:
     """The impaired injection's delivery: the managed core units, read without the manifest."""
     units = {unit.unit_id: _read_rule_body(plugin_root, unit.path) for unit in MANAGED_CORE_UNITS}
-    return Delivery(notice, units, _plan_session(units, set(units), scope, set()))
+    return Delivery(notice, units, _plan(units, set(units), scope, set(), audience))
 
 
-def _plan_session(
-    units: Mapping[str, str], managed_only: set[str], scope: ProjectScope, disable_set: set[str]
+def _plan(
+    units: Mapping[str, str],
+    managed_only: set[str],
+    scope: ProjectScope,
+    disable_set: set[str],
+    audience: Audience,
 ) -> tuple[DeliveryPart, ...]:
     native = _natively_installed(managed_only)  # an `every` unit keeps its linked copy
-    event, agent = Event.SESSION, AgentKind.INHERITING  # a session's agent kind is moot
-    return plan_delivery(units, managed_only, scope, event, agent, disable_set, native)
+    return plan_delivery(
+        units, managed_only, scope, audience.event, audience.agent, disable_set, native
+    )
 
 
 def _manifest_delivery(
-    rules: list[dict], plugin_root: Path, cwd: Path, scope: ProjectScope, *, effects: bool
+    rules: list[dict],
+    plugin_root: Path,
+    cwd: Path,
+    scope: ProjectScope,
+    audience: Audience,
+    *,
+    effects: bool,
 ) -> Delivery:
     """The delivery the manifest and the project blacklist decide; `effects` lets it write."""
     # A managed root gets the blacklist template, so projects discover the mechanism.
@@ -418,17 +503,15 @@ def _manifest_delivery(
         apply_symlink_exclusions(cwd, compute_symlink_exclusions(disable_set, rules))
 
     units, managed_only = _hook_delivered_units(rules, plugin_root)
-    delivery = Delivery(None, units, _plan_session(units, managed_only, scope, disable_set))
+    delivery = Delivery(None, units, _plan(units, managed_only, scope, disable_set, audience))
     if effects:
         _log_injection_summary(rules, units, delivery, disable_set)
     return delivery
 
 
-def _session_delivery(raw: str, *, effects: bool) -> Delivery:
-    plugin_root = _resolve_plugin_root()
-    cwd = _resolve_cwd(raw)
-    scope = scope_of(str(cwd))
-
+def _planned_delivery(
+    plugin_root: Path, cwd: Path, scope: ProjectScope, audience: Audience, *, effects: bool
+) -> Delivery:
     # Kill switch: opt-out env var disables injection, all but the managed core units.
     if is_disabled(DISABLE_FLAG):
         print(
@@ -436,18 +519,33 @@ def _session_delivery(raw: str, *, effects: bool) -> Delivery:
             " only the managed core units are delivered",
             file=sys.stderr,
         )
-        return _floor_delivery(plugin_root, scope, None)
+        return _floor_delivery(plugin_root, scope, audience, None)
 
     # An unavailable manifest is non-fatal but never silent; one that cannot be applied (a
     # damaged row) is the same impaired case, so it never costs a managed scope its core units.
     try:
         rules = _load_manifest(plugin_root)
-        return _manifest_delivery(rules, plugin_root, cwd, scope, effects=effects)
+        return _manifest_delivery(rules, plugin_root, cwd, scope, audience, effects=effects)
     except ManifestUnavailableError as exc:
-        return _floor_delivery(plugin_root, scope, _unavailable_notice(exc, scope))
+        notice = _unavailable_notice(exc, scope)
     except Exception as exc:
         failure = ManifestUnavailableError(f"could not apply manifest: {exc!r}", REINSTALL_FIX)
-        return _floor_delivery(plugin_root, scope, _unavailable_notice(failure, scope))
+        notice = _unavailable_notice(failure, scope)
+    return _floor_delivery(plugin_root, scope, audience, notice)
+
+
+def _requested_delivery(payload: dict, slot: int | None) -> tuple[Event, Delivery]:
+    """The event the payload names and its delivery; a spawn's carries no notice and writes
+    nothing, since its session has already reported and written."""
+    plugin_root = _resolve_plugin_root()
+    cwd = Path(payload.get("cwd") or os.getcwd())
+    scope = scope_of(str(cwd))
+    if payload.get("hook_event_name") != EVENT_NAMES[Event.SUBAGENT]:
+        effects = slot in (None, EFFECTS_SLOT)
+        return Event.SESSION, _planned_delivery(plugin_root, cwd, scope, SESSION, effects=effects)
+    spawn = Audience(Event.SUBAGENT, _agent_kind(payload.get("agent_type"), plugin_root, cwd))
+    delivery = _planned_delivery(plugin_root, cwd, scope, spawn, effects=False)
+    return Event.SUBAGENT, replace(delivery, notice=None)
 
 
 def _requested_slot(argv: list[str]) -> int | None:
@@ -467,20 +565,20 @@ def main(argv: list[str] | None = None) -> None:
         print(f"[inject_rules] WARNING: {exc}; nothing injected", file=sys.stderr)
         return
 
-    delivery = _session_delivery(raw, effects=slot in (None, EFFECTS_SLOT))
+    event, delivery = _requested_delivery(_parse_payload(raw), slot)
     if slot is None:
         text = delivery.whole_text()
     else:
         texts = delivery.slot_texts()
         text = texts[slot - 1] if slot <= len(texts) else ""
     if text:
-        _emit_additional_context(text)
+        _emit_additional_context(text, event)
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        # Fault tolerance: never block SessionStart on any unhandled exception.
+        # Fault tolerance: never block a session or a spawn on any unhandled exception.
         print(f"[inject_rules] ERROR: unhandled exception: {exc}", file=sys.stderr)
         sys.exit(0)

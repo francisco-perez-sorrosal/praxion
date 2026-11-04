@@ -1,11 +1,12 @@
 """The rule injector is registered with room for its largest delivery and a spare slot.
 
 Each registered `inject_rules.py --slot N` prints one part of the plan, so a plan
-with more parts than slots would lose its tail without a word. These tests count
-the parts of the largest delivery the injector can plan (every hook-delivered
-unit and every managed core unit, in a managed scope), read with the injector's
-own readers, and hold the registered slots at that count plus one: a growing rule
-fails here instead of being dropped.
+with more parts than slots would lose its tail without a word. These tests count,
+for the main session and for an inheriting spawn, the parts of the largest
+delivery the injector can plan (in a managed scope: every hook-delivered unit and
+every managed core unit for the session, the core units alone for a spawn), read
+with the injector's own readers, and hold the registered slots of each event at
+that count plus one: a growing rule fails here instead of being dropped.
 
 The slot mode itself is tested here too, by running the hook against the synthetic
 plugin tree of `test_inject_rules.py`: the parts the slots print, the floor an
@@ -50,7 +51,7 @@ HOOKS_JSON = REPO_ROOT / "hooks" / "hooks.json"
 INJECTOR_COMMAND = "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py"
 EVENTS = {"SessionStart": Event.SESSION, "SubagentStart": Event.SUBAGENT}
 SPARE_SLOTS = 1
-SESSION_START_TIMEOUT = 15
+INJECTOR_TIMEOUT = 15
 MANAGED = Managed(REPO_ROOT, REPO_ROOT / ".ai-state")
 
 
@@ -78,11 +79,13 @@ def _largest_supply() -> dict[str, str]:
 
 
 def _strings_needed(units: dict[str, str], event: Event) -> int:
-    """The most strings one delivery prints: the whole managed plan, or the floor and its notice."""
+    """The most strings one delivery prints: the whole managed plan, or the floor and the
+    notice a session (never a spawn) is given beside it."""
     plan = plan_delivery(units, set(units), MANAGED, event, AgentKind.INHERITING, set(), set())
     core = {unit.unit_id for unit in MANAGED_CORE_UNITS}
     floor = [part for part in plan if part.unit_id in core]
-    return max(len(plan), len(floor) + 1)
+    notice = 1 if event is Event.SESSION else 0
+    return max(len(plan), len(floor) + notice)
 
 
 def _has_room(event: str, units: dict[str, str]) -> bool:
@@ -92,12 +95,11 @@ def _has_room(event: str, units: dict[str, str]) -> bool:
 REGISTERED_EVENTS = [event for event in EVENTS if _injector_hooks(event)]
 
 
-def test_the_injector_is_registered_at_session_start_and_at_no_unknown_event():
+def test_the_injector_is_registered_at_session_start_and_subagent_start_and_nowhere_else():
     groups = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))["hooks"]
     found = {event for event in groups if _injector_hooks(event)}
 
-    assert "SessionStart" in found
-    assert found <= set(EVENTS)
+    assert found == set(EVENTS)
 
 
 @pytest.mark.parametrize("event", REGISTERED_EVENTS)
@@ -109,11 +111,9 @@ def test_every_event_has_a_slot_per_part_of_its_largest_delivery_and_a_spare(eve
 
 
 @pytest.mark.parametrize("event", REGISTERED_EVENTS)
-def test_an_oversize_unit_leaves_the_registered_slots_short(event):
+def test_an_oversize_core_unit_leaves_the_registered_slots_short(event):
     section = "## Section\n\n" + "x" * 78 + "\n\n"
-    units = {**_largest_supply(), "swe/oversize": section * 1_000}
-    if event == "SubagentStart":  # a spawn plans only managed core units
-        pytest.skip("the canary unit is not a core unit, so a spawn never plans it")
+    units = {**_largest_supply(), MANAGED_CORE_UNITS[0].unit_id: section * 1_000}
 
     assert not _has_room(event, units)
 
@@ -126,6 +126,20 @@ def test_every_slot_is_registered_once_in_order_and_nothing_runs_without_a_slot(
     assert all(f" {inject_rules.SLOT_FLAG} " in hook["command"] for hook in hooks)
 
 
+def test_the_subagent_start_slots_come_last_in_their_own_group_matching_every_spawn():
+    groups = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))["hooks"]["SubagentStart"]
+    *earlier, last = groups
+
+    assert last["matcher"] == ""
+    assert last["hooks"] == _injector_hooks("SubagentStart")
+    assert not any(
+        hook["command"].startswith(INJECTOR_COMMAND) for group in earlier for hook in group["hooks"]
+    )
+    assert all(
+        hook["timeout"] == INJECTOR_TIMEOUT and hook["async"] is False for hook in last["hooks"]
+    )
+
+
 def test_the_session_start_slots_keep_the_injectors_place_and_timeout():
     group = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))["hooks"]["SessionStart"][0]
     commands = [hook["command"] for hook in group["hooks"]]
@@ -135,7 +149,7 @@ def test_the_session_start_slots_keep_the_injectors_place_and_timeout():
     assert commands[first - 1].endswith("/hooks/inject_decisions.py")
     assert commands[first + slots].endswith("/hooks/surface_praxion_feedback.py")
     assert all(
-        hook["timeout"] == SESSION_START_TIMEOUT and hook["async"] is False
+        hook["timeout"] == INJECTOR_TIMEOUT and hook["async"] is False
         for hook in _injector_hooks("SessionStart")
     )
 

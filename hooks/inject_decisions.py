@@ -1,6 +1,8 @@
 """SessionStart hook: inject Architecture Decision Record (ADR) context.
 
-Reads ``.ai-state/decisions/DECISIONS_INDEX.md``, parses the markdown table,
+Reads ``decisions/DECISIONS_INDEX.md`` from the session's managed project (the
+``.ai-state/`` that ``scope_of`` finds from the working directory, which may sit
+above it), parses the markdown table,
 filters to accepted/proposed ADRs, and injects the decisions most relevant to
 this session as ``additionalContext`` at SessionStart. Architectural decisions
 are hard constraints that should surface to every agent at the start of work.
@@ -21,7 +23,8 @@ of any memory backend.
 Behavior contract:
 - Fail-open: any error exits 0 with no output; never blocks SessionStart.
 - Kill-switch: ``PRAXION_DISABLE_DECISION_INJECTION=1`` disables injection.
-- Degrades silently when the index is missing or holds no injectable rows.
+- Degrades silently when the directory is unmanaged, or the index is missing or
+  holds no injectable rows.
 
 Synchronous hook (async: false). Exit 0 unconditionally -- must never
 block session creation.
@@ -37,6 +40,7 @@ import sys
 from pathlib import Path
 
 from _hook_utils import is_disabled
+from _project_scope import Managed, scope_of
 
 # -- Constants ----------------------------------------------------------------
 
@@ -364,8 +368,8 @@ def _build_adr_output(rows: list[dict], budget: int, tokens: dict[str, int] | No
 def _emit_additional_context(context: str) -> None:
     """Emit additionalContext for SessionStart.
 
-    SubagentStart additionalContext is silently ignored by Claude Code --
-    use PreToolUse(Agent) with updatedInput for subagent context injection.
+    SubagentStart additionalContext is delivered to the spawn as well; this hook
+    is registered for SessionStart only.
     """
     output = {
         "hookSpecificOutput": {
@@ -396,7 +400,11 @@ def main() -> None:
 
     cwd = payload.get("cwd") or os.getcwd()
 
-    index_path = Path(cwd) / ".ai-state" / "decisions" / "DECISIONS_INDEX.md"
+    scope = scope_of(cwd)
+    if not isinstance(scope, Managed):
+        return
+
+    index_path = Path(scope.state_dir) / "decisions" / "DECISIONS_INDEX.md"
     index_content = _read_decisions_index(index_path)
     if index_content is None:
         return

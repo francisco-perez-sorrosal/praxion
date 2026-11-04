@@ -95,12 +95,39 @@ class TestDecisionsInjected:
         assert result.returncode == 0
         assert "dec-001" in _injected_context(result)
 
+    def test_a_subdirectory_receives_the_decisions_of_its_managed_project(
+        self, tmp_path: Path
+    ) -> None:
+        _write_index(
+            tmp_path,
+            "| dec-300 | Billing rule | accepted | architectural | 2026-03-01 | a | Sum |\n",
+        )
+        (tmp_path / ".git").mkdir()
+        subdirectory = tmp_path / "packages" / "billing"
+        subdirectory.mkdir(parents=True)
+        result = _run_hook({"cwd": str(subdirectory)}, subdirectory)
+        assert result.returncode == 0
+        assert "dec-300" in _injected_context(result)
+
 
 class TestDecisionsSuppressed:
     """Cases where no context must be emitted."""
 
     def test_silent_when_index_missing(self, tmp_path: Path) -> None:
         result = _run_hook({"cwd": str(tmp_path)}, tmp_path)
+        assert result.returncode == 0
+        assert result.stdout.strip() == ""
+
+    def test_silent_for_a_directory_below_state_outside_a_checkout(self, tmp_path: Path) -> None:
+        """A directory above that holds the index is not the session's project
+        unless a checkout encloses both; outside one only the start counts."""
+        _write_index(
+            tmp_path,
+            "| dec-301 | Outer rule | accepted | architectural | 2026-03-01 | a | Sum |\n",
+        )
+        child = tmp_path / "child"
+        child.mkdir()
+        result = _run_hook({"cwd": str(child)}, child)
         assert result.returncode == 0
         assert result.stdout.strip() == ""
 

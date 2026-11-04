@@ -6,7 +6,7 @@ obligation — but only when the prompt is non-trivial and the session is
 in a Praxion-managed project.
 
 Fast-skip conditions (exit 0, no output):
-  (a) cwd has no .ai-state/ directory (non-Praxion project)
+  (a) cwd is not in a managed project (no .ai-state/ serves it)
   (b) PRAXION_DISABLE_PROCESS_INJECT=1 is set
   (c) _is_continuation(payload) returns True (continuation turn)
   (d) prompt length <= 60 AND prompt does not contain '?'
@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 from _hook_utils import is_disabled
+from _project_scope import Unmanaged, scope_of
 
 # -- Constants -----------------------------------------------------------------
 
@@ -127,7 +128,7 @@ def _process(payload: dict) -> None:
     prompt = payload.get("prompt", "")
 
     # Gate (a): non-Praxion project
-    if not Path(cwd, ".ai-state").is_dir():
+    if isinstance(scope_of(cwd), Unmanaged):
         return
 
     # Gate (b): opt-out flag

@@ -126,6 +126,36 @@ def test_non_praxion_project_emits_no_framing(tmp_path, monkeypatch):
     )
 
 
+def test_subdirectory_of_a_managed_checkout_emits_framing(tmp_path, monkeypatch):
+    """The project is the directory that holds .ai-state/, wherever the session starts."""
+    module = _load_module()
+    (tmp_path / ".ai-state").mkdir()
+    (tmp_path / ".git").mkdir()
+    subdirectory = tmp_path / "packages" / "billing"
+    subdirectory.mkdir(parents=True)
+    monkeypatch.chdir(subdirectory)
+    payload = _make_payload(
+        prompt="Implement the new authentication module with JWT tokens and refresh logic",
+        cwd=str(subdirectory),
+    )
+    assert _run_hook(module, payload) is not None
+
+
+def test_directory_below_state_outside_a_checkout_emits_no_framing(tmp_path, monkeypatch):
+    """A directory above that holds .ai-state/ but is no checkout is not the
+    session's project: outside a checkout only the start directory counts."""
+    module = _load_module()
+    (tmp_path / ".ai-state").mkdir()
+    child = tmp_path / "child"
+    child.mkdir()
+    monkeypatch.chdir(child)
+    payload = _make_payload(
+        prompt="Implement the new authentication module with JWT tokens and refresh logic",
+        cwd=str(child),
+    )
+    assert _run_hook(module, payload) is None
+
+
 # ---------------------------------------------------------------------------
 # Fast-skip: disable flag
 # ---------------------------------------------------------------------------

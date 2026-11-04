@@ -414,6 +414,33 @@ def test_no_injection_when_ai_state_absent(subagent_type: str, non_praxion_proje
     assert result.stdout == "", f"No injection expected without .ai-state/; got: {result.stdout!r}"
 
 
+def test_host_native_subagent_in_a_subdirectory_of_a_managed_checkout_gets_the_preamble(
+    praxion_main_repo: Path,
+) -> None:
+    """The project is the directory that holds .ai-state/, not the session's cwd."""
+    subdirectory = praxion_main_repo / "packages" / "billing"
+    subdirectory.mkdir(parents=True)
+    payload = _pretooluse_payload(subagent_type="Explore", cwd=str(subdirectory))
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    prompt = json.loads(result.stdout)["hookSpecificOutput"]["updatedInput"]["prompt"]
+    assert prompt.startswith(PREAMBLE_MARKER)
+
+
+def test_no_injection_below_state_that_lies_outside_a_checkout(tmp_path: Path) -> None:
+    """A directory above that holds .ai-state/ but is no checkout is not the
+    session's project: outside a checkout only the start directory counts."""
+    (tmp_path / ".ai-state").mkdir()
+    child = tmp_path / "child"
+    child.mkdir()
+    payload = _pretooluse_payload(subagent_type="Plan", cwd=str(child))
+    result = _run_hook(payload)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
 def test_no_injection_when_cwd_has_no_ai_state_subdirectory(tmp_path: Path) -> None:
     """Even with a valid filesystem path, no preamble if .ai-state/ is missing."""
     # Create unrelated dirs to confirm it's not just "any dir triggers injection"
@@ -1058,26 +1085,26 @@ def _drive_main(payload: object, monkeypatch, raw: str | None = None) -> str:
     return ""
 
 
-class TestAiStateGateAndCache:
+class TestManagedGateAndCache:
     def test_directory_with_ai_state_is_recognized(self, praxion_project: Path) -> None:
         module = _load_module()
-        assert module._has_ai_state(str(praxion_project), "s1") is True
+        assert module._is_managed(str(praxion_project), "s1") is True
 
     def test_directory_without_ai_state_is_rejected(self, non_praxion_project: Path) -> None:
         module = _load_module()
-        assert module._has_ai_state(str(non_praxion_project), "s1") is False
+        assert module._is_managed(str(non_praxion_project), "s1") is False
 
     def test_second_lookup_for_the_same_session_reuses_the_cached_answer(
         self, praxion_project: Path
     ) -> None:
         """Dense fan-out must not re-stat the filesystem once per spawn."""
         module = _load_module()
-        assert module._has_ai_state(str(praxion_project), "sess-cache") is True
+        assert module._is_managed(str(praxion_project), "sess-cache") is True
 
         # Removing the directory would flip the real answer; the cache must win.
         (praxion_project / ".ai-state").rmdir()
-        assert module._has_ai_state(str(praxion_project), "sess-cache") is True
-        assert module._has_ai_state(str(praxion_project), "different-session") is False
+        assert module._is_managed(str(praxion_project), "sess-cache") is True
+        assert module._is_managed(str(praxion_project), "different-session") is False
 
     @pytest.mark.parametrize(
         ("subagent_type", "expected"),

@@ -1,7 +1,8 @@
 """Whether a working directory belongs to a managed project, and which one.
 
-The single home of the "is this directory served by a ``.ai-state/``?" question.
-A session may work from any subdirectory of a checkout, yet its project is the
+The single home of the "is this directory served by a ``.ai-state/``?" question:
+``locate`` answers it for the observation log, ``scope_of`` for everything that
+is delivered only to managed projects. A session may work from any subdirectory of a checkout, yet its project is the
 directory whose root holds ``.ai-state/``: ``locate`` walks up from the working
 directory to the nearest such directory and stops at the first ``.git`` entry,
 so a separate clone nested inside a managed project never borrows its host's
@@ -22,6 +23,26 @@ CHECKOUT_MARKER = ".git"  # a directory in a clone, a file in a linked worktree
 # ``project`` names the directory that holds the state, never a resolved link
 # target: ``.ai-state`` may be a symlink to a directory kept elsewhere.
 Location = namedtuple("Location", ("state_dir", "project_dir", "project"))
+
+
+# Immutable like the dataclasses they stand in for: ``dataclasses`` and
+# ``typing`` are off the hook hot path (``locate`` runs on every tool call).
+# Callers tell the cases apart by type (``isinstance``), never by tuple equality.
+Managed = namedtuple("Managed", ("root", "state_dir"))  # root holds state_dir
+Unmanaged = namedtuple("Unmanaged", ())  # no .ai-state/ serves the directory
+
+ProjectScope = Managed | Unmanaged
+
+
+def scope_of(cwd):
+    """The `ProjectScope` of ``cwd``: `Managed` exactly when `locate` finds a
+    location for it. The one constructor of the type, so every managed-only
+    behaviour shares the log's answer by construction. Never raises, and keeps
+    nothing between calls: every call evaluates the directory afresh."""
+    location = locate(cwd)
+    if location is None:
+        return Unmanaged()
+    return Managed(location.project_dir, location.state_dir)
 
 
 def locate(cwd):

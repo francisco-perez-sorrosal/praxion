@@ -18,7 +18,43 @@
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py --slot 1",
+            "timeout": 15,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py --slot 2",
+            "timeout": 15,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py --slot 3",
+            "timeout": 15,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py --slot 4",
+            "timeout": 15,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py --slot 5",
+            "timeout": 15,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py --slot 6",
+            "timeout": 15,
+            "async": false
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/inject_rules.py --slot 7",
             "timeout": 15,
             "async": false
           },

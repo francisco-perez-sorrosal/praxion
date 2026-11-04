@@ -2,8 +2,9 @@
 
 The planner is pure, so each test states a property of its output: the parts of
 a unit rebuild the file body exactly, none passes the per-part ceiling, splits
-fall on headings, the plan does not depend on who computes it, and the scope,
-event and agent kind decide which units are planned at all.
+fall on headings, the plan does not depend on who computes it, and the
+managed-only set, the scope, the event and the agent kind decide which units
+are planned at all.
 """
 
 from __future__ import annotations
@@ -20,10 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _project_scope import Managed, Unmanaged  # noqa: E402
 from _rule_delivery import (  # noqa: E402
-    GIT_CONVENTIONS_ID,
     MANAGED_CORE_UNITS,
     MAX_PART_CHARS,
-    ROUTING_RESIDENT_ID,
     AgentKind,
     DeliveryPart,
     Event,
@@ -42,8 +41,12 @@ REPO_ROOT = next(
 )
 FRONTMATTER = re.compile(r"\A---\s*\n.*?\n---\s*\n", re.DOTALL)
 
+GIT_CONVENTIONS_ID = "swe/vcs/git-conventions"
+ROUTING_RESIDENT_ID = "swe/agent-model-routing-resident"
 CORE_IDS = tuple(unit.unit_id for unit in MANAGED_CORE_UNITS)
 SESSION_MANAGED_IDS = (GIT_CONVENTIONS_ID, ROUTING_RESIDENT_ID, *CORE_IDS)
+# The managed-only set once the four units carry `project_scope: managed`.
+MANAGED_ONLY_IDS = frozenset({ROUTING_RESIDENT_ID, *CORE_IDS})
 MANAGED = Managed(Path("/project"), Path("/project/.ai-state"))
 UNMANAGED = Unmanaged()
 
@@ -65,9 +68,17 @@ def _synthetic_units() -> dict[str, str]:
 
 
 def _plan(
-    units, scope=MANAGED, event=Event.SESSION, agent=AgentKind.INHERITING, disabled=(), native=()
+    units,
+    scope=MANAGED,
+    event=Event.SESSION,
+    agent=AgentKind.INHERITING,
+    disabled=(),
+    native=(),
+    managed_only=MANAGED_ONLY_IDS,
 ):
-    return plan_delivery(units, scope, event, agent, frozenset(disabled), frozenset(native))
+    return plan_delivery(
+        units, frozenset(managed_only), scope, event, agent, frozenset(disabled), frozenset(native)
+    )
 
 
 def _chunk(part: DeliveryPart) -> str:
@@ -318,6 +329,33 @@ def test_the_disable_set_drops_a_blacklistable_unit_and_never_a_core_unit():
     assert tuple(p.unit_id for p in spawn) == CORE_IDS
 
 
+def test_with_no_managed_only_unit_every_session_plans_every_unit_and_no_spawn_plans_one():
+    units = _synthetic_units()
+
+    for scope in (MANAGED, UNMANAGED):
+        session = _plan(units, scope=scope, managed_only=())
+        spawn = _plan(units, scope=scope, event=Event.SUBAGENT, managed_only=())
+
+        assert tuple(p.unit_id for p in session) == SESSION_MANAGED_IDS
+        assert spawn == ()
+
+
+def test_only_the_named_managed_only_units_leave_an_unmanaged_session():
+    plan = _plan(_synthetic_units(), scope=UNMANAGED, managed_only={CORE_IDS[0]})
+
+    assert tuple(p.unit_id for p in plan) == (
+        GIT_CONVENTIONS_ID,
+        ROUTING_RESIDENT_ID,
+        *CORE_IDS[1:],
+    )
+
+
+def test_a_spawn_plans_only_the_core_units_that_are_managed_only():
+    plan = _plan(_synthetic_units(), event=Event.SUBAGENT, managed_only={CORE_IDS[2]})
+
+    assert tuple(p.unit_id for p in plan) == (CORE_IDS[2],)
+
+
 def test_a_unit_without_a_body_or_not_supplied_is_left_out_of_the_plan():
     units = _synthetic_units()
     units[ROUTING_RESIDENT_ID] = ""
@@ -331,7 +369,7 @@ def test_a_unit_without_a_body_or_not_supplied_is_left_out_of_the_plan():
 # -- the plan is the same wherever it is computed ------------------------------
 
 
-def test_the_plan_is_identical_across_runs_and_does_not_depend_on_supply_order():
+def test_the_plan_is_identical_across_runs_and_keeps_the_core_order_whatever_the_supply():
     units = _real_units()
     reordered = dict(reversed(list(units.items())))
 
@@ -341,6 +379,14 @@ def test_the_plan_is_identical_across_runs_and_does_not_depend_on_supply_order()
 
     assert first == second == third
     assert all(isinstance(p, DeliveryPart) for p in first)
+
+
+def test_units_of_the_same_group_keep_the_order_they_are_supplied_in():
+    units = {unit_id: f"body of {unit_id}\n" for unit_id in ("z/every", "a/every", "m/managed")}
+
+    plan = _plan(units, managed_only={"m/managed"})
+
+    assert tuple(p.unit_id for p in plan) == ("z/every", "a/every", "m/managed")
 
 
 def test_a_real_managed_plan_reads_the_same_slot_by_slot_and_each_slot_prints_one_part():

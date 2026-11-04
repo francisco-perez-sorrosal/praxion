@@ -35,7 +35,15 @@ mechanism — any attempt produces a stderr warning and is ignored.
 
 Behavior contract:
 - Fail-open: any internal error exits 0 with no output; never block SessionStart.
-- Kill-switch: PRAXION_DISABLE_RULE_INJECTION=1 disables injection entirely.
+- Slots: `--slot N` (1-based) plans the whole delivery (`_rule_delivery`) and
+  prints its Nth self-labelled part, nothing past the plan; only slot 1 writes
+  files and logs, so parallel slots never race. No argument: the whole plan as one
+  JSON under one header.
+- Impaired floor: the kill switch, a missing PyYAML and a missing, unreadable or
+  malformed manifest still deliver `MANAGED_CORE_UNITS` to a managed scope and
+  nothing to an unmanaged one; an unavailable manifest is reported to the session.
+- No double delivery: a managed-only unit still linked at user scope (`<config>/rules/
+  <id>.md`, a link left from before a relink) loads natively, so the hook skips it.
 - Backward-compatible: no project config → all rules loaded (no exclusions).
 - Schema-guarded: version > 1 in project config → log warning and load all.
 - Idempotent: settings.json is rewritten only when its `claudeMdExcludes`
@@ -69,6 +77,7 @@ import re
 import shutil
 import sys
 import sysconfig
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -79,16 +88,27 @@ except ImportError:
 
 from _hook_utils import is_disabled
 from _project_scope import Managed, ProjectScope, scope_of
+from _rule_delivery import (
+    MANAGED_CORE_UNITS,
+    AgentKind,
+    Delivery,
+    DeliveryPart,
+    Event,
+    plan_delivery,
+)
 
 # -- Constants -----------------------------------------------------------------
 
 DISABLE_FLAG = "PRAXION_DISABLE_RULE_INJECTION"
 SUPPORTED_SCHEMA_VERSION = 1
+SLOT_FLAG = "--slot"
+# Slot 1 is the one process of a slotted run that writes files and logs the summary.
+EFFECTS_SLOT = 1
+# Claude Code's user configuration directory: this variable, else ~/.claude.
+CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
 
 # `project_scope` manifest value delivered only inside a managed project.
 _MANAGED_ONLY = "managed"
-
-_INJECT_HEADER = "## Praxion Rules (auto-injected)\n\n"
 
 # Frontmatter delimiter pattern for stripping YAML blocks from rule files.
 _FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
@@ -162,6 +182,8 @@ def _load_manifest(plugin_root: Path) -> list[dict]:
         data = _load_yaml(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise ManifestUnavailableError(f"could not parse manifest: {exc}", reinstall) from exc
+    if not isinstance(data, dict):
+        raise ManifestUnavailableError("manifest is not a YAML mapping", reinstall)
     rules = data.get("rules", [])
     if not isinstance(rules, list):
         raise ManifestUnavailableError("manifest 'rules' is not a list", reinstall)
@@ -184,11 +206,11 @@ def _pyyaml_fix(executable: str, *, externally_managed: bool) -> str:
     )
 
 
-def _report_unavailable(exc: ManifestUnavailableError) -> None:
-    """Log the skip and tell the session — stderr alone reaches neither the
+def _unavailable_notice(exc: ManifestUnavailableError) -> str:
+    """Log the skip and word it for the session — stderr alone reaches neither the
     model nor the user, so the rules would vanish silently."""
     print(f"[inject_rules] WARNING: {exc.reason}; skipping rule injection", file=sys.stderr)
-    _emit_additional_context(
+    return (
         "## Praxion rule injection skipped\n\n"
         f"Praxion's hook-delivered rules were NOT loaded this session: {exc.reason}. "
         f"{exc.fix} Tell the user if their work depends on those conventions."
@@ -387,24 +409,46 @@ def _apply_symlink_exclusions(cwd: Path, exclusions: list[str]) -> None:
 # -- Rule body reading ---------------------------------------------------------
 
 
-def _read_rule_body(plugin_root: Path, rule: dict) -> str:
+def _read_rule_body(plugin_root: Path, rel_path: str) -> str:
     """Read a rule file and strip its frontmatter.
 
     Returns empty string on any I/O error.
     """
-    rel_path = rule.get("path", "")
     if not rel_path:
         return ""
     rule_path = plugin_root / rel_path
     try:
         raw = rule_path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         print(
             f"[inject_rules] WARNING: could not read rule file {rule_path}: {exc}",
             file=sys.stderr,
         )
         return ""
     return _strip_frontmatter(raw)
+
+
+def _natively_installed(unit_ids: Iterable[str]) -> frozenset[str]:
+    """The units Claude Code still loads from a user-scope rule link, so a hook copy
+    would arrive twice: a link left from before the unit moved to hook delivery."""
+    config_dir = Path(os.environ.get(CONFIG_DIR_VARIABLE) or Path.home() / ".claude")
+    return frozenset(
+        unit_id for unit_id in unit_ids if _links_to_rule(config_dir / "rules", unit_id)
+    )
+
+
+def _links_to_rule(user_rules: Path, unit_id: str) -> bool:
+    """Whether `<user rules>/<id>.md` is a live link into any checkout's `rules/<id>.md`
+    (the installer links from whichever checkout ran it; a dangling link loads nothing)."""
+    link = user_rules / f"{unit_id}.md"
+    try:
+        return (
+            link.is_symlink()
+            and link.is_file()
+            and link.resolve().as_posix().endswith(f"/rules/{unit_id}.md")
+        )
+    except (OSError, RuntimeError):  # a link loop resolves to nothing
+        return False
 
 
 # -- additionalContext emitter -------------------------------------------------
@@ -622,43 +666,19 @@ def _add_residents_of_disabled(
     return disable_set | residents
 
 
-def _delivers_in(rule: dict, scope: ProjectScope) -> bool:
-    """Whether the rule's `project_scope` lets it reach a session in this scope.
+def _hook_delivered_units(rules: list[dict], plugin_root: Path) -> tuple[dict[str, str], set[str]]:
+    """The hook-deliver rows' bodies in manifest order, and the ids of the managed-only ones.
 
     Only the exact value `managed` restricts delivery; an unreadable or unknown
     value reads as `every`, so a damaged row never silently drops a rule.
     """
-    return rule.get("project_scope") != _MANAGED_ONLY or isinstance(scope, Managed)
-
-
-def _select_hook_deliver_rules(
-    rules: list[dict], disable_set: set[str], scope: ProjectScope
-) -> tuple[list[dict], list[dict], list[str]]:
-    """Split hook-deliver rules into (rules to inject, all hook-deliver rules, suppressed IDs)."""
-    hook_deliver_rules = [r for r in rules if r.get("install") == "hook-deliver"]
-    inject_rules = [
-        r for r in hook_deliver_rules if r.get("id") not in disable_set and _delivers_in(r, scope)
-    ]
-    suppressed_hd_ids = [r["id"] for r in hook_deliver_rules if r.get("id") in disable_set]
-    return inject_rules, hook_deliver_rules, suppressed_hd_ids
-
-
-def _collect_rule_bodies(plugin_root: Path, inject_rules: list[dict]) -> list[str]:
-    """Read and collect bodies for the selected rules, in manifest order."""
-    bodies: list[str] = []
-    for rule in inject_rules:
-        body = _read_rule_body(plugin_root, rule)
-        if body:
-            bodies.append(body)
-    return bodies
+    rows = [r for r in rules if r.get("install") == "hook-deliver" and "id" in r]
+    units = {r["id"]: _read_rule_body(plugin_root, r.get("path", "")) for r in rows}
+    return units, {r["id"] for r in rows if r.get("project_scope") == _MANAGED_ONLY}
 
 
 def _log_injection_summary(
-    rules: list[dict],
-    inject_rules: list[dict],
-    hook_deliver_rules: list[dict],
-    suppressed_hd_ids: list[str],
-    disable_set: set[str],
+    rules: list[dict], units: Mapping[str, str], delivery: Delivery, disable_set: set[str]
 ) -> None:
     """Emit the stderr observability summary line for this SessionStart run.
 
@@ -667,71 +687,108 @@ def _log_injection_summary(
     (defense-in-depth — see `_compute_symlink_exclusions`).
     """
     core_count = sum(1 for r in rules if r.get("core") is True)
-    hd_suppressed_str = ", ".join(sorted(suppressed_hd_ids)) if suppressed_hd_ids else "none"
+    suppressed = sorted(unit_id for unit_id in units if unit_id in disable_set)
     exclusion_str = ", ".join(sorted(disable_set)) if disable_set else "none"
     print(
         f"[inject_rules] Loaded {core_count} core rules;"
-        f" injected {len(inject_rules)}/{len(hook_deliver_rules)} hook-deliver rules"
-        f" (suppressed: {hd_suppressed_str});"
+        f" injected {len(delivery.unit_ids())}/{len(units)} hook-deliver rules"
+        f" (suppressed: {', '.join(suppressed) or 'none'});"
         f" claudeMdExcludes entries: {exclusion_str}",
         file=sys.stderr,
     )
 
 
-def main() -> None:
-    raw = _drain_stdin()
+# -- Delivery: one plan, printed whole or one slot at a time --------------------
 
-    # Kill switch: opt-out env var disables injection entirely.
-    if is_disabled(DISABLE_FLAG):
-        print(
-            "[inject_rules] Rule injection disabled by PRAXION_DISABLE_RULE_INJECTION",
-            file=sys.stderr,
-        )
-        return
 
-    plugin_root = _resolve_plugin_root()
-    cwd = _resolve_cwd(raw)
-    scope = scope_of(str(cwd))
+def _floor_delivery(plugin_root: Path, scope: ProjectScope, notice: str | None) -> Delivery:
+    """The impaired injection's delivery: the managed core units, read without the manifest."""
+    units = {unit.unit_id: _read_rule_body(plugin_root, unit.path) for unit in MANAGED_CORE_UNITS}
+    return Delivery(notice, units, _plan_session(units, set(units), scope, set()))
 
-    # Locate and parse manifest; an unavailable manifest is non-fatal but never silent.
-    try:
-        rules = _load_manifest(plugin_root)
-    except ManifestUnavailableError as exc:
-        _report_unavailable(exc)
-        return
 
-    # A managed project's root gets the user-facing template in .claude/ so
-    # projects discover the blacklist mechanism without manual cp or running
-    # /onboard-project. Idempotent; writes nothing elsewhere.
-    _ensure_template_present(scope, plugin_root)
+def _plan_session(
+    units: Mapping[str, str], managed_only: set[str], scope: ProjectScope, disable_set: set[str]
+) -> tuple[DeliveryPart, ...]:
+    native = _natively_installed(managed_only)  # an `every` unit keeps its linked copy
+    event, agent = Event.SESSION, AgentKind.INHERITING  # a session's agent kind is moot
+    return plan_delivery(units, managed_only, scope, event, agent, disable_set, native)
 
-    all_rule_ids = [r["id"] for r in rules if "id" in r]
+
+def _manifest_delivery(
+    rules: list[dict], plugin_root: Path, cwd: Path, scope: ProjectScope, *, effects: bool
+) -> Delivery:
+    """The delivery the manifest and the project blacklist decide; `effects` lets it write."""
+    # A managed root gets the blacklist template, so projects discover the mechanism.
+    if effects:
+        _ensure_template_present(scope, plugin_root)
 
     # Read project blacklist; missing = empty disable list (backward compat).
     # Malformed YAML is fail-open; schema version > 1 is fail-open.
+    all_rule_ids = [r["id"] for r in rules if "id" in r]
     disable_patterns = _resolve_disable_patterns(_blacklist_directory(cwd, scope))
     disable_set = _compute_disable_set(disable_patterns, rules, all_rule_ids)
     disable_set = _add_residents_of_disabled(disable_set, rules, plugin_root)
 
-    # Reconcile claudeMdExcludes in .claude/settings.json with the symlinked
-    # rules in the disable set. Hook-deliver rules are handled below via the
-    # additionalContext filter; the two mechanisms together give the YAML
-    # uniform reach across all install types.
-    symlink_exclusions = _compute_symlink_exclusions(disable_set, rules)
-    _apply_symlink_exclusions(cwd, symlink_exclusions)
+    # claudeMdExcludes covers the linked rules in the disable set, the plan the
+    # hook-deliver ones: together the YAML reaches every install type.
+    if effects:
+        _apply_symlink_exclusions(cwd, _compute_symlink_exclusions(disable_set, rules))
 
-    inject_rules, hook_deliver_rules, suppressed_hd_ids = _select_hook_deliver_rules(
-        rules, disable_set, scope
-    )
-    _log_injection_summary(rules, inject_rules, hook_deliver_rules, suppressed_hd_ids, disable_set)
+    units, managed_only = _hook_delivered_units(rules, plugin_root)
+    delivery = Delivery(None, units, _plan_session(units, managed_only, scope, disable_set))
+    if effects:
+        _log_injection_summary(rules, units, delivery, disable_set)
+    return delivery
 
-    # Concatenate rule bodies in manifest order under a single H2 header.
-    bodies = _collect_rule_bodies(plugin_root, inject_rules)
-    if not bodies:
+
+def _session_delivery(raw: str, *, effects: bool) -> Delivery:
+    plugin_root = _resolve_plugin_root()
+    cwd = _resolve_cwd(raw)
+    scope = scope_of(str(cwd))
+
+    # Kill switch: opt-out env var disables injection, all but the managed core units.
+    if is_disabled(DISABLE_FLAG):
+        print(
+            "[inject_rules] Rule injection disabled by PRAXION_DISABLE_RULE_INJECTION;"
+            " only the managed core units are delivered",
+            file=sys.stderr,
+        )
+        return _floor_delivery(plugin_root, scope, None)
+
+    # An unavailable manifest is non-fatal but never silent.
+    try:
+        rules = _load_manifest(plugin_root)
+    except ManifestUnavailableError as exc:
+        return _floor_delivery(plugin_root, scope, _unavailable_notice(exc))
+    return _manifest_delivery(rules, plugin_root, cwd, scope, effects=effects)
+
+
+def _requested_slot(argv: list[str]) -> int | None:
+    """The slot after `--slot`, or None for no arguments (the whole plan); ValueError otherwise."""
+    if not argv:
+        return None
+    if len(argv) == 2 and argv[0] == SLOT_FLAG and argv[1].isdigit() and int(argv[1]) > 0:
+        return int(argv[1])
+    raise ValueError(f"expected no arguments or `{SLOT_FLAG} N` (N >= 1), got {argv!r}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    raw = _drain_stdin()
+    try:
+        slot = _requested_slot(sys.argv[1:] if argv is None else argv)
+    except ValueError as exc:
+        print(f"[inject_rules] WARNING: {exc}; nothing injected", file=sys.stderr)
         return
 
-    context = _INJECT_HEADER + "\n\n".join(bodies)
-    _emit_additional_context(context)
+    delivery = _session_delivery(raw, effects=slot in (None, EFFECTS_SLOT))
+    if slot is None:
+        text = delivery.whole_text()
+    else:
+        texts = delivery.slot_texts()
+        text = texts[slot - 1] if slot <= len(texts) else ""
+    if text:
+        _emit_additional_context(text)
 
 
 if __name__ == "__main__":

@@ -22,9 +22,6 @@ from _project_scope import Managed, ProjectScope
 # Claude Code truncates a hook's additionalContext past this many characters.
 MAX_PART_CHARS = 10_000
 
-GIT_CONVENTIONS_ID = "swe/vcs/git-conventions"
-ROUTING_RESIDENT_ID = "swe/agent-model-routing-resident"
-
 # The injector's header, specialised per part: "<prefix>: <unit>, part k of n".
 LABEL_PREFIX = "## Praxion Rules (auto-injected)"
 
@@ -51,7 +48,7 @@ MANAGED_CORE_UNITS = (
     CoreUnit("swe/agent-intermediate-documents", "rules/swe/agent-intermediate-documents.md", 2),
     CoreUnit("swe/adr-conventions-resident", "rules/swe/adr-conventions-resident.md", 3),
 )
-_CORE_IDS = tuple(unit.unit_id for unit in sorted(MANAGED_CORE_UNITS, key=lambda u: u.order))
+_CORE_ORDER = {unit.unit_id: unit.order for unit in MANAGED_CORE_UNITS}
 
 
 class Event(Enum):
@@ -86,6 +83,28 @@ class DeliveryPart:
             )
 
 
+@dataclass(frozen=True)
+class Delivery:
+    """What a session receives: an optional notice, then the planned parts of ``units``."""
+
+    notice: str | None
+    units: Mapping[str, str]
+    parts: tuple[DeliveryPart, ...]
+
+    def unit_ids(self) -> list[str]:
+        return list(dict.fromkeys(part.unit_id for part in self.parts))
+
+    def slot_texts(self) -> tuple[str, ...]:
+        """One string per slot: the notice first, so a reader of the first line sees it."""
+        return (*([self.notice] if self.notice else []), *(part.text for part in self.parts))
+
+    def whole_text(self) -> str:
+        """Every planned unit under one unlabelled header, as one string; empty for nothing."""
+        bodies = [self.units[unit_id] for unit_id in self.unit_ids()]
+        rules = f"{LABEL_PREFIX}\n\n" + "\n\n".join(bodies) if bodies else ""
+        return "\n\n".join(text for text in (self.notice, rules) if text)
+
+
 def parse_agent_kind(agent_type: str | None, omit_claude_md: bool | None) -> AgentKind:
     """The kind of a spawn, from its type and its definition's ``omitClaudeMd``.
 
@@ -101,6 +120,7 @@ def parse_agent_kind(agent_type: str | None, omit_claude_md: bool | None) -> Age
 
 def plan_delivery(
     units: Mapping[str, str],
+    managed_only: Collection[str],
     scope: ProjectScope,
     event: Event,
     agent: AgentKind,
@@ -109,31 +129,43 @@ def plan_delivery(
 ) -> tuple[DeliveryPart, ...]:
     """The parts to print, in delivery order, for one hook event.
 
-    ``units`` maps a unit id to its file body (frontmatter already removed); a
-    unit that is absent or empty is left out. A unit still installed natively
-    is skipped so nothing arrives twice. The disable set drops any unit but the
-    core ones. ``agent`` matters only for a spawn.
+    ``units`` maps a unit id to its file body (frontmatter already removed), in
+    the order the manifest lists them; a unit that is empty is left out.
+    ``managed_only`` names the units that reach only a managed scope. A unit
+    still installed natively is skipped so nothing arrives twice. The disable
+    set drops any unit but the core ones. ``agent`` matters only for a spawn.
     """
     parts: list[DeliveryPart] = []
-    for unit_id in _wanted_ids(scope, event, agent):
+    for unit_id in _wanted_ids(units, managed_only, scope, event, agent):
         if unit_id in natively_installed:
             continue
-        if unit_id in disable_set and unit_id not in _CORE_IDS:
+        if unit_id in disable_set and unit_id not in _CORE_ORDER:
             continue
-        parts.extend(split_unit(unit_id, units.get(unit_id, "")))
+        parts.extend(split_unit(unit_id, units[unit_id]))
     return tuple(parts)
 
 
-def _wanted_ids(scope: ProjectScope, event: Event, agent: AgentKind) -> tuple[str, ...]:
+def _wanted_ids(
+    units: Mapping[str, str],
+    managed_only: Collection[str],
+    scope: ProjectScope,
+    event: Event,
+    agent: AgentKind,
+) -> list[str]:
+    """Every-scope units first, then the managed-only ones, the core units last in
+    their own order; a stable sort keeps the manifest order within each group."""
+    ordered = sorted(
+        units, key=lambda unit_id: (unit_id in managed_only, _CORE_ORDER.get(unit_id, 0))
+    )
     managed = isinstance(scope, Managed)
     if event is Event.SESSION:
-        if managed:
-            return (GIT_CONVENTIONS_ID, ROUTING_RESIDENT_ID, *_CORE_IDS)
-        return (GIT_CONVENTIONS_ID,)
-    # A spawn never received the git conventions or the routing resident.
+        return [unit_id for unit_id in ordered if managed or unit_id not in managed_only]
+    # A spawn inherits only the managed core units, never the session's other text.
     if managed and agent is AgentKind.INHERITING:
-        return _CORE_IDS
-    return ()
+        return [
+            unit_id for unit_id in ordered if unit_id in managed_only and unit_id in _CORE_ORDER
+        ]
+    return []
 
 
 def split_unit(unit_id: str, body: str) -> tuple[DeliveryPart, ...]:

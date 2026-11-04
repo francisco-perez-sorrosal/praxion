@@ -563,7 +563,6 @@ def test_disable_env_var_suppresses_all_injection(plugin_root: Path, project_dir
 
 def test_stderr_summary_line_matches_expected_format(plugin_root: Path, project_dir: Path) -> None:
     """The hook emits a stderr summary line: [inject_rules] Loaded N core rules; injected M/T ..."""
-    import re
 
     result = _run_hook(plugin_root, project_dir)
     assert result.returncode == 0, f"Hook failed. stderr: {result.stderr!r}"
@@ -998,6 +997,12 @@ def _import_hook_module():
     return inject_rules
 
 
+def _import_blacklist_module():
+    import _rule_blacklist
+
+    return _rule_blacklist
+
+
 def test_pyyaml_fix_never_suggests_pip_for_an_externally_managed_interpreter() -> None:
     """PEP 668 interpreters (Homebrew, Debian system python) refuse `pip
     install`; advising it would dead-end the user on the machines that hit
@@ -1194,7 +1199,7 @@ def _shared_resident_reader():
 def test_the_injectors_resident_check_agrees_with_the_shared_reader(text: str) -> None:
     shared = _shared_resident_reader().resident_parent
 
-    assert _import_hook_module()._resident_parent(text) == shared(text)
+    assert _import_blacklist_module().resident_parent(text) == shared(text)
 
 
 def _rule_row(
@@ -1212,7 +1217,7 @@ def _write_rule(plugin_root: Path, rel_path: str, frontmatter: str) -> None:
 def test_a_disabled_rule_adds_only_the_hook_deliver_non_core_residents_that_name_it(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    module = _import_hook_module()
+    blacklist = _import_blacklist_module()
     _write_rule(tmp_path, "rules/a/resident.md", "resident_of: rules/swe/parent.md")
     _write_rule(tmp_path, "rules/a/other.md", "resident_of: rules/swe/other-parent.md")
     _write_rule(tmp_path, "rules/a/core.md", "resident_of: rules/swe/parent.md")
@@ -1227,26 +1232,26 @@ def test_a_disabled_rule_adds_only_the_hook_deliver_non_core_residents_that_name
         {"id": "a/pathless", "install": "hook-deliver"},
     ]
 
-    disabled = module._add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
+    disabled = blacklist.add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
 
     assert disabled == {"swe/parent", "a/resident"}
     assert capsys.readouterr().err == "", "a row without a path is no resident, not a read failure"
 
 
 def test_an_empty_disable_set_reads_no_rule_file(tmp_path: Path) -> None:
-    module = _import_hook_module()
+    blacklist = _import_blacklist_module()
     rules = [_rule_row("a/resident", "rules/a/missing.md")]
 
-    assert module._add_residents_of_disabled(set(), rules, tmp_path) == set()
+    assert blacklist.add_residents_of_disabled(set(), rules, tmp_path) == set()
 
 
 def test_an_unreadable_resident_file_is_kept_and_reported(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    module = _import_hook_module()
+    blacklist = _import_blacklist_module()
     rules = [_rule_row("a/resident", "rules/a/missing.md")]
 
-    disabled = module._add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
+    disabled = blacklist.add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
 
     assert disabled == {"swe/parent"}
     warning = capsys.readouterr().err
@@ -1376,240 +1381,3 @@ def test_a_managed_row_reaches_only_a_managed_scope(
 
     assert (_MANAGED_ONLY_MARKER in unmanaged) is delivered_unmanaged
     assert _MANAGED_ONLY_MARKER in managed
-
-
-# ===========================================================================
-# Slots, the impaired floor and units still linked at user scope
-# ===========================================================================
-
-_CORE_UNIT_IDS = (
-    "swe/swe-agent-coordination-protocol",
-    "swe/agent-intermediate-documents",
-    "swe/adr-conventions-resident",
-)
-_LABEL = re.compile(r"\A## Praxion Rules \(auto-injected\): (\S+), part (\d+) of (\d+)\n\n")
-_SLOTS_PROBED = 12
-_KILL_SWITCH = "PRAXION_DISABLE_RULE_INJECTION"
-_IMPAIRMENTS = (
-    "kill-switch",
-    "no-yaml",
-    "manifest-missing",
-    "manifest-unreadable",
-    "manifest-not-yaml",
-    "manifest-not-a-mapping",
-)
-
-
-def _core_body(unit_id: str) -> str:
-    return f"## {unit_id} (core rule body)"
-
-
-def _impair(plugin_root: Path, impairment: str) -> dict[str, str]:
-    """Impair the plugin's manifest as named; the extra variables the run needs."""
-    manifest = plugin_root / "rules" / "_manifest.yaml"
-    if impairment == "kill-switch":
-        return {_KILL_SWITCH: "1"}
-    if impairment == "manifest-missing":
-        manifest.unlink()
-    elif impairment == "manifest-unreadable":
-        manifest.unlink()
-        manifest.mkdir()
-    elif impairment == "manifest-not-yaml":
-        manifest.write_text("rules: [unterminated\n  - {id: : :\n", encoding="utf-8")
-    elif impairment == "manifest-not-a-mapping":
-        manifest.write_text("just a line of text\n", encoding="utf-8")
-    return {}
-
-
-def _run(plugin_root: Path, cwd: Path, *args: str, impairment: str = "") -> str:
-    """The hook's additionalContext for `args`, under one impairment of its injection."""
-    extra = _impair(plugin_root, impairment)
-    block_yaml = "sys.modules['yaml'] = None; " if impairment == "no-yaml" else ""
-    launcher = (
-        f"import runpy, sys; {block_yaml}sys.argv = [{str(HOOK_SCRIPT)!r}, *{list(args)!r}]; "
-        f"sys.path.insert(0, {str(HOOK_SCRIPT.parent)!r}); "
-        f"runpy.run_path({str(HOOK_SCRIPT)!r}, run_name='__main__')"
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", launcher],
-        capture_output=True,
-        text=True,
-        cwd=str(cwd),
-        env={**_hook_env(plugin_root), **extra},
-        timeout=10,
-        stdin=subprocess.DEVNULL,
-    )
-    assert result.returncode == 0, result.stderr
-    return _additional_context(result)
-
-
-def _slot_texts(plugin_root: Path, cwd: Path) -> list[str]:
-    return [_run(plugin_root, cwd, "--slot", str(n)) for n in range(1, _SLOTS_PROBED + 1)]
-
-
-def _add_managed_core_rows(plugin_root: Path) -> None:
-    """The flipped manifest's shape: the core units as managed-only hook-deliver rows, and
-    one managed-only unit large enough to need several parts."""
-    big = plugin_root / "rules" / "swe" / "big.md"
-    big.write_text("".join(f"## Big {n}\n\n{'b' * 3_000}\n\n" for n in range(8)), encoding="utf-8")
-    manifest = plugin_root / "rules" / "_manifest.yaml"
-    text = manifest.read_text(encoding="utf-8")
-    for unit_id in _CORE_UNIT_IDS:
-        head = f"- id: {unit_id}\n  path: rules/{unit_id}.md\n  load: always_on\n  core: true\n"
-        text = text.replace(
-            head + "  install: symlink\n",
-            head + "  install: hook-deliver\n  project_scope: managed\n",
-        )
-    row = (
-        "- id: swe/big\n  path: rules/swe/big.md\n  load: always_on\n  core: false\n"
-        "  install: hook-deliver\n  chars: 24000\n  project_scope: managed\n"
-    )
-    manifest.write_text(text.replace("categories:", row + "categories:"), encoding="utf-8")
-
-
-def _link_at_user_scope(plugin_root: Path, unit_id: str, target: Path) -> None:
-    link = plugin_root / "home" / ".claude" / "rules" / f"{unit_id}.md"
-    link.parent.mkdir(parents=True, exist_ok=True)
-    link.symlink_to(target)
-
-
-def _rebuilt_units(texts: list[str]) -> str:
-    """Each unit's chunks joined in slot order, the units joined as the whole mode joins them."""
-    labelled = [(_LABEL.match(text), text) for text in texts]
-    units = dict.fromkeys(match.group(1) for match, _ in labelled)
-    return "\n\n".join(
-        "".join(text[match.end() :] for match, text in labelled if match.group(1) == unit_id)
-        for unit_id in units
-    )
-
-
-def test_slots_print_disjoint_labelled_parts_whose_union_is_the_whole_plan(
-    plugin_root: Path, tmp_path: Path
-) -> None:
-    _add_managed_core_rows(plugin_root)
-    root, _ = _managed_root(tmp_path)
-
-    texts = [text for text in _slot_texts(plugin_root, root) if text]
-    places = {(_LABEL.match(text).group(1), _LABEL.match(text).group(2)) for text in texts}
-    whole = _run(plugin_root, root)
-
-    assert len(places) == len(texts) > len(_CORE_UNIT_IDS) + 3
-    assert max(len(text) for text in texts) <= 10_000
-    assert whole == "## Praxion Rules (auto-injected)\n\n" + _rebuilt_units(texts)
-
-
-def test_a_slot_past_the_plan_prints_nothing(plugin_root: Path, project_dir: Path) -> None:
-    texts = _slot_texts(plugin_root, project_dir)
-
-    assert [bool(text) for text in texts] == [True] * 3 + [False] * (_SLOTS_PROBED - 3)
-
-
-@pytest.mark.parametrize("args", [("--slot", "0"), ("--slot", "x"), ("--slot",), ("--all",)])
-def test_a_malformed_argument_prints_nothing(
-    plugin_root: Path, project_dir: Path, args: tuple[str, ...]
-) -> None:
-    assert _run(plugin_root, project_dir, *args) == ""
-
-
-def test_only_the_first_slot_writes_the_exclusions(plugin_root: Path, tmp_path: Path) -> None:
-    root, _ = _managed_root(tmp_path)
-    _write_project_config(root, "version: 1\ndisable: [ml/*]\n")
-
-    _run(plugin_root, root, "--slot", "2")
-    written_by_slot_two = (root / ".claude" / "settings.json").exists()
-    _run(plugin_root, root, "--slot", "1")
-
-    assert not written_by_slot_two
-    assert "claudeMdExcludes" in (root / ".claude" / "settings.json").read_text()
-
-
-@pytest.mark.parametrize("impairment", _IMPAIRMENTS)
-def test_an_impaired_injection_still_delivers_the_core_units_to_a_managed_scope(
-    plugin_root: Path, tmp_path: Path, impairment: str
-) -> None:
-    root, _ = _managed_root(tmp_path)
-
-    context = _run(plugin_root, root, impairment=impairment)
-
-    assert [_core_body(unit_id) in context for unit_id in _CORE_UNIT_IDS] == [True] * 3
-    assert _GIT_CONVENTIONS_MARKER not in context
-    assert _ROUTING_MARKER not in context
-
-
-@pytest.mark.parametrize("impairment", _IMPAIRMENTS)
-def test_an_impaired_injection_delivers_no_unit_to_an_unmanaged_scope(
-    plugin_root: Path, project_dir: Path, impairment: str
-) -> None:
-    context = _run(plugin_root, project_dir, impairment=impairment)
-
-    assert "Praxion Rules (auto-injected)" not in context
-    assert not any(_core_body(unit_id) in context for unit_id in _CORE_UNIT_IDS)
-
-
-def test_an_unavailable_manifest_notice_is_the_first_slot_before_the_floor(
-    plugin_root: Path, tmp_path: Path
-) -> None:
-    root, _ = _managed_root(tmp_path)
-
-    texts = [
-        _run(plugin_root, root, "--slot", str(n), impairment="manifest-not-a-mapping")
-        for n in range(1, 6)
-    ]
-
-    assert texts[0].startswith("## Praxion rule injection skipped")
-    assert [bool(text) for text in texts] == [True] * 4 + [False]
-
-
-def test_a_unit_still_linked_at_user_scope_is_skipped(plugin_root: Path, tmp_path: Path) -> None:
-    root, _ = _managed_root(tmp_path)
-    linked = _CORE_UNIT_IDS[1]
-    _link_at_user_scope(plugin_root, linked, plugin_root / "rules" / f"{linked}.md")
-
-    floor = _run(plugin_root, root, impairment="kill-switch")
-    _add_managed_core_rows(plugin_root)
-    managed = _run(plugin_root, root)
-
-    assert (_core_body(linked) in floor, _core_body(linked) in managed) == (False, False)
-    assert _core_body(_CORE_UNIT_IDS[0]) in floor
-    assert _core_body(_CORE_UNIT_IDS[0]) in managed
-
-
-def test_a_unit_for_every_scope_still_linked_at_user_scope_stays_injected(
-    plugin_root: Path, tmp_path: Path
-) -> None:
-    root, _ = _managed_root(tmp_path)
-    linked = "swe/vcs/git-conventions"
-    _link_at_user_scope(plugin_root, linked, plugin_root / "rules" / f"{linked}.md")
-
-    assert _GIT_CONVENTIONS_BODY.strip() in _run(plugin_root, root)
-
-
-def test_a_dangling_link_does_not_count_as_installed(plugin_root: Path, tmp_path: Path) -> None:
-    root, _ = _managed_root(tmp_path)
-    _link_at_user_scope(plugin_root, _CORE_UNIT_IDS[1], tmp_path / "missing.md")
-
-    assert _core_body(_CORE_UNIT_IDS[1]) in _run(plugin_root, root, impairment="kill-switch")
-
-
-def test_a_link_to_another_file_does_not_count_as_installed(
-    plugin_root: Path, tmp_path: Path
-) -> None:
-    root, _ = _managed_root(tmp_path)
-    other = tmp_path / "notes.md"
-    other.write_text("notes\n")
-    _link_at_user_scope(plugin_root, _CORE_UNIT_IDS[1], other)
-
-    assert _core_body(_CORE_UNIT_IDS[1]) in _run(plugin_root, root, impairment="kill-switch")
-
-
-def test_the_user_configuration_directory_variable_locates_the_user_scope_links(
-    plugin_root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    config = tmp_path / "config"
-    link = config / "rules" / f"{_CORE_UNIT_IDS[0]}.md"
-    link.parent.mkdir(parents=True)
-    link.symlink_to(plugin_root / "rules" / f"{_CORE_UNIT_IDS[0]}.md")
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config))
-    module = _import_hook_module()
-
-    assert module._natively_installed(_CORE_UNIT_IDS) == {_CORE_UNIT_IDS[0]}

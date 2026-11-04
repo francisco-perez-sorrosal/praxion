@@ -19,7 +19,8 @@ STATE = ".ai-state"
 GIT = ".git"
 
 # `locate` runs on every hook call; nothing beyond these may be imported.
-_ALLOWED_IMPORTS = frozenset({"__future__", "collections", "os", "pathlib"})
+# `_project_scope` owns `locate` and is itself stdlib-only.
+_ALLOWED_IMPORTS = frozenset({"__future__", "collections", "os", "pathlib", "_project_scope"})
 
 
 def _project(root: Path, *, checkout: bool = True) -> Path:

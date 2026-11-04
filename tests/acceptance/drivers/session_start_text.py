@@ -59,7 +59,9 @@ from tests.acceptance.drivers.scratch_projects import copy_home, impair_manifest
 KILL_SWITCH = "PRAXION_DISABLE_RULE_INJECTION"
 HEADLESS, INTERACTIVE = "sdk-cli", "cli"
 LEAN_ROLE = "researcher"
-INHERITING_ROLE = "implementer"
+# A role outside the eligibility pin, so no flip can make it lean: the implementer, named first,
+# was switched to its kernel on main (08ca61da).
+INHERITING_ROLE = "systems-architect"
 HOST_NATIVE = "general-purpose"
 NON_TRIVIAL_PROMPT = (
     "Please restructure the payment module so refunds and charges share one validation path, "

@@ -49,6 +49,12 @@ HOOK_DELIVER_ORDER = [
     "swe/vcs/git-conventions",
 ]
 
+# `project_scope` frontmatter: `every` (the default, never emitted) or `managed`
+# (delivered only into Praxion-managed projects).
+PROJECT_SCOPE_EVERY = "every"
+PROJECT_SCOPE_MANAGED = "managed"
+PROJECT_SCOPES = frozenset({PROJECT_SCOPE_EVERY, PROJECT_SCOPE_MANAGED})
+
 MANIFEST_HEADER = (
     "# AUTO-GENERATED. Do not edit by hand.\n"
     "# Regenerate with: python3 scripts/regenerate_rules_manifest.py\n"
@@ -90,6 +96,9 @@ def _build_rule_record(rule_path: Path, fm: dict[str, Any]) -> dict[str, Any]:
     }
     if paths_value := fm.get("paths"):
         record["paths"] = paths_value
+    # Anything but the default is emitted so the validator can refuse an unknown value.
+    if (scope := str(fm.get("project_scope", PROJECT_SCOPE_EVERY))) != PROJECT_SCOPE_EVERY:
+        record["project_scope"] = scope
     return record
 
 
@@ -139,6 +148,36 @@ def _validate_hook_deliver_coverage(records: list[dict[str, Any]]) -> list[str]:
     ]
 
 
+def _validate_project_scope(records: list[dict[str, Any]]) -> list[str]:
+    """Verify every `project_scope` value is known and that `managed` rules are
+    hook-delivered, always-on and unscoped by path — the only shape the
+    managed-only delivery can honour (a symlinked rule reaches every project)."""
+    errors = []
+    for r in records:
+        scope = r.get("project_scope")
+        if scope is None:
+            continue
+        rid = r["id"]
+        if scope not in PROJECT_SCOPES:
+            errors.append(
+                f"ERROR: rule '{rid}' has unknown project_scope '{scope}'"
+                f" (expected one of: {', '.join(sorted(PROJECT_SCOPES))})"
+            )
+            continue
+        if r["load"] != "always_on":
+            errors.append(
+                f"ERROR: managed rule '{rid}' must declare load: always_on (got '{r['load']}')"
+            )
+        if "paths" in r:
+            errors.append(f"ERROR: managed rule '{rid}' must not declare paths:")
+        if r["install"] != "hook-deliver":
+            errors.append(
+                f"ERROR: managed rule '{rid}' must declare install: hook-deliver"
+                f" (got '{r['install']}')"
+            )
+    return errors
+
+
 def _ordered_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return records in canonical manifest order:
     1. Core rules (alphabetical by id)
@@ -185,7 +224,11 @@ def _all_validation_errors(records: list[dict[str, Any]]) -> list[str]:
     """Aggregate every structural validation that must pass before the manifest
     is considered well-formed. Runs all validators so the user sees every
     error at once rather than discovering them one-at-a-time."""
-    return _validate_core_rules(records) + _validate_hook_deliver_coverage(records)
+    return (
+        _validate_core_rules(records)
+        + _validate_hook_deliver_coverage(records)
+        + _validate_project_scope(records)
+    )
 
 
 def run_generate() -> int:

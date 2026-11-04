@@ -548,6 +548,86 @@ def test_no_categories_block_in_generated_manifest(
 
 
 # ---------------------------------------------------------------------------
+# project_scope frontmatter key
+# ---------------------------------------------------------------------------
+
+
+def _frontmatter(**fields: Any) -> str:
+    return "---\n" + yaml.safe_dump(fields, sort_keys=False) + "---\n"
+
+
+def _generate_with_memory_protocol(
+    monkeypatch: pytest.MonkeyPatch,
+    minimal_rules_tree: tuple[Path, Path],
+    frontmatter: str,
+    capsys: pytest.CaptureFixture[str],
+) -> tuple[int, dict[str, Any], str]:
+    """Rewrite one hook-delivered rule's frontmatter, regenerate, and return
+    (exit code, that rule's record, stderr)."""
+    rules_dir, manifest_path = minimal_rules_tree
+    (rules_dir / "swe" / "memory-protocol.md").write_text(frontmatter + "## Memory\n")
+    mod = _patched_module(monkeypatch, rules_dir, manifest_path)
+    exit_code = mod.run_generate()
+    stderr = capsys.readouterr().err
+    if exit_code != 0:
+        return exit_code, {}, stderr
+    rules = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))["rules"]
+    return exit_code, next(r for r in rules if r["id"] == "swe/memory-protocol"), stderr
+
+
+def test_managed_rule_is_emitted_with_its_project_scope(monkeypatch, minimal_rules_tree, capsys):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="managed")
+    exit_code, record, _ = _generate_with_memory_protocol(
+        monkeypatch, minimal_rules_tree, fm, capsys
+    )
+    assert exit_code == 0
+    assert record["project_scope"] == "managed"
+
+
+@pytest.mark.parametrize("scope_fields", [{}, {"project_scope": "every"}])
+def test_every_or_absent_project_scope_emits_no_key(
+    monkeypatch, minimal_rules_tree, capsys, scope_fields
+):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", **scope_fields)
+    exit_code, record, _ = _generate_with_memory_protocol(
+        monkeypatch, minimal_rules_tree, fm, capsys
+    )
+    assert exit_code == 0
+    assert "project_scope" not in record
+
+
+@pytest.mark.parametrize(
+    ("fields", "complaint"),
+    [
+        ({"load": "always_on", "install": "hook-deliver", "paths": ["**/*.py"]}, "paths"),
+        ({"load": "path_scoped", "install": "hook-deliver"}, "load: always_on"),
+        ({"load": "always_on", "install": "symlink"}, "install: hook-deliver"),
+    ],
+    ids=["with-paths", "path-scoped-load", "symlink-install"],
+)
+def test_managed_rule_with_a_non_deliverable_shape_is_refused_by_name(
+    monkeypatch, minimal_rules_tree, capsys, fields, complaint
+):
+    fm = _frontmatter(core=False, project_scope="managed", **fields)
+    exit_code, _, stderr = _generate_with_memory_protocol(
+        monkeypatch, minimal_rules_tree, fm, capsys
+    )
+    assert exit_code == 1
+    assert "swe/memory-protocol" in stderr
+    assert complaint in stderr
+
+
+def test_unknown_project_scope_is_refused_by_name(monkeypatch, minimal_rules_tree, capsys):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="some")
+    exit_code, _, stderr = _generate_with_memory_protocol(
+        monkeypatch, minimal_rules_tree, fm, capsys
+    )
+    assert exit_code == 1
+    assert "swe/memory-protocol" in stderr
+    assert "some" in stderr
+
+
+# ---------------------------------------------------------------------------
 # Subprocess smoke-test: CLI --check exit-code contract
 # ---------------------------------------------------------------------------
 

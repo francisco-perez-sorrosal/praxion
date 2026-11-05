@@ -5,7 +5,9 @@ under `tests/acceptance/fixtures/project_gating/` (`gating_readings.freeze`), so
 compares with today without reading history. A *statement* is a sentence of at least 30
 characters that is not a heading; process text is compared as a multiset of statements, so a
 statement that arrives twice counts twice. The two constitutional sentences are recognised by
-meaning, each within one paragraph.
+meaning, each within one paragraph. The frozen base serves this change's before-and-after
+claim: a later legitimate edit to a managed-only rule or to the constitution re-freezes these
+fixtures only as an answered Spec Question (td-559).
 
 `declared_edits` reads the record of the change's declared edits (`declared_edits.json`), each
 with its before and after wording. It is read only when a reading differs from today.

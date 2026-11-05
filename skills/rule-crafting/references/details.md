@@ -5,6 +5,7 @@ Detailed guidance for writing, debugging, and maintaining rules. Back to [SKILL.
 ## Contents
 
 - [Rule Loading Mechanics](#rule-loading-mechanics)
+- [Project Scope](#project-scope)
 - [Writing Effective Rules](#writing-effective-rules)
 - [Debugging Rule Loading](#debugging-rule-loading)
 - [Rule Lifecycle](#rule-lifecycle)
@@ -45,6 +46,27 @@ All always-loaded content (CLAUDE.md files + rules without `paths:`) shares a 25
 | `.claude/CLAUDE.md` | Always loaded |
 | Rules without `paths:` | Always eligible (loaded by relevance) |
 | Rules with `paths:` | Loaded only when file patterns match |
+
+## Project Scope
+
+`project_scope` says where a rule reaches a session. `every` (the default; the manifest omits the key) reaches every project. `managed` reaches a session only when the working directory belongs to a Praxion-managed project: one whose `.ai-state/` sits at the working directory or at an ancestor, up to the first `.git` entry (`hooks/_project_scope.py::scope_of`).
+
+Legality, enforced by `scripts/regenerate_rules_manifest.py`, which refuses to write the manifest otherwise:
+
+- The value is `every` or `managed`. Any other value is an error.
+- A `managed` rule is `load: always_on`, `install: hook-deliver`, and carries no `paths:`. A path-scoped rule has no always-loaded text for a managed-only delivery to carry, and a symlink would reach every project.
+- The set is pinned. Exactly four rules carry `managed`: the coordination protocol, the intermediate-documents rule, the ADR resident and the model-routing resident. Adding a rule to the set means editing the pin, not only the frontmatter.
+- The two constitutional rules (the behavioural contract and git conventions) never carry `managed`.
+
+**Resident exception.** A resident (`resident_of:`) keeps its parent's `core` key and declares its own `load` (`always_on`), `install` and `project_scope`. A managed rule cannot carry `paths:`, so a path-scoped parent cannot itself be managed; the resident declares its own scope. The ADR resident is `managed` while its parent, `swe/adr-conventions`, reaches every project.
+
+**Delivery.** `hooks/inject_rules.py` delivers a managed rule:
+
+- to a session in a managed project, at SessionStart;
+- to an inheriting spawn, at SubagentStart, only when the rule is one of the three managed core units (the protocol, the intermediate-documents rule, the ADR resident). The routing resident does not reach spawns;
+- to nothing else. Lean spawns (a definition that sets `omitClaudeMd`), `Explore` and `Plan` receive no managed rule.
+
+The installer never links a managed rule into `~/.claude/rules/`. The Codex bridge and the Cursor exporter do not scope by `project_scope`: they carry every non-resident rule, managed ones included. Scoping is a Claude Code delivery property.
 
 ## Writing Effective Rules
 

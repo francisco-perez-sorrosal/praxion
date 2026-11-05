@@ -413,7 +413,7 @@ disable:
 
 The user can then rename `.example` to `.claude/praxion-rules.yaml` and uncomment entries in the `disable:` list to activate them (or keep `.example` for reference and author a fresh `praxion-rules.yaml` from scratch).
 
-See [`docs/rules-taxonomy.md`](../../../docs/rules-taxonomy.md) for the complete reference on rule categories, token accounting, and disable-list configuration. A project with no `.claude/praxion-rules.yaml` loads all rules identically to the original behavior — backward compatible, opt-out default.
+See [`docs/rules-taxonomy.md`](../../../docs/rules-taxonomy.md) for the complete reference on rule categories, token accounting, and disable-list configuration. A managed project with no `.claude/praxion-rules.yaml` loads all rules identically to the original behavior — backward compatible, opt-out default. An unmanaged directory loads every rule except the managed-only ones (see [`rules/README.md`](../../../rules/README.md)), and the template copy below writes only into a managed project's root, never into an unmanaged directory or a subdirectory of one.
 
 ## §Phase 5b — Hackathon mode gate
 

@@ -9,11 +9,11 @@ Every Praxion-onboarded project inherits a curated set of rules: coding style, b
 
 ## Token-Savings Ceiling (Read This First)
 
-**The maximum baseline token reduction this mechanism can deliver is the sum of the *hook-deliver* rule sizes — currently about 2,450 tokens across two rules** (tokenizer-measured 2026-11-01: the resident 753, git-conventions 1,699) (the routing rule's session-start text, `swe/agent-model-routing-resident`, and `swe/vcs/git-conventions`). Everything else in the disable list is a *policy guarantee*, not a token saver:
+**The maximum baseline token reduction this mechanism can deliver is the sum of the sizes of the *disableable* hook-deliver rules — currently about 2,450 tokens across two rules** (tokenizer-measured 2026-11-01: the resident 753, git-conventions 1,699) (the routing rule's session-start text, `swe/agent-model-routing-resident`, and `swe/vcs/git-conventions`). Everything else in the disable list is a *policy guarantee*, not a token saver:
 
 - **Core rules** (`core: true`, ~9,174 tokens, tokenizer-measured) are non-disableable. They load unconditionally — listing them in `disable:` emits a warning and changes nothing.
 - **Path-scoped rules** (19 rules) are already lazy: they cost **zero tokens at SessionStart** regardless of the disable list. Adding them to `disable:` produces a *declarative* guarantee that they will never load — useful in projects where a generically-named trigger file could appear (`prepare.py` in a non-ML project) — but yields no baseline savings.
-- **Hook-deliver rules** are the only group whose disable status moves tokens.
+- **Disableable hook-deliver rules** are the only group whose disable status moves tokens. The three managed core units are hook-delivered too, but they are core, so the mechanism never moves them.
 
 If your goal is to shrink the always-loaded surface beyond the ~2.45k-token hook-deliver ceiling, the lever is **not** the YAML — it is the `core: true/false` classification in `rules/_manifest.yaml`, or splitting bulky always-on rules into thin always-on summaries plus on-demand reference files under `skills/<name>/references/`. The YAML mechanism is a per-project filter over the rules already available; the `core` classification is the architectural decision about *which* rules are available at all.
 
@@ -23,10 +23,10 @@ Praxion delivers rules through two channels. The per-project `.claude/praxion-ru
 
 | Channel | Delivery | Disable mechanism |
 |---------|----------|-------------------|
-| **Hook-deliver** | Body shipped at SessionStart via `additionalContext` JSON from `inject_rules.py` | Filtered out of `additionalContext` when in the YAML disable list; **also** receives a `claudeMdExcludes` entry as defense-in-depth against stale symlinks from a prior install when this rule was an `install: symlink` |
+| **Hook-deliver** | Body shipped via `additionalContext` JSON from `inject_rules.py`: at SessionStart, and for the three managed core units also at SubagentStart (inheriting spawns only). A rule marked `project_scope: managed` reaches only managed projects | Filtered out of `additionalContext` when in the YAML disable list; **also** receives a `claudeMdExcludes` entry as defense-in-depth against stale symlinks from a prior install when this rule was an `install: symlink` |
 | **Symlink** | File installed to `~/.claude/rules/<id>.md`; Claude Code's native runtime loads it (unconditionally for always-on rules; on matching `Read` for path-scoped rules) | Portable glob (`**/.claude/rules/<id>.md`) reconciled into `claudeMdExcludes` in `.claude/settings.json`; Claude Code's runtime skips the file |
 
-Together the two mechanisms give the YAML uniform reach: **any rule named in the disable list is guaranteed not to load**. The one exception is core rules (`core: true`) — they remain non-disableable, and attempts to disable them emit a stderr warning.
+Together the two mechanisms give the YAML uniform reach: **any rule named in the disable list is guaranteed not to load**. The one exception is core rules (`core: true`) — they remain non-disableable, and attempts to disable them emit a stderr warning. The hook-delivery channel itself is the decision recorded in dec-167.
 
 ## Three Categories of Rules
 
@@ -42,13 +42,15 @@ Five core entries encode Praxion's operating contract: four rules and the reside
 | `swe/agent-intermediate-documents` | `rules/swe/agent-intermediate-documents.md` | `.ai-work/` and `.ai-state/` document locations, lifetimes, task-slug convention | ~1130 tokens |
 | `swe/swe-agent-coordination-protocol` | `rules/swe/swe-agent-coordination-protocol.md` | Agent pipeline, tier table, delegation checklists, parallel execution | ~4573 tokens |
 
-**Total always-loaded core tokens:** ~6,205 on the gate's default tokenizer (see [`measure_token_budget.py`](../scripts/measure_token_budget.py)'s `count_tokens`; `--model <id>` reads them on a current model's tokenizer, which counts higher).
+Three of these five (the coordination protocol, the intermediate-documents rule and the ADR resident) reach managed projects only. An unmanaged project never loads them, and no disable entry is involved.
+
+**Total always-loaded core tokens (managed project):** ~6,205 on the gate's default tokenizer (see [`measure_token_budget.py`](../scripts/measure_token_budget.py)'s `count_tokens`; `--model <id>` reads them on a current model's tokenizer, which counts higher).
 
 `rules/CLAUDE.md` is not a rule: it is the rules tree's directory guide, skipped by the manifest and the installer, and Claude Code loads it on demand as a nested `CLAUDE.md` when a session touches `rules/`. It was a core rule until 2026-10-11.
 
 ### 2. Always-Loaded Hook-Deliver Rules (disableable, biggest token savings)
 
-Two rules ship at SessionStart and contribute to the always-loaded token baseline. Disabling them via the YAML filters them out of `additionalContext` — the most direct way to reclaim always-loaded tokens.
+Two rules are disableable hook-deliver rules. They ship at SessionStart and contribute to the always-loaded token baseline; disabling them via the YAML filters them out of `additionalContext`, the most direct way to reclaim always-loaded tokens. The three managed core units (section 1) are also hook-delivered, but they are core and never filtered.
 
 | ID | Rule file | Purpose | Token cost | Typical disabler |
 |----|-----------|---------|------------|------------------|
@@ -135,7 +137,7 @@ The disable list supports fnmatch glob patterns. Note that fnmatch's `*` crosses
 | `ml/*` | 3 ML rules (all path-scoped) | `claudeMdExcludes` patterns added; no SessionStart token savings; declarative-only guarantee |
 | `writing/*` | 4 writing rules (all path-scoped) | Same as above |
 | `swe/vcs/*` | 2 VCS rules: `git-conventions` (hook-deliver) + `pr-conventions` (path-scoped) | `git-conventions` filtered from `additionalContext` (reclaims ~1.7k tokens); `pr-conventions` added to `claudeMdExcludes` |
-| `swe/*` | 16 SWE rules | 5 core: warnings emitted, kept loaded; 2 hook-deliver: filtered from `additionalContext` (~2.45k tokens reclaimed); 9 path-scoped: `claudeMdExcludes` patterns added |
+| `swe/*` | 16 SWE rules | 5 core: warnings emitted, kept loaded (three reach managed projects only); 2 disableable hook-deliver: filtered from `additionalContext` (~2.45k tokens reclaimed); 9 path-scoped: `claudeMdExcludes` patterns added |
 
 ## Core Rule Protection
 
@@ -167,9 +169,9 @@ For debugging or temporary disabling, set the environment variable:
 PRAXION_DISABLE_RULE_INJECTION=1 claude-code
 ```
 
-This skips the `inject_rules.py` hook entirely. Effects:
+This bypasses the manifest and the project's disable list: the `inject_rules.py` hook still runs and delivers only the managed core units. Effects:
 
-- Hook-deliver rule bodies are absent from `additionalContext` (the two blacklistable always-loaded rules are not delivered)
+- In a managed project the three managed core units are still delivered; in an unmanaged directory nothing is. The two disableable hook-deliver rules are absent from `additionalContext` in either case
 - The hook does **not** run `claudeMdExcludes` reconciliation; any existing entries from prior sessions remain in effect via Claude Code's native runtime, so previously-disabled symlinked rules stay disabled
 - Core rules symlinked into `~/.claude/rules/` continue to load via Claude Code's native rule mechanism
 
@@ -180,16 +182,16 @@ This skips the `inject_rules.py` hook entirely. Effects:
 When a session starts, the `inject_rules.py` hook logs a summary line to stderr:
 
 ```
-[inject_rules] Loaded 5 core rules; injected 2/2 hook-deliver rules (suppressed: none); claudeMdExcludes entries: none
+[inject_rules] Loaded 5 core rules; injected 5/5 hook-deliver rules (suppressed: none); claudeMdExcludes entries: none
 ```
 
 With suppressions active (e.g., `disable: [ml/*, swe/vcs/git-conventions]`):
 
 ```
-[inject_rules] Loaded 5 core rules; injected 1/2 hook-deliver rules (suppressed: swe/vcs/git-conventions); claudeMdExcludes entries: ml/eval-driven-verification, ml/experiment-commit-conventions, ml/experiment-tracking-conventions, ml/gpu-budget-conventions, swe/vcs/git-conventions
+[inject_rules] Loaded 5 core rules; injected 4/5 hook-deliver rules (suppressed: swe/vcs/git-conventions); claudeMdExcludes entries: ml/eval-driven-verification, ml/experiment-commit-conventions, ml/experiment-tracking-conventions, ml/gpu-budget-conventions, swe/vcs/git-conventions
 ```
 
-This confirms which rules were loaded, which hook-deliver rules were filtered, and which rules were added to `claudeMdExcludes` for the session. Note: the disabled hook-deliver rule (`swe/vcs/git-conventions`) appears in *both* the `suppressed:` list and the `claudeMdExcludes entries:` list — the latter is defense-in-depth against stale symlinks (see [`hooks/inject_rules.py`](../hooks/inject_rules.py) `_compute_symlink_exclusions` docstring). Disabling `swe/agent-model-routing` suppresses the routing rule's session-start text through its parent's id, and adds both that text and the path-scoped rule to `claudeMdExcludes`.
+The `Loaded N core rules` count is the manifest's, the same in every scope; the injected count depends on scope. An unmanaged directory reads `injected 1/5`, because only `swe/vcs/git-conventions` reaches it. This confirms which rules were loaded, which hook-deliver rules were filtered, and which rules were added to `claudeMdExcludes` for the session. Note: the disabled hook-deliver rule (`swe/vcs/git-conventions`) appears in *both* the `suppressed:` list and the `claudeMdExcludes entries:` list — the latter is defense-in-depth against stale symlinks (see `compute_symlink_exclusions` in [`hooks/_rule_blacklist.py`](../hooks/_rule_blacklist.py)). Disabling `swe/agent-model-routing` suppresses the routing rule's session-start text through its parent's id, and adds both that text and the path-scoped rule to `claudeMdExcludes`.
 
 ### Misuse warnings
 
@@ -223,7 +225,7 @@ disable:
   - writing/*
 ```
 
-**SessionStart token reduction:** ~2,450 (both hook-deliver rules). Path-scoped categories contribute zero baseline cost regardless — disabling them adds declarative guarantees but no SessionStart savings.
+**SessionStart token reduction:** ~2,450 (both disableable hook-deliver rules). Path-scoped categories contribute zero baseline cost regardless — disabling them adds declarative guarantees but no SessionStart savings.
 
 ### ML Project
 

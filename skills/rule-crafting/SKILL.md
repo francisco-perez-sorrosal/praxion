@@ -189,7 +189,7 @@ Use `##` (h2) as the top-level heading — rules are injected into a larger cont
 
 ### Frontmatter Fields
 
-Claude Code reads exactly one rule frontmatter key, `paths`. Praxion's canonical rules (`rules/**/*.md`, shipped via the plugin) carry five more, read by its installer, SessionStart hook, Codex bridge, kernel tools and Cursor exporter — project-local rules in `.claude/rules/` do not need them. All are optional, and `scripts/regenerate_rules_manifest.py` copies them into the generated `rules/_manifest.yaml`, which is what those consumers actually read: regenerate after changing any of them.
+Claude Code reads exactly one rule frontmatter key, `paths`. Praxion's canonical rules (`rules/**/*.md`, shipped via the plugin) carry six more, read by its installer, SessionStart hook, Codex bridge, kernel tools and Cursor exporter — project-local rules in `.claude/rules/` do not need them. All are optional, and `scripts/regenerate_rules_manifest.py` copies them into the generated `rules/_manifest.yaml`, which is what those consumers actually read: regenerate after changing any of them.
 
 | Field | Values (default) | Meaning — and the consumer that reads it |
 |---|---|---|
@@ -198,6 +198,7 @@ Claude Code reads exactly one rule frontmatter key, `paths`. Praxion's canonical
 | `load` | `always_on` / `path_scoped` (`path_scoped`) | **Descriptive only** — copied into the manifest, but no installer, hook, or runtime path branches on it. Actual loading is decided by `paths` (runtime) and `install` (delivery). Keep it consistent with `paths` so the manifest reads true |
 | `install` | `symlink` / `hook-deliver` (`symlink`) | Delivery channel. `symlink` → `link_rules()` in `lib/install_shared.sh` links the file into `~/.claude/rules/`. `hook-deliver` → the installer skips it and `hooks/inject_rules.py` injects it at SessionStart, where a project blacklist can suppress it. Every `hook-deliver` rule must also appear in `HOOK_DELIVER_ORDER` in `regenerate_rules_manifest.py` |
 | `codex` | nested `portability` / `load` (absent) | Codex-export classification only, read by `codex/config/export-codex-rules-bridge.py` — see [Automatic Codex Classification](#automatic-codex-classification) |
+| `project_scope` | `every` / `managed` (`every`; the manifest omits the key) | Where the rule reaches a session. `managed` reaches only Praxion-managed projects, through the injector's hook delivery alone: the installer never links it, and the Codex bridge and Cursor exporter do not scope it. Legal only on an always-on, hook-delivered rule with no `paths:`, and only for the pinned ids; see [details.md § Project Scope](references/details.md#project-scope) |
 | `resident_of` | path of a rule (absent) | Marks the file as the always-loaded projection of the named path-scoped rule. Read by the kernel tools (`scripts/kernel_sources.py`, through `scripts/_resident_of.py`) and by the Cursor exporter and the Codex bridge, which skip the file (each checks the key itself, held equal to `_resident_of.py` by a parity test); see [Path-Scoped Rule With a Resident File](#path-scoped-rule-with-a-resident-file) |
 
 **Nested `codex.load` is not the top-level `load`.** Different keys, different consumers, different value sets — `codex.load` also accepts `exclude` and `auto`, and any value other than `exclude` requires `codex.portability: portable`. The nesting is the only thing keeping them apart; never flatten one into the other.
@@ -260,7 +261,7 @@ Verified 2026-10-11 against `code.claude.com/docs/en/memory` and the Claude Code
 A rule that must stay discoverable from session start but costs too much to load in full can be split into a pair, never into main + satellite (see [Self-Containment Constraint](#self-containment-constraint)):
 
 - **The rule** `P`: path-scoped (`paths:`), byte-identical to the lean arm measured in the paired run. It keeps `codex: load: always_on`, because Codex has no path scoping and must keep today's text.
-- **The resident** `R`: a small always-loaded file next to it, named `<rule>-resident.md`, with `resident_of: <path of P>`, and the `core`, `load` and `install` keys mirrored from `P`; the Codex bridge and the Cursor exporter leave out any file that declares `resident_of`, so it needs no `codex:` key. Every non-blank body line of `R` is a line of `P`, verbatim; the kernel check enforces it, and `R` gets no audience entry.
+- **The resident** `R`: a small always-loaded file next to it, named `<rule>-resident.md`, with `resident_of: <path of P>`, `P`'s `core` key, and its own `load: always_on` and `install`; the Codex bridge and the Cursor exporter leave out any file that declares `resident_of`, so it needs no `codex:` key. Every non-blank body line of `R` is a line of `P`, verbatim; the kernel check enforces it, and `R` gets no audience entry.
 
 Order of work: declare the move in a kit; run the paired run (full rule against the pair); ship exactly the lean arm's files; generate `rules/_manifest.yaml` with `scripts/regenerate_rules_manifest.py`, never by hand; name every difference from the measured arm (frontmatter, `chars`, stamp) instead of letting it pass unremarked.
 

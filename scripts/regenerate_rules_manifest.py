@@ -39,10 +39,13 @@ EXPECTED_CORE_IDS = frozenset(
     }
 )
 
-# Blacklistable always-loaded rules in canonical injection order.
-# This order drives additionalContext concatenation in inject_rules.py.
-# Any rule whose frontmatter declares `install: hook-deliver` MUST appear in
-# this list — _validate_hook_deliver_coverage() enforces this at check time.
+# Where each `install: hook-deliver` rule sits in the manifest. inject_rules.py
+# hands the rules to hooks/_rule_delivery.py in this order, and the planner keeps
+# it only within a group: every-scope rules first, then the managed-only ones,
+# the core units last in MANAGED_CORE_UNITS order. So this list orders rules
+# within a group; the planner decides what a managed session receives first.
+# Every hook-deliver rule MUST be listed — _validate_hook_deliver_coverage()
+# enforces this at check time.
 HOOK_DELIVER_ORDER = [
     "swe/memory-protocol",
     "swe/agent-model-routing-resident",
@@ -150,9 +153,8 @@ def _validate_hook_deliver_coverage(records: list[dict[str, Any]]) -> list[str]:
     """Verify every install: hook-deliver rule appears in HOOK_DELIVER_ORDER.
 
     Catches the footgun where a new hook-deliver rule is added without updating
-    the canonical injection-order list — without this check, the new rule
-    would fall through to the path-scoped section of the manifest and lose
-    its stable injection position.
+    the order list — without this check, the new rule would fall through to
+    the path-scoped section of the manifest and lose its stable position.
     """
     declared = {r["id"] for r in records if r.get("install") == "hook-deliver" and "id" in r}
     ordered = set(HOOK_DELIVER_ORDER)
@@ -162,7 +164,7 @@ def _validate_hook_deliver_coverage(records: list[dict[str, Any]]) -> list[str]:
     return [
         f"ERROR: hook-deliver rule '{rid}' is not in HOOK_DELIVER_ORDER in"
         f" scripts/regenerate_rules_manifest.py. Add it in the desired"
-        f" injection position (manifest order drives additionalContext order)."
+        f" manifest position (the delivery planner keeps it within the rule's group)."
         for rid in sorted(missing)
     ]
 

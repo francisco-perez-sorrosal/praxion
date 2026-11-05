@@ -107,6 +107,9 @@ MOVE_CHECKOUT_FILES = (
     "hooks/inject_rules.py",  # the registered session-start rule injection, run over an arm copy
     "claude/config/praxion-rules.yaml.example",  # read by inject_rules.py
     "hooks/_hook_utils.py",  # imported by inject_rules.py and remind_adr.py
+    "hooks/_project_scope.py",  # imported by inject_rules.py and _observation_log/location.py
+    "hooks/_rule_delivery.py",  # the injector's delivery planner, imported by inject_rules.py
+    "hooks/_rule_blacklist.py",  # the blacklist and template helpers, imported by inject_rules.py
     "hooks/commit_gate.sh",  # the wrapper the registered PreToolUse Bash commands run through
     "hooks/remind_adr.py",  # a registered PreToolUse hook on Bash, run on a commit command
     "cursor/config/export-cursor-rules.py",  # the Cursor rules export, run over each arm's tree

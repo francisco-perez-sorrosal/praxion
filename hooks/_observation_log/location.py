@@ -1,64 +1,17 @@
 """Which log, and which ``project``, a working directory belongs to.
 
-The package's one answer to that question. A session may work from any
-subdirectory of a checkout, yet its events belong to the project whose root
-holds ``.ai-state/``: ``locate`` walks up from the working directory to the
-nearest such directory and stops at the first ``.git`` entry, so a separate
-clone nested inside a recording project never writes into its host's log.
-
-Runs on every hook call: ``pathlib`` and ``collections`` only, no subprocess,
-at most two ``stat`` calls per directory level.
+The package's one answer to that question, now owned by ``hooks/_project_scope.py``
+(the single predicate for "is this directory served by a ``.ai-state/``?"); this
+module re-exports it so the log's importers keep one stable path. Behaviour is
+unchanged: ``locate`` walks up from the working directory to the nearest
+``.ai-state/`` and stops at the first ``.git`` entry.
 """
 
 from __future__ import annotations
 
-from collections import namedtuple
-from pathlib import Path
+try:  # imported as ``hooks._observation_log`` (repo root on the path)
+    from .._project_scope import CHECKOUT_MARKER, STATE_DIRNAME, Location, locate
+except ImportError:  # imported bare, with ``hooks/`` on the path (every hook script)
+    from _project_scope import CHECKOUT_MARKER, STATE_DIRNAME, Location, locate
 
-STATE_DIRNAME = ".ai-state"
-CHECKOUT_MARKER = ".git"  # a directory in a clone, a file in a linked worktree
-
-# ``project`` names the directory that holds the state, never a resolved link
-# target: ``.ai-state`` may be a symlink to a directory kept elsewhere.
-Location = namedtuple("Location", ("state_dir", "project_dir", "project"))
-
-
-def locate(cwd):
-    """The `Location` serving ``cwd``, or None when no log serves it.
-
-    The directory itself wins when it holds ``.ai-state/``. Otherwise the
-    nearest ancestor that does serves it, provided that ancestor sits at or
-    below the checkout root (the first directory up with a ``.git`` entry). A
-    directory that is in no checkout, or whose checkout holds no state, has no
-    log. A relative ``cwd`` has no meaning to a hook (it would resolve against
-    the hook's own directory), and one that no longer exists -- a removed linked
-    worktree, a deleted subdirectory -- would otherwise be read as its
-    still-recording parents by path text alone: both give None. Never raises: a
-    non-string or empty ``cwd`` and any ``OSError`` give None.
-    """
-    if not isinstance(cwd, str) or not cwd:
-        return None
-    start = Path(cwd)
-    try:
-        if not start.is_absolute() or not start.is_dir():
-            return None
-        project_dir = _serving_directory(start)
-    except OSError:
-        return None
-    if project_dir is None:
-        return None
-    return Location(project_dir / STATE_DIRNAME, project_dir, project_dir.name)
-
-
-def _serving_directory(start):
-    """The nearest directory at or above ``start`` holding the state, never
-    past the checkout root; ``start`` itself needs no checkout around it."""
-    nearest = None
-    for directory in (start, *start.parents):
-        if nearest is None and (directory / STATE_DIRNAME).is_dir():
-            nearest = directory
-            if directory == start:
-                return start
-        if (directory / CHECKOUT_MARKER).exists():
-            return nearest
-    return None
+__all__ = ("CHECKOUT_MARKER", "STATE_DIRNAME", "Location", "locate")

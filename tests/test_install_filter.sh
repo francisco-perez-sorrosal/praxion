@@ -594,6 +594,51 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Test 14: a managed row is never symlinked, even when the manifest says so
+# -----------------------------------------------------------------------------
+# Managed rules reach managed projects through the injection hook only. The
+# generator refuses `managed` + `install: symlink`; this canary is a hand-edited
+# manifest that carries the combination anyway.
+start_test "test_managed_row_is_never_linked_and_a_prior_link_is_swept"
+
+MANAGED_SRC="${TMPDIR}/managed_src"
+MANAGED_TGT="${TMPDIR}/managed_tgt"
+mkdir -p "${MANAGED_SRC}/swe" "${MANAGED_TGT}/swe"
+printf '# style\n'   > "${MANAGED_SRC}/swe/coding-style.md"
+printf '# managed\n' > "${MANAGED_SRC}/swe/managed-only.md"
+cat > "${MANAGED_SRC}/_manifest.yaml" <<'YAMLEOF'
+version: 1
+rules:
+- id: swe/coding-style
+  path: rules/swe/coding-style.md
+  install: symlink
+  project_scope: every
+- id: swe/managed-only
+  path: rules/swe/managed-only.md
+  install: symlink
+  project_scope: managed
+YAMLEOF
+
+MANAGED_PATHS="$(manifest_rule_paths "${MANAGED_SRC}/_manifest.yaml" symlink | tr '\n' ' ')"
+if [ "$MANAGED_PATHS" = "swe/coding-style.md " ]; then
+    pass "manifest_rule_paths drops the managed row from the symlink selection"
+else
+    fail "symlink selection with a managed row: '${MANAGED_PATHS}'"
+fi
+
+# A link left by an install that predates the flip.
+ln -sf "${MANAGED_SRC}/swe/managed-only.md" "${MANAGED_TGT}/swe/managed-only.md"
+
+link_rules "$MANAGED_SRC" "$MANAGED_TGT"
+
+MANAGED_LINKED="$(cd "$MANAGED_TGT" && find . -type l | sed 's|^\./||' | sort | tr '\n' ' ')"
+if [ "$MANAGED_LINKED" = "swe/coding-style.md " ]; then
+    pass "the managed row is neither linked nor kept: the prior link is swept"
+else
+    fail "managed row left a link behind: '${MANAGED_LINKED}'"
+fi
+
+# -----------------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------------
 printf "\n---\n"

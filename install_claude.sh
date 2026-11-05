@@ -1221,7 +1221,7 @@ check_claude_code() {
         elif "$hook_python" -c "import yaml" 2>/dev/null; then
             info "Hook interpreter ${hook_python} imports PyYAML"
         else
-            warn "Hook interpreter ${hook_python} lacks PyYAML — hook-delivered rules are skipped; put a python3 with PyYAML first on PATH"
+            warn "Hook interpreter ${hook_python} lacks PyYAML — hook-delivered rules are skipped, managed core procedures are still delivered; put a python3 with PyYAML first on PATH"
             healthy=false
         fi
         # Warn only about hooks earlier Praxion versions registered in

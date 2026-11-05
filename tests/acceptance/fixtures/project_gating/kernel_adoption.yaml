@@ -1,0 +1,5 @@
+# Frozen for the project-gating acceptance scenarios: the lean role delivers its kernel,
+# every other role is at no status, so what a spawn receives never follows the live ledger.
+roles:
+  researcher:
+    status: switched

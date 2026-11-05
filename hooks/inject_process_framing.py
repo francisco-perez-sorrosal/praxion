@@ -6,7 +6,7 @@ obligation — but only when the prompt is non-trivial and the session is
 in a Praxion-managed project.
 
 Fast-skip conditions (exit 0, no output):
-  (a) cwd has no .ai-state/ directory (non-Praxion project)
+  (a) cwd is not in a managed project (no .ai-state/ serves it)
   (b) PRAXION_DISABLE_PROCESS_INJECT=1 is set
   (c) _is_continuation(payload) returns True (continuation turn)
   (d) prompt length <= 60 AND prompt does not contain '?'
@@ -18,11 +18,13 @@ Synchronous hook. Exit 0 unconditionally — must never block prompt submission.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
 from _hook_utils import is_disabled
+from _project_scope import Unmanaged, scope_of
 
 # -- Constants -----------------------------------------------------------------
 
@@ -123,11 +125,13 @@ def main() -> None:
 
 def _process(payload: dict) -> None:
     """Apply gates and emit additionalContext when all gates pass."""
-    cwd = payload.get("cwd", "")
+    # A payload without cwd names the process directory, as the decision context does.
+    cwd = payload.get("cwd") or os.getcwd()
     prompt = payload.get("prompt", "")
 
     # Gate (a): non-Praxion project
-    if not Path(cwd, ".ai-state").is_dir():
+    scope = scope_of(cwd)
+    if isinstance(scope, Unmanaged):
         return
 
     # Gate (b): opt-out flag
@@ -139,7 +143,7 @@ def _process(payload: dict) -> None:
     # When the flag is OFF but the CLAUDE.md block is present, emit advisory
     # messages to help the user restore full ceremony.
     if not is_disabled(_HACKATHON_FLAG):
-        _check_hackathon_consistency(cwd)
+        _check_hackathon_consistency(scope.root)
 
     # Gate (c): continuation turn
     if _is_continuation(payload):
@@ -170,16 +174,16 @@ def _emit_advisory(message: str) -> None:
     print(json.dumps({"additionalContext": message}))
 
 
-def _has_hackathon_block(cwd: str) -> bool:
-    """Return True if the project CLAUDE.md contains the hackathon heading."""
-    claude_md = Path(cwd, "CLAUDE.md")
+def _has_hackathon_block(root: Path) -> bool:
+    """Return True if the managed root's CLAUDE.md contains the hackathon heading."""
+    claude_md = Path(root, "CLAUDE.md")
     try:
         return _HACKATHON_HEADING in claude_md.read_text(encoding="utf-8")
     except OSError:
         return False
 
 
-def _check_hackathon_consistency(cwd: str) -> None:
+def _check_hackathon_consistency(root: Path) -> None:
     """Emit advisory messages when the hackathon block is present but the flag is off.
 
     Both advisories (consistency warning + test-discipline reminder) fire when
@@ -188,7 +192,7 @@ def _check_hackathon_consistency(cwd: str) -> None:
     Fail-open: any exception exits silently.
     """
     try:
-        if _has_hackathon_block(cwd):
+        if _has_hackathon_block(root):
             _emit_advisory(_CONSISTENCY_WARNING)
             _emit_advisory(_TEST_DISCIPLINE_REMINDER)
     except Exception:

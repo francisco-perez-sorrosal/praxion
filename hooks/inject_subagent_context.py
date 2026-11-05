@@ -31,14 +31,14 @@ nothing -- preserving the original gate contract of each concern.
 Fast-skip conditions (exit 0, no stdout, strictly empty):
   (a) tool_name is not "Agent"
   (b) tool_input is not a JSON object
-  (c) [preamble only] cwd has no .ai-state/ directory (non-Praxion project)
+  (c) [preamble only] cwd is not in a managed project (no .ai-state/ serves it)
   (d) [preamble only] subagent_type matches praxion:* AND
       PRAXION_INJECT_NATIVE_SUBAGENTS is not set
   (e) [preamble only] PRAXION_DISABLE_SUBAGENT_INJECT=1 is set
   (f) [worktree lines only] PRAXION_DISABLE_WORKTREE_PATH_BRIEFING=1 is set
   (g) [worktree lines only] cwd is empty
 
-Caching: .ai-state/ presence is cached per session_id to avoid per-spawn
+Caching: the managed answer is cached per session_id to avoid per-spawn
 filesystem stats on dense fan-out pipelines.
 
 Synchronous hook. Exit 0 unconditionally — must never block subagent creation.
@@ -55,6 +55,7 @@ from pathlib import Path
 
 from _hook_utils import is_disabled
 from _kernel_preamble import _PREAMBLE
+from _project_scope import Managed, scope_of
 
 # -- Constants -----------------------------------------------------------------
 
@@ -77,22 +78,22 @@ _SUBPROCESS_TIMEOUT_SECONDS = 3
 # are not swept into the captured root.
 _WORKTREE_PATH_RE = re.compile(r"(/\S*?\.claude/worktrees/[A-Za-z0-9_.-]+)")
 
-# Per-session-id cache: maps session_id → bool (True = .ai-state/ present)
+# Per-session-id cache: maps session_id → bool (True = the session is in a managed project)
 _session_cache: dict[str, bool] = {}
 
 
 # -- Preamble gates --------------------------------------------------------------
 
 
-def _has_ai_state(cwd: str, session_id: str) -> bool:
-    """Return True if cwd contains a .ai-state/ subdirectory.
+def _is_managed(cwd: str, session_id: str) -> bool:
+    """Return True if a .ai-state/ serves cwd (see ``scope_of``).
 
     Caches the result per session_id to avoid repeated filesystem stats
     on multi-agent fan-out from the same session.
     """
     if session_id in _session_cache:
         return _session_cache[session_id]
-    result = Path(cwd, ".ai-state").is_dir()
+    result = isinstance(scope_of(cwd), Managed)
     _session_cache[session_id] = result
     return result
 
@@ -110,7 +111,7 @@ def _preamble_segment(subagent_type: str, cwd: str, session_id: str) -> str:
     """
     if is_disabled(_DISABLE_PREAMBLE_FLAG):
         return ""
-    if not cwd or not _has_ai_state(cwd, session_id):
+    if not cwd or not _is_managed(cwd, session_id):
         return ""
     if _is_praxion_native(subagent_type):
         inject_native = os.environ.get(_INJECT_NATIVE_FLAG, "").strip()

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""SessionStart hook: apply the per-project Praxion rules blacklist.
+"""SessionStart and SubagentStart hook: apply the per-project Praxion rules blacklist.
 
 Reads `rules/_manifest.yaml` to determine each rule's delivery type
 (`install: hook-deliver` vs `install: symlink`), reads the optional
 per-project `.claude/praxion-rules.yaml` blacklist, and applies the
-disable list through two complementary mechanisms:
+disable list through two complementary mechanisms (their helpers live in
+`_rule_blacklist`):
 
 1. `install: hook-deliver` rules — suppressed by filtering them out of
    the `additionalContext` payload returned to Claude Code at SessionStart.
@@ -35,15 +36,40 @@ mechanism — any attempt produces a stderr warning and is ignored.
 
 Behavior contract:
 - Fail-open: any internal error exits 0 with no output; never block SessionStart.
-- Kill-switch: PRAXION_DISABLE_RULE_INJECTION=1 disables injection entirely.
+- Slots: `--slot N` (1-based) plans the whole delivery (`_rule_delivery`) and
+  prints its Nth self-labelled part, nothing past the plan; only slot 1 writes
+  files and logs, so parallel slots never race. No argument: the whole plan as one
+  JSON under one header.
+- Impaired floor: the kill switch, a missing PyYAML, a missing, unreadable or
+  malformed manifest, and any failure applying it (a damaged row) still deliver
+  `MANAGED_CORE_UNITS` to a managed scope and no unit to an unmanaged one; an
+  unavailable manifest is reported to the session in either scope.
+- No double delivery: a managed-only unit still linked at user scope (`<config>/rules/
+  <id>.md`, a link left from before a relink) loads natively, so the hook skips it.
 - Backward-compatible: no project config → all rules loaded (no exclusions).
 - Schema-guarded: version > 1 in project config → log warning and load all.
 - Idempotent: settings.json is rewritten only when its `claudeMdExcludes`
   would actually change; otherwise no write happens.
-- Auto-template: when Praxion is active in a project but neither
-  `.claude/praxion-rules.yaml` nor `.claude/praxion-rules.yaml.example`
-  exists, the shipped template is copied to `.claude/praxion-rules.yaml.example`
-  so projects discover the mechanism without manual `cp`. Idempotent.
+- Auto-template: when the start directory belongs to a managed project (see
+  `_project_scope.scope_of`) whose root has neither `.claude/praxion-rules.yaml`
+  nor `.claude/praxion-rules.yaml.example`, the shipped template is copied to the
+  root's `.claude/praxion-rules.yaml.example` so projects discover the mechanism
+  without manual `cp`. Nothing is written in an unmanaged directory or into a
+  subdirectory of a managed project. Idempotent.
+- Blacklist reach: a user-written `.claude/praxion-rules.yaml` is read from the
+  start directory, else from the managed root; a subdirectory's own list wins.
+- Project scope: a hook-deliver rule whose manifest row says
+  `project_scope: managed` is delivered only in a managed scope; any other
+  value, or none, reads as `every`.
+- Spawns: a `SubagentStart` payload plans for the spawn instead. An inheriting
+  spawn in a managed scope receives the managed core units, impaired floor
+  included, and never the session's other units; `Explore`, `Plan` and a spawn
+  whose definition sets `omitClaudeMd` (this plugin's `agents/<role>.md` for
+  `praxion:<role>`, else the project's `.claude/agents/<name>.md`, the start
+  directory's before the managed root's, then the user's) receive nothing, and a
+  definition that cannot be read, or that spells the flag other than the literal
+  `true`, counts as inheriting. A spawn writes no file, logs no summary and gets
+  no notice: its session did all three.
 
 Visibility of misuse (turned silent no-ops into stderr warnings):
 - `disable:` provided as a scalar (not a list) → warning, treated as empty.
@@ -55,13 +81,13 @@ Visibility of misuse (turned silent no-ops into stderr warnings):
 
 from __future__ import annotations
 
-import fnmatch
 import json
 import os
 import re
-import shutil
 import sys
 import sysconfig
+from collections.abc import Collection, Mapping
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -71,27 +97,52 @@ except ImportError:
     yaml = None  # type: ignore[assignment]
 
 from _hook_utils import is_disabled
+from _project_scope import Managed, ProjectScope, scope_of
+from _rule_blacklist import (
+    add_residents_of_disabled,
+    apply_symlink_exclusions,
+    blacklist_directory,
+    blacklist_path,
+    compute_disable_set,
+    compute_symlink_exclusions,
+    disable_patterns,
+    ensure_template_present,
+)
+from _rule_delivery import (
+    MANAGED_CORE_UNITS,
+    AgentKind,
+    Delivery,
+    DeliveryPart,
+    Event,
+    parse_agent_kind,
+    plan_delivery,
+)
 
 # -- Constants -----------------------------------------------------------------
 
 DISABLE_FLAG = "PRAXION_DISABLE_RULE_INJECTION"
-SUPPORTED_SCHEMA_VERSION = 1
+SLOT_FLAG = "--slot"
+# Slot 1 is the one process of a slotted run that writes files and logs the summary.
+EFFECTS_SLOT = 1
+# Claude Code's user configuration directory: this variable, else ~/.claude.
+CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
+REINSTALL_FIX = "Reinstall the Praxion plugin, then start a new session."
+# The harness's name for each event, as the payload carries it and the output must echo it.
+EVENT_NAMES = {Event.SESSION: "SessionStart", Event.SUBAGENT: "SubagentStart"}
+# `<namespace>:<role>` names an agent of this plugin, defined in its `agents/<role>.md`.
+PLUGIN_NAMESPACE = "praxion"
+# The only text that sets the flag, as the commit gate reads it (`kernel_ledger_checks.OMIT_SET`):
+# one reading of one fact, and any other spelling reads as inheriting, the safe direction.
+_OMIT_SET = "true"
+_OMIT_FLAG = re.compile(r"^omitClaudeMd:[ \t]*([^\s#]*)", re.MULTILINE)
+# An agent name is a file name in an `agents/` directory, never a path out of it.
+_AGENT_NAME = re.compile(r"\w[\w.-]*")
 
-_INJECT_HEADER = "## Praxion Rules (auto-injected)\n\n"
+# `project_scope` manifest value delivered only inside a managed project.
+_MANAGED_ONLY = "managed"
 
 # Frontmatter delimiter pattern for stripping YAML blocks from rule files.
 _FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
-
-# Glob-pattern prefix Praxion uses for claudeMdExcludes entries it manages.
-# Any entry starting with this prefix is recomputed on every SessionStart;
-# any entry not starting with it is preserved as a user-managed exclusion.
-_PRAXION_EXCLUSION_PREFIX = "**/.claude/rules/"
-
-# A resident file names the rule it stands for in a top-level `resident_of:` frontmatter key.
-# Local copy of scripts/_resident_of.py::resident_parent — the injector runs from copies that
-# carry only rules/, lib/ and hooks/ — held equal to it by a parity test in test_inject_rules.py.
-_RESIDENT_OF_KEY = re.compile(r"""^["']?resident_of["']?\s*:\s*(.*?)\s*$""")
-_FRONTMATTER_DELIMITER = "---"
 
 
 # -- Frontmatter stripping -----------------------------------------------------
@@ -139,9 +190,8 @@ def _load_manifest(plugin_root: Path) -> list[dict]:
         ManifestUnavailableError: the manifest is missing, unparseable, or malformed.
     """
     manifest_path = plugin_root / "rules" / "_manifest.yaml"
-    reinstall = "Reinstall the Praxion plugin, then start a new session."
     if not manifest_path.exists():
-        raise ManifestUnavailableError(f"manifest not found at {manifest_path}", reinstall)
+        raise ManifestUnavailableError(f"manifest not found at {manifest_path}", REINSTALL_FIX)
     if yaml is None:
         raise ManifestUnavailableError(
             f"the hook interpreter `{sys.executable}` cannot import PyYAML",
@@ -150,10 +200,12 @@ def _load_manifest(plugin_root: Path) -> list[dict]:
     try:
         data = _load_yaml(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
-        raise ManifestUnavailableError(f"could not parse manifest: {exc}", reinstall) from exc
+        raise ManifestUnavailableError(f"could not parse manifest: {exc}", REINSTALL_FIX) from exc
+    if not isinstance(data, dict):
+        raise ManifestUnavailableError("manifest is not a YAML mapping", REINSTALL_FIX)
     rules = data.get("rules", [])
     if not isinstance(rules, list):
-        raise ManifestUnavailableError("manifest 'rules' is not a list", reinstall)
+        raise ManifestUnavailableError("manifest 'rules' is not a list", REINSTALL_FIX)
     return rules
 
 
@@ -173,13 +225,21 @@ def _pyyaml_fix(executable: str, *, externally_managed: bool) -> str:
     )
 
 
-def _report_unavailable(exc: ManifestUnavailableError) -> None:
-    """Log the skip and tell the session — stderr alone reaches neither the
-    model nor the user, so the rules would vanish silently."""
+def _unavailable_notice(exc: ManifestUnavailableError, scope: ProjectScope) -> str:
+    """Log the skip and word it for the session — stderr alone reaches neither the
+    model nor the user, so the rules would vanish silently. An unmanaged scope gets
+    it too: it is a diagnostic, not a unit, and its header is what the eval observer
+    keys on; a managed scope is told the core procedures that still arrive."""
     print(f"[inject_rules] WARNING: {exc.reason}; skipping rule injection", file=sys.stderr)
-    _emit_additional_context(
+    loaded = (
+        "Only Praxion's managed core procedures were loaded this session; its other"
+        " hook-delivered rules were NOT"
+        if isinstance(scope, Managed)
+        else "Praxion's hook-delivered rules were NOT loaded this session"
+    )
+    return (
         "## Praxion rule injection skipped\n\n"
-        f"Praxion's hook-delivered rules were NOT loaded this session: {exc.reason}. "
+        f"{loaded}: {exc.reason}. "
         f"{exc.fix} Tell the user if their work depends on those conventions."
     )
 
@@ -187,13 +247,13 @@ def _report_unavailable(exc: ManifestUnavailableError) -> None:
 # -- Project blacklist loading -------------------------------------------------
 
 
-def _load_project_config(cwd: Path) -> dict | None:
-    """Read .claude/praxion-rules.yaml from the project directory.
+def _load_project_config(directory: Path) -> dict | None:
+    """Read .claude/praxion-rules.yaml from a directory.
 
     Returns parsed dict, or None if the file is missing (empty disable list).
     Raises ValueError on malformed YAML (caller handles fail-open).
     """
-    config_path = cwd / ".claude" / "praxion-rules.yaml"
+    config_path = blacklist_path(directory)
     if not config_path.exists():
         return None
     try:
@@ -203,179 +263,20 @@ def _load_project_config(cwd: Path) -> dict | None:
     return data if isinstance(data, dict) else {}
 
 
-# -- Glob resolution -----------------------------------------------------------
-
-
-def _resolve_disable_globs(
-    patterns: list[str], all_rule_ids: list[str]
-) -> tuple[set[str], list[str]]:
-    """Expand glob patterns against all manifest rule IDs using fnmatch.
-
-    Returns a tuple of (disabled_ids, unmatched_patterns).
-    `unmatched_patterns` is the subset of `patterns` that matched zero rule IDs,
-    preserved in input order. The caller logs a warning per unmatched pattern so
-    typos like `disable: [my/tpyo-rule]` are visible rather than silent no-ops.
-    """
-    disabled: set[str] = set()
-    unmatched: list[str] = []
-    for pattern in patterns:
-        matched_any = False
-        for rule_id in all_rule_ids:
-            if fnmatch.fnmatch(rule_id, pattern):
-                disabled.add(rule_id)
-                matched_any = True
-        if not matched_any:
-            unmatched.append(pattern)
-    return disabled, unmatched
-
-
-# -- Core protection -----------------------------------------------------------
-
-
-def _filter_core_rules(disable_set: set[str], rules: list[dict]) -> set[str]:
-    """Remove core rules from the disable set, emitting a warning for each.
-
-    Returns the filtered disable set (core rules removed).
-    """
-    core_ids = {r["id"] for r in rules if r.get("core") is True}
-    attempted_core = disable_set & core_ids
-    for rule_id in sorted(attempted_core):
-        print(
-            f"[inject_rules] WARNING: cannot disable core rule '{rule_id}' — kept loaded",
-            file=sys.stderr,
-        )
-    return disable_set - core_ids
-
-
-# -- Symlink-rule exclusions via claudeMdExcludes -----------------------------
-
-
-def _compute_symlink_exclusions(disable_set: set[str], rules: list[dict]) -> list[str]:
-    """Compute portable claudeMdExcludes glob patterns for disabled rules.
-
-    For each non-core rule_id in disable_set, produce a glob pattern of the
-    form `**/.claude/rules/<id>.md` that matches the rule's installed symlink
-    path on any user's machine — irrespective of home-directory layout.
-
-    Both `install: symlink` and `install: hook-deliver` rules are covered:
-
-    - For `install: symlink` rules, the exclusion is the primary suppression
-      mechanism (Claude Code loads them as user-scope memory files via the
-      symlink tree).
-    - For `install: hook-deliver` rules, the additionalContext filter is the
-      primary mechanism; the exclusion here is **defense-in-depth** against
-      stale symlinks left by prior installs (when a rule's install type
-      flipped from `symlink` to `hook-deliver` and the old symlink was never
-      pruned). The `sweep_stale_rule_symlinks` step in the installer is the
-      structural fix; this exclusion is the runtime safety net.
-
-    Core rules are not included — they are non-disableable by design and are
-    filtered out of `disable_set` upstream (`_filter_core_rules`).
-
-    Returns a sorted list (deterministic order for idempotent settings writes).
-    """
-    rule_by_id = {r["id"]: r for r in rules if "id" in r}
-    patterns: list[str] = []
-    for rule_id in disable_set:
-        rule = rule_by_id.get(rule_id)
-        if rule is None:
-            continue
-        # Skip core rules defensively — they should already be filtered out
-        # upstream, but this guard makes the function safe to call directly.
-        if rule.get("core") is True:
-            continue
-        patterns.append(f"{_PRAXION_EXCLUSION_PREFIX}{rule_id}.md")
-    return sorted(patterns)
-
-
-def _apply_symlink_exclusions(cwd: Path, exclusions: list[str]) -> None:
-    """Reconcile Praxion-managed claudeMdExcludes in <cwd>/.claude/settings.json.
-
-    Reads the project's settings.json, replaces any existing entries whose
-    pattern starts with `**/.claude/rules/` (Praxion-managed) with the new
-    `exclusions` list, and preserves all other entries (user-managed). Skips
-    the write when claudeMdExcludes would not actually change (idempotency).
-
-    Fail-open: any exception is logged to stderr and swallowed — settings
-    reconciliation is auxiliary and must never break SessionStart.
-    """
-    try:
-        settings_path = cwd / ".claude" / "settings.json"
-        existing: dict = {}
-        if settings_path.exists():
-            try:
-                existing = json.loads(settings_path.read_text(encoding="utf-8"))
-                if not isinstance(existing, dict):
-                    existing = {}
-            except (json.JSONDecodeError, OSError) as exc:
-                print(
-                    f"[inject_rules] WARNING: could not parse {settings_path}:"
-                    f" {exc}. Praxion-managed claudeMdExcludes reconciliation"
-                    " skipped — the YAML disable list will NOT be applied until"
-                    " the JSON is fixed. Validate with: python3 -c"
-                    " 'import json,sys; json.load(open(sys.argv[1]))' .claude/settings.json",
-                    file=sys.stderr,
-                )
-                return
-
-        current = existing.get("claudeMdExcludes", [])
-        if not isinstance(current, list):
-            current = []
-
-        preserved = [
-            entry
-            for entry in current
-            if not (isinstance(entry, str) and entry.startswith(_PRAXION_EXCLUSION_PREFIX))
-        ]
-        reconciled = preserved + exclusions
-
-        if reconciled == current:
-            return  # Idempotent: nothing to write.
-
-        if reconciled:
-            existing["claudeMdExcludes"] = reconciled
-        else:
-            # Empty after reconciliation — remove the key entirely so the file
-            # stays minimal when no exclusions apply.
-            existing.pop("claudeMdExcludes", None)
-
-        settings_path.parent.mkdir(parents=True, exist_ok=True)
-        # sort_keys=False preserves the user's existing top-level key ordering;
-        # claudeMdExcludes itself is already deterministically sorted in
-        # _compute_symlink_exclusions, so the file content is still stable
-        # across runs without alphabetizing unrelated user-managed keys.
-        settings_path.write_text(
-            json.dumps(existing, indent=2, sort_keys=False) + "\n",
-            encoding="utf-8",
-        )
-        print(
-            f"[inject_rules] Reconciled claudeMdExcludes in {settings_path}:"
-            f" {len(exclusions)} Praxion-managed,"
-            f" {len(preserved)} user-managed preserved",
-            file=sys.stderr,
-        )
-    except Exception as exc:
-        print(
-            f"[inject_rules] claudeMdExcludes reconciliation skipped: {exc}",
-            file=sys.stderr,
-        )
-
-
 # -- Rule body reading ---------------------------------------------------------
 
 
-def _read_rule_body(plugin_root: Path, rule: dict) -> str:
+def _read_rule_body(plugin_root: Path, rel_path: str) -> str:
     """Read a rule file and strip its frontmatter.
 
     Returns empty string on any I/O error.
     """
-    rel_path = rule.get("path", "")
     if not rel_path:
         return ""
     rule_path = plugin_root / rel_path
     try:
         raw = rule_path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         print(
             f"[inject_rules] WARNING: could not read rule file {rule_path}: {exc}",
             file=sys.stderr,
@@ -384,44 +285,100 @@ def _read_rule_body(plugin_root: Path, rule: dict) -> str:
     return _strip_frontmatter(raw)
 
 
+def _natively_installed(unit_ids: Collection[str]) -> frozenset[str]:
+    """The units Claude Code still loads from a user-scope rule link, so a hook copy
+    would arrive twice: a link left from before the unit moved to hook delivery."""
+    config_dir = _user_config_dir() if unit_ids else None
+    if config_dir is None:
+        return frozenset()
+    return frozenset(
+        unit_id for unit_id in unit_ids if _links_to_rule(config_dir / "rules", unit_id)
+    )
+
+
+def _user_config_dir() -> Path | None:
+    """Claude Code's user configuration directory; None with no HOME and no passwd entry."""
+    try:
+        return Path(os.environ.get(CONFIG_DIR_VARIABLE) or Path.home() / ".claude")
+    except (RuntimeError, KeyError):
+        return None
+
+
+def _links_to_rule(user_rules: Path, unit_id: str) -> bool:
+    """Whether `<user rules>/<id>.md` is a live link into any checkout's `rules/<id>.md`
+    (the installer links from whichever checkout ran it; a dangling link loads nothing)."""
+    link = user_rules / f"{unit_id}.md"
+    try:
+        return (
+            link.is_symlink()
+            and link.is_file()
+            and link.resolve().as_posix().endswith(f"/rules/{unit_id}.md")
+        )
+    except (OSError, RuntimeError):  # a link loop resolves to nothing
+        return False
+
+
+# -- Spawns: whether a spawn inherits the instruction files ---------------------
+
+
+def _agent_kind(agent_type: object, plugin_root: Path, cwd: Path, scope: ProjectScope) -> AgentKind:
+    """The spawn's kind; a definition that is absent or cannot be read counts as inheriting."""
+    name = agent_type if isinstance(agent_type, str) else None
+    candidates = _definition_candidates(name, plugin_root, cwd, scope) if name else ()
+    return parse_agent_kind(name, _omits_claude_md(candidates))
+
+
+def _definition_candidates(
+    agent_type: str, plugin_root: Path, cwd: Path, scope: ProjectScope
+) -> tuple[Path, ...]:
+    """Where the spawn's definition may be, first match winning: this plugin's
+    `agents/<role>.md` for `praxion:<role>`; for a bare name the project's
+    `.claude/agents/<name>.md` (the start directory's, then the managed root's), then the
+    user's; none for another plugin's agent, a host-native one, or a name that is no file name."""
+    namespace, separator, name = agent_type.rpartition(":")
+    if not _AGENT_NAME.fullmatch(name):
+        return ()
+    if separator:
+        return (plugin_root / "agents" / f"{name}.md",) if namespace == PLUGIN_NAMESPACE else ()
+    roots = [cwd, *([scope.root] if isinstance(scope, Managed) and scope.root != cwd else [])]
+    user_dir = _user_config_dir()
+    homes = [*(root / ".claude" for root in roots), *([user_dir] if user_dir else [])]
+    return tuple(home / "agents" / f"{name}.md" for home in homes)
+
+
+def _omits_claude_md(candidates: tuple[Path, ...]) -> bool | None:
+    """Whether the first definition present sets `omitClaudeMd`; None when none is present or
+    the first one that may be cannot be read. Reading is the existence test: a stat that fails
+    on an unreadable parent is then an unreadable definition, never an escaping error."""
+    for definition in candidates:
+        try:
+            text = definition.read_text(encoding="utf-8")
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        except (OSError, UnicodeDecodeError):
+            return None
+        return _sets_omit_flag(text)
+    return None
+
+
+def _sets_omit_flag(definition: str) -> bool | None:
+    """Whether the frontmatter's `omitClaudeMd` is the literal true, the last duplicate
+    winning as in YAML; None with no frontmatter."""
+    frontmatter = _FRONTMATTER_RE.match(definition)
+    if frontmatter is None:
+        return None
+    written = _OMIT_FLAG.findall(frontmatter.group(0))
+    return bool(written) and written[-1] == _OMIT_SET
+
+
 # -- additionalContext emitter -------------------------------------------------
 
 
-def _ensure_template_present(cwd: Path, plugin_root: Path) -> None:
-    """Copy the shipped blacklist template into the project's .claude/ if absent.
-
-    Idempotent. Skips when EITHER `.claude/praxion-rules.yaml.example` OR
-    `.claude/praxion-rules.yaml` already exists. Fail-safe: any exception
-    is logged and swallowed (template placement is auxiliary; never breaks
-    SessionStart).
-    """
-    try:
-        claude_dir = cwd / ".claude"
-        example_path = claude_dir / "praxion-rules.yaml.example"
-        live_path = claude_dir / "praxion-rules.yaml"
-        if example_path.exists() or live_path.exists():
-            return
-        template_src = plugin_root / "claude" / "config" / "praxion-rules.yaml.example"
-        if not template_src.is_file():
-            return
-        claude_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(template_src, example_path)
-        print(
-            f"[inject_rules] Created blacklist template at {example_path}",
-            file=sys.stderr,
-        )
-    except Exception as exc:
-        print(
-            f"[inject_rules] Template placement skipped: {exc}",
-            file=sys.stderr,
-        )
-
-
-def _emit_additional_context(context: str) -> None:
-    """Emit additionalContext JSON for the SessionStart hook contract."""
+def _emit_additional_context(context: str, event: Event) -> None:
+    """Emit additionalContext JSON for the event's hook contract."""
     output = {
         "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
+            "hookEventName": EVENT_NAMES[event],
             "additionalContext": context,
         }
     }
@@ -447,259 +404,201 @@ def _resolve_plugin_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _resolve_cwd(raw_payload: str) -> Path:
-    """Parse the SessionStart JSON payload on stdin and resolve the working directory."""
+def _parse_payload(raw_payload: str) -> dict:
+    """The hook's JSON payload on stdin; anything that is not a JSON object reads as empty."""
     try:
         payload = json.loads(raw_payload) if raw_payload.strip() else {}
     except (json.JSONDecodeError, TypeError):
         payload = {}
-    return Path(payload.get("cwd") or os.getcwd())
+    return payload if isinstance(payload, dict) else {}
 
 
-def _resolve_schema_version(project_cfg: dict) -> int:
-    """Extract and validate the project config's `version:` field, coercing bad shapes to 1."""
-    raw_version = project_cfg.get("version", 1)
-    if isinstance(raw_version, int):
-        return raw_version
-    print(
-        f"[inject_rules] WARNING: 'version:' field has non-integer"
-        f" value {raw_version!r}; coercing to 1. Expected: 'version: 1'.",
-        file=sys.stderr,
-    )
-    return 1
-
-
-def _resolve_disable_patterns(cwd: Path) -> list[str]:
+def _resolve_disable_patterns(config_dir: Path) -> list[str]:
     """Load the project's raw `disable:` patterns, failing open on any malformed input.
 
-    Returns an empty list for: missing config, malformed YAML, an unsupported
-    schema version, or a non-list `disable:` value. Each fail-open path emits
-    a stderr warning except the plain-missing-config case (backward compat).
+    Returns an empty list for a missing config or malformed YAML, and whatever
+    `disable_patterns` keeps of a parsed one. Each fail-open path emits a stderr
+    warning except the plain-missing-config case (backward compat).
     """
     try:
-        project_cfg = _load_project_config(cwd)
+        project_cfg = _load_project_config(config_dir)
     except ValueError as exc:
         print(
             f"[inject_rules] WARNING: {exc}; injecting all rules (fail open)",
             file=sys.stderr,
         )
         return []
-    if project_cfg is None:
-        return []
-
-    version = _resolve_schema_version(project_cfg)
-    if version > SUPPORTED_SCHEMA_VERSION:
-        print(
-            f"[inject_rules] Schema version {version} is not supported by "
-            "this version of Praxion; falling back to no suppression",
-            file=sys.stderr,
-        )
-        return []  # Fail open: inject all (no suppression)
-
-    raw_disable = project_cfg.get("disable", [])
-    if isinstance(raw_disable, list):
-        return list(raw_disable)
-    if "disable" in project_cfg:
-        # Present but malformed: scalar, dict, or null. Silent coercion would
-        # mask a typo (e.g., `disable: ml/*` instead of `disable: [ml/*]`), so
-        # surface it explicitly.
-        print(
-            f"[inject_rules] WARNING: 'disable:' must be a YAML list,"
-            f" got {type(raw_disable).__name__}: {raw_disable!r}."
-            " Treating as empty. Use the list form:"
-            " 'disable:\\n  - rule/id'",
-            file=sys.stderr,
-        )
-    return []
+    return [] if project_cfg is None else disable_patterns(project_cfg)
 
 
-def _compute_disable_set(
-    disable_patterns: list[str], rules: list[dict], all_rule_ids: list[str]
-) -> set[str]:
-    """Resolve glob patterns to rule IDs, warn on typos, and strip core rules.
+def _hook_delivered_units(rules: list[dict], plugin_root: Path) -> tuple[dict[str, str], set[str]]:
+    """The hook-deliver rows' bodies in manifest order, and the ids of the managed-only ones.
 
-    Combines glob resolution (`_resolve_disable_globs`) with core-rule
-    protection (`_filter_core_rules`) — the two steps that turn raw YAML
-    patterns into the final, safe-to-apply set of suppressed rule IDs.
+    Only the exact value `managed` restricts delivery; an unreadable or unknown
+    value reads as `every`, so a damaged row never silently drops a rule.
     """
-    disable_set, unmatched_patterns = _resolve_disable_globs(disable_patterns, all_rule_ids)
-    for pattern in unmatched_patterns:
-        print(
-            f"[inject_rules] WARNING: disable pattern {pattern!r} matched no"
-            " rule in rules/_manifest.yaml — typo? Run `python3"
-            " scripts/regenerate_rules_manifest.py` to see valid IDs.",
-            file=sys.stderr,
-        )
-    return _filter_core_rules(disable_set, rules)
-
-
-def _resident_parent(text: str) -> str | None:
-    """The rule path a file's frontmatter names in `resident_of`, or None when it names none."""
-    lines = text.splitlines()
-    if not lines or lines[0].rstrip() != _FRONTMATTER_DELIMITER:
-        return None
-    closing = next(
-        (i for i in range(1, len(lines)) if lines[i].rstrip() == _FRONTMATTER_DELIMITER), None
-    )
-    if closing is None:  # never closed: not frontmatter
-        return None
-    for line in lines[1:closing]:
-        match = _RESIDENT_OF_KEY.match(line)
-        if match:
-            return match.group(1).strip("\"'") or None
-    return None
-
-
-def _read_resident_parent_id(plugin_root: Path, rule: dict) -> str | None:
-    """The id of the rule this manifest row stands for as a resident, or None.
-
-    A rule's id is its path minus `rules/` and `.md`. Fail-open: an unreadable
-    file is treated as no resident, so it stays injected.
-    """
-    rel_path = rule.get("path", "")
-    if not rel_path:
-        return None
-    try:
-        text = (plugin_root / rel_path).read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        print(
-            f"[inject_rules] WARNING: could not read rule file {plugin_root / rel_path}: {exc}",
-            file=sys.stderr,
-        )
-        return None
-    parent_path = _resident_parent(text)
-    if parent_path is None:
-        return None
-    return parent_path.removeprefix("rules/").removesuffix(".md")
-
-
-def _add_residents_of_disabled(
-    disable_set: set[str], rules: list[dict], plugin_root: Path
-) -> set[str]:
-    """Add to the disable set every hook-deliver resident whose parent rule is in it.
-
-    A path-scoped rule keeps its always-loaded one-line projection as a separate
-    rule, so the blacklist's id globs would otherwise miss it and an opt-out
-    would silently regain the session-start text. A core resident stays loaded,
-    like any core rule; a core parent never reaches the disable set.
-    """
-    if not disable_set:
-        return disable_set
-    residents = {
-        rule["id"]
-        for rule in rules
-        if rule.get("install") == "hook-deliver"
-        and rule.get("core") is not True
-        and "id" in rule
-        and _read_resident_parent_id(plugin_root, rule) in disable_set
-    }
-    return disable_set | residents
-
-
-def _select_hook_deliver_rules(
-    rules: list[dict], disable_set: set[str]
-) -> tuple[list[dict], list[dict], list[str]]:
-    """Split hook-deliver rules into (rules to inject, all hook-deliver rules, suppressed IDs)."""
-    hook_deliver_rules = [r for r in rules if r.get("install") == "hook-deliver"]
-    inject_rules = [r for r in hook_deliver_rules if r.get("id") not in disable_set]
-    suppressed_hd_ids = [r["id"] for r in hook_deliver_rules if r.get("id") in disable_set]
-    return inject_rules, hook_deliver_rules, suppressed_hd_ids
-
-
-def _collect_rule_bodies(plugin_root: Path, inject_rules: list[dict]) -> list[str]:
-    """Read and collect bodies for the selected rules, in manifest order."""
-    bodies: list[str] = []
-    for rule in inject_rules:
-        body = _read_rule_body(plugin_root, rule)
-        if body:
-            bodies.append(body)
-    return bodies
+    rows = [r for r in rules if r.get("install") == "hook-deliver" and "id" in r]
+    units = {r["id"]: _read_rule_body(plugin_root, r.get("path", "")) for r in rows}
+    return units, {r["id"] for r in rows if r.get("project_scope") == _MANAGED_ONLY}
 
 
 def _log_injection_summary(
-    rules: list[dict],
-    inject_rules: list[dict],
-    hook_deliver_rules: list[dict],
-    suppressed_hd_ids: list[str],
-    disable_set: set[str],
+    rules: list[dict], units: Mapping[str, str], delivery: Delivery, disable_set: set[str]
 ) -> None:
-    """Emit the stderr observability summary line for this SessionStart run.
-
-    `disable_set` (sorted) doubles as the claudeMdExcludes entry list: it now
-    covers every non-core disabled rule regardless of install type
-    (defense-in-depth — see `_compute_symlink_exclusions`).
-    """
+    """Emit the stderr observability summary line for this SessionStart run;
+    `disable_set` (sorted) doubles as the claudeMdExcludes entry list."""
     core_count = sum(1 for r in rules if r.get("core") is True)
-    hd_suppressed_str = ", ".join(sorted(suppressed_hd_ids)) if suppressed_hd_ids else "none"
+    suppressed = sorted(unit_id for unit_id in units if unit_id in disable_set)
     exclusion_str = ", ".join(sorted(disable_set)) if disable_set else "none"
     print(
         f"[inject_rules] Loaded {core_count} core rules;"
-        f" injected {len(inject_rules)}/{len(hook_deliver_rules)} hook-deliver rules"
-        f" (suppressed: {hd_suppressed_str});"
+        f" injected {len(delivery.unit_ids())}/{len(units)} hook-deliver rules"
+        f" (suppressed: {', '.join(suppressed) or 'none'});"
         f" claudeMdExcludes entries: {exclusion_str}",
         file=sys.stderr,
     )
 
 
-def main() -> None:
-    raw = _drain_stdin()
+# -- Delivery: one plan, printed whole or one slot at a time --------------------
 
-    # Kill switch: opt-out env var disables injection entirely.
-    if is_disabled(DISABLE_FLAG):
-        print(
-            "[inject_rules] Rule injection disabled by PRAXION_DISABLE_RULE_INJECTION",
-            file=sys.stderr,
-        )
-        return
 
-    plugin_root = _resolve_plugin_root()
-    cwd = _resolve_cwd(raw)
+@dataclass(frozen=True)
+class Audience:
+    """Who a delivery is planned for: the main session, or a spawn of one kind."""
 
-    # Locate and parse manifest; an unavailable manifest is non-fatal but never silent.
-    try:
-        rules = _load_manifest(plugin_root)
-    except ManifestUnavailableError as exc:
-        _report_unavailable(exc)
-        return
+    event: Event
+    agent: AgentKind = AgentKind.INHERITING  # a session's agent kind is moot
 
-    # Praxion is active in this project — ensure the user-facing template
-    # exists in .claude/ so projects discover the blacklist mechanism
-    # without manual cp or running /onboard-project. Idempotent.
-    _ensure_template_present(cwd, plugin_root)
 
-    all_rule_ids = [r["id"] for r in rules if "id" in r]
+SESSION = Audience(Event.SESSION)
+
+
+def _floor_delivery(
+    plugin_root: Path, scope: ProjectScope, audience: Audience, notice: str | None
+) -> Delivery:
+    """The impaired injection's delivery: the managed core units, read without the manifest."""
+    units = {unit.unit_id: _read_rule_body(plugin_root, unit.path) for unit in MANAGED_CORE_UNITS}
+    return Delivery(notice, units, _plan(units, set(units), scope, set(), audience))
+
+
+def _plan(
+    units: Mapping[str, str],
+    managed_only: set[str],
+    scope: ProjectScope,
+    disable_set: set[str],
+    audience: Audience,
+) -> tuple[DeliveryPart, ...]:
+    native = _natively_installed(managed_only)  # an `every` unit keeps its linked copy
+    return plan_delivery(
+        units, managed_only, scope, audience.event, audience.agent, disable_set, native
+    )
+
+
+def _manifest_delivery(
+    rules: list[dict],
+    plugin_root: Path,
+    cwd: Path,
+    scope: ProjectScope,
+    audience: Audience,
+    *,
+    effects: bool,
+) -> Delivery:
+    """The delivery the manifest and the project blacklist decide; `effects` lets it write."""
+    # A managed root gets the blacklist template, so projects discover the mechanism.
+    if effects:
+        ensure_template_present(scope, plugin_root)
 
     # Read project blacklist; missing = empty disable list (backward compat).
     # Malformed YAML is fail-open; schema version > 1 is fail-open.
-    disable_patterns = _resolve_disable_patterns(cwd)
-    disable_set = _compute_disable_set(disable_patterns, rules, all_rule_ids)
-    disable_set = _add_residents_of_disabled(disable_set, rules, plugin_root)
+    all_rule_ids = [r["id"] for r in rules if "id" in r]
+    patterns = _resolve_disable_patterns(blacklist_directory(cwd, scope))
+    disable_set = compute_disable_set(patterns, rules, all_rule_ids)
+    disable_set = add_residents_of_disabled(disable_set, rules, plugin_root)
 
-    # Reconcile claudeMdExcludes in .claude/settings.json with the symlinked
-    # rules in the disable set. Hook-deliver rules are handled below via the
-    # additionalContext filter; the two mechanisms together give the YAML
-    # uniform reach across all install types.
-    symlink_exclusions = _compute_symlink_exclusions(disable_set, rules)
-    _apply_symlink_exclusions(cwd, symlink_exclusions)
+    # claudeMdExcludes covers the linked rules in the disable set, the plan the
+    # hook-deliver ones: together the YAML reaches every install type.
+    if effects:
+        apply_symlink_exclusions(cwd, compute_symlink_exclusions(disable_set, rules))
 
-    inject_rules, hook_deliver_rules, suppressed_hd_ids = _select_hook_deliver_rules(
-        rules, disable_set
+    units, managed_only = _hook_delivered_units(rules, plugin_root)
+    delivery = Delivery(None, units, _plan(units, managed_only, scope, disable_set, audience))
+    if effects:
+        _log_injection_summary(rules, units, delivery, disable_set)
+    return delivery
+
+
+def _planned_delivery(
+    plugin_root: Path, cwd: Path, scope: ProjectScope, audience: Audience, *, effects: bool
+) -> Delivery:
+    # Kill switch: opt-out env var disables injection, all but the managed core units.
+    if is_disabled(DISABLE_FLAG):
+        print(
+            "[inject_rules] Rule injection disabled by PRAXION_DISABLE_RULE_INJECTION;"
+            " only the managed core units are delivered",
+            file=sys.stderr,
+        )
+        return _floor_delivery(plugin_root, scope, audience, None)
+
+    # An unavailable manifest is non-fatal but never silent; one that cannot be applied (a
+    # damaged row) is the same impaired case, so it never costs a managed scope its core units.
+    try:
+        rules = _load_manifest(plugin_root)
+        return _manifest_delivery(rules, plugin_root, cwd, scope, audience, effects=effects)
+    except ManifestUnavailableError as exc:
+        notice = _unavailable_notice(exc, scope)
+    except Exception as exc:
+        failure = ManifestUnavailableError(f"could not apply manifest: {exc!r}", REINSTALL_FIX)
+        notice = _unavailable_notice(failure, scope)
+    return _floor_delivery(plugin_root, scope, audience, notice)
+
+
+def _requested_delivery(payload: dict, slot: int | None) -> tuple[Event, Delivery]:
+    """The event the payload names and its delivery; a spawn's carries no notice and writes
+    nothing, since its session has already reported and written."""
+    plugin_root = _resolve_plugin_root()
+    cwd = Path(payload.get("cwd") or os.getcwd())
+    scope = scope_of(str(cwd))
+    if payload.get("hook_event_name") != EVENT_NAMES[Event.SUBAGENT]:
+        effects = slot in (None, EFFECTS_SLOT)
+        return Event.SESSION, _planned_delivery(plugin_root, cwd, scope, SESSION, effects=effects)
+    spawn = Audience(
+        Event.SUBAGENT, _agent_kind(payload.get("agent_type"), plugin_root, cwd, scope)
     )
-    _log_injection_summary(rules, inject_rules, hook_deliver_rules, suppressed_hd_ids, disable_set)
+    delivery = _planned_delivery(plugin_root, cwd, scope, spawn, effects=False)
+    return Event.SUBAGENT, replace(delivery, notice=None)
 
-    # Concatenate rule bodies in manifest order under a single H2 header.
-    bodies = _collect_rule_bodies(plugin_root, inject_rules)
-    if not bodies:
+
+def _requested_slot(argv: list[str]) -> int | None:
+    """The slot after `--slot`, or None for no arguments (the whole plan); ValueError otherwise."""
+    if not argv:
+        return None
+    if len(argv) == 2 and argv[0] == SLOT_FLAG and argv[1].isdigit() and int(argv[1]) > 0:
+        return int(argv[1])
+    raise ValueError(f"expected no arguments or `{SLOT_FLAG} N` (N >= 1), got {argv!r}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    raw = _drain_stdin()
+    try:
+        slot = _requested_slot(sys.argv[1:] if argv is None else argv)
+    except ValueError as exc:
+        print(f"[inject_rules] WARNING: {exc}; nothing injected", file=sys.stderr)
         return
 
-    context = _INJECT_HEADER + "\n\n".join(bodies)
-    _emit_additional_context(context)
+    event, delivery = _requested_delivery(_parse_payload(raw), slot)
+    if slot is None:
+        text = delivery.whole_text()
+    else:
+        texts = delivery.slot_texts()
+        text = texts[slot - 1] if slot <= len(texts) else ""
+    if text:
+        _emit_additional_context(text, event)
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        # Fault tolerance: never block SessionStart on any unhandled exception.
+        # Fault tolerance: never block a session or a spawn on any unhandled exception.
         print(f"[inject_rules] ERROR: unhandled exception: {exc}", file=sys.stderr)
         sys.exit(0)

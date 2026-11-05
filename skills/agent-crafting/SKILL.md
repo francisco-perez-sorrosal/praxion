@@ -149,11 +149,11 @@ Do **not** reach for a subagent for a quick targeted edit (spawn latency dwarfs 
 - **Agents cannot spawn agents.** Do not include `Agent` (or its `Task` alias) in tools. Chain agents from the main conversation instead.
 - **System prompt isolation.** Agents receive only their markdown body + basic env details, not the full Claude Code system prompt. Subagents **do** inherit the `claudeMd` surface — every `CLAUDE.md` file plus every symlinked always-loaded rule (measured 21,287 tokens). They do **not** inherit:
   - Skills from the parent context (must be listed in the `skills` field)
-  - Hook-delivered rules (`install: hook-deliver` — `SessionStart` does not fire for subagents)
+  - Hook-delivered rules, with one exception: `SessionStart` does not fire for subagents, but `SubagentStart` delivers the three managed core units (the coordination protocol, the intermediate-documents rule, the ADR resident) to an inheriting spawn in a managed project. The routing resident and git conventions never reach a spawn. A spawn whose definition sets `omitClaudeMd`, and the `Explore` and `Plan` built-ins, receive none of the hook-delivered rules
   - Parent's conversation history or context
   - The full system prompt
 
-  Corollary: a token added to a symlinked always-loaded rule is multiplied by the pipeline's spawn count.
+  Corollary: a token added to an always-loaded rule that reaches spawns (a symlinked rule, or one of the three managed core units) is multiplied by the pipeline's spawn count.
 - **Session loading.** Agents load at session start. Manually added files need a restart or `/agents`.
 - **Foreground**: Blocks main conversation; permission prompts pass through.
 - **Background**: Runs concurrently; permissions pre-approved; press **Ctrl+B** to background a running agent (or set `background: true`).

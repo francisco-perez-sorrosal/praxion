@@ -41,13 +41,15 @@ rules/
 
 ### Always-Loaded Rules
 
+Rules marked **Managed projects only** reach a session only in a Praxion-managed project (one whose `.ai-state/` serves the working directory). The installer does not link them to `~/.claude/rules/`; the `hooks/inject_rules.py` hook delivers them at SessionStart, and the three core units among them (all but the routing resident) also reach inheriting spawns at SubagentStart. `scripts/measure_token_budget.py` drops them from an unmanaged `--repo-root`; a managed directory, Praxion's own checkout included, keeps them.
+
 | File | Purpose |
 | ---- | ------- |
 | `swe/agent-behavioral-contract.md` | Four-behavior contract (Surface Assumptions, Register Objection, Stay Surgical, Simplicity First) for every write/plan/review agent |
-| `swe/agent-intermediate-documents.md` | Agent document locations (`.ai-work/` ephemeral, `.ai-state/` persistent), lifecycle tiers, cleanup |
-| `swe/agent-model-routing-resident.md` | Session-start text of the model-routing rule (hook-delivered, blacklistable under the rule's id `swe/agent-model-routing`): the spawn directive and its sanctioned deviations; the full rule loads on `agents/**` |
-| `swe/adr-conventions-resident.md` | One-line resident of the ADR rule (its title and opening sentence), `core`; the full rule loads on `.ai-state/decisions/**` |
-| `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference |
+| `swe/agent-intermediate-documents.md` | Agent document locations (`.ai-work/` ephemeral, `.ai-state/` persistent), lifecycle tiers, cleanup. **Managed projects only** |
+| `swe/agent-model-routing-resident.md` | Session-start text of the model-routing rule (hook-delivered, blacklistable under the rule's id `swe/agent-model-routing`): the spawn directive and its sanctioned deviations; the full rule loads on `agents/**`. **Managed projects only** |
+| `swe/adr-conventions-resident.md` | One-line resident of the ADR rule (its title and opening sentence), `core`; the full rule loads on `.ai-state/decisions/**`. **Managed projects only** |
+| `swe/swe-agent-coordination-protocol.md` | Agent selection, coordination pipeline, parallel execution — detailed tables in `software-planning` skill reference. **Managed projects only** |
 | `swe/vcs/git-conventions.md` | Commit scope, staging discipline, secrets, exclusions, message format |
 
 ### Path-Scoped Rules
@@ -256,13 +258,9 @@ rules/ml/eval-driven-verification.md          →  ~/.claude/rules/ml/eval-drive
 rules/ml/experiment-tracking-conventions.md   →  ~/.claude/rules/ml/experiment-tracking-conventions.md
 rules/ml/gpu-budget-conventions.md            →  ~/.claude/rules/ml/gpu-budget-conventions.md
 rules/swe/agent-behavioral-contract.md        →  ~/.claude/rules/swe/agent-behavioral-contract.md
-rules/swe/agent-intermediate-documents.md      →  ~/.claude/rules/swe/agent-intermediate-documents.md
 rules/swe/coding-style.md                     →  ~/.claude/rules/swe/coding-style.md
 rules/swe/adr-conventions.md                  →  ~/.claude/rules/swe/adr-conventions.md
-rules/swe/adr-conventions-resident.md         →  ~/.claude/rules/swe/adr-conventions-resident.md
 rules/swe/staleness-policy.md                 →  ~/.claude/rules/swe/staleness-policy.md
-rules/swe/swe-agent-coordination-protocol.md  →  ~/.claude/rules/swe/swe-agent-coordination-protocol.md
-rules/swe/vcs/git-conventions.md              →  ~/.claude/rules/swe/vcs/git-conventions.md
 rules/writing/diagram-conventions.md          →  ~/.claude/rules/writing/diagram-conventions.md
 rules/writing/readme-style.md                 →  ~/.claude/rules/writing/readme-style.md
 ```

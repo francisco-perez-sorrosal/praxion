@@ -22,6 +22,7 @@ while the production module does not yet exist.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 from pathlib import Path
@@ -124,6 +125,36 @@ def test_non_praxion_project_emits_no_framing(tmp_path, monkeypatch):
     assert result is None, (
         f"Hook must emit no output when .ai-state/ is absent (non-Praxion project). Got: {result}"
     )
+
+
+def test_subdirectory_of_a_managed_checkout_emits_framing(tmp_path, monkeypatch):
+    """The project is the directory that holds .ai-state/, wherever the session starts."""
+    module = _load_module()
+    (tmp_path / ".ai-state").mkdir()
+    (tmp_path / ".git").mkdir()
+    subdirectory = tmp_path / "packages" / "billing"
+    subdirectory.mkdir(parents=True)
+    monkeypatch.chdir(subdirectory)
+    payload = _make_payload(
+        prompt="Implement the new authentication module with JWT tokens and refresh logic",
+        cwd=str(subdirectory),
+    )
+    assert _run_hook(module, payload) is not None
+
+
+def test_directory_below_state_outside_a_checkout_emits_no_framing(tmp_path, monkeypatch):
+    """A directory above that holds .ai-state/ but is no checkout is not the
+    session's project: outside a checkout only the start directory counts."""
+    module = _load_module()
+    (tmp_path / ".ai-state").mkdir()
+    child = tmp_path / "child"
+    child.mkdir()
+    monkeypatch.chdir(child)
+    payload = _make_payload(
+        prompt="Implement the new authentication module with JWT tokens and refresh logic",
+        cwd=str(child),
+    )
+    assert _run_hook(module, payload) is None
 
 
 # ---------------------------------------------------------------------------
@@ -424,3 +455,87 @@ def test_malformed_stdin_exits_zero_without_output(tmp_path, monkeypatch):
     assert result is None, (
         f"Malformed stdin must produce no output (exit 0 silently). Got: {result}"
     )
+
+
+# ---------------------------------------------------------------------------
+# One answer: hackathon advisories follow the managed root; the three gate
+# sites agree with scope_of on every layout
+# ---------------------------------------------------------------------------
+
+
+def test_subdirectory_session_gets_the_advisories_of_its_managed_root(tmp_path, monkeypatch):
+    """The hackathon block lives in the root's CLAUDE.md, not the session's directory."""
+    module = _load_module()
+    (tmp_path / ".ai-state").mkdir()
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("## Hackathon Mode\n", encoding="utf-8")
+    subdirectory = tmp_path / "packages" / "billing"
+    subdirectory.mkdir(parents=True)
+    monkeypatch.chdir(subdirectory)
+    monkeypatch.delenv("PRAXION_HACKATHON_MODE", raising=False)
+    payload = _make_payload(prompt="ok", cwd=str(subdirectory))
+
+    captured = io.StringIO()
+    with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))):
+        with patch.object(sys, "stdout", captured):
+            module.main()
+
+    assert "Hackathon Mode" in captured.getvalue()
+
+
+def test_a_payload_without_cwd_names_the_process_directory(tmp_path, monkeypatch):
+    """Absent cwd means the process directory, as in the decision context."""
+    module = _load_module()
+    (tmp_path / ".ai-state").mkdir()
+    monkeypatch.chdir(tmp_path)
+    payload = _make_payload(
+        prompt="Implement the new authentication module with JWT tokens and refresh logic",
+        cwd="",
+    )
+    assert _run_hook(module, payload) is not None
+
+
+def test_the_three_gate_sites_agree_with_scope_of_on_every_layout(tmp_path, monkeypatch):
+    """Decision context, prompt reminder and spawn preamble switch on scope_of's answer."""
+    import subprocess
+
+    sys.path.insert(0, str(HOOKS_DIR))
+    import inject_subagent_context
+    from _project_scope import Managed, scope_of
+    from test_project_scope import _LAYOUTS
+
+    framing = _load_module()
+    prompt = "Implement the new authentication module with JWT tokens and refresh logic"
+    index = (
+        "| ID | Title | Status | Category | Date | Tags | Summary |\n"
+        "|----|-------|--------|----------|------|------|---------|\n"
+        "| dec-001 | First | accepted | a | 2026-01-01 | a | Sum |\n"
+    )
+    for name, build in sorted(_LAYOUTS.items()):
+        base = tmp_path / name
+        base.mkdir()
+        start = str(build(base))
+        scope = scope_of(start)
+        expected = isinstance(scope, Managed)
+        if expected:
+            (scope.state_dir / "decisions").mkdir(exist_ok=True)
+            (scope.state_dir / "decisions" / "DECISIONS_INDEX.md").write_text(index)
+        monkeypatch.chdir(start)
+
+        reminded = _run_hook(framing, _make_payload(prompt=prompt, cwd=start)) is not None
+        spawned = bool(
+            inject_subagent_context._preamble_segment("general", start, f"parity-{name}")
+        )
+        decided = (
+            "dec-001"
+            in subprocess.run(
+                [sys.executable, str(HOOKS_DIR / "inject_decisions.py")],
+                input=json.dumps({"cwd": start}),
+                capture_output=True,
+                text=True,
+                cwd=start,
+                timeout=10,
+            ).stdout
+        )
+
+        assert (decided, reminded, spawned) == (expected,) * 3, name

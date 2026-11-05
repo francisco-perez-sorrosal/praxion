@@ -9,6 +9,13 @@ stdout is not context for this event. This driver does exactly that against a
 plugin checkout (usually a sandbox) and hands back those strings in registration
 order, so a hook added by a change is delivered to without touching the driver.
 
+The strings are read per channel. Every registered hook runs, but a claim about the kernel
+reads what the kernel hook (`hooks/inject_kernel.py`, found by its registration) printed and
+nothing else: the rule injector (`hooks/inject_rules.py`) delivers on the same event, and what it
+delivers to a spawn in a managed project is the rule channel's, not the kernel's. `channel=None`
+reads every hook's strings. The project is managed by default; the kernel's delivery does not
+depend on that, so a kernel claim holds whichever way the rule channel behaves.
+
 The host-native preamble is reached the same way, through the `PreToolUse` hooks
 registered for the `Agent` tool: the preamble is the text a hook's `updatedInput`
 puts ahead of the original prompt.
@@ -33,6 +40,7 @@ from tests.acceptance.drivers.kernel_sandbox import isolated_env
 from tests.acceptance.drivers.observation_harness import log_rows
 
 KERNEL_ROW = "kernel_injected"
+KERNEL_HOOK = "inject_kernel.py"  # the script the kernel channel's registrations run
 ORIGINAL_PROMPT = "ORIGINAL-PROMPT: map the repository layout."
 
 # The SubagentStart registrations before this change: what "the hook removed from
@@ -115,7 +123,7 @@ def _hook_output(stdout: str) -> dict:
 
 @dataclass(frozen=True)
 class Injection:
-    strings: tuple[str, ...]  # every additionalContext, in registration order
+    strings: tuple[str, ...]  # the channel's additionalContext strings, in registration order
     exits: tuple[HookExit, ...]
 
     @property
@@ -133,8 +141,13 @@ def spawn(
     *,
     process_cwd: Path | None = None,
     raw_stdin: str | None = None,
+    channel: str | None = KERNEL_HOOK,
 ) -> Injection:
-    """Announce one subagent of `agent_type` started in `project`."""
+    """Announce one subagent of `agent_type` started in `project`.
+
+    `strings` are those printed by the hooks whose registered command runs the `channel`
+    script (the kernel's, by default); `None` keeps every hook's. `exits` are every hook's.
+    """
     number = next(_spawns)
     cwd = process_cwd or project
     payload = {
@@ -150,7 +163,9 @@ def spawn(
     exits = _deliver(plugin_root, "SubagentStart", payload, stdin, cwd, scratch)
     strings = tuple(
         out["additionalContext"]
-        for out in (_hook_output(e.stdout) for e in exits)
+        for e in exits
+        if channel is None or re.search(rf"hooks/{re.escape(channel)}\b", e.command)
+        for out in [_hook_output(e.stdout)]
         if isinstance(out.get("additionalContext"), str)
     )
     return Injection(strings, tuple(exits))

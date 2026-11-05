@@ -359,6 +359,7 @@ def session_start(
     `disable` writes a blacklist naming those patterns; `preset` copies a blacklist file in."""
     project = scratch / "project"
     (project / ".claude").mkdir(parents=True, exist_ok=True)
+    (project / ".ai-state").mkdir(exist_ok=True)  # a managed project: the managed-only text arrives
     blacklist = project / ".claude" / "praxion-rules.yaml"
     if preset is not None:
         blacklist.write_bytes(preset.read_bytes())

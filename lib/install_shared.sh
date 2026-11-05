@@ -38,6 +38,12 @@ fi
 # cross-checks the result with an independent grep, so generator schema drift
 # fails there rather than as a silently short whitelist at install time.
 #
+# A record whose `project_scope` is `managed` is never selected for `symlink`:
+# managed rules reach only managed projects through the injection hook, so a
+# user-scope link would load them everywhere. The generator refuses that
+# combination; the reader holds the line for a hand-edited manifest, and the
+# sweep then removes a link already there.
+#
 # Arguments:
 #   $1 — manifest_file: absolute path to rules/_manifest.yaml
 #   $2 — install_type:  the `install:` value to select (symlink | hook-deliver)
@@ -55,8 +61,9 @@ manifest_rule_paths() {
             return line
         }
         function _flush() {
-            if (path ~ /^rules\// && install == want) print substr(path, 7)
-            path = ""; install = ""
+            managed_symlink = (want == "symlink" && scope == "managed")
+            if (path ~ /^rules\// && install == want && !managed_symlink) print substr(path, 7)
+            path = ""; install = ""; scope = ""
         }
         /^[[:space:]]*rules:[[:space:]]*$/ { in_rules = 1; next }
         in_rules && /^[^[:space:]#-]/ { _flush(); in_rules = 0 }
@@ -64,6 +71,7 @@ manifest_rule_paths() {
         /^[[:space:]]*-[[:space:]]/ { _flush(); sub(/^[[:space:]]*-[[:space:]]*/, "") }
         /^[[:space:]]*path:[[:space:]]/ { path = _value($0); next }
         /^[[:space:]]*install:[[:space:]]/ { install = _value($0); next }
+        /^[[:space:]]*project_scope:[[:space:]]/ { scope = _value($0); next }
         END { _flush() }
     ' "$manifest_file"
 }

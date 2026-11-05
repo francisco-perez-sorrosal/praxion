@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from praxion_evals.adherence import grade, tasks
+from praxion_evals.adherence import grade, managed_fixture, tasks
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.confinement import (
     Confinement,
@@ -217,7 +217,10 @@ def attempt[R](
         except Exception as error:  # nothing was started, so nothing was spent
             return reserved.settle(budget, 0.0), finish(_crash(error), 0.0)
         try:
-            env = launch.env_for(root, [Path(path) for path in _program_order(confinement)])
+            env = {
+                **launch.env_for(root, [Path(path) for path in _program_order(confinement)]),
+                **managed_fixture.switches_for(tasks.scratch_dir(SandboxPaths(root))),
+            }
             run = run_session(spec, env)
         except Exception as error:  # the process may have run and spent: charge the budget
             return reserved.settle(budget, None), finish(_crash(error), budget)
@@ -299,6 +302,8 @@ def _prepare(
     sandbox = SandboxPaths(root)
     populate(root)
     commit = tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), page_url)
+    # marked after the fixture commit, so the marker is no part of what the session authors
+    managed_fixture.mark_managed(tasks.scratch_dir(sandbox))
     confinement = session_confinement(
         task.role,
         build.copy_root,

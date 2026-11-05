@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -181,10 +182,12 @@ def _hook_env(plugin_root: Path) -> dict[str, str]:
     """The environment a child hook process runs in.
 
     The mutation sensor sets MUTANT_UNDER_TEST for its own process; a child hook cannot locate
-    mutmut's config from its cwd, so it must run the code as written.
+    mutmut's config from its cwd, so it must run the code as written. HOME is a scratch one, so
+    the developer's own user-scope rule links never read as a natively installed unit.
     """
-    env = {**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root)}
+    env = {**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root), "HOME": str(plugin_root / "home")}
     env.pop("MUTANT_UNDER_TEST", None)
+    env.pop("CLAUDE_CONFIG_DIR", None)
     return env
 
 
@@ -560,7 +563,6 @@ def test_disable_env_var_suppresses_all_injection(plugin_root: Path, project_dir
 
 def test_stderr_summary_line_matches_expected_format(plugin_root: Path, project_dir: Path) -> None:
     """The hook emits a stderr summary line: [inject_rules] Loaded N core rules; injected M/T ..."""
-    import re
 
     result = _run_hook(plugin_root, project_dir)
     assert result.returncode == 0, f"Hook failed. stderr: {result.stderr!r}"
@@ -995,6 +997,12 @@ def _import_hook_module():
     return inject_rules
 
 
+def _import_blacklist_module():
+    import _rule_blacklist
+
+    return _rule_blacklist
+
+
 def test_pyyaml_fix_never_suggests_pip_for_an_externally_managed_interpreter() -> None:
     """PEP 668 interpreters (Homebrew, Debian system python) refuse `pip
     install`; advising it would dead-end the user on the machines that hit
@@ -1191,7 +1199,7 @@ def _shared_resident_reader():
 def test_the_injectors_resident_check_agrees_with_the_shared_reader(text: str) -> None:
     shared = _shared_resident_reader().resident_parent
 
-    assert _import_hook_module()._resident_parent(text) == shared(text)
+    assert _import_blacklist_module().resident_parent(text) == shared(text)
 
 
 def _rule_row(
@@ -1209,7 +1217,7 @@ def _write_rule(plugin_root: Path, rel_path: str, frontmatter: str) -> None:
 def test_a_disabled_rule_adds_only_the_hook_deliver_non_core_residents_that_name_it(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    module = _import_hook_module()
+    blacklist = _import_blacklist_module()
     _write_rule(tmp_path, "rules/a/resident.md", "resident_of: rules/swe/parent.md")
     _write_rule(tmp_path, "rules/a/other.md", "resident_of: rules/swe/other-parent.md")
     _write_rule(tmp_path, "rules/a/core.md", "resident_of: rules/swe/parent.md")
@@ -1224,28 +1232,152 @@ def test_a_disabled_rule_adds_only_the_hook_deliver_non_core_residents_that_name
         {"id": "a/pathless", "install": "hook-deliver"},
     ]
 
-    disabled = module._add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
+    disabled = blacklist.add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
 
     assert disabled == {"swe/parent", "a/resident"}
     assert capsys.readouterr().err == "", "a row without a path is no resident, not a read failure"
 
 
 def test_an_empty_disable_set_reads_no_rule_file(tmp_path: Path) -> None:
-    module = _import_hook_module()
+    blacklist = _import_blacklist_module()
     rules = [_rule_row("a/resident", "rules/a/missing.md")]
 
-    assert module._add_residents_of_disabled(set(), rules, tmp_path) == set()
+    assert blacklist.add_residents_of_disabled(set(), rules, tmp_path) == set()
 
 
 def test_an_unreadable_resident_file_is_kept_and_reported(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    module = _import_hook_module()
+    blacklist = _import_blacklist_module()
     rules = [_rule_row("a/resident", "rules/a/missing.md")]
 
-    disabled = module._add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
+    disabled = blacklist.add_residents_of_disabled({"swe/parent"}, rules, tmp_path)
 
     assert disabled == {"swe/parent"}
     warning = capsys.readouterr().err
     assert "[inject_rules] WARNING: could not read rule file" in warning
     assert str(tmp_path / "rules" / "a" / "missing.md") in warning
+
+
+# ===========================================================================
+# Project scope: template placement, blacklist reach and managed-only rows
+# ===========================================================================
+
+_TEMPLATE_RELATIVE = Path(".claude") / "praxion-rules.yaml.example"
+_GIT_CONVENTIONS_MARKER = "This is the git conventions rule body."
+_ROUTING_MARKER = "This is the model routing rule body."
+_MANAGED_ONLY_MARKER = "This is the managed-only rule body."
+
+
+@pytest.fixture
+def with_template(plugin_root: Path) -> Path:
+    """The plugin root, now also shipping the blacklist template."""
+    source = plugin_root / "claude" / "config" / "praxion-rules.yaml.example"
+    source.parent.mkdir(parents=True)
+    source.write_text("version: 1\ndisable: []\n", encoding="utf-8")
+    return plugin_root
+
+
+def _managed_root(tmp_path: Path) -> tuple[Path, Path]:
+    """A managed project root and a subdirectory of it, both existing."""
+    root = tmp_path / "managed"
+    subdirectory = root / "services" / "api"
+    subdirectory.mkdir(parents=True)
+    (root / ".ai-state").mkdir()
+    (root / ".git").mkdir()  # a subdirectory is served only inside a checkout
+    return root, subdirectory
+
+
+def test_an_unmanaged_start_writes_no_template(with_template: Path, project_dir: Path) -> None:
+    _run_hook(with_template, project_dir)
+
+    assert not (project_dir / ".claude").exists()
+
+
+def test_a_root_start_writes_the_template_at_the_root(with_template: Path, tmp_path: Path) -> None:
+    root, _ = _managed_root(tmp_path)
+
+    _run_hook(with_template, root)
+
+    assert (root / _TEMPLATE_RELATIVE).is_file()
+
+
+def test_a_subdirectory_start_writes_the_template_at_the_root_only(
+    with_template: Path, tmp_path: Path
+) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+
+    _run_hook(with_template, subdirectory)
+
+    assert (root / _TEMPLATE_RELATIVE).is_file()
+    assert not (subdirectory / ".claude").exists()
+
+
+def test_a_root_with_a_user_blacklist_gets_no_template(with_template: Path, tmp_path: Path) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+    _write_project_config(root, "version: 1\ndisable: []\n")
+
+    _run_hook(with_template, subdirectory)
+
+    assert not (root / _TEMPLATE_RELATIVE).exists()
+
+
+def test_a_subdirectory_start_honours_the_roots_blacklist(
+    plugin_root: Path, tmp_path: Path
+) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+    _disable(root, "swe/vcs/git-conventions")
+
+    context = _additional_context(_run_hook(plugin_root, subdirectory))
+
+    assert _GIT_CONVENTIONS_MARKER not in context
+    assert _ROUTING_MARKER in context
+
+
+def test_a_subdirectorys_own_blacklist_wins_over_the_roots(
+    plugin_root: Path, tmp_path: Path
+) -> None:
+    root, subdirectory = _managed_root(tmp_path)
+    _disable(root, "swe/vcs/git-conventions")
+    _disable(subdirectory, "swe/agent-model-routing")
+
+    context = _additional_context(_run_hook(plugin_root, subdirectory))
+
+    assert _GIT_CONVENTIONS_MARKER in context
+    assert _ROUTING_MARKER not in context
+
+
+def _add_scoped_row(plugin_root: Path, project_scope: str) -> None:
+    """Append a hook-deliver row carrying the given `project_scope` value to the manifest."""
+    body = plugin_root / "rules" / "swe" / "scoped.md"
+    body.write_text(f"{_MANAGED_ONLY_MARKER}\n", encoding="utf-8")
+    manifest = plugin_root / "rules" / "_manifest.yaml"
+    row = (
+        "- id: swe/scoped\n  path: rules/swe/scoped.md\n  load: always_on\n  core: false\n"
+        f"  install: hook-deliver\n  chars: 10\n  project_scope: {project_scope}\n"
+    )
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("categories:", row + "categories:"),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.parametrize(
+    ("project_scope", "delivered_unmanaged"),
+    [("managed", False), ("every", True), ("somewhere-else", True), ("[managed]", True)],
+)
+def test_a_managed_row_reaches_only_a_managed_scope(
+    plugin_root: Path,
+    tmp_path: Path,
+    project_dir: Path,
+    project_scope: str,
+    delivered_unmanaged: bool,
+) -> None:
+    _add_scoped_row(plugin_root, project_scope)
+    root, _ = _managed_root(tmp_path)
+
+    unmanaged = _additional_context(_run_hook(plugin_root, project_dir))
+    managed = _additional_context(_run_hook(plugin_root, root))
+
+    assert (_MANAGED_ONLY_MARKER in unmanaged) is delivered_unmanaged
+    assert _MANAGED_ONLY_MARKER in managed

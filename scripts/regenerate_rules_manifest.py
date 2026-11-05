@@ -39,15 +39,43 @@ EXPECTED_CORE_IDS = frozenset(
     }
 )
 
-# Blacklistable always-loaded rules in canonical injection order.
-# This order drives additionalContext concatenation in inject_rules.py.
-# Any rule whose frontmatter declares `install: hook-deliver` MUST appear in
-# this list — _validate_hook_deliver_coverage() enforces this at check time.
+# Where each `install: hook-deliver` rule sits in the manifest. inject_rules.py
+# hands the rules to hooks/_rule_delivery.py in this order, and the planner keeps
+# it only within a group: every-scope rules first, then the managed-only ones,
+# the core units last in MANAGED_CORE_UNITS order. So this list orders rules
+# within a group; the planner decides what a managed session receives first.
+# Every hook-deliver rule MUST be listed — _validate_hook_deliver_coverage()
+# enforces this at check time.
 HOOK_DELIVER_ORDER = [
     "swe/memory-protocol",
     "swe/agent-model-routing-resident",
     "swe/vcs/git-conventions",
+    "swe/swe-agent-coordination-protocol",
+    "swe/agent-intermediate-documents",
+    "swe/adr-conventions-resident",
 ]
+
+# `project_scope` frontmatter: `every` (the default, never emitted) or `managed`
+# (delivered only into Praxion-managed projects).
+PROJECT_SCOPE_EVERY = "every"
+PROJECT_SCOPE_MANAGED = "managed"
+PROJECT_SCOPES = frozenset({PROJECT_SCOPE_EVERY, PROJECT_SCOPE_MANAGED})
+
+# The rules that reach only a managed project: exactly these carry
+# `project_scope: managed`. hooks/_rule_delivery.py's MANAGED_CORE_UNITS is this
+# set minus the routing resident, held equal by a test there.
+EXPECTED_MANAGED_IDS = frozenset(
+    {
+        "swe/swe-agent-coordination-protocol",
+        "swe/agent-intermediate-documents",
+        "swe/adr-conventions-resident",
+        "swe/agent-model-routing-resident",
+    }
+)
+
+# The constitution reaches every session, managed or not: none of these may
+# ever be marked managed, whatever EXPECTED_MANAGED_IDS comes to say.
+CONSTITUTION_IDS = frozenset({"swe/agent-behavioral-contract", "swe/vcs/git-conventions"})
 
 MANIFEST_HEADER = (
     "# AUTO-GENERATED. Do not edit by hand.\n"
@@ -90,6 +118,9 @@ def _build_rule_record(rule_path: Path, fm: dict[str, Any]) -> dict[str, Any]:
     }
     if paths_value := fm.get("paths"):
         record["paths"] = paths_value
+    # Anything but the default is emitted so the validator can refuse an unknown value.
+    if (scope := str(fm.get("project_scope", PROJECT_SCOPE_EVERY))) != PROJECT_SCOPE_EVERY:
+        record["project_scope"] = scope
     return record
 
 
@@ -122,9 +153,8 @@ def _validate_hook_deliver_coverage(records: list[dict[str, Any]]) -> list[str]:
     """Verify every install: hook-deliver rule appears in HOOK_DELIVER_ORDER.
 
     Catches the footgun where a new hook-deliver rule is added without updating
-    the canonical injection-order list — without this check, the new rule
-    would fall through to the path-scoped section of the manifest and lose
-    its stable injection position.
+    the order list — without this check, the new rule would fall through to
+    the path-scoped section of the manifest and lose its stable position.
     """
     declared = {r["id"] for r in records if r.get("install") == "hook-deliver" and "id" in r}
     ordered = set(HOOK_DELIVER_ORDER)
@@ -134,19 +164,73 @@ def _validate_hook_deliver_coverage(records: list[dict[str, Any]]) -> list[str]:
     return [
         f"ERROR: hook-deliver rule '{rid}' is not in HOOK_DELIVER_ORDER in"
         f" scripts/regenerate_rules_manifest.py. Add it in the desired"
-        f" injection position (manifest order drives additionalContext order)."
+        f" manifest position (the delivery planner keeps it within the rule's group)."
         for rid in sorted(missing)
     ]
 
 
+def _validate_project_scope(records: list[dict[str, Any]]) -> list[str]:
+    """Verify every `project_scope` value is known and that `managed` rules are
+    hook-delivered, always-on and unscoped by path — the only shape the
+    managed-only delivery can honour (a symlinked rule reaches every project)."""
+    errors = []
+    for r in records:
+        scope = r.get("project_scope")
+        if scope is None:
+            continue
+        rid = r["id"]
+        if scope not in PROJECT_SCOPES:
+            errors.append(
+                f"ERROR: rule '{rid}' has unknown project_scope '{scope}'"
+                f" (expected one of: {', '.join(sorted(PROJECT_SCOPES))})"
+            )
+            continue
+        if r["load"] != "always_on":
+            errors.append(
+                f"ERROR: managed rule '{rid}' must declare load: always_on (got '{r['load']}')"
+            )
+        if "paths" in r:
+            errors.append(f"ERROR: managed rule '{rid}' must not declare paths:")
+        if r["install"] != "hook-deliver":
+            errors.append(
+                f"ERROR: managed rule '{rid}' must declare install: hook-deliver"
+                f" (got '{r['install']}')"
+            )
+    return errors
+
+
+def _validate_managed_set(records: list[dict[str, Any]]) -> list[str]:
+    """Verify the managed rules are exactly EXPECTED_MANAGED_IDS and that no
+    constitution rule is among them, so a frontmatter edit can neither widen nor
+    narrow what an unmanaged session loses."""
+    managed = {r["id"] for r in records if r.get("project_scope") == PROJECT_SCOPE_MANAGED}
+    errors = [
+        f"ERROR: constitution rule '{rid}' must reach every project, not only managed ones"
+        for rid in sorted(managed & CONSTITUTION_IDS)
+    ]
+    errors += [
+        f"ERROR: rule '{rid}' must declare project_scope: managed"
+        for rid in sorted(EXPECTED_MANAGED_IDS - managed)
+    ]
+    errors += [
+        f"ERROR: rule '{rid}' declares project_scope: managed but is not in"
+        f" EXPECTED_MANAGED_IDS in scripts/regenerate_rules_manifest.py"
+        for rid in sorted(managed - EXPECTED_MANAGED_IDS - CONSTITUTION_IDS)
+    ]
+    return errors
+
+
 def _ordered_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return records in canonical manifest order:
-    1. Core rules (alphabetical by id)
-    2. Hook-deliver rules in stable injection order
+    """Return records in canonical manifest order, each rule once:
+    1. Core rules not hook-delivered (alphabetical by id)
+    2. Hook-deliver rules in stable injection order, core or not
     3. Path-scoped rules (alphabetical by id)
     """
     by_id = {r["id"]: r for r in records}
-    core_rules = sorted((r for r in records if r.get("core")), key=lambda r: r["id"])
+    core_rules = sorted(
+        (r for r in records if r.get("core") and r["id"] not in HOOK_DELIVER_ORDER),
+        key=lambda r: r["id"],
+    )
     hook_rules = [by_id[rid] for rid in HOOK_DELIVER_ORDER if rid in by_id]
     path_scoped = sorted(
         (r for r in records if not r.get("core") and r["id"] not in HOOK_DELIVER_ORDER),
@@ -185,7 +269,12 @@ def _all_validation_errors(records: list[dict[str, Any]]) -> list[str]:
     """Aggregate every structural validation that must pass before the manifest
     is considered well-formed. Runs all validators so the user sees every
     error at once rather than discovering them one-at-a-time."""
-    return _validate_core_rules(records) + _validate_hook_deliver_coverage(records)
+    return (
+        _validate_core_rules(records)
+        + _validate_hook_deliver_coverage(records)
+        + _validate_project_scope(records)
+        + _validate_managed_set(records)
+    )
 
 
 def run_generate() -> int:

@@ -2,6 +2,7 @@
 core: false
 load: always_on
 install: hook-deliver
+project_scope: managed
 resident_of: rules/swe/agent-model-routing.md
 ---
 

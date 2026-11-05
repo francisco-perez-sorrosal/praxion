@@ -59,6 +59,26 @@ install: hook-deliver
 ---
 """
 
+# A core rule that reaches only managed projects, by the hook.
+_MANAGED_CORE_FRONTMATTER = """\
+---
+core: true
+load: always_on
+install: hook-deliver
+project_scope: managed
+---
+"""
+
+# A blacklistable rule that reaches only managed projects, by the hook.
+_MANAGED_HOOK_FRONTMATTER = """\
+---
+core: false
+load: always_on
+install: hook-deliver
+project_scope: managed
+---
+"""
+
 # Mixed codex: + core: frontmatter (as memory-protocol.md carries post-Step-2).
 _MERGED_FRONTMATTER = """\
 ---
@@ -97,6 +117,31 @@ def _seed(directory: Path, tree: dict[str, Any]) -> None:
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
+
+
+def _seed_rules(tmp_path: Path, swe_overrides: dict[str, str] | None = None) -> tuple[Path, Path]:
+    """Seed tmp_path/rules with the six core rules and the hook-delivered rules a
+    valid tree needs; ``swe_overrides`` replaces or adds files under swe/.
+
+    Returns (rules_dir, manifest_path).
+    """
+    rules_dir = tmp_path / "rules"
+    swe: dict[str, Any] = {
+        "adr-conventions.md": _CORE_FRONTMATTER + "## ADR Conventions\n",
+        "adr-conventions-resident.md": _MANAGED_CORE_FRONTMATTER + "## ADR\n",
+        "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Behavioral Contract\n",
+        "agent-intermediate-documents.md": _MANAGED_CORE_FRONTMATTER + "## Intermediate Docs\n",
+        "swe-agent-coordination-protocol.md": _MANAGED_CORE_FRONTMATTER
+        + "## Coordination Protocol\n",
+        # Hook-delivered blacklistable rules
+        "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory Protocol\n",
+        "agent-model-routing-resident.md": _MANAGED_HOOK_FRONTMATTER + "## Model Routing\n",
+        "vcs": {"git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git Conventions\n"},
+        **(swe_overrides or {}),
+    }
+    # Directory guide carrying stale core frontmatter: must be skipped
+    _seed(rules_dir, {"CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n\nSome content.\n", "swe": swe})
+    return rules_dir, rules_dir / "_manifest.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -139,32 +184,7 @@ def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
 
     Returns (rules_dir, manifest_path).
     """
-    rules_dir = tmp_path / "rules"
-    manifest_path = rules_dir / "_manifest.yaml"
-
-    _seed(
-        rules_dir,
-        {
-            # Directory guide carrying stale core frontmatter: must be skipped
-            "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n\nSome content.\n",
-            # swe/ core rules
-            "swe": {
-                "adr-conventions.md": _CORE_FRONTMATTER + "## ADR Conventions\n",
-                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
-                "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Behavioral Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## Intermediate Docs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER
-                + "## Coordination Protocol\n",
-                # Hook-delivered blacklistable rules
-                "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory Protocol\n",
-                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Model Routing\n",
-                "vcs": {
-                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git Conventions\n",
-                },
-            },
-        },
-    )
-    return rules_dir, manifest_path
+    return _seed_rules(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -177,27 +197,7 @@ def test_manifest_schema_contains_expected_fields_per_rule(
     tmp_path: Path,
 ) -> None:
     """Generator emits id, path, load, core, install, chars for each rule."""
-    rules_dir = tmp_path / "rules"
-    manifest_path = rules_dir / "_manifest.yaml"
-
-    _seed(
-        rules_dir,
-        {
-            "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
-            "swe": {
-                "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
-                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
-                "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
-                "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
-                "vcs": {
-                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
-                },
-            },
-        },
-    )
+    rules_dir, manifest_path = _seed_rules(tmp_path)
 
     mod = _patched_module(monkeypatch, rules_dir, manifest_path)
     exit_code = mod.run_generate()
@@ -279,30 +279,9 @@ def test_rule_without_core_frontmatter_defaults_to_core_false(
     tmp_path: Path,
 ) -> None:
     """A rule file with no core: field in frontmatter produces core: false (no crash)."""  # noqa: E501
-    rules_dir = tmp_path / "rules"
-    manifest_path = rules_dir / "_manifest.yaml"
-
-    # All 6 core rules present (with core: true) so the validator passes.
-    # Add one path-scoped rule without any core: field.
-    _seed(
-        rules_dir,
-        {
-            "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
-            "swe": {
-                "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
-                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
-                "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
-                "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
-                # Rule with path-scoped frontmatter only — no core: field.
-                "coding-style.md": _PATH_SCOPED_FRONTMATTER + "## Coding Style\n",
-                "vcs": {
-                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
-                },
-            },
-        },
+    # A path-scoped rule without any core: field, beside the valid tree.
+    rules_dir, manifest_path = _seed_rules(
+        tmp_path, {"coding-style.md": _PATH_SCOPED_FRONTMATTER + "## Coding Style\n"}
     )
 
     mod = _patched_module(monkeypatch, rules_dir, manifest_path)
@@ -329,30 +308,14 @@ def test_core_rule_missing_core_true_frontmatter_causes_exit_1(
     capsys: pytest.CaptureFixture,
 ) -> None:
     """Generator exits 1 with ERROR message when a core rule lacks core: true."""
-    rules_dir = tmp_path / "rules"
-    manifest_path = rules_dir / "_manifest.yaml"
-
-    # All 6 expected core IDs present but one has core: false — triggers ERROR.
-    _seed(
-        rules_dir,
+    # Every expected core id present, but one carries core: false.
+    rules_dir, manifest_path = _seed_rules(
+        tmp_path,
         {
-            "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
-            "swe": {
-                "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
-                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
-                "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                # agent-intermediate-documents.md: core: false — should trigger ERROR.  # noqa: E501
-                "agent-intermediate-documents.md": (
-                    "---\ncore: false\nload: always_on\ninstall: symlink\n---\n"
-                    "## Intermediate Docs\n"
-                ),
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
-                "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
-                "vcs": {
-                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
-                },
-            },
+            "agent-intermediate-documents.md": (
+                "---\ncore: false\nload: always_on\ninstall: hook-deliver\n"
+                "project_scope: managed\n---\n## Intermediate Docs\n"
+            )
         },
     )
 
@@ -384,7 +347,8 @@ def test_resident_file_dropping_core_true_fails_the_drift_check(
 
     resident = rules_dir / "swe" / "adr-conventions-resident.md"
     resident.write_text(
-        "---\ncore: false\nload: always_on\ninstall: symlink\n---\n## ADR\n", encoding="utf-8"
+        _MANAGED_CORE_FRONTMATTER.replace("core: true", "core: false") + "## ADR\n",
+        encoding="utf-8",
     )
 
     assert mod.run_check() == 1
@@ -425,28 +389,9 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
     tmp_path: Path,
 ) -> None:
     """Merged codex: + core: frontmatter in memory-protocol.md produces core: false, install: hook-deliver."""  # noqa: E501
-    rules_dir = tmp_path / "rules"
-    manifest_path = rules_dir / "_manifest.yaml"
-
-    # Use the merged frontmatter that mirrors the real memory-protocol.md post-Step-2.
-    _seed(
-        rules_dir,
-        {
-            "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
-            "swe": {
-                "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
-                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
-                "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
-                # memory-protocol with merged codex: + core: frontmatter
-                "memory-protocol.md": _MERGED_FRONTMATTER + "## Memory Protocol\n",
-                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
-                "vcs": {
-                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
-                },
-            },
-        },
+    # The merged frontmatter that mirrors the real memory-protocol.md post-Step-2.
+    rules_dir, manifest_path = _seed_rules(
+        tmp_path, {"memory-protocol.md": _MERGED_FRONTMATTER + "## Memory Protocol\n"}
     )
 
     mod = _patched_module(monkeypatch, rules_dir, manifest_path)
@@ -488,30 +433,9 @@ def test_hook_deliver_rule_missing_from_order_list_fails_generation(
     cause the generator to fail with a helpful error — protecting against
     the footgun where a new always-on rule lands without a stable injection
     position."""
-    rules_dir = tmp_path / "rules"
-    manifest_path = rules_dir / "_manifest.yaml"
-
-    # Minimal valid tree (6 core rules + 3 known hook-deliver rules) PLUS
-    # one new hook-deliver rule that is NOT in HOOK_DELIVER_ORDER.
-    _seed(
-        rules_dir,
-        {
-            "CLAUDE.md": _CORE_FRONTMATTER + "# Rules\n",
-            "swe": {
-                "adr-conventions.md": _CORE_FRONTMATTER + "## ADR\n",
-                "adr-conventions-resident.md": _CORE_FRONTMATTER + "## ADR\n",
-                "agent-behavioral-contract.md": _CORE_FRONTMATTER + "## Contract\n",
-                "agent-intermediate-documents.md": _CORE_FRONTMATTER + "## IntermediateDocs\n",
-                "swe-agent-coordination-protocol.md": _CORE_FRONTMATTER + "## CoordProtocol\n",
-                "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory\n",
-                "agent-model-routing-resident.md": _HOOK_DELIVER_FRONTMATTER + "## Routing\n",
-                "vcs": {
-                    "git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git\n",
-                },
-                # New hook-deliver rule, not in HOOK_DELIVER_ORDER:
-                "newly-added-rule.md": _HOOK_DELIVER_FRONTMATTER + "## NewRule\n",
-            },
-        },
+    # The valid tree plus one new hook-deliver rule that is NOT in HOOK_DELIVER_ORDER.
+    rules_dir, manifest_path = _seed_rules(
+        tmp_path, {"newly-added-rule.md": _HOOK_DELIVER_FRONTMATTER + "## NewRule\n"}
     )
 
     mod = _patched_module(monkeypatch, rules_dir, manifest_path)
@@ -545,6 +469,179 @@ def test_no_categories_block_in_generated_manifest(
     assert "categories" not in parsed, (
         f"Parsed manifest must not contain a 'categories' key. Got keys: {list(parsed.keys())!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# project_scope frontmatter key
+# ---------------------------------------------------------------------------
+
+
+def _frontmatter(**fields: Any) -> str:
+    return "---\n" + yaml.safe_dump(fields, sort_keys=False) + "---\n"
+
+
+ROUTING_RESIDENT = "swe/agent-model-routing-resident"
+MEMORY_PROTOCOL = "swe/memory-protocol"
+
+
+def _generate_with(
+    monkeypatch: pytest.MonkeyPatch,
+    minimal_rules_tree: tuple[Path, Path],
+    frontmatter: str,
+    capsys: pytest.CaptureFixture[str],
+    rule_id: str = MEMORY_PROTOCOL,
+) -> tuple[int, dict[str, Any], str]:
+    """Rewrite one hook-delivered rule's frontmatter, regenerate, and return
+    (exit code, that rule's record, stderr)."""
+    rules_dir, manifest_path = minimal_rules_tree
+    (rules_dir / f"{rule_id}.md").write_text(frontmatter + "## Rule\n")
+    mod = _patched_module(monkeypatch, rules_dir, manifest_path)
+    exit_code = mod.run_generate()
+    stderr = capsys.readouterr().err
+    if exit_code != 0:
+        return exit_code, {}, stderr
+    rules = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))["rules"]
+    return exit_code, next(r for r in rules if r["id"] == rule_id), stderr
+
+
+def test_managed_rule_is_emitted_with_its_project_scope(monkeypatch, minimal_rules_tree, capsys):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="managed")
+    exit_code, record, _ = _generate_with(
+        monkeypatch, minimal_rules_tree, fm, capsys, ROUTING_RESIDENT
+    )
+    assert exit_code == 0
+    assert record["project_scope"] == "managed"
+
+
+@pytest.mark.parametrize("scope_fields", [{}, {"project_scope": "every"}])
+def test_every_or_absent_project_scope_emits_no_key(
+    monkeypatch, minimal_rules_tree, capsys, scope_fields
+):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", **scope_fields)
+    exit_code, record, _ = _generate_with(monkeypatch, minimal_rules_tree, fm, capsys)
+    assert exit_code == 0
+    assert "project_scope" not in record
+
+
+@pytest.mark.parametrize(
+    ("fields", "complaint"),
+    [
+        ({"load": "always_on", "install": "hook-deliver", "paths": ["**/*.py"]}, "paths"),
+        ({"load": "path_scoped", "install": "hook-deliver"}, "load: always_on"),
+        ({"load": "always_on", "install": "symlink"}, "install: hook-deliver"),
+    ],
+    ids=["with-paths", "path-scoped-load", "symlink-install"],
+)
+def test_managed_rule_with_a_non_deliverable_shape_is_refused_by_name(
+    monkeypatch, minimal_rules_tree, capsys, fields, complaint
+):
+    fm = _frontmatter(core=False, project_scope="managed", **fields)
+    exit_code, _, stderr = _generate_with(
+        monkeypatch, minimal_rules_tree, fm, capsys, ROUTING_RESIDENT
+    )
+    assert exit_code == 1
+    assert ROUTING_RESIDENT in stderr
+    assert complaint in stderr
+
+
+def test_unknown_project_scope_is_refused_by_name(monkeypatch, minimal_rules_tree, capsys):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="some")
+    exit_code, _, stderr = _generate_with(monkeypatch, minimal_rules_tree, fm, capsys)
+    assert exit_code == 1
+    assert MEMORY_PROTOCOL in stderr
+    assert "some" in stderr
+
+
+# ---------------------------------------------------------------------------
+# The managed set is pinned: exactly four rules, never a constitution rule
+# ---------------------------------------------------------------------------
+
+
+def test_the_real_rules_mark_exactly_the_pinned_managed_set(monkeypatch) -> None:
+    # The mutation sensor runs a copy of this file deeper down: walk up to the checkout.
+    root = next(r for r in SCRIPTS_DIR.parents if (r / "rules" / "_manifest.yaml").is_file())
+    mod = _patched_module(monkeypatch, root / "rules", root / "rules" / "_manifest.yaml")
+
+    managed = {r["id"] for r in mod._collect_rules() if r.get("project_scope") == "managed"}
+
+    assert (
+        managed
+        == mod.EXPECTED_MANAGED_IDS
+        == {
+            "swe/swe-agent-coordination-protocol",
+            "swe/agent-intermediate-documents",
+            "swe/adr-conventions-resident",
+            ROUTING_RESIDENT,
+        }
+    )
+
+
+def test_the_constitution_is_never_in_the_managed_pin() -> None:
+    mod = _load_module()
+
+    assert mod.CONSTITUTION_IDS == {"swe/agent-behavioral-contract", "swe/vcs/git-conventions"}
+    assert not mod.EXPECTED_MANAGED_IDS & mod.CONSTITUTION_IDS
+
+
+def test_a_rule_marked_managed_outside_the_pin_is_refused(monkeypatch, minimal_rules_tree, capsys):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="managed")
+    exit_code, _, stderr = _generate_with(monkeypatch, minimal_rules_tree, fm, capsys)
+
+    assert exit_code == 1
+    assert MEMORY_PROTOCOL in stderr
+    assert "EXPECTED_MANAGED_IDS" in stderr
+
+
+def test_a_pinned_rule_losing_its_managed_scope_is_refused(monkeypatch, minimal_rules_tree, capsys):
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver")
+    exit_code, _, stderr = _generate_with(
+        monkeypatch, minimal_rules_tree, fm, capsys, ROUTING_RESIDENT
+    )
+
+    assert exit_code == 1
+    assert f"rule '{ROUTING_RESIDENT}' must declare project_scope: managed" in stderr
+
+
+def test_a_constitution_rule_marked_managed_is_refused_even_when_pinned(
+    monkeypatch, minimal_rules_tree, capsys
+):
+    rules_dir, manifest_path = minimal_rules_tree
+    fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="managed")
+    (rules_dir / "swe" / "vcs" / "git-conventions.md").write_text(fm + "## Git\n")
+    mod = _patched_module(monkeypatch, rules_dir, manifest_path)
+    monkeypatch.setattr(
+        mod, "EXPECTED_MANAGED_IDS", mod.EXPECTED_MANAGED_IDS | {"swe/vcs/git-conventions"}
+    )
+
+    assert mod.run_generate() == 1
+    assert "constitution rule 'swe/vcs/git-conventions'" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Injection order: a core rule delivered by the hook takes its order position once
+# ---------------------------------------------------------------------------
+
+
+def test_the_order_list_lists_every_managed_unit_and_the_git_conventions_once() -> None:
+    """Membership, not position: the delivery planner orders a managed session."""
+    mod = _load_module()
+
+    assert len(mod.HOOK_DELIVER_ORDER) == len(set(mod.HOOK_DELIVER_ORDER))
+    assert mod.EXPECTED_MANAGED_IDS | {"swe/vcs/git-conventions"} <= set(mod.HOOK_DELIVER_ORDER)
+
+
+def test_a_core_hook_delivered_rule_appears_once_in_injection_order(
+    monkeypatch, minimal_rules_tree
+):
+    rules_dir, manifest_path = minimal_rules_tree
+    mod = _patched_module(monkeypatch, rules_dir, manifest_path)
+    assert mod.run_generate() == 0
+
+    ids = [r["id"] for r in yaml.safe_load(manifest_path.read_text(encoding="utf-8"))["rules"]]
+    hook_ids = [rid for rid in ids if rid in mod.HOOK_DELIVER_ORDER]
+
+    assert len(ids) == len(set(ids))
+    assert hook_ids == mod.HOOK_DELIVER_ORDER
 
 
 # ---------------------------------------------------------------------------

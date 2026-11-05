@@ -44,14 +44,14 @@ Channel A+. The three symlinked units stop being linked at user scope. `hooks/in
 
 ## Consequences
 
-- Unmanaged sessions and inheriting spawns stop receiving the procedures; managed sessions and spawns receive the same text by a different carrier (a system-reminder block instead of a user rule), so adherence is re-measured by the paired channel run before any improvement or equivalence is claimed beyond bounded non-regression.
+- Unmanaged sessions and inheriting spawns stop receiving the procedures; managed sessions and spawns receive the same text by a different carrier (a system-reminder block instead of a user rule). The paired channel run that was to re-measure adherence was declined by the user on 2026-11-05: the move eval cannot express a project-gating move (no task kit, a channel that reaches no line, no governed checks for the protocol, the intermediate-documents rule or the routing resident; td-579). What is established is text parity (every statement a managed session and inheriting spawn received before arrives, checked by content) and the token bounds; equivalence of adherence is unmeasured, and nothing beyond bounded non-regression of the text is claimed.
 - When no Praxion hook runs at all, managed sessions no longer receive the three units (today they do natively); the user accepted this floor (F1).
 - Subdirectory sessions of a managed project gain the decision context, prompt reminder and preamble.
 - dec-167's clause "core rules continue using native symlinks" is narrowed: core rules with `project_scope: managed` are hook-delivered.
 
 ## Disconfirmation
 
-- **Falsifier:** probe P1 or the REQ-04 scenarios show any SubagentStart part missing, truncated or unreadable in an inheriting spawn, or the paired run shows a regression on a check beyond its allowance in the full arm.
+- **Falsifier:** probe P1 or the REQ-04 scenarios show any SubagentStart part missing, truncated or unreadable in an inheriting spawn, or a paired channel run, once the instrument can express this move (td-579), shows a regression on a check beyond its allowance.
 - **Steelmanned runner-up (C):** native project copies are the only carrier that survives a session in which no hook runs, keeps the exact user-rule-like position in the instruction hierarchy, and avoids slot-order risk; its nested-directory over-reach costs little, since a project's own CLAUDE.md already reaches those directories today.
 - **Reversal trigger:** P1 fails at the needed size, or the user answers SQ-7 with F3; then C becomes the primary carrier for managed projects and A+ shrinks to the bridge.
 - **Activation:** fired (spawn delivery at size 6/10; process loss is user-visible). Tier-B not run: reversible by one manifest table edit and a relink.

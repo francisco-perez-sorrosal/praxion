@@ -1,7 +1,8 @@
 ---
-id: dec-draft-b7e3ef71
+id: dec-490
+draft_id: dec-draft-b7e3ef71
 title: Managed-only procedures reach sessions and inheriting spawns by gated hooks, decided by one project predicate
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-03
 summary: The coordination protocol, intermediate-documents rule and ADR resident leave the user-scope symlink set; with the routing resident they are delivered by the rule injector only where locate() finds .ai-state/, over SessionStart for the main session and SubagentStart for inheriting spawns, in labelled parts under the 10,000-character cap; every managed-only gate uses the same predicate.

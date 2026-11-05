@@ -23,7 +23,7 @@ affected_reqs:
   - REQ-03
   - REQ-04
   - REQ-07
-superseded_in_part_by: [dec-453, dec-draft-b7e3ef71]
+superseded_in_part_by: [dec-453, dec-490]
 ---
 
 ## Context

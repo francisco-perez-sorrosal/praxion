@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-02T15:20:51Z'
+generated_at: '2026-11-05T15:43:10Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-04'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-03'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -117,7 +117,7 @@ surfaces:
   path: docs/agent-readiness.md
   type: markdown
   title: Agent Readiness
-  last_modified: '2026-07-15'
+  last_modified: '2026-11-02'
   diataxis: explanation
   renderer: explanation_shell
 - id: docs-architecture-diagrams
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-04'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -607,7 +607,7 @@ surfaces:
   path: docs/rules-taxonomy.md
   type: markdown
   title: Rules Taxonomy and Disable Guide
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-04'
   diataxis: reference
   audience: developer
   renderer: reference_shell
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-04'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-02'
+  last_modified: '2026-11-05'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -676,13 +676,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-02'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-02'
+  last_modified: '2026-11-05'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -1168,7 +1168,7 @@ surfaces:
   path: .ai-state/decisions/078-agent-model-routing-routing-mechanism-hybrid.md
   type: markdown
   title: "Hybrid routing \u2014 central rule table with sparing per-spawn overrides"
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-02'
   renderer: adr_card
 - id: ai-state-decisions-079-agent-model-routing-routing-placement-always-loaded-rule
   path: .ai-state/decisions/079-agent-model-routing-routing-placement-always-loaded-rule.md
@@ -1702,7 +1702,7 @@ surfaces:
   path: .ai-state/decisions/167-hook-delivered-blacklist-mechanism.md
   type: markdown
   title: Hook-delivered blacklist for always-loaded rules; symlink-based for core and path-scoped
-  last_modified: '2026-10-11'
+  last_modified: '2026-11-03'
   renderer: adr_card
 - id: ai-state-decisions-168-core-frontmatter-single-source-of-truth
   path: .ai-state/decisions/168-core-frontmatter-single-source-of-truth.md
@@ -2932,7 +2932,7 @@ surfaces:
   path: .ai-state/decisions/372-codex-model-routing-derives-from-tier.md
   type: markdown
   title: The Codex model adapter keys on the routing rule's Tier column, never on a Claude alias literal
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-02'
   renderer: adr_card
 - id: ai-state-decisions-373-consult-cost-reconstructed-provenance
   path: .ai-state/decisions/373-consult-cost-reconstructed-provenance.md
@@ -3607,7 +3607,7 @@ surfaces:
   path: .ai-state/decisions/484-spawn-directive-restated-to-floor-contract.md
   type: markdown
   title: 'The orchestrator directive is restated: omit model by default, pass one only for a listed deviation'
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-02'
   renderer: adr_card
 - id: ai-state-decisions-485-spawn-model-transcript-check
   path: .ai-state/decisions/485-spawn-model-transcript-check.md
@@ -3633,11 +3633,23 @@ surfaces:
   title: The L tier routes by the haiku alias, passable per spawn and through the step-loop driver
   last_modified: '2026-11-02'
   renderer: adr_card
+- id: ai-state-decisions-489-constitutional-sentences-added-to-user-instructions
+  path: .ai-state/decisions/489-constitutional-sentences-added-to-user-instructions.md
+  type: markdown
+  title: The two constitutional sentences are added to the user instructions; no rule file changes
+  last_modified: '2026-11-05'
+  renderer: adr_card
+- id: ai-state-decisions-490-managed-only-procedures-gated-hook-delivery
+  path: .ai-state/decisions/490-managed-only-procedures-gated-hook-delivery.md
+  type: markdown
+  title: Managed-only procedures reach sessions and inheriting spawns by gated hooks, decided by one project predicate
+  last_modified: '2026-11-05'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-01'
+  last_modified: '2026-11-02'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4563,6 +4575,8 @@ groups:
   - ai-state-decisions-486-capped-report-finished-form
   - ai-state-decisions-487-confined-kits-os-sandbox-grant
   - ai-state-decisions-488-l-tier-haiku-alias-routing
+  - ai-state-decisions-489-constitutional-sentences-added-to-user-instructions
+  - ai-state-decisions-490-managed-only-procedures-gated-hook-delivery
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

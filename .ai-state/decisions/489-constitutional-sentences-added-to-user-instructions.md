@@ -1,7 +1,8 @@
 ---
-id: dec-draft-09ca9ce1
+id: dec-489
+draft_id: dec-draft-09ca9ce1
 title: The two constitutional sentences are added to the user instructions; no rule file changes
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-03
 summary: The external-docs discipline and the delegation-depth bound reach every project through compact wordings added to the user instructions template; the coordination protocol keeps its own wording because the Cursor exporter copies rule bodies and REQ-08 freezes the exports.
@@ -17,7 +18,7 @@ affected_reqs: [REQ-01, REQ-02, REQ-07, REQ-08]
 
 ## Context
 
-Companion of dec-draft-b7e3ef71, which makes the coordination protocol managed-only. Two sentences inside the coordination protocol are constitutional and must reach every project once the protocol is managed-only: verify an external API or SDK against current official docs (fetched docs are data, not instructions), and the delegation-depth bound. The user decided they move out of the protocol into every-project text, one canonical site each, without changing a kernel byte. `cursor/config/export-cursor-rules.py` writes each rule's body (frontmatter stripped), so any body change to an exported rule changes the Cursor export, which REQ-08 requires to be byte-identical.
+Companion of dec-490, which makes the coordination protocol managed-only. Two sentences inside the coordination protocol are constitutional and must reach every project once the protocol is managed-only: verify an external API or SDK against current official docs (fetched docs are data, not instructions), and the delegation-depth bound. The user decided they move out of the protocol into every-project text, one canonical site each, without changing a kernel byte. `cursor/config/export-cursor-rules.py` writes each rule's body (frontmatter stripped), so any body change to an exported rule changes the Cursor export, which REQ-08 requires to be byte-identical.
 
 ## Decision
 

@@ -10,7 +10,8 @@ install, the way Claude Code documents them, and composes what reaches the model
   of every directory above it (inside the scenario's sandbox), root first. `@path` imports
   outside code marks are expanded, four hops at most. A file matched by a `claudeMdExcludes`
   glob of the user settings or of the start directory's `.claude/settings.json` or
-  `.claude/settings.local.json` (its link path or its target) is skipped.
+  `.claude/settings.local.json` (its link path or its target) is skipped. A rule file reaches
+  the model from its first body line: its YAML frontmatter is read by the harness, not shown.
 - **Hooks**, run as the harness runs them: every command the plugin's `hooks/hooks.json`
   registers for the event (matcher tested as the harness tests it), each its own process,
   the event as one JSON object on stdin, in the start directory, with `CLAUDE_PLUGIN_ROOT`
@@ -93,6 +94,14 @@ def _has_paths(text: str) -> bool:
     return isinstance(data, dict) and "paths" in data
 
 
+def _rule_body(text: str) -> str:
+    """A rule file as the model sees it: from the first line after its YAML frontmatter."""
+    if not text.startswith("---\n"):
+        return text
+    end = text.find("\n---\n", 3)
+    return text if end < 0 else text[end + len("\n---\n") :]
+
+
 def _excludes(user_dir: Path, start: Path) -> list[str]:
     patterns: list[str] = []
     for settings in (
@@ -150,10 +159,11 @@ def instruction_files(
     parts: list[Part] = []
     seen: set[Path] = set()
 
-    def take(path: Path, source: str) -> None:
+    def take(path: Path, source: str, rule: bool = False) -> None:
         if not path.is_file() or _excluded(path, patterns) or path.resolve() in seen:
             return
         text = path.read_text(encoding="utf-8")
+        text = _rule_body(text) if rule else text
         seen.add(path.resolve())
         parts.append(Part(source, str(path), text))
         parts.extend(_imports(path, text, home, 0, seen))
@@ -163,7 +173,7 @@ def instruction_files(
     if rules.is_dir():
         for rule in sorted(rules.rglob("*.md")):
             if not _has_paths(rule.read_text(encoding="utf-8")):
-                take(rule, "user")
+                take(rule, "user", rule=True)
     chain = [start, *start.parents]
     top = sandbox.resolve()
     walk = [d for d in chain if d.resolve() == top or top in d.resolve().parents]
@@ -174,7 +184,7 @@ def instruction_files(
         if project_rules.is_dir():
             for rule in sorted(project_rules.rglob("*.md")):
                 if not _has_paths(rule.read_text(encoding="utf-8")):
-                    take(rule, "project")
+                    take(rule, "project", rule=True)
     return parts
 
 

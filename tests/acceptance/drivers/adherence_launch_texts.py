@@ -6,7 +6,10 @@ launch before the stand-in answers, reads what that session would receive with
 `session_start_text`: the instruction files of the launch's configuration directory
 (`CLAUDE_CONFIG_DIR`, else its HOME's `.claude`) and of its working directory, plus the
 `SessionStart` hooks of its `--plugin-dir` copy run in that directory; and what the role it spawns
-would receive, by `session_start_text.spawn_start` against the same plugin copy. The readings are
+would receive, by `session_start_text.spawn_start` against the same plugin copy. The eval's copy
+holds the files an adherence run reads, not the scripts the plugin's hooks run, so the reading is
+taken against that copy laid over this checkout (`_running_plugin`): its definitions, rules and
+registrations, this checkout's hook scripts. The readings are
 taken from copies of the launch's directories, so a hook that writes cannot change what the run
 goes on to measure, and are masked to tokens, so two runs compare.
 
@@ -202,11 +205,46 @@ def read_launch(argv: Sequence[str], environ: Mapping[str, str], cwd: Path, role
         project = sandbox / "project"
         shutil.copytree(cwd, project, symlinks=True)
         shutil.copytree(config_dir, sandbox / "home" / ".claude", symlinks=True)
+        launched_plugin = plugin
+        plugin = _running_plugin(launched_plugin, sandbox / "plugin")
         machine = Machine(sandbox / "home", plugin, sandbox)
-        tokens = {**machine.tokens(), home: "<home>", cwd: "<project>", project: "<project>"}
+        tokens = {
+            **machine.tokens(),
+            launched_plugin: "<plugin>",
+            home: "<home>",
+            cwd: "<project>",
+            project: "<project>",
+        }
         session = session_start(machine, project, entrypoint=HEADLESS).process_text
         spawned = spawn_start(machine, project, f"praxion:{role}").process_text
         return Reading(_masked(session, tokens), _masked(spawned, tokens))
+
+
+def _running_plugin(launched: Path, dest: Path) -> Path:
+    """The launch's plugin copy as the harness runs it: laid over this checkout, so the hook
+    scripts its registrations name are there to run.
+
+    Where both hold a directory the two are merged; where both hold a file the copy's wins, so
+    the arm's definitions, the rules and manifest, the registrations and the kernel index are the
+    launch's own. This checkout's `.ai-state` stays out, and the kernel adoption ledger is the
+    frozen one, as `scratch_projects.plugin_root` has it.
+    """
+    left_out = (".ai-state", ".ai-work", ".git", ".claude")
+    _lay_over(REPO_ROOT, launched, dest, left_out)
+    (dest / ".ai-state").mkdir(exist_ok=True)
+    shutil.copy(FIXTURES / "kernel_adoption.yaml", dest / ".ai-state" / "kernel_adoption.yaml")
+    return dest
+
+
+def _lay_over(below: Path, above: Path, dest: Path, left_out: Sequence[str] = ()) -> None:
+    dest.mkdir(parents=True, exist_ok=True)
+    names = {e.name for e in below.iterdir()} | {e.name for e in above.iterdir()}
+    for name in sorted(names - set(left_out)):
+        low, high = below / name, above / name
+        if low.is_dir() and not low.is_symlink() and high.is_dir() and not high.is_symlink():
+            _lay_over(low, high, dest / name)
+        else:
+            (dest / name).symlink_to(high if high.exists() or high.is_symlink() else low)
 
 
 def _masked(text: str, tokens: Mapping[Path, str]) -> str:

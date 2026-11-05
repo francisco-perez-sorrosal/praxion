@@ -1,8 +1,8 @@
 """Readings over the whole checkout for project gating, and the freezing of today's readings.
 
 The always-loaded budget command (`measure_token_budget.py --json --repo-root <dir>`) under a
-scratch install, every Codex and Cursor export by digest with the checkout's location
-normalised out, the generated kernels by digest, and `freeze`, which writes every fixture under
+scratch install and its plugin root, every Codex and Cursor export by digest with the
+checkout's location normalised out, the generated kernels by digest, and `freeze`, which writes every fixture under
 `tests/acceptance/fixtures/project_gating/` from a tree that must be the pipeline base.
 """
 
@@ -48,8 +48,15 @@ from tests.acceptance.drivers.session_start_text import (
 
 
 def budget_reading(machine: Machine, directory: Path) -> tuple[int, dict]:
-    """`measure_token_budget.py --json --repo-root <directory>` under the scratch install."""
-    env = isolated_env(machine.sandbox / ".budget")
+    """`measure_token_budget.py --json --repo-root <directory>` under the scratch install.
+
+    The instrument finds the rules a session loads by hook through the plugin's manifest: the
+    directory's own `rules/`, else `CLAUDE_PLUGIN_ROOT`. A session of an installed plugin has that
+    variable set, so the reading is taken with the scratch install's plugin root, as the hooks are
+    (`session_start_text._env`); without it a directory that carries no `rules/` counts no
+    hook-delivered rule.
+    """
+    env = isolated_env(machine.sandbox / ".budget", CLAUDE_PLUGIN_ROOT=str(machine.plugin))
     env["HOME"] = str(machine.home)
     result = subprocess.run(
         [

@@ -51,10 +51,12 @@ def test_a_refused_run_is_named_by_the_run_index_beside_its_results_file(tmp_pat
 
 
 def test_a_session_reporting_no_cost_is_counted_at_its_full_budget(tmp_path):
+    # Two planned sessions of one unswitched role: a switched role has no lean arm to build,
+    # so its sessions never reach the cap this scenario exercises.
     journey = run_journey(
         tmp_path,
-        roles=("verifier", "implementer"),
-        arms=("lean",),
+        roles=("verifier",),
+        arms=("full", "lean"),
         run_cap_usd=1.5,
         session_budget_usd=1.0,
         sessions_report_cost=False,

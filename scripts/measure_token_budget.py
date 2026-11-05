@@ -74,6 +74,7 @@ import urllib.request
 from datetime import date, timedelta
 from pathlib import Path
 
+from _budget_scope import loaded_rows
 from _repo_root import resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -223,8 +224,8 @@ def _discover_rules_manifest(repo_root: Path) -> Path | None:
     return None
 
 
-def _hook_deliver_rule_paths(manifest_text: str) -> list[str]:
-    """`path:` values of manifest entries whose `install:` is `hook-deliver`.
+def _manifest_rows(manifest_text: str) -> list[dict[str, str]]:
+    """The manifest's rows as `key: value` dicts, in file order.
 
     Deliberately not a YAML parse -- this module is stdlib-only by
     construction (see the module docstring) -- and `rules/_manifest.yaml` is
@@ -233,25 +234,15 @@ def _hook_deliver_rule_paths(manifest_text: str) -> list[str]:
     `key: value` scalar lines with no nesting. A line-scan over that one
     shape is exact; it would not be for arbitrary YAML.
     """
-    current_path: str | None = None
-    current_install: str | None = None
-    results: list[str] = []
-
-    def _flush() -> None:
-        if current_path and current_install == "hook-deliver":
-            results.append(current_path)
-
+    rows: list[dict[str, str]] = []
     for line in manifest_text.splitlines():
         stripped = line.strip()
         if stripped.startswith("- id:"):
-            _flush()
-            current_path, current_install = None, None
-        elif stripped.startswith("path:"):
-            current_path = stripped[len("path:") :].strip().strip("'\"")
-        elif stripped.startswith("install:"):
-            current_install = stripped[len("install:") :].strip().strip("'\"")
-    _flush()
-    return results
+            rows.append({})
+        key, _, value = stripped.removeprefix("- ").partition(":")
+        if rows and key.isidentifier() and value:
+            rows[-1][key] = value.strip().strip("'\"")
+    return rows
 
 
 def _hook_delivered_files(repo_root: Path) -> list[tuple[Path, str]]:
@@ -259,18 +250,20 @@ def _hook_delivered_files(repo_root: Path) -> list[tuple[Path, str]]:
     symlinked -- the manifest's `install: hook-deliver` rows -- resolved
     against the manifest's own repo root (`<root>/rules/_manifest.yaml` ->
     `<root>`), since a plugin-cache manifest and a checkout manifest
-    describe two different physical trees. Returns `(path, name)` pairs so
-    the caller can dedup by `name` against whatever other channel already
-    delivered the same rule (see `always_loaded_files`)."""
+    describe two different physical trees. Only the rows the session in
+    `repo_root` is served: the managed-only ones reach a managed project
+    alone. Returns `(path, name)` pairs so the caller can dedup by `name`
+    against whatever other channel already delivered the same rule (see
+    `always_loaded_files`)."""
     manifest_path = _discover_rules_manifest(repo_root)
     if manifest_path is None:
         return []
     manifest_root = manifest_path.parent.parent
-    relative_paths = _hook_deliver_rule_paths(manifest_path.read_text(encoding="utf-8"))
+    rows = _manifest_rows(manifest_path.read_text(encoding="utf-8"))
     return [
-        (manifest_root / rel, rel.removeprefix("rules/"))
-        for rel in relative_paths
-        if rel.startswith("rules/")
+        (manifest_root / row["path"], row["path"].removeprefix("rules/"))
+        for row in loaded_rows(repo_root, rows)
+        if row.get("install") == "hook-deliver" and row.get("path", "").startswith("rules/")
     ]
 
 

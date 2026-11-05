@@ -1,7 +1,8 @@
 ---
 core: true
 load: always_on
-install: symlink
+install: hook-deliver
+project_scope: managed
 ---
 
 ## SWE Agent Coordination Protocol

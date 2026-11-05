@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-11-02T16:08:26Z'
+generated_at: '2026-11-04T16:38:17Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -13,42 +13,46 @@ rules:
   chars: 8786
   paths:
   - .ai-state/decisions/**
-- id: swe/adr-conventions-resident
-  path: rules/swe/adr-conventions-resident.md
-  load: always_on
-  core: true
-  install: symlink
-  chars: 281
 - id: swe/agent-behavioral-contract
   path: rules/swe/agent-behavioral-contract.md
   load: always_on
   core: true
   install: symlink
   chars: 1572
-- id: swe/agent-intermediate-documents
-  path: rules/swe/agent-intermediate-documents.md
-  load: always_on
-  core: true
-  install: symlink
-  chars: 4134
-- id: swe/swe-agent-coordination-protocol
-  path: rules/swe/swe-agent-coordination-protocol.md
-  load: always_on
-  core: true
-  install: symlink
-  chars: 18643
 - id: swe/agent-model-routing-resident
   path: rules/swe/agent-model-routing-resident.md
   load: always_on
   core: false
   install: hook-deliver
-  chars: 1688
+  chars: 1711
+  project_scope: managed
 - id: swe/vcs/git-conventions
   path: rules/swe/vcs/git-conventions.md
   load: always_on
   core: false
   install: hook-deliver
   chars: 4689
+- id: swe/swe-agent-coordination-protocol
+  path: rules/swe/swe-agent-coordination-protocol.md
+  load: always_on
+  core: true
+  install: hook-deliver
+  chars: 18671
+  project_scope: managed
+- id: swe/agent-intermediate-documents
+  path: rules/swe/agent-intermediate-documents.md
+  load: always_on
+  core: true
+  install: hook-deliver
+  chars: 4162
+  project_scope: managed
+- id: swe/adr-conventions-resident
+  path: rules/swe/adr-conventions-resident.md
+  load: always_on
+  core: true
+  install: hook-deliver
+  chars: 309
+  project_scope: managed
 - id: eval/eval-data-governance
   path: rules/eval/eval-data-governance.md
   load: path_scoped

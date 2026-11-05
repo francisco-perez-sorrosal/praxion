@@ -47,6 +47,9 @@ HOOK_DELIVER_ORDER = [
     "swe/memory-protocol",
     "swe/agent-model-routing-resident",
     "swe/vcs/git-conventions",
+    "swe/swe-agent-coordination-protocol",
+    "swe/agent-intermediate-documents",
+    "swe/adr-conventions-resident",
 ]
 
 # `project_scope` frontmatter: `every` (the default, never emitted) or `managed`
@@ -54,6 +57,22 @@ HOOK_DELIVER_ORDER = [
 PROJECT_SCOPE_EVERY = "every"
 PROJECT_SCOPE_MANAGED = "managed"
 PROJECT_SCOPES = frozenset({PROJECT_SCOPE_EVERY, PROJECT_SCOPE_MANAGED})
+
+# The rules that reach only a managed project: exactly these carry
+# `project_scope: managed`. hooks/_rule_delivery.py's MANAGED_CORE_UNITS is this
+# set minus the routing resident, held equal by a test there.
+EXPECTED_MANAGED_IDS = frozenset(
+    {
+        "swe/swe-agent-coordination-protocol",
+        "swe/agent-intermediate-documents",
+        "swe/adr-conventions-resident",
+        "swe/agent-model-routing-resident",
+    }
+)
+
+# The constitution reaches every session, managed or not: none of these may
+# ever be marked managed, whatever EXPECTED_MANAGED_IDS comes to say.
+CONSTITUTION_IDS = frozenset({"swe/agent-behavioral-contract", "swe/vcs/git-conventions"})
 
 MANIFEST_HEADER = (
     "# AUTO-GENERATED. Do not edit by hand.\n"
@@ -178,14 +197,38 @@ def _validate_project_scope(records: list[dict[str, Any]]) -> list[str]:
     return errors
 
 
+def _validate_managed_set(records: list[dict[str, Any]]) -> list[str]:
+    """Verify the managed rules are exactly EXPECTED_MANAGED_IDS and that no
+    constitution rule is among them, so a frontmatter edit can neither widen nor
+    narrow what an unmanaged session loses."""
+    managed = {r["id"] for r in records if r.get("project_scope") == PROJECT_SCOPE_MANAGED}
+    errors = [
+        f"ERROR: constitution rule '{rid}' must reach every project, not only managed ones"
+        for rid in sorted(managed & CONSTITUTION_IDS)
+    ]
+    errors += [
+        f"ERROR: rule '{rid}' must declare project_scope: managed"
+        for rid in sorted(EXPECTED_MANAGED_IDS - managed)
+    ]
+    errors += [
+        f"ERROR: rule '{rid}' declares project_scope: managed but is not in"
+        f" EXPECTED_MANAGED_IDS in scripts/regenerate_rules_manifest.py"
+        for rid in sorted(managed - EXPECTED_MANAGED_IDS - CONSTITUTION_IDS)
+    ]
+    return errors
+
+
 def _ordered_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return records in canonical manifest order:
-    1. Core rules (alphabetical by id)
-    2. Hook-deliver rules in stable injection order
+    """Return records in canonical manifest order, each rule once:
+    1. Core rules not hook-delivered (alphabetical by id)
+    2. Hook-deliver rules in stable injection order, core or not
     3. Path-scoped rules (alphabetical by id)
     """
     by_id = {r["id"]: r for r in records}
-    core_rules = sorted((r for r in records if r.get("core")), key=lambda r: r["id"])
+    core_rules = sorted(
+        (r for r in records if r.get("core") and r["id"] not in HOOK_DELIVER_ORDER),
+        key=lambda r: r["id"],
+    )
     hook_rules = [by_id[rid] for rid in HOOK_DELIVER_ORDER if rid in by_id]
     path_scoped = sorted(
         (r for r in records if not r.get("core") and r["id"] not in HOOK_DELIVER_ORDER),
@@ -228,6 +271,7 @@ def _all_validation_errors(records: list[dict[str, Any]]) -> list[str]:
         _validate_core_rules(records)
         + _validate_hook_deliver_coverage(records)
         + _validate_project_scope(records)
+        + _validate_managed_set(records)
     )
 
 

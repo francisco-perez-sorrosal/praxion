@@ -9,6 +9,7 @@ are planned at all.
 
 from __future__ import annotations
 
+import ast
 import re
 import sys
 from pathlib import Path
@@ -272,6 +273,39 @@ def test_the_core_units_are_the_protocol_the_documents_rule_and_the_adr_resident
         ("swe/adr-conventions-resident", "rules/swe/adr-conventions-resident.md", 3),
     ]
     assert all((REPO_ROOT / u.path).is_file() for u in MANAGED_CORE_UNITS)
+
+
+def _generator_pin(name: str) -> frozenset[str]:
+    """A frozenset the manifest generator pins, read from its source, not imported:
+    the generator needs PyYAML and this hook test does not."""
+    tree = ast.parse((REPO_ROOT / "scripts" / "regenerate_rules_manifest.py").read_text())
+    value = next(
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(getattr(t, "id", None) == name for t in node.targets)
+    )
+    return frozenset(ast.literal_eval(value.args[0]))
+
+
+def _frontmatter_of(rule_path: str) -> dict[str, str]:
+    block = FRONTMATTER.match((REPO_ROOT / rule_path).read_text(encoding="utf-8")).group(0)
+    pairs = (line.split(":", 1) for line in block.splitlines() if ":" in line)
+    return {key.strip(): value.strip() for key, value in pairs}
+
+
+def test_the_core_units_are_the_generators_managed_pin_less_the_routing_resident():
+    assert set(CORE_IDS) == _generator_pin("EXPECTED_MANAGED_IDS") - {ROUTING_RESIDENT_ID}
+
+
+@pytest.mark.parametrize("unit", MANAGED_CORE_UNITS, ids=lambda u: u.unit_id)
+def test_each_core_units_frontmatter_makes_it_a_managed_hook_delivered_core_rule(unit):
+    frontmatter = _frontmatter_of(unit.path)
+
+    assert unit.path == f"rules/{unit.unit_id}.md"
+    assert frontmatter["core"] == "true"
+    assert frontmatter["install"] == "hook-deliver"
+    assert frontmatter["project_scope"] == "managed"
 
 
 def test_an_unmanaged_session_plans_the_git_conventions_only():

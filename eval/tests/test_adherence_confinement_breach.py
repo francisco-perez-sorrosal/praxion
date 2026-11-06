@@ -4,6 +4,8 @@ break a confinement they do not hold."""
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
 
 from praxion_evals.adherence.confinement import (
@@ -21,6 +23,7 @@ from praxion_evals.adherence.session_loop import RETRYABLE_ERRORS
 SANDBOX_REFUSAL = "Sandbox is required but failed to initialize: seatbelt denied"
 STARTUP_STDERR = "Error: sandbox required by settings (failIfUnavailable) but unavailable."
 COPY = "/work/run/plugin"
+OTHER_ROLES = sorted(set(get_args(Role)) - CONFINED_ROLES)
 
 
 def _refused(command: str, source="permission_denials") -> RefusedCommand:
@@ -90,7 +93,12 @@ def test_the_sandbox_refusal_in_a_tool_result_is_broken(role):
 
 @pytest.mark.parametrize("role", sorted(CONFINED_ROLES))
 def test_a_refused_prescribed_command_is_broken_and_named(role):
-    command = {"verifier": "extract_spec.py ledger-cli --check", "implementer": "pytest -q"}[role]
+    command = {
+        "verifier": "extract_spec.py ledger-cli --check",
+        "implementer": "pytest -q",
+        "test-engineer": "ruff check tests",
+        "systems-architect": "check_design_checkpoint.py --json",
+    }[role]
 
     evidence = _breach(role, refused=[_refused("curl -s https://example.com"), _refused(command)])
 
@@ -126,7 +134,7 @@ def test_a_researcher_refused_a_test_run_is_not_broken():
     assert _breach("researcher", refused=[_refused("python -m pytest -q")]) is None
 
 
-@pytest.mark.parametrize("role", ["researcher", "test-engineer", "systems-architect"])
+@pytest.mark.parametrize("role", OTHER_ROLES)
 def test_a_role_outside_the_confined_kits_is_never_broken_by_any_signal(role):
     evidence = _breach(
         role,
@@ -139,8 +147,9 @@ def test_a_role_outside_the_confined_kits_is_never_broken_by_any_signal(role):
     assert evidence is None
 
 
-def test_the_verifier_does_not_prescribe_the_test_runner():
-    assert refused_prescribed("verifier", (_refused("python -m pytest -q"),)) is None
+@pytest.mark.parametrize("role", ["verifier", "systems-architect"])
+def test_a_role_that_never_runs_the_test_runner_does_not_prescribe_it(role):
+    assert refused_prescribed(role, (_refused("python -m pytest -q"),)) is None
 
 
 def test_the_prescriptions_cover_exactly_the_confined_roles():
@@ -183,6 +192,57 @@ VERIFIER_FORMS = [
     'python3 -c "from rework_manifest import compute_row_id; print(compute_row_id(1))"',
     "python3 -c 'import sys; sys.path.insert(0, \"scripts\"); import rework_manifest'",
 ]
+
+
+TEST_ENGINEER_FORMS = [
+    "pytest tests -q --tb=short -rf",
+    "python3 -m pytest tests -q --tb=short -rf",
+    "uv run pytest -q",
+    "py.test -q",
+    "ruff format tests",
+    "ruff check --fix tests",
+    "mutation_sensor.py --help",
+    f"python3 {COPY}/scripts/mutation_sensor.py --targets src/a.py --tests tests/test_a.py",
+    "git show HEAD:pyproject.toml",
+    "git diff --quiet HEAD -- pyproject.toml",
+    "mkdir -p .ai-work/s/logs && python3 -m pytest tests -q > .ai-work/s/logs/step-1.log 2>&1",
+]
+ARCHITECT_FORMS = [
+    "extract_spec.py s",
+    f"python3 {COPY}/scripts/extract_spec.py s",
+    "check_footprint_criteria.py s --stage spec",
+    f"python3 {COPY}/scripts/check_footprint_criteria.py s --stage spec",
+    "check_design_checkpoint.py --json",
+    f"python3 {COPY}/scripts/check_design_checkpoint.py --json",
+    "query_adrs.py --status accepted",
+    "git config user.email",
+    "git config user.name",
+    "git rev-parse --abbrev-ref HEAD",
+    "git log --oneline -5",
+]
+# The reads that name a decision fragment (its author, its branch) are prescribed to the
+# architect alone, so adding them widened no other role's reading of a refusal.
+ARCHITECT_ONLY = ["git config user.email", "git rev-parse --abbrev-ref HEAD"]
+
+
+@pytest.mark.parametrize("command", TEST_ENGINEER_FORMS)
+def test_every_form_of_a_test_engineers_prescribed_command_is_read_as_prescribed(command):
+    refused = _refused(command)
+
+    assert refused_prescribed("test-engineer", (refused,)) == refused
+
+
+@pytest.mark.parametrize("command", ARCHITECT_FORMS)
+def test_every_form_of_a_systems_architects_prescribed_command_is_read_as_prescribed(command):
+    refused = _refused(command)
+
+    assert refused_prescribed("systems-architect", (refused,)) == refused
+
+
+@pytest.mark.parametrize("role", ["implementer", "verifier", "test-engineer"])
+@pytest.mark.parametrize("command", ARCHITECT_ONLY)
+def test_the_architects_decision_fragment_reads_are_prescribed_to_no_other_role(role, command):
+    assert refused_prescribed(role, (_refused(command),)) is None
 
 
 @pytest.mark.parametrize("command", IMPLEMENTER_FORMS)
@@ -360,10 +420,10 @@ NOT_PRESCRIBED = [
 ]
 
 
+@pytest.mark.parametrize("role", sorted(CONFINED_ROLES))
 @pytest.mark.parametrize("command", [c for c in NOT_PRESCRIBED if c])
-def test_a_command_no_definition_prescribes_is_not_read_as_prescribed(command):
-    assert refused_prescribed("implementer", (_refused(command),)) is None
-    assert refused_prescribed("verifier", (_refused(command),)) is None
+def test_a_command_no_definition_prescribes_is_not_read_as_prescribed(role, command):
+    assert refused_prescribed(role, (_refused(command),)) is None
 
 
 def test_the_first_refused_prescribed_command_is_the_one_named():

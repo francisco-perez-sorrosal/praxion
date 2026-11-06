@@ -106,13 +106,23 @@ def covered(path: str, roots: list[str]) -> bool:
 # -- Who is confined ---------------------------------------------------------------------------
 
 
-def test_the_confined_roles_are_the_implementer_and_the_verifier():
-    assert CONFINED_ROLES == {"implementer", "verifier"}
+def test_the_confined_roles_are_the_implementer_the_verifier_and_the_two_writer_roles():
+    assert CONFINED_ROLES == {"implementer", "verifier", "test-engineer", "systems-architect"}
 
 
 @pytest.mark.parametrize("role", sorted(CONFINED_ROLES))
 def test_a_confined_role_gets_a_confinement(world, role):
     assert isinstance(confinement_for(role, world.places, world.operator), Confinement)
+
+
+@pytest.mark.parametrize("role", sorted(CONFINED_ROLES - {"implementer"}))
+def test_every_confined_role_is_held_to_the_implementers_contract(world, role):
+    held = confinement_for(role, world.places, world.operator)
+    implementers = confinement_for("implementer", world.places, world.operator)
+
+    assert held is not None
+    assert implementers is not None
+    assert settings_of(held) == settings_of(implementers)
 
 
 @pytest.mark.parametrize("role", OTHER_ROLES)

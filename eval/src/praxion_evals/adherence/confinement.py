@@ -1,11 +1,12 @@
 """The shell confinement of a confined kit's session, as one value and its rendered settings.
 
-The implementer's and the verifier's sessions run shell commands (the fixture's tests, the
-formatter, the linter, git reads, Praxion's scripts). A command pattern cannot bound them,
-because pytest runs code the role just wrote, so the harness's OS sandbox bounds them
-instead. ``confinement_for`` builds the value from where the session runs and what the
-operator's machine holds; ``settings_of`` renders it as the ``sandbox`` block the session is
-started with (``--settings``). Every other role gets ``None`` and keeps its grant.
+The sessions of the confined roles (the implementer, the verifier, the test-engineer and the
+systems-architect) run shell commands (the fixture's tests, the formatter, the linter, git
+reads, Praxion's scripts). A command pattern cannot bound them, because pytest runs code the
+role just wrote, so the harness's OS sandbox bounds them instead. ``confinement_for`` builds
+the value from where the session runs and what the operator's machine holds; ``settings_of``
+renders it as the ``sandbox`` block the session is started with (``--settings``). Every other
+role gets ``None`` and keeps its grant.
 
 Two facts shape the paths:
 
@@ -46,7 +47,9 @@ from typing import Any, NamedTuple
 
 from praxion_evals.adherence.model import RefusedCommand, Role
 
-CONFINED_ROLES: frozenset[Role] = frozenset({"implementer", "verifier"})
+CONFINED_ROLES: frozenset[Role] = frozenset(
+    {"implementer", "verifier", "test-engineer", "systems-architect"}
+)
 
 # Names under the operator's real home. The first layer of protection is `deny_read` over the
 # whole home; these also hold where the harness's filesystem isolation is off (macOS).
@@ -233,7 +236,9 @@ def _covers(root: str, path: str) -> bool:
 _GIT_READS = frozenset({"git diff", "git log", "git show", "git status"})
 
 # What each confined role's definition has it run, by program name, `python -m` module,
-# script file name or `git <subcommand>`. The verifier never runs the test runner.
+# script file name or `git <subcommand>`. The verifier and the systems-architect never run the
+# test runner. The systems-architect's `git config` and `git rev-parse` reads name a decision
+# fragment (its author and branch), so a refusal of them is the grant's, not the role's.
 PRESCRIBED_COMMANDS: dict[Role, frozenset[str]] = {
     "implementer": frozenset(
         {
@@ -257,6 +262,18 @@ PRESCRIBED_COMMANDS: dict[Role, frozenset[str]] = {
             "check_footprint_criteria.py",
             "query_adrs.py",
             "reconcile_pipeline_state.py",
+        }
+    )
+    | _GIT_READS,
+    "test-engineer": frozenset({"pytest", "py.test", "ruff", "mutation_sensor.py"}) | _GIT_READS,
+    "systems-architect": frozenset(
+        {
+            "extract_spec.py",
+            "check_footprint_criteria.py",
+            "check_design_checkpoint.py",
+            "query_adrs.py",
+            "git config",
+            "git rev-parse",
         }
     )
     | _GIT_READS,

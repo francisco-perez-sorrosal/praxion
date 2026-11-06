@@ -29,7 +29,10 @@ def _build(role: Role, tmp_path: Path) -> ArmBuild:
     root = tmp_path / "copy"
     (root / "agents").mkdir(parents=True)
     shutil.copy(REPO_ROOT / "agents" / f"{role}.md", root / "agents" / f"{role}.md")
-    return ArmBuild(role, "full", root, None, "digest", ())
+    # The first task of a role can be an early stop, whose copy is capped at the definition.
+    cap = tasks.turn_cap_of(_task(role))
+    patched = () if cap is None else (f"agents/{role}.md",)
+    return ArmBuild(role, "full", root, cap, "digest", patched)
 
 
 def _task(role: Role):

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-05T15:43:10Z'
+generated_at: '2026-11-06T05:46:56Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-10-10'
+  last_modified: '2026-11-05'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-03'
+  last_modified: '2026-11-06'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-04'
+  last_modified: '2026-11-05'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -1702,7 +1702,7 @@ surfaces:
   path: .ai-state/decisions/167-hook-delivered-blacklist-mechanism.md
   type: markdown
   title: Hook-delivered blacklist for always-loaded rules; symlink-based for core and path-scoped
-  last_modified: '2026-11-03'
+  last_modified: '2026-11-05'
   renderer: adr_card
 - id: ai-state-decisions-168-core-frontmatter-single-source-of-truth
   path: .ai-state/decisions/168-core-frontmatter-single-source-of-truth.md
@@ -3649,7 +3649,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-02'
+  last_modified: '2026-11-05'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3978,6 +3978,12 @@ surfaces:
   type: markdown
   title: "SPEC: Wave 3 \u2014 Production-Gate Cohort + Registry Declarative Spine"
   last_modified: '2026-08-13'
+  renderer: default_markdown
+- id: ai-state-specs-spec-project-gating-2026-11-06
+  path: .ai-state/specs/SPEC_project-gating_2026-11-06.md
+  type: markdown
+  title: 'Spec: project-gating (the pipeline procedures reach only managed projects, by gated hooks to the main session and its inheriting spawns, decided by one predicate; every project keeps the constitution)'
+  last_modified: '2026-11-05'
   renderer: default_markdown
 - id: ai-state-specs-spec-project-metrics-2026-04-23
   path: .ai-state/specs/SPEC_project-metrics_2026-04-23.md
@@ -4632,6 +4638,7 @@ groups:
   - ai-state-specs-spec-p5-issue-autofix-2026-07-24
   - ai-state-specs-spec-process-economy-p3-1-2026-09-18
   - ai-state-specs-spec-production-gate-cohort-2026-06-26
+  - ai-state-specs-spec-project-gating-2026-11-06
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-specs-spec-ralph-lite-2026-10-08
   - ai-state-specs-spec-routing-facts-2026-11-02

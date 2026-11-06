@@ -16,6 +16,7 @@ affected_files:
 affected_reqs:
   - REQ-02
   - REQ-05
+superseded_in_part_by: [dec-491]
 ---
 
 ## Context

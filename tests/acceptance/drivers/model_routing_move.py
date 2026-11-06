@@ -32,6 +32,7 @@ import fnmatch
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -441,18 +442,27 @@ def marketplace_complete(scratch: Path) -> Path:
     on a first session: over this checkout laid out as the installed plugin's cache in `scratch`'s
     HOME; returns the user rules directory it linked.
 
-    The cache is a directory of its own holding this checkout's `rules/` (a link) and a copy of the
-    CLAUDE.md template, not a link to the whole checkout: the completion renders CLAUDE.md into
-    its cache, and that must not write into the checkout."""
-    cache = scratch / "home" / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion"
-    (cache / "claude" / "config").mkdir(parents=True, exist_ok=True)
-    (cache / "rules").symlink_to(REPO_ROOT / "rules")
-    (cache / GLOBAL_INSTRUCTIONS).write_bytes((REPO_ROOT / GLOBAL_INSTRUCTIONS).read_bytes())
+    The plugin sits in a version directory of the cache, as Claude Code installs it, and
+    `CLAUDE_PLUGIN_ROOT` names it, as the harness sets it for a plugin hook. It holds a copy of
+    this checkout's `rules/` and of the installer's shared library the completion links through
+    (a copy, since that library's `find` does not descend into a start directory that is a link),
+    and a copy of the CLAUDE.md template, not a link to the whole checkout: the completion renders
+    CLAUDE.md into its plugin directory, and that must not write into the checkout."""
+    plugin = scratch / "home" / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion" / "0.0.0"
+    (plugin / "claude" / "config").mkdir(parents=True, exist_ok=True)
+    shutil.copytree(REPO_ROOT / "rules", plugin / "rules")
+    shutil.copytree(REPO_ROOT / "lib", plugin / "lib")
+    (plugin / GLOBAL_INSTRUCTIONS).write_bytes((REPO_ROOT / GLOBAL_INSTRUCTIONS).read_bytes())
     result = subprocess.run(
         [sys.executable, str(REPO_ROOT / "hooks" / "auto_complete_install.py")],
         input="",
         cwd=scratch,
-        env=isolated_env(scratch, PRAXION_AUTO_COMPLETE="1", PRAXION_DISABLE_AUTO_COMPLETE="0"),
+        env=isolated_env(
+            scratch,
+            PRAXION_AUTO_COMPLETE="1",
+            PRAXION_DISABLE_AUTO_COMPLETE="0",
+            CLAUDE_PLUGIN_ROOT=str(plugin),
+        ),
         capture_output=True,
         text=True,
         timeout=120,

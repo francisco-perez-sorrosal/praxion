@@ -285,3 +285,36 @@ sweep_stale_rule_symlinks() {
 
     SWEEP_STALE_RULE_SYMLINKS_REMOVED="$removed"
 }
+
+# Bring <rules_target_dir> up to the manifest without taking over any link:
+# sweep the stale links `stale_rule_symlinks` names, then link each manifest
+# `install: symlink` rule that has no working link. A live link is never
+# re-pointed, wherever it points, so a clone install's links into its own
+# checkout stay its own, and a regular file at a rule's place is never
+# replaced. The plugin's first-session completion runs this after an update.
+# Fail-safe like the sweep: a manifest it cannot read changes nothing.
+#
+# Arguments:
+#   $1 — rules_source_dir: absolute path to the plugin's rules/ directory
+#   $2 — rules_target_dir: absolute path to the destination rules directory
+refresh_rule_symlinks() {
+    local rules_source_dir="$1"
+    local rules_target_dir="$2"
+    [ -d "$rules_source_dir" ] || return 0
+    sweep_stale_rule_symlinks "$rules_source_dir" "$rules_target_dir"
+
+    local missing_rules="" rc=0 rel_path link
+    missing_rules=$(missing_rule_symlinks "$rules_source_dir" "$rules_target_dir") || rc=$?
+    [ "$rc" -eq 0 ] || return 0
+    while IFS= read -r rel_path; do
+        [ -n "$rel_path" ] || continue
+        [ -f "${rules_source_dir}/${rel_path}" ] || continue
+        link="${rules_target_dir}/${rel_path}"
+        # A regular file at the rule's place is the operator's own.
+        if [ -e "$link" ] && [ ! -L "$link" ]; then
+            continue
+        fi
+        mkdir -p "$(dirname "$link")"
+        ln -sfn "${rules_source_dir}/${rel_path}" "$link"
+    done <<< "$missing_rules"
+}

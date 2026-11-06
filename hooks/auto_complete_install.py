@@ -9,11 +9,18 @@ Fast-skip conditions (exit 0, silent):
       AND marker mtime >= plugin cache directory mtime (post-update rearm)
   (2) PRAXION_DISABLE_AUTO_COMPLETE=1 is set
 
-Otherwise (cold path):
-  - Check whether all surfaces are already present (CLAUDE.md symlink + rules
-    sentinel). If present: write marker and exit 0 (no install needed).
-  - Otherwise: derive personal-info defaults, optionally prompt the operator
-    (30s timeout-accept), run install steps, write marker.
+Otherwise, from the plugin this hook runs from (its own version directory,
+`.../praxion/<version>/`, never the unversioned cache parent):
+  - Surfaces already present (CLAUDE.md symlink and the rules sentinel, both
+    resolving): refresh the rule links -- sweep each stale Praxion link and link
+    each manifest rule that has none -- then write the marker. An existing live
+    link is never re-pointed, so a clone install's links stay its own.
+  - Otherwise (cold path): derive personal-info defaults, optionally prompt the
+    operator (30s timeout-accept), run install steps, write marker.
+
+Rule linking goes through the installer's own shell library
+(`lib/install_shared.sh`), so this hook, `install.sh` and `install.sh --check`
+apply one manifest reading and one stale-link predicate.
 
 Non-interactive auto-accept:
   - PRAXION_AUTO_COMPLETE=1 set: skip prompt, use defaults.
@@ -24,8 +31,10 @@ Exit 0 unconditionally — this hook must NEVER block session start.
 
 from __future__ import annotations
 
+import json
 import os
 import signal
+import subprocess
 import sys
 from pathlib import Path
 
@@ -49,12 +58,22 @@ _TRUTHY = frozenset({"1", "true", "yes"})
 _MARKER_FILENAME = ".praxion-complete-installed"
 _DECLINE_MARKER_FILENAME = ".praxion-install-declined"
 
+# The unversioned cache parent: an update adds a version directory under it,
+# which moves its mtime past the marker's and re-arms the hook. Install sources
+# are read from the version directory `_plugin_root` returns, never from here.
 _PLUGIN_CACHE_SUBPATH = Path(".claude") / "plugins" / "cache" / "bit-agora" / "praxion"
+_INSTALLED_PLUGINS_SUBPATH = Path(".claude") / "plugins" / "installed_plugins.json"
+_PLUGIN_KEY_PREFIX = "praxion@"
 _RULES_SENTINEL_SUBPATH = Path(".claude") / "rules" / "swe" / "agent-behavioral-contract.md"
 _CLAUDE_MD_SUBPATH = Path(".claude") / "CLAUDE.md"
 
-# Template is inside the plugin cache directory
+# Relative to the plugin root
 _TEMPLATE_RELATIVE = Path("claude") / "config" / "CLAUDE.md.tmpl"
+_SHARED_LIB_RELATIVE = Path("lib") / "install_shared.sh"
+
+# One rule-linking run: a few hundred symlinks at most, well inside the hook's
+# registered 35-second budget alongside the 30-second prompt.
+_LINKER_TIMEOUT_SECS = 20
 
 # Interactive prompt timeout (seconds)
 _PROMPT_TIMEOUT_SECS = 30
@@ -76,6 +95,33 @@ def _home() -> Path:
     if home_env:
         return Path(home_env)
     return Path.home()
+
+
+def _plugin_root(home: Path) -> Path | None:
+    """Return the directory of the Praxion plugin to install from, or None.
+
+    The hook's own `CLAUDE_PLUGIN_ROOT` comes first: Claude Code sets it to the
+    plugin the hook runs from, a cache version directory for a marketplace
+    install or a checkout under `--plugin-dir`. Without it, the plugin registry
+    (`installed_plugins.json`) names the install path of the praxion plugin.
+    Claude Code installs into `.../praxion/<version>/`, so the unversioned
+    cache parent never holds the plugin's files.
+    """
+    env_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "").strip()
+    if env_root and Path(env_root).is_dir():
+        return Path(env_root)
+    try:
+        registry = json.loads((home / _INSTALLED_PLUGINS_SUBPATH).read_text(encoding="utf-8"))
+        for key, installs in registry.get("plugins", {}).items():
+            if not key.startswith(_PLUGIN_KEY_PREFIX):
+                continue
+            for install in installs:
+                root = Path(install.get("installPath", ""))
+                if install.get("installPath") and root.is_dir():
+                    return root
+    except (OSError, ValueError, AttributeError, TypeError):
+        pass
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -109,12 +155,13 @@ def _surfaces_present(home: Path) -> bool:
     """Return True when all expected global surfaces are in place.
 
     Surfaces checked:
-      - ~/.claude/CLAUDE.md exists AND is a symlink
+      - ~/.claude/CLAUDE.md is a symlink that resolves (a link left dangling
+        when an old plugin version's directory is removed is not installed)
       - ~/.claude/rules/swe/agent-behavioral-contract.md exists
     """
     claude_md = home / _CLAUDE_MD_SUBPATH
     rules_sentinel = home / _RULES_SENTINEL_SUBPATH
-    return claude_md.is_symlink() and rules_sentinel.exists()
+    return claude_md.is_symlink() and claude_md.exists() and rules_sentinel.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -141,16 +188,14 @@ def _write_decline_marker(home: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _render_claude_md(home: Path, values: dict[str, str]) -> None:
-    """Render ~/.claude/CLAUDE.md from the plugin cache template.
+def _render_claude_md(home: Path, values: dict[str, str], root: Path) -> None:
+    """Render ~/.claude/CLAUDE.md from the plugin's template.
 
-    Finds the template in the plugin cache, renders it into a real file
-    in the plugin cache's config dir, then symlinks ~/.claude/CLAUDE.md
-    to that rendered file.  Raises on any I/O error.
+    Renders the template into a real file in the plugin's config dir, then
+    symlinks ~/.claude/CLAUDE.md to that rendered file.  Raises on any I/O error.
     """
-    plugin_cache = home / _PLUGIN_CACHE_SUBPATH
-    template_path = plugin_cache / _TEMPLATE_RELATIVE
-    rendered_path = plugin_cache / "claude" / "config" / "CLAUDE.md"
+    template_path = root / _TEMPLATE_RELATIVE
+    rendered_path = root / "claude" / "config" / "CLAUDE.md"
 
     _render_mod.render_claude_md(template_path, rendered_path, values)
 
@@ -161,102 +206,53 @@ def _render_claude_md(home: Path, values: dict[str, str]) -> None:
     claude_md_link.symlink_to(rendered_path)
 
 
-def _load_hook_deliver_set(rules_src: Path) -> frozenset[Path] | None:
-    """Return the set of rule paths (relative to rules_src) with install: hook-deliver.
+def _run_rule_linker(home: Path, root: Path, function: str) -> None:
+    """Run one rule-linking function of the plugin's shell library.
 
-    Reads rules/_manifest.yaml from the plugin cache.  Returns None when the manifest
-    is missing or unparseable, signalling the caller to fall back to linking all files.
+    `function` is `link_rules` (the installer's full link: sweep, then link the
+    manifest's `install: symlink` set) or `refresh_rule_symlinks` (sweep, then
+    link only the rules that have no working link). The library reads the
+    manifest without PyYAML, so the ambient `python3` this hook runs under
+    never decides which rules get linked. A plugin without the library or a
+    rules directory links nothing.
     """
-    import yaml  # third-party PyYAML; declared in pyproject.toml dev group
-
-    manifest_path = rules_src / "_manifest.yaml"
-    if not manifest_path.exists():
-        return None
-
-    try:
-        raw = manifest_path.read_text(encoding="utf-8")
-        data = yaml.safe_load(raw)
-        if not isinstance(data, dict) or "rules" not in data:
-            return None
-        hook_deliver: set[Path] = set()
-        for entry in data["rules"]:
-            if isinstance(entry, dict) and entry.get("install") == "hook-deliver":
-                rule_path = entry.get("path", "")
-                # path field is relative to repo root (e.g. "rules/swe/agent-model-routing.md")
-                # Strip the leading "rules/" prefix to get path relative to rules_src
-                if rule_path.startswith("rules/"):
-                    hook_deliver.add(Path(rule_path[len("rules/") :]))
-        return frozenset(hook_deliver)
-    except Exception:
-        return None
-
-
-_SKIP_NAMES = frozenset({"README.md", "_manifest.yaml"})
-_REFERENCES_SEGMENT = "references"
-
-
-def _should_skip_rule(rel_path: Path) -> bool:
-    """Return True for files that should never be symlinked as rules.
-
-    Skips README.md, _manifest.yaml, and anything under a references/ directory.
-    Matches the filter applied by lib/install_shared.sh link_rules().
-    """
-    if rel_path.name in _SKIP_NAMES:
-        return True
-    return _REFERENCES_SEGMENT in rel_path.parts
-
-
-def _link_rules(home: Path) -> None:
-    """Symlink ~/.claude/rules/ entries from the plugin cache rules directory.
-
-    Switches from directory-level to per-file symlinking so that manifest-based
-    filtering (install: hook-deliver) can exclude individual rule files.
-    Rules with install: hook-deliver are delivered by inject_rules.py at session
-    start instead; symlinking them here would defeat the blacklist mechanism.
-
-    Fall-back: if the manifest is missing or unparseable, all .md files are
-    linked (preserves backward compatibility with pre-manifest installs).
-
-    Idempotency: stale symlinks that now map to hook-deliver files are removed
-    so a re-install cleans up entries from previous installs.
-    """
-    plugin_cache = home / _PLUGIN_CACHE_SUBPATH
-    rules_src = plugin_cache / "rules"
-    rules_dest = home / ".claude" / "rules"
-
-    if not rules_src.is_dir():
+    rules_src = root / "rules"
+    library = root / _SHARED_LIB_RELATIVE
+    if not rules_src.is_dir() or not library.is_file():
         return
-
-    rules_dest.mkdir(parents=True, exist_ok=True)
-
-    hook_deliver = _load_hook_deliver_set(rules_src)
-    # None means manifest missing/unparseable → link everything (backward compat)
-    manifest_available = hook_deliver is not None
-
-    for rule_file in sorted(rules_src.rglob("*.md")):
-        rel = rule_file.relative_to(rules_src)
-        if _should_skip_rule(rel):
-            continue
-
-        dest_file = rules_dest / rel
-        dest_file.parent.mkdir(parents=True, exist_ok=True)
-
-        if manifest_available and rel in hook_deliver:
-            # This file is now hook-delivered — remove any stale symlink from
-            # a previous install that linked it directly
-            if dest_file.is_symlink():
-                dest_file.unlink()
-            continue
-
-        if dest_file.is_symlink():
-            dest_file.unlink()
-        dest_file.symlink_to(rule_file)
+    subprocess.run(
+        ["bash", "-c", 'source "$1" && "$2" "$3" "$4"', "auto_complete_install"]
+        + [str(library), function, str(rules_src), str(home / ".claude" / "rules")],
+        env={**os.environ, "HOME": str(home)},
+        capture_output=True,
+        timeout=_LINKER_TIMEOUT_SECS,
+        check=True,
+    )
 
 
-def _link_scripts(home: Path) -> None:
-    """Symlink user-facing scripts from the plugin cache into ~/.local/bin/."""
-    plugin_cache = home / _PLUGIN_CACHE_SUBPATH
-    scripts_src = plugin_cache / "scripts"
+def _link_rules(home: Path, root: Path) -> None:
+    """Link ~/.claude/rules/ to the manifest's `install: symlink` set.
+
+    The installer's own `link_rules`: stale Praxion links are swept, every
+    `install: symlink` rule is linked, hook-delivered rules and directory guides
+    are never linked. Used on a cold install.
+    """
+    _run_rule_linker(home, root, "link_rules")
+
+
+def _refresh_rules(home: Path, root: Path) -> None:
+    """Bring installed rule links to this plugin version without taking any over.
+
+    Sweeps each stale Praxion link (a rule the manifest no longer links, in
+    this plugin's rules or any cached version's) and links each manifest rule
+    that has no working link. An existing live link is left as it is.
+    """
+    _run_rule_linker(home, root, "refresh_rule_symlinks")
+
+
+def _link_scripts(home: Path, root: Path) -> None:
+    """Symlink user-facing scripts from the plugin into ~/.local/bin/."""
+    scripts_src = root / "scripts"
     bin_dest = home / ".local" / "bin"
 
     if not scripts_src.is_dir():
@@ -276,11 +272,11 @@ def _link_scripts(home: Path) -> None:
         dest.symlink_to(script)
 
 
-def _run_install(home: Path, values: dict[str, str]) -> None:
+def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
     """Run the full install sequence: render CLAUDE.md, link rules, link scripts."""
-    _render_claude_md(home, values)
-    _link_rules(home)
-    _link_scripts(home)
+    _render_claude_md(home, values, root)
+    _link_rules(home, root)
+    _link_scripts(home, root)
 
 
 # ---------------------------------------------------------------------------
@@ -362,13 +358,14 @@ def _resolve_mode() -> bool:
     return os.environ.get(_AUTO_COMPLETE_FLAG, "").strip().lower() in _TRUTHY
 
 
-def _perform_install(home: Path, values: dict[str, str], auto_complete: bool) -> None:
+def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, root: Path) -> None:
     """Run the interactive-prompt + install sequence for the cold path.
 
     When auto_complete is False, prompts the operator (30s timeout-accept).
     On decline writes a soft-decline marker and returns without installing.
     On accept (or auto_complete=True), runs the full install and writes the
-    completion marker.
+    completion marker. A failed install is reported as one, with the command
+    that completes it, never as a success.
     """
     if not auto_complete:
         try:
@@ -383,19 +380,27 @@ def _perform_install(home: Path, values: dict[str, str], auto_complete: bool) ->
                 pass
             return
 
-    # Run install steps (each failure is swallowed; marker still written)
+    # Run install steps (a failure is reported below; the marker is still written)
+    failure: Exception | None = None
     try:
-        _run_install(home, values)
-    except Exception:
-        pass
+        _run_install(home, values, root)
+    except Exception as exc:
+        failure = exc
 
-    # Write completion marker regardless of install success
+    # Write the marker regardless: without it the same failing install would
+    # rerun at every session start.
     try:
         _write_marker(home)
     except Exception:
         pass
 
-    sys.stderr.write("[Praxion] Auto-install complete.\n")
+    if failure is None:
+        sys.stderr.write("[Praxion] Auto-install complete.\n")
+    else:
+        sys.stderr.write(
+            f"[Praxion] Auto-install could not finish ({type(failure).__name__}); "
+            "run /praxion-complete-install to complete it.\n"
+        )
     sys.stderr.flush()
 
 
@@ -417,8 +422,19 @@ def _run() -> None:
     if _is_install_complete(home):
         return
 
-    # Surfaces present (CLAUDE.md symlink + rules sentinel): write marker, done
+    root = _plugin_root(home)
+    if root is None:
+        # Nothing to install from: leave the marker unwritten so a later
+        # session, once the plugin is resolvable, still completes the install.
+        return
+
+    # Surfaces present (an install or an update ran before): refresh the rule
+    # links to this version, then record completion.
     if _surfaces_present(home):
+        try:
+            _refresh_rules(home, root)
+        except Exception:
+            pass
         try:
             _write_marker(home)
         except Exception:
@@ -435,7 +451,7 @@ def _run() -> None:
             "GITHUB_URL": "https://github.com/anon",
         }
 
-    _perform_install(home, values, _resolve_mode())
+    _perform_install(home, values, _resolve_mode(), root)
 
 
 if __name__ == "__main__":

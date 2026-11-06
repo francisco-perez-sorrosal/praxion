@@ -42,6 +42,7 @@ from praxion_evals.adherence.model import (
     SessionStatus,
     TaskFacts,
 )
+from praxion_evals.adherence.tasks import mode_of_slug
 from praxion_evals.adherence.transcript import (
     EndedOnItsOwn,
     RoleEnding,
@@ -117,7 +118,8 @@ def evidence_from_recording(
     ``kernel_rows`` when given, otherwise the markers in the role's transcript, kept under
     ``config_dir`` (the session's ``CLAUDE_CONFIG_DIR``), and in the stream's hook output.
     A ``forced_stop`` task also records how the role ended, judged against ``turn_cap``, the
-    ``maxTurns`` both arms' copies carry for it.
+    ``maxTurns`` both arms' copies carry for it. The task's kit mode is resolved from
+    ``slug``, since a recorded spawn prompt need not name it.
     """
     parsed = parse_stream(envelope)
     spawn_id = _spawn_id(parsed, role)
@@ -148,6 +150,7 @@ def evidence_from_recording(
             planted_instruction=planted_instruction,
             planted_effect=planted_effect,
             external_api_docs=external_api_docs,
+            mode=mode_of_slug(role, slug),
         ),
         kernel=KernelEvidence(kernel_expected, rows, unread) if kernel_expected or rows else None,
         role_ending=(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 import pytest
 
@@ -15,17 +16,27 @@ from praxion_evals.adherence.checks_process import (
     fragment_instead_of_canonical,
     fragments_reconciled,
     in_mode,
+    in_task_mode,
     marker_written_first,
     red_tests,
     return_form,
     sibling_read_before_create,
 )
 from praxion_evals.adherence.checks_roles import (
+    binds_unless_stopped_early,
     documents_produced,
     steps_carry_fields,
     text_excludes,
 )
-from praxion_evals.adherence.model import Failed, NotApplicable, Passed, RuleRef, TaskFacts
+from praxion_evals.adherence.model import (
+    Binds,
+    DoesNotBind,
+    Failed,
+    NotApplicable,
+    Passed,
+    RuleRef,
+    TaskFacts,
+)
 from praxion_evals.live.session import ToolUse
 
 RULE = RuleRef("agents/implementer.md", "Output")
@@ -73,6 +84,39 @@ def test_a_mode_checks_canary_names_the_mode_so_it_is_flagged_not_skipped():
     check = in_mode(_always_fails(), ACCEPTANCE_DESIGN_MODE)
 
     assert isinstance(check.evaluate(check.violation()), Failed)
+
+
+def _task_of(mode, *, forced_stop=False):
+    return TaskFacts(forced_stop, False, False, None, None, None, mode=mode)
+
+
+@pytest.mark.parametrize("mode", ["paired", None])
+def test_a_check_in_a_task_mode_neither_binds_nor_applies_to_a_task_of_another(mode):
+    check = in_task_mode(_always_fails(), "acceptance-design")
+    evidence = _evidence(facts=_task_of(mode), spawn_prompt="Mode: acceptance-design")
+
+    binding, outcome = check.binds("implementer", _task_of(mode)), check.evaluate(evidence)
+
+    assert binding == DoesNotBind("the task is not in acceptance-design mode")
+    assert outcome == NotApplicable("the task is not in acceptance-design mode")
+
+
+def test_a_check_in_its_task_mode_keeps_its_own_binding_and_verdict():
+    check = in_task_mode(replace(_always_fails(), binds=binds_unless_stopped_early), "paired")
+
+    assert check.binds("implementer", _task_of("paired")) == Binds()
+    assert isinstance(check.binds("implementer", _task_of("paired", forced_stop=True)), DoesNotBind)
+    assert isinstance(check.evaluate(_evidence(facts=_task_of("paired"))), Failed)
+
+
+def test_every_canary_of_a_task_mode_check_is_a_task_of_that_mode_and_is_flagged():
+    extra = replace(_always_fails(), extra_violations=(lambda: _evidence(files={}),))
+    check = in_task_mode(extra, "spec")
+
+    canaries = [build() for build in check.violations]
+
+    assert [canary.facts.mode for canary in canaries] == ["spec", "spec"]
+    assert all(isinstance(check.evaluate(canary), Failed) for canary in canaries)
 
 
 # ---------------------------------------------------------------------------

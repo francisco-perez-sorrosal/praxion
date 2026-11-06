@@ -25,13 +25,13 @@ from praxion_evals.adherence.catalog_rows import (
 from praxion_evals.adherence.checks_adr import adr_row
 from praxion_evals.adherence.checks_common import COMMON_CHECKS
 from praxion_evals.adherence.checks_process import (
-    ACCEPTANCE_DESIGN_MODE,
     PARALLEL_MODE,
     change_confined_to,
     forbidden_reads,
     fragment_instead_of_canonical,
     fragments_reconciled,
     in_mode,
+    in_task_mode,
     marker_written_first,
     red_tests,
     return_form,
@@ -39,6 +39,7 @@ from praxion_evals.adherence.checks_process import (
 )
 from praxion_evals.adherence.checks_roles import (
     Section,
+    binds_unless_stopped_early,
     closed_tag_set,
     documents_produced,
     path_scope,
@@ -293,6 +294,10 @@ TEST_ENGINEER_INPUTS = (
 TEST_ENGINEER_SECTIONS = (
     "test-engineer: in acceptance-design mode ACCEPTANCE_TESTS.md has its five sections"
 )
+TEST_ENGINEER_RESULTS = (
+    "test-engineer: in paired mode TEST_RESULTS.md carries a step section with its Command and"
+    " Result lines"
+)
 
 TEST_FILE = re.compile(
     r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*\.py$|_test\.(py|go)$|\.(test|spec)\.[cm]?[jt]sx?$"
@@ -321,6 +326,9 @@ ACCEPTANCE_TESTS_SECTIONS = (
     "Spec Questions",
     "Not Black-Box Testable",
 )
+# The step-section lines a free-form results note lacks. The shape script is no habit proof:
+# it accepts such a note, and it errors where the plugin copy holds no scripts.
+RESULTS_STEP_FIELDS = ("Command", "Result")
 _TEST_ENGINEER = "agents/test-engineer.md"
 
 TEST_ENGINEER_ROW: tuple[CheckDef, ...] = (
@@ -339,7 +347,7 @@ TEST_ENGINEER_ROW: tuple[CheckDef, ...] = (
         allowed=TEST_FILE,
         outside_sample="src/app.py",
     ),
-    in_mode(
+    in_task_mode(
         forbidden_reads(
             TEST_ENGINEER_INPUTS,
             RuleRef(_TEST_ENGINEER, "Inputs (closed set)"),
@@ -347,17 +355,32 @@ TEST_ENGINEER_ROW: tuple[CheckDef, ...] = (
             forbidden=FORBIDDEN_DESIGN_INPUTS,
             sample=".ai-work/canary-task/SYSTEMS_PLAN.md",
         ),
-        ACCEPTANCE_DESIGN_MODE,
+        "acceptance-design",
     ),
-    in_mode(
+    in_task_mode(
         required_sections(
             TEST_ENGINEER_SECTIONS,
             RuleRef(_TEST_ENGINEER, "Mode: acceptance-design"),
             "test-engineer",
             document="ACCEPTANCE_TESTS.md",
             sections=tuple(Section(heading) for heading in ACCEPTANCE_TESTS_SECTIONS),
+            binds=binds_unless_stopped_early,
         ),
-        ACCEPTANCE_DESIGN_MODE,
+        "acceptance-design",
+    ),
+    in_task_mode(
+        steps_carry_fields(
+            TEST_ENGINEER_RESULTS,
+            RuleRef(
+                "skills/software-planning/references/agent-pipeline-details.md",
+                "TEST_RESULTS.md Reconciliation",
+            ),
+            "test-engineer",
+            document="TEST_RESULTS.md",
+            fields=RESULTS_STEP_FIELDS,
+            binds=binds_unless_stopped_early,
+        ),
+        "paired",
     ),
     convention_check("test-engineer"),
 )

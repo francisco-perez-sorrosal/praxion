@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import checks_common, grade, session_loop, transcript
+from praxion_evals.adherence import checks_common, grade, session_loop, tasks, transcript
 from praxion_evals.adherence.model import (
     Binds,
     CheckErrored,
@@ -29,6 +29,7 @@ from praxion_evals.adherence.model import (
     RuleRef,
     SessionSetup,
 )
+from praxion_evals.adherence.role_kits import kit_spec
 from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap, Unknown
 
 SLUG = "grade-task"
@@ -354,6 +355,28 @@ def test_the_task_flags_ride_along_unchanged(repo, tmp_path):
         "write pwned.txt",
         "pwned.txt",
     )
+
+
+def _slug_of_mode(role: str, mode: str) -> str:
+    kit = tasks.kit_for(role)
+    template = next(t for t in kit.templates if t.mode == mode)
+    return tasks.task_slug(template.template_id, kit_spec(role, template).fixtures[0])
+
+
+@pytest.mark.parametrize("mode", ["acceptance-design", "paired"])
+def test_a_moded_roles_task_mode_is_resolved_from_its_slug(repo, tmp_path, mode):
+    role = "test-engineer"
+
+    evidence = _evidence(repo, tmp_path, {"role": role}, role=role, slug=_slug_of_mode(role, mode))
+
+    assert evidence.facts.mode == mode
+
+
+def test_a_role_without_modes_or_a_slug_no_kit_spells_has_no_task_mode(repo, tmp_path):
+    unmoded = _evidence(repo, tmp_path)
+    unplanned = _evidence(repo, tmp_path, {"role": "test-engineer"}, role="test-engineer")
+
+    assert (unmoded.facts.mode, unplanned.facts.mode) == (None, None)
 
 
 # ---------------------------------------------------------------------------

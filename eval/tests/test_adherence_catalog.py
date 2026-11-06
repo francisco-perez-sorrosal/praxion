@@ -13,6 +13,9 @@ from praxion_evals.adherence.catalog import (
     RESEARCHER_SECTIONS,
     RESEARCHER_SOURCES,
     ROLE_ROWS,
+    TEST_ENGINEER_INPUTS,
+    TEST_ENGINEER_RESULTS,
+    TEST_ENGINEER_SECTIONS,
     VERIFIER_LEDGER,
     VERIFIER_PARTIAL,
     VERIFIER_TAGS,
@@ -109,7 +112,7 @@ def test_the_only_judged_role_checks_are_the_adr_categories():
 
 @pytest.mark.parametrize(
     ("role", "clauses"),
-    [("implementer", 8), ("test-engineer", 5), ("doc-engineer", 3), ("systems-architect", 7)],
+    [("implementer", 8), ("test-engineer", 6), ("doc-engineer", 3), ("systems-architect", 7)],
 )
 def test_each_role_carries_one_check_per_clause_of_its_row(role, clauses):
     assert len(ROLE_ROWS[role]) == clauses
@@ -376,6 +379,126 @@ def test_a_clause_stated_for_one_mode_does_not_apply_to_a_task_in_another(role, 
 
     assert isinstance(status, Measured)
     assert isinstance(status.outcomes[name], NotApplicable)
+
+
+# ---------------------------------------------------------------------------
+# The test-engineer's own process, gated by the task's kit mode
+# ---------------------------------------------------------------------------
+
+TASK_DIR = ".ai-work/grade-task"
+FIVE_SECTIONS = (
+    "## Sources Read\n\n- the spec delta\n\n## Scenarios\n\n- a limit over the cap is refused\n\n"
+    "## Boundary Assumptions\n\n- the CLI is the boundary\n\n## Spec Questions\n\n- none\n\n"
+    "## Not Black-Box Testable\n\n- none\n"
+)
+RESULTS_SECTION = (
+    "## Step 1 — the limit tests\n"  # id-citation-discipline:ignore (the shape's own heading)
+    "Command: `uv run pytest tests -q`\nResult: pass=0 fail=3 skip=0\n"
+)
+
+
+def _read_of(path: str) -> ToolUse:
+    return ToolUse(f"toolu_read_{path}", "Read", {"file_path": path}, "canary-spawn")
+
+
+def _te_outcome(name: str, mode: str | None, *, forced_stop: bool = False, **kwargs):
+    facts = TaskFacts(forced_stop, False, False, None, None, None, mode=mode)
+    evidence = _gradable("test-engineer", slug="grade-task", facts=facts, **kwargs)
+
+    status = grade.grade(evidence, [name], judge=None, setup=None)
+
+    assert isinstance(status, Measured)
+    return status.outcomes[name]
+
+
+HABIT_RECORDS = [
+    pytest.param(
+        TEST_ENGINEER_INPUTS,
+        "acceptance-design",
+        {
+            "tool_uses": [
+                _read_of(f"{TASK_DIR}/SYSTEMS_PLAN.md"),
+                _read_of(f"{TASK_DIR}/TASK_BRIEF.md"),
+            ]
+        },
+        id="acceptance-design reads the design",
+    ),
+    pytest.param(
+        TEST_ENGINEER_SECTIONS,
+        "acceptance-design",
+        {
+            "files": {
+                f"{TASK_DIR}/ACCEPTANCE_TESTS.md": "# Acceptance tests\n\n- tests/test_limit.py\n"
+            }
+        },
+        id="acceptance-design writes a plain list",
+    ),
+    pytest.param(
+        TEST_ENGINEER_RESULTS,
+        "paired",
+        {"files": {f"{TASK_DIR}/TEST_RESULTS.md": "All tests pass.\n"}},
+        id="paired writes a free-form note",
+    ),
+    pytest.param(TEST_ENGINEER_RESULTS, "paired", {"files": {}}, id="paired writes no results"),
+]
+
+GOOD_RECORDS = [
+    pytest.param(
+        TEST_ENGINEER_INPUTS,
+        "acceptance-design",
+        {"tool_uses": [_read_of("README.md"), _read_of("tests/acceptance/conftest.py")]},
+        id="acceptance-design reads only the allowed",
+    ),
+    pytest.param(
+        TEST_ENGINEER_SECTIONS,
+        "acceptance-design",
+        {"files": {f"{TASK_DIR}/ACCEPTANCE_TESTS.md": FIVE_SECTIONS}},
+        id="acceptance-design writes the five sections",
+    ),
+    pytest.param(
+        TEST_ENGINEER_RESULTS,
+        "paired",
+        {"files": {f"{TASK_DIR}/TEST_RESULTS.md": RESULTS_SECTION}},
+        id="paired writes a step section",
+    ),
+]
+
+
+@pytest.mark.parametrize(("name", "mode", "record"), HABIT_RECORDS)
+def test_a_habit_record_of_the_test_engineers_mode_fails_its_check_for_that_mode(
+    name, mode, record
+):
+    assert isinstance(_te_outcome(name, mode, **record), Failed)
+
+
+@pytest.mark.parametrize(("name", "mode", "record"), GOOD_RECORDS)
+def test_a_record_in_the_form_its_rule_states_passes_the_check_for_that_mode(name, mode, record):
+    assert _te_outcome(name, mode, **record) == Passed()
+
+
+@pytest.mark.parametrize(
+    ("name", "other", "record"),
+    [
+        (TEST_ENGINEER_INPUTS, "paired", HABIT_RECORDS[0].values[2]),
+        (TEST_ENGINEER_SECTIONS, "paired", HABIT_RECORDS[1].values[2]),
+        (TEST_ENGINEER_RESULTS, "acceptance-design", HABIT_RECORDS[2].values[2]),
+    ],
+)
+def test_a_test_engineer_check_is_not_applicable_to_a_task_of_its_other_mode(name, other, record):
+    # The prompt names acceptance design on every task: the task's mode alone gates the check.
+    outcome = _te_outcome(name, other, spawn_prompt="Mode: acceptance-design", **record)
+
+    assert isinstance(outcome, NotApplicable)
+
+
+@pytest.mark.parametrize(
+    ("name", "mode"),
+    [(TEST_ENGINEER_SECTIONS, "acceptance-design"), (TEST_ENGINEER_RESULTS, "paired")],
+)
+def test_a_test_engineer_document_check_is_not_applicable_when_the_task_stopped_it_early(
+    name, mode
+):
+    assert isinstance(_te_outcome(name, mode, forced_stop=True), NotApplicable)
 
 
 # ---------------------------------------------------------------------------

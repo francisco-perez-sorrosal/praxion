@@ -8,14 +8,16 @@ proves it fires, and every one is a pure function of the recorded evidence.
 
 A *mode* (parallel, acceptance design) is named by the main session's spawn prompt,
 which is the task the eval wrote; :func:`in_mode` makes a check not applicable outside
-the mode its rule is stated for.
+the mode its rule is stated for. A writer kit's task carries its mode in the task facts
+instead (the bound driver's recorded prompts name none), and :func:`in_task_mode` gates on
+that.
 """
 
 from __future__ import annotations
 
 import os
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 
@@ -35,15 +37,19 @@ from praxion_evals.adherence.checks_roles import (
     session_cwd,
 )
 from praxion_evals.adherence.model import (
+    Binding,
     BindsFor,
     CheckOutcome,
+    DoesNotBind,
     Failed,
+    KitMode,
     MechanicalCheck,
     NotApplicable,
     Passed,
     Role,
     RuleRef,
     SessionEvidence,
+    TaskFacts,
 )
 from praxion_evals.live.session import ToolUse
 
@@ -81,6 +87,38 @@ def in_mode(check: MechanicalCheck, mode: Mode) -> MechanicalCheck:
         return with_spawn_prompt(check.violation(), mode.sample_prompt)
 
     return replace(check, evaluate=evaluate, violation=violation)
+
+
+def in_task_mode(check: MechanicalCheck, mode: KitMode) -> MechanicalCheck:
+    """``check``, binding only on a task of kit ``mode``; each canary is a task of that mode.
+
+    The binding and the evaluation both refuse another mode, so a caller that evaluates
+    without binding first reads the same ``not applicable`` the grader records.
+    """
+    off_mode = f"the task is not in {mode} mode"
+
+    def binds(role: Role, facts: TaskFacts) -> Binding:
+        return check.binds(role, facts) if facts.mode == mode else DoesNotBind(off_mode)
+
+    def evaluate(evidence: SessionEvidence) -> CheckOutcome:
+        if evidence.facts.mode != mode:
+            return NotApplicable(off_mode)
+        return check.evaluate(evidence)
+
+    def of_mode(build: Callable[[], SessionEvidence]) -> Callable[[], SessionEvidence]:
+        def built() -> SessionEvidence:
+            evidence = build()
+            return replace(evidence, facts=replace(evidence.facts, mode=mode))
+
+        return built
+
+    return replace(
+        check,
+        binds=binds,
+        evaluate=evaluate,
+        violation=of_mode(check.violation),
+        extra_violations=tuple(of_mode(build) for build in check.extra_violations),
+    )
 
 
 def with_spawn_prompt(evidence: SessionEvidence, prompt: str) -> SessionEvidence:

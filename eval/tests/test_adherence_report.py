@@ -94,6 +94,7 @@ def results_of(
     observed_error: float | None = None,
     allowance_method: str | None = None,
     extra: Mapping[str, object] | None = None,
+    role: str = "researcher",
 ) -> RunResults:
     return RunResults(
         run=RunInfo(
@@ -102,13 +103,13 @@ def results_of(
             claude_code_version="9.9.9",
             complete=True,
             refused_launches=(),
-            earlier_runs={"researcher": earlier_runs},
+            earlier_runs={role: earlier_runs},
             extra=dict(extra or {}),
         ),
         settings=declared(required_pairs, allowance_method),
         declared_at="2026-10-12T08:59:00Z",
-        catalog={"researcher": CHECKS},
-        arms={"researcher": {"full": {"built": True}, "lean": {"built": True}}},
+        catalog={role: CHECKS},
+        arms={role: {"full": {"built": True}, "lean": {"built": True}}},
         sessions=tuple(sessions),
         golden_bad_case_verdicts=None
         if observed_error is None
@@ -776,3 +777,66 @@ def test_a_continued_runs_report_does_not_list_its_own_parts_as_earlier_runs():
     text = report.render(continuing_part(lineage=lineage, **listing(draws=draws)), [stopped_part()])
 
     assert "same definition and kernel: run-0: flip clear." in text
+
+
+# ---------------------------------------------------------------------------
+# A writer role's modes: the covered ones with their complete pairs, the rest unmeasured
+# ---------------------------------------------------------------------------
+
+ENGINEER = "test-engineer"
+RETIRED_TEMPLATE = "retired-template"
+
+
+def writer_report(*pairs: tuple[str, SessionStatus, SessionStatus]) -> str:
+    """The test-engineer's report over (template id, full, lean) pairs, one task per pair."""
+    records = []
+    for index, (template_id, full, lean) in enumerate(pairs):
+        for arm, status in zip(("full", "lean"), (full, lean), strict=True):
+            setup = SessionSetup(arm, COMMIT, ENGINEER, f"task-{index:03d}", template_id, 7)  # type: ignore[arg-type]
+            records.append(SessionRecord(setup, status, 0.01, 1000, "2026-10-12T09:00:00Z"))
+    return report.render(results_of(records, role=ENGINEER))
+
+
+GOOD = measured(ALL_PASS)
+
+
+def test_a_writer_report_counts_complete_pairs_per_covered_mode_and_lists_the_rest_unmeasured():
+    text = writer_report(
+        ("acceptance-export-spec", GOOD, GOOD),
+        ("acceptance-limit-spec", GOOD, GOOD),
+        ("limit-tests", GOOD, GOOD),
+    )
+
+    assert "  mode acceptance-design: 2 complete pairs" in text.splitlines()
+    assert "  mode paired: 1 complete pairs" in text.splitlines()
+    assert "  mode pre-refactor: unmeasured" in text.splitlines()
+
+
+def test_the_mode_lines_sit_beside_the_flip_claim_before_the_checks():
+    lines = writer_report(("limit-tests", GOOD, GOOD)).splitlines()
+
+    headline = next(i for i, line in enumerate(lines) if line.startswith(f"Role {ENGINEER}:"))
+    checks = lines.index("  Checks:")
+    mode_rows = [i for i, line in enumerate(lines) if line.startswith("  mode ")]
+
+    assert mode_rows
+    assert all(headline < row < checks for row in mode_rows)
+
+
+def test_an_incomplete_pair_is_counted_by_no_mode():
+    errored = Errored("result_error", "the session failed")
+
+    text = writer_report(("limit-tests", GOOD, GOOD), ("summary-tests", GOOD, errored))
+
+    assert "  mode paired: 1 complete pairs" in text.splitlines()
+
+
+def test_a_session_whose_template_the_kit_no_longer_holds_counts_under_no_covered_mode():
+    text = writer_report(("limit-tests", GOOD, GOOD), (RETIRED_TEMPLATE, GOOD, GOOD))
+
+    assert "  mode paired: 1 complete pairs" in text.splitlines()
+    assert "  1 complete pairs under no covered mode: their template is not in the kit" in text
+
+
+def test_a_role_without_modes_gets_no_mode_line():
+    assert "  mode " not in render(same_both_arms(2))

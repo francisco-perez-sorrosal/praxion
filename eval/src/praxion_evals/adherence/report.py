@@ -20,7 +20,7 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from statistics import median
 from textwrap import shorten
-from typing import Any, assert_never
+from typing import Any, assert_never, cast
 
 from praxion_evals.adherence.lineage import (
     LAUNCH_REFUSED,
@@ -37,6 +37,7 @@ from praxion_evals.adherence.lineage import (
 from praxion_evals.adherence.model import (
     ARMS,
     OWN_DISCORDANCE_EXACT,
+    ROLE_MODES,
     Assessed,
     CheckErrored,
     CheckOutcome,
@@ -53,6 +54,7 @@ from praxion_evals.adherence.model import (
     Pair,
     Passed,
     Regression,
+    Role,
     RoleVerdict,
     SessionRecord,
     SessionStatus,
@@ -74,6 +76,7 @@ from praxion_evals.adherence.results import (
     skipped_files,
 )
 from praxion_evals.adherence.run_ending import stop_summary
+from praxion_evals.adherence.tasks import mode_of
 from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap
 from praxion_evals.adherence.verdict import tally
 
@@ -253,6 +256,7 @@ def _role_section(
         f" worst-case recount, pairs with a lean-side error and a measured full side counted as"
         f" lean failures: {_lean_errored(pairs)}."
     )
+    lines += _mode_lines(role, complete)
     lines += _session_lines(results, role)
     lines += _run_out_lines(results, role)
     lines += [f"{INDENT}Checks:"]
@@ -275,6 +279,27 @@ def _role_headline(verdict: RoleVerdict) -> str:
             )
         case _:
             assert_never(verdict)
+
+
+def _mode_lines(role: str, complete: Iterable[Pair]) -> list[str]:
+    """The modes a role's run covers, each with its complete pairs, and the modes of its
+    definition no kit measures. Nothing for a role without modes.
+
+    A pair whose template the kit no longer holds has no mode, so it counts under none.
+    """
+    known = cast(Role, role)  # a results file's roles are checked against ROLES when it loads
+    modes = ROLE_MODES.get(known)
+    if modes is None:
+        return []
+    by_mode = Counter(mode_of(known, pair.template_id) for pair in complete)
+    lines = [f"{INDENT}mode {mode}: {by_mode[mode]} complete pairs" for mode in modes.covered]
+    lines += [f"{INDENT}mode {mode}: unmeasured" for mode in modes.unmeasured]
+    if by_mode[None]:
+        lines.append(
+            f"{INDENT}{by_mode[None]} complete pairs under no covered mode:"
+            " their template is not in the kit"
+        )
+    return lines
 
 
 def _lean_errored(pairs: Iterable[Pair]) -> int:

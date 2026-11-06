@@ -144,6 +144,16 @@ def test_a_dry_run_lists_every_task_of_every_named_arm(
 
 
 @pytest.mark.usefixtures("no_launch")
+def test_every_dry_run_line_carries_a_mode_key_that_is_null_for_a_role_without_modes(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    lines = dry_run(capsys, tmp_path, "--role", ROLE, "--max-tasks", "2")
+
+    assert lines, "the dry run plans sessions"
+    assert all("mode" in line and line["mode"] is None for line in lines)
+
+
+@pytest.mark.usefixtures("no_launch")
 def test_a_dry_run_shows_a_confined_kits_confinement_places_and_program_order(capsys, tmp_path):
     token_file = tmp_path / "session-token"
     token_file.write_text("sk-ant-oat01-example\n")
@@ -208,7 +218,7 @@ def test_a_dry_run_leaves_another_kits_line_without_confinement_or_places(capsys
 
     assert lines, "the dry run plans sessions"
     for line in lines:
-        assert list(line) == ["role", "arm", "task_id", "argv", "env_names"]
+        assert list(line) == ["role", "arm", "task_id", "mode", "argv", "env_names"]
         assert "--settings" not in line["argv"]
 
 

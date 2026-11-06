@@ -679,6 +679,7 @@ def _print_dry_run(
                     "role": role,
                     "arm": arm,
                     "task_id": task.task_id,
+                    "mode": task.mode,
                     "argv": build_argv(spec),
                     "env_names": env_names,
                 }

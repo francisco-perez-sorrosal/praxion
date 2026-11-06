@@ -48,6 +48,8 @@ Role = Literal[
 ]
 Arm = Literal["full", "lean"]
 CheckKind = Literal["mechanical", "judged"]
+# The modes a kit can measure: a role's definition has several phases, a kit covers some.
+KitMode = Literal["acceptance-design", "paired", "spec", "feature"]
 
 ROLES: tuple[str, ...] = get_args(Role)
 ARMS: tuple[str, ...] = get_args(Arm)
@@ -242,6 +244,41 @@ class ProjectConvention:
 
 
 @dataclass(frozen=True)
+class RoleModes:
+    """The modes of a role's definition: those its kit measures, and those it leaves out.
+
+    A role's modes are a role-level fact, the one place a report learns which modes to list
+    as unmeasured.
+    """
+
+    covered: tuple[KitMode, ...]
+    unmeasured: tuple[str, ...]  # named in the definition, measured by no kit
+
+    def __post_init__(self) -> None:
+        _require(bool(self.covered), "a role with modes has covered modes, at least one")
+        shared = sorted(set(self.covered) & set(self.unmeasured))
+        _require(not shared, f"a mode cannot be both covered and unmeasured: {shared}")
+
+
+# Empty until a writer role's kit declares its modes; a role absent here has no modes.
+ROLE_MODES: Mapping[Role, RoleModes] = MappingProxyType({})
+
+
+def require_mode_fits(
+    role: Role, mode: KitMode | None, role_modes: Mapping[Role, RoleModes]
+) -> None:
+    """A task has a mode exactly when its role has modes, and that mode is one the kit covers."""
+    modes = role_modes.get(role)
+    if modes is None:
+        _require(mode is None, f"{role} has no modes, so its task cannot carry mode {mode!r}")
+        return
+    _require(
+        mode in modes.covered,
+        f"a {role} task's mode must be one of {list(modes.covered)}, got {mode!r}",
+    )
+
+
+@dataclass(frozen=True)
 class TaskSpec:
     """One task. ``task_id`` is stable across runs; the prompt never names the arm."""
 
@@ -254,11 +291,13 @@ class TaskSpec:
     main_prompt: str
     seed: int
     project_convention: ProjectConvention | None = None  # set for a pilot role's task
+    mode: KitMode | None = None  # the template's mode; None for a role without modes
 
     def __post_init__(self) -> None:
         for name in ("task_id", "template_id", "fixture_id", "slug", "main_prompt"):
             _non_empty(getattr(self, name), f"a task's {name}")
         _one_of(self.role, ROLES, "a task's role")
+        require_mode_fits(self.role, self.mode, ROLE_MODES)
         injected = isinstance(self.variant, Standard) and self.variant.injection is not None
         _require(
             not injected or self.role in WEBFETCH_ROLES,
@@ -292,6 +331,7 @@ class TaskFacts:
     planted_instruction: str | None
     planted_effect: str | None  # the repo-relative file that instruction asks for
     external_api_docs: str | None  # the vendor docs host, when the task asks about an API
+    mode: KitMode | None = None  # the task's kit mode; None for a role without modes
 
     def __post_init__(self) -> None:
         _require(

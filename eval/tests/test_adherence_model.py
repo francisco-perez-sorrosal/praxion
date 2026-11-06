@@ -38,14 +38,17 @@ from praxion_evals.adherence.model import (
     Passed,
     RefusedCommand,
     Regression,
+    RoleModes,
     RuleRef,
     ScopeConflict,
     SessionRecord,
     SessionSetup,
     Standard,
+    TaskFacts,
     TaskSpec,
     Underpowered,
     Withheld,
+    require_mode_fits,
 )
 from praxion_evals.adherence.transcript import EndedOnItsOwn, StoppedAtCap, Unknown
 from praxion_evals.live.results import ErrorKind as LiveErrorKind
@@ -263,6 +266,64 @@ def test_a_webfetch_role_can_carry_an_injection():
 
 def test_a_judged_check_with_both_golden_cases_is_judged():
     assert JudgedCheck(**JUDGED).kind == "judged"
+
+
+# ---------------------------------------------------------------------------
+# Kit modes: a role's modes are a role-level fact, a task's mode must fit them
+# ---------------------------------------------------------------------------
+
+SYNTHETIC_MODES = {"test-engineer": RoleModes(("acceptance-design", "paired"), ("pre-refactor",))}
+
+
+def test_a_role_that_covers_a_mode_and_leaves_others_unmeasured_can_be_built():
+    modes = RoleModes(("spec", "feature"), ("rework",))
+
+    assert modes.covered == ("spec", "feature")
+    assert modes.unmeasured == ("rework",)
+
+
+def test_a_role_must_cover_at_least_one_mode():
+    with pytest.raises(ValueError, match="covered"):
+        RoleModes((), ("rework",))
+
+
+def test_a_mode_cannot_be_both_covered_and_unmeasured():
+    with pytest.raises(ValueError, match="spec"):
+        RoleModes(("spec", "feature"), ("spec",))
+
+
+def test_a_mode_on_a_role_without_modes_is_refused():
+    with pytest.raises(ValueError, match="researcher"):
+        require_mode_fits("researcher", "paired", SYNTHETIC_MODES)
+
+
+def test_a_role_without_modes_takes_no_mode():
+    require_mode_fits("researcher", None, SYNTHETIC_MODES)
+
+
+def test_a_role_with_modes_needs_a_mode():
+    with pytest.raises(ValueError, match="test-engineer"):
+        require_mode_fits("test-engineer", None, SYNTHETIC_MODES)
+
+
+def test_a_mode_the_role_does_not_cover_is_refused():
+    with pytest.raises(ValueError, match="feature"):
+        require_mode_fits("test-engineer", "feature", SYNTHETIC_MODES)
+
+
+def test_a_covered_mode_fits():
+    require_mode_fits("test-engineer", "paired", SYNTHETIC_MODES)
+
+
+def test_a_task_and_its_facts_carry_no_mode_by_default():
+    assert _task().mode is None
+    facts = TaskFacts(False, False, False, None, None, None)
+    assert facts.mode is None
+
+
+def test_a_task_refuses_a_mode_while_its_role_has_none():
+    with pytest.raises(ValueError, match="researcher"):
+        _task(role="researcher", mode="paired")
 
 
 # ---------------------------------------------------------------------------

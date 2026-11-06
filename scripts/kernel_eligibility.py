@@ -16,4 +16,6 @@ ELIGIBLE_ROLES = (
     "skill-genesis",
     "context-engineer",
     "implementer",
+    "test-engineer",
+    "systems-architect",
 )

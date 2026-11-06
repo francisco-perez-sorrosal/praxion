@@ -147,7 +147,7 @@ def test_eligibility_is_judged_against_the_pin_not_the_ledger(monkeypatch) -> No
     assert isinstance(parse_ledger(verifier=switched_row()).records["verifier"], kl.Switched)
 
 
-def test_the_pin_lists_the_five_pilot_roles_and_the_implementer() -> None:
+def test_the_pin_lists_the_pilot_roles_the_implementer_and_the_two_writer_roles() -> None:
     assert sorted(ELIGIBLE_ROLES) == sorted(
         [
             "researcher",
@@ -156,6 +156,8 @@ def test_the_pin_lists_the_five_pilot_roles_and_the_implementer() -> None:
             "skill-genesis",
             "context-engineer",
             "implementer",
+            "test-engineer",
+            "systems-architect",
         ]
     )
 

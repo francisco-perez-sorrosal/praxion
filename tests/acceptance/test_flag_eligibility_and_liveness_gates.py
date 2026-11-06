@@ -2,7 +2,8 @@
 
 `omitClaudeMd` is accepted only as a literal true. The eligible roles live apart from the
 adoption records and the definitions; a commit that changes them together with a record
-or a flag is refused, naming both. The implementer is eligible; its definition carries the
+or a flag is refused, naming both. The test-engineer and the systems-architect are eligible
+beside the implementer. The implementer is eligible; its definition carries the
 flag exactly when its committed record is switched, and under a ledger holding it at trial its
 spawn receives its kernel and the project's instruction file and leaves one row the liveness
 check judges clean. A
@@ -111,7 +112,7 @@ def test_a_commit_changing_the_eligible_roles_and_a_flag_is_refused_naming_both(
 def test_a_move_to_switched_of_a_role_eligible_only_from_that_commit_is_refused(
     sandbox: Sandbox,
 ) -> None:
-    role = "systems-architect"
+    role = "doc-engineer"
     flip_gate.set_eligible_roles(sandbox.root, flip_gate.eligible_roles(sandbox.root) | {role})
     switch_with_flag(sandbox, cited_switch_record(sandbox.root, role))
     regenerate(sandbox.root)
@@ -140,10 +141,15 @@ def test_a_flip_commit_edits_nothing_that_holds_the_eligible_roles() -> None:
     assert not any(path.startswith("agents/") for path in held_in)
 
 
-def test_the_implementer_is_eligible_beside_the_five_pilot_roles_and_no_other(
+def test_the_implementer_and_the_two_writer_roles_are_eligible_beside_the_pilot_roles_and_no_other(
     sandbox: Sandbox,
 ) -> None:
-    assert flip_gate.eligible_roles(REPO_ROOT) == {*PILOT_ROLES, "implementer"}
+    assert flip_gate.eligible_roles(REPO_ROOT) == {
+        *PILOT_ROLES,
+        "implementer",
+        "test-engineer",
+        "systems-architect",
+    }
 
 
 # -- The implementer, ready for a trial ---------------------------------------------------------------

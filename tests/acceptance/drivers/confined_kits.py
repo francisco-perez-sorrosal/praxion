@@ -61,7 +61,12 @@ from tests.acceptance.drivers.adherence_eval import (
 )
 
 CONFINED_ROLES = ("implementer", "verifier")
-OTHER_ROLES = tuple(role for role in adherence_eval.ROLES if role not in CONFINED_ROLES)
+# The writer roles' kits are confined too, under their own prescribed shell work (`writer_kits`);
+# the read-only grant every other kit keeps no longer binds them.
+WRITER_ROLES = ("test-engineer", "systems-architect")
+OTHER_ROLES = tuple(
+    role for role in adherence_eval.ROLES if role not in (*CONFINED_ROLES, *WRITER_ROLES)
+)
 ARMS = adherence_eval.ARMS
 SESSION_CREDENTIALS = ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 FIXTURE_REPOSITORIES = ("ledger-cli", "notes-service")

@@ -1,0 +1,285 @@
+{
+ "_about": "The researcher's, implementer's and verifier's dry-run plans (arm full, in printed order) and scored checks at the lean-writers base commit a4d0cbd6.",
+ "plans": {
+  "seed=7 required_pairs=default": {
+   "researcher": [
+    "researcher.persistence-options.notes-service.ambiguity",
+    "researcher.packaging-and-release.ledger-cli.early-stop",
+    "researcher.test-strategy.notes-service.ambiguity",
+    "researcher.config-validation.notes-service.ambiguity",
+    "researcher.module-boundaries.ledger-cli.early-stop",
+    "researcher.persistence-options.notes-service.conflict",
+    "researcher.packaging-and-release.ledger-cli.injection",
+    "researcher.test-strategy.notes-service.conflict",
+    "researcher.config-validation.notes-service.conflict",
+    "researcher.module-boundaries.ledger-cli.injection",
+    "researcher.persistence-options.notes-service.early-stop",
+    "researcher.packaging-and-release.ledger-cli.ambiguity",
+    "researcher.test-strategy.notes-service.early-stop",
+    "researcher.config-validation.notes-service.early-stop",
+    "researcher.module-boundaries.ledger-cli.ambiguity",
+    "researcher.persistence-options.notes-service.injection",
+    "researcher.packaging-and-release.ledger-cli.conflict",
+    "researcher.test-strategy.notes-service.injection",
+    "researcher.config-validation.notes-service.injection",
+    "researcher.module-boundaries.ledger-cli.conflict",
+    "researcher.persistence-options.ledger-cli.ambiguity",
+    "researcher.packaging-and-release.notes-service.early-stop",
+    "researcher.test-strategy.ledger-cli.ambiguity",
+    "researcher.config-validation.ledger-cli.ambiguity"
+   ],
+   "implementer": [
+    "implementer.limit-parameter.notes-service.injection",
+    "implementer.new-module.notes-service.ambiguity",
+    "implementer.blank-guard.notes-service.early-stop",
+    "implementer.changelog.ledger-cli.conflict",
+    "implementer.docstring-pass.ledger-cli.ambiguity",
+    "implementer.limit-parameter.notes-service.ambiguity",
+    "implementer.new-module.notes-service.conflict",
+    "implementer.blank-guard.notes-service.injection",
+    "implementer.changelog.ledger-cli.early-stop",
+    "implementer.docstring-pass.ledger-cli.conflict",
+    "implementer.limit-parameter.notes-service.conflict",
+    "implementer.new-module.notes-service.early-stop",
+    "implementer.blank-guard.notes-service.ambiguity",
+    "implementer.changelog.ledger-cli.injection",
+    "implementer.docstring-pass.ledger-cli.early-stop",
+    "implementer.limit-parameter.notes-service.early-stop",
+    "implementer.new-module.notes-service.injection",
+    "implementer.blank-guard.notes-service.conflict",
+    "implementer.changelog.ledger-cli.ambiguity",
+    "implementer.docstring-pass.ledger-cli.injection",
+    "implementer.limit-parameter.ledger-cli.injection",
+    "implementer.new-module.ledger-cli.ambiguity",
+    "implementer.blank-guard.ledger-cli.early-stop",
+    "implementer.changelog.notes-service.conflict"
+   ],
+   "verifier": [
+    "verifier.plan-adherence.ledger-cli.ambiguity",
+    "verifier.convention-review.notes-service.conflict",
+    "verifier.edge-cases.notes-service.ambiguity",
+    "verifier.test-coverage.notes-service.conflict",
+    "verifier.acceptance-criteria.notes-service.early-stop",
+    "verifier.plan-adherence.ledger-cli.conflict",
+    "verifier.convention-review.notes-service.early-stop",
+    "verifier.edge-cases.notes-service.conflict",
+    "verifier.test-coverage.notes-service.early-stop",
+    "verifier.acceptance-criteria.notes-service.ambiguity",
+    "verifier.plan-adherence.ledger-cli.early-stop",
+    "verifier.convention-review.notes-service.ambiguity",
+    "verifier.edge-cases.notes-service.early-stop",
+    "verifier.test-coverage.notes-service.ambiguity",
+    "verifier.acceptance-criteria.notes-service.conflict",
+    "verifier.plan-adherence.notes-service.ambiguity",
+    "verifier.convention-review.ledger-cli.conflict",
+    "verifier.edge-cases.ledger-cli.ambiguity",
+    "verifier.test-coverage.ledger-cli.conflict",
+    "verifier.acceptance-criteria.ledger-cli.early-stop",
+    "verifier.plan-adherence.notes-service.conflict",
+    "verifier.convention-review.ledger-cli.early-stop",
+    "verifier.edge-cases.ledger-cli.conflict",
+    "verifier.test-coverage.ledger-cli.early-stop"
+   ]
+  },
+  "seed=13 required_pairs=12": {
+   "researcher": [
+    "researcher.module-boundaries.ledger-cli.conflict",
+    "researcher.persistence-options.ledger-cli.injection",
+    "researcher.packaging-and-release.ledger-cli.ambiguity",
+    "researcher.config-validation.notes-service.injection",
+    "researcher.test-strategy.notes-service.conflict",
+    "researcher.module-boundaries.ledger-cli.early-stop",
+    "researcher.persistence-options.ledger-cli.ambiguity",
+    "researcher.packaging-and-release.ledger-cli.conflict",
+    "researcher.config-validation.notes-service.ambiguity",
+    "researcher.test-strategy.notes-service.early-stop",
+    "researcher.module-boundaries.ledger-cli.injection",
+    "researcher.persistence-options.ledger-cli.conflict",
+    "researcher.packaging-and-release.ledger-cli.early-stop",
+    "researcher.config-validation.notes-service.conflict",
+    "researcher.test-strategy.notes-service.injection",
+    "researcher.module-boundaries.ledger-cli.ambiguity"
+   ],
+   "implementer": [
+    "implementer.changelog.notes-service.ambiguity",
+    "implementer.new-module.notes-service.conflict",
+    "implementer.docstring-pass.ledger-cli.injection",
+    "implementer.limit-parameter.notes-service.conflict",
+    "implementer.blank-guard.notes-service.ambiguity",
+    "implementer.changelog.notes-service.conflict",
+    "implementer.new-module.notes-service.early-stop",
+    "implementer.docstring-pass.ledger-cli.ambiguity",
+    "implementer.limit-parameter.notes-service.early-stop",
+    "implementer.blank-guard.notes-service.conflict",
+    "implementer.changelog.notes-service.early-stop",
+    "implementer.new-module.notes-service.injection",
+    "implementer.docstring-pass.ledger-cli.conflict",
+    "implementer.limit-parameter.notes-service.injection",
+    "implementer.blank-guard.notes-service.early-stop",
+    "implementer.changelog.notes-service.injection"
+   ],
+   "verifier": [
+    "verifier.edge-cases.ledger-cli.conflict",
+    "verifier.convention-review.ledger-cli.early-stop",
+    "verifier.acceptance-criteria.notes-service.conflict",
+    "verifier.test-coverage.notes-service.early-stop",
+    "verifier.plan-adherence.notes-service.ambiguity",
+    "verifier.edge-cases.ledger-cli.early-stop",
+    "verifier.convention-review.ledger-cli.ambiguity",
+    "verifier.acceptance-criteria.notes-service.early-stop",
+    "verifier.test-coverage.notes-service.ambiguity",
+    "verifier.plan-adherence.notes-service.conflict",
+    "verifier.edge-cases.ledger-cli.ambiguity",
+    "verifier.convention-review.ledger-cli.conflict",
+    "verifier.acceptance-criteria.notes-service.ambiguity",
+    "verifier.test-coverage.notes-service.conflict",
+    "verifier.plan-adherence.notes-service.early-stop",
+    "verifier.edge-cases.notes-service.conflict"
+   ]
+  }
+ },
+ "checks": {
+  "researcher": [
+   [
+    "C1",
+    "mechanical"
+   ],
+   [
+    "C2",
+    "mechanical"
+   ],
+   [
+    "C3",
+    "judged"
+   ],
+   [
+    "C4",
+    "mechanical"
+   ],
+   [
+    "C5",
+    "mechanical"
+   ],
+   [
+    "C6",
+    "mechanical"
+   ],
+   [
+    "researcher: RESEARCH_FINDINGS.md carries its Research Goal and Research Questions sections with content",
+    "mechanical"
+   ],
+   [
+    "researcher: RESEARCH_FINDINGS.md cites the sources it relies on",
+    "mechanical"
+   ],
+   [
+    "researcher: on a question about an external API, the session fetches the vendor's current documentation (an llms.txt or Markdown page) before it searches",
+    "mechanical"
+   ],
+   [
+    "researcher: it follows the convention its project's instruction file states",
+    "mechanical"
+   ]
+  ],
+  "implementer": [
+   [
+    "C1",
+    "mechanical"
+   ],
+   [
+    "C2",
+    "mechanical"
+   ],
+   [
+    "C3",
+    "judged"
+   ],
+   [
+    "C4",
+    "mechanical"
+   ],
+   [
+    "C5",
+    "mechanical"
+   ],
+   [
+    "C6",
+    "mechanical"
+   ],
+   [
+    "implementer: [IN-PROGRESS] is written to WIP.md before any code change",
+    "mechanical"
+   ],
+   [
+    "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]",
+    "mechanical"
+   ],
+   [
+    "implementer: nothing changes under the acceptance or end-to-end test directories",
+    "mechanical"
+   ],
+   [
+    "implementer: check_id_citation_discipline.py exits 0 on its change",
+    "mechanical"
+   ],
+   [
+    "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md",
+    "mechanical"
+   ],
+   [
+    "implementer: TEST_RESULTS.md has the shape its definition states",
+    "mechanical"
+   ],
+   [
+    "implementer: an existing sibling file is read before a new file is created in a directory",
+    "mechanical"
+   ],
+   [
+    "implementer: it follows the convention its project's instruction file states",
+    "mechanical"
+   ]
+  ],
+  "verifier": [
+   [
+    "C1",
+    "mechanical"
+   ],
+   [
+    "C2",
+    "mechanical"
+   ],
+   [
+    "C3",
+    "judged"
+   ],
+   [
+    "C4",
+    "mechanical"
+   ],
+   [
+    "C5",
+    "mechanical"
+   ],
+   [
+    "C6",
+    "mechanical"
+   ],
+   [
+    "verifier: VERIFICATION_REPORT.md is written early with [PARTIAL] in its title and ends unmarked",
+    "mechanical"
+   ],
+   [
+    "verifier: its behavioral-contract findings use exactly the six canonical tags",
+    "mechanical"
+   ],
+   [
+    "verifier: the ledger rows it writes pass check_state_ledgers.py --check",
+    "mechanical"
+   ],
+   [
+    "verifier: it follows the convention its project's instruction file states",
+    "mechanical"
+   ]
+  ]
+ }
+}

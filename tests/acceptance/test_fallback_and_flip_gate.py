@@ -124,14 +124,14 @@ def test_a_switched_definition_differs_from_before_only_by_the_flag_and_its_bloc
 
 def test_omit_claude_md_on_a_role_outside_the_pilot_is_refused(sandbox: Sandbox) -> None:
     kernel_adoption.record(
-        sandbox.root, flip_gate.cited_switch_record(sandbox.root, "systems-architect")
+        sandbox.root, flip_gate.cited_switch_record(sandbox.root, "doc-engineer")
     )
-    kernel_sandbox.set_frontmatter_key(sandbox, "systems-architect", OMIT)
+    kernel_sandbox.set_frontmatter_key(sandbox, "doc-engineer", OMIT)
 
     verdict = commit_gate(sandbox.root)
 
     assert verdict.refused, "a role outside the eligible ones was switched"
-    assert "systems-architect" in verdict.output, verdict.output
+    assert "doc-engineer" in verdict.output, verdict.output
 
 
 FOREIGN_EVAL = "a passing run from another eval"

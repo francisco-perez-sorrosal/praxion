@@ -966,7 +966,7 @@ def test_a_manifest_naming_an_unknown_mode_is_refused(tmp_path):
         tasks._load_template(tmp_path)
 
 
-@pytest.mark.parametrize("role", [role for role in ROLES if role != MODED])
+@pytest.mark.parametrize("role", [role for role in ROLES if role not in model.ROLE_MODES])
 def test_a_role_without_modes_has_no_moded_kit_and_no_template_carries_a_mode(role):
     assert role not in model.ROLE_MODES
     assert role not in role_kits.MODED_KITS
@@ -1087,3 +1087,72 @@ def test_an_acceptance_design_extract_that_lost_a_token_refuses_the_kit(token, f
 
     with pytest.raises(ValueError, match=f"acceptance-export-spec.*lacks the {token} token"):
         tasks.kit_for(MODED)
+
+
+# ---------------------------------------------------------------------------
+# The systems-architect's kit: two modes, five templates, one convention
+# ---------------------------------------------------------------------------
+
+ARCHITECT = "systems-architect"
+SPEC_TEMPLATES = ["spec-duplicate-detection", "spec-tag-filter"]
+FEATURE_TEMPLATES = ["audit-trail", "export-document", "retention-limit"]
+# The base commit's prompt for the role, which a feature task must still be given byte for byte.
+BASE_FEATURE_PROMPT = (
+    "Task slug: {slug}. Design the change described in .ai-work/{slug}/TASK_BRIEF.md; the "
+    "research findings are in the same directory and the repository you are in is the codebase."
+)
+SPEC_PROMPT = (
+    "Task slug: {slug}. Mode: spec. Write the specification for the change described in "
+    ".ai-work/{slug}/TASK_BRIEF.md; the research findings are in the same directory and the "
+    "repository you are in is the codebase."
+)
+
+
+def _architect_tasks(mode: str) -> list[TaskSpec]:
+    return [task for task in _pool(ARCHITECT) if task.mode == mode]
+
+
+def test_the_architects_kit_loads_its_five_templates_with_their_modes():
+    kit = tasks.kit_for(ARCHITECT)
+
+    modes = {template.template_id: template.mode for template in kit.templates}
+    assert modes == {
+        **dict.fromkeys(SPEC_TEMPLATES, "spec"),
+        **dict.fromkeys(FEATURE_TEMPLATES, "feature"),
+    }
+    assert model.ROLE_MODES[ARCHITECT] == RoleModes(
+        ("spec", "feature"), ("baseline-audit", "post-refactor-adaptation", "rework")
+    )
+
+
+def test_a_spec_task_is_prompted_with_the_directive():
+    held = _architect_tasks("spec")
+
+    assert held
+    for task in held:
+        assert SPEC_PROMPT.format(slug=task.slug) in task.main_prompt, task.task_id
+
+
+def test_a_feature_task_is_prompted_as_the_base_commit_prompted_the_role():
+    held = _architect_tasks("feature")
+
+    assert held
+    for task in held:
+        assert BASE_FEATURE_PROMPT.format(slug=task.slug) in task.main_prompt, task.task_id
+
+
+@pytest.mark.parametrize("mode", ["spec", "feature"])
+def test_each_architect_mode_holds_at_least_a_third_of_a_default_plan(mode):
+    planned = tasks.generate(ARCHITECT, SEED, tasks.list_size(ARCHITECT))
+
+    assert 3 * sum(task.mode == mode for task in planned) >= len(planned)
+
+
+@pytest.mark.parametrize("mode", ["spec", "feature"])
+def test_a_scratch_repository_holds_the_research_findings_and_its_brief(mode, tmp_path):
+    task = _architect_tasks(mode)[0]
+
+    tasks.build_scratch_repo(task, tmp_path / "scratch")
+
+    work = tmp_path / "scratch" / ".ai-work" / task.slug
+    assert {path.name for path in work.iterdir()} == {"RESEARCH_FINDINGS.md", "TASK_BRIEF.md"}

@@ -62,16 +62,6 @@ ROLE_KITS: Mapping[str, RoleKit] = {
         fixtures=("ledger-cli", "notes-service"),
         fixture_inputs=("LEARNINGS.md",),
     ),
-    "systems-architect": RoleKit(
-        brief="TASK_BRIEF.md",
-        prompt=(
-            "Task slug: {slug}. Design the change described in .ai-work/{slug}/{brief}; the "
-            "research findings are in the same directory and the repository you are in is "
-            "the codebase."
-        ),
-        fixtures=("ledger-cli", "notes-service"),
-        fixture_inputs=("RESEARCH_FINDINGS.md",),
-    ),
     "implementation-planner": RoleKit(
         brief="SYSTEMS_PLAN.md",
         prompt=(
@@ -209,7 +199,29 @@ MODED_KITS: Mapping[Role, Mapping[KitMode, RoleKit]] = MappingProxyType(
                 ),
                 fixtures=("ledger-cli", "notes-service"),
             ),
-        }
+        },
+        "systems-architect": {
+            "spec": RoleKit(
+                brief="TASK_BRIEF.md",
+                prompt=(
+                    "Task slug: {slug}. Mode: spec. Write the specification for the change "
+                    "described in .ai-work/{slug}/{brief}; the research findings are in the same "
+                    "directory and the repository you are in is the codebase."
+                ),
+                fixtures=("ledger-cli", "notes-service"),
+                fixture_inputs=("RESEARCH_FINDINGS.md",),
+            ),
+            "feature": RoleKit(
+                brief="TASK_BRIEF.md",
+                prompt=(
+                    "Task slug: {slug}. Design the change described in .ai-work/{slug}/{brief}; "
+                    "the research findings are in the same directory and the repository you are "
+                    "in is the codebase."
+                ),
+                fixtures=("ledger-cli", "notes-service"),
+                fixture_inputs=("RESEARCH_FINDINGS.md",),
+            ),
+        },
     }
 )
 

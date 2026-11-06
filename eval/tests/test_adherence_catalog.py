@@ -28,6 +28,7 @@ from praxion_evals.adherence.catalog_rows import (
     VALIDATOR_PRE_MERGE,
     VALIDATOR_SECTIONS,
 )
+from praxion_evals.adherence.checks_adr import adr_row
 from praxion_evals.adherence.checks_common import COMMON_CHECKS, synthetic_evidence
 from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT, section_body
 from praxion_evals.adherence.model import (
@@ -108,7 +109,7 @@ def test_the_only_judged_role_checks_are_the_adr_categories():
 
 @pytest.mark.parametrize(
     ("role", "clauses"),
-    [("implementer", 8), ("test-engineer", 5), ("doc-engineer", 3), ("systems-architect", 6)],
+    [("implementer", 8), ("test-engineer", 5), ("doc-engineer", 3), ("systems-architect", 7)],
 )
 def test_each_role_carries_one_check_per_clause_of_its_row(role, clauses):
     assert len(ROLE_ROWS[role]) == clauses
@@ -133,10 +134,15 @@ def test_each_remaining_role_carries_one_check_per_clause_of_its_row(role, claus
     assert all(check.name.startswith(f"{role}: ") for check in ROLE_ROWS[role])
 
 
+def _architect_adr_clauses() -> list[str]:
+    """The ADR clauses the architect's row shares with the design roles and the planner."""
+    return [c.name.removeprefix("systems-architect: ") for c in adr_row("systems-architect")]
+
+
 @pytest.mark.parametrize("role", ["interface-designer", "agentic-transactions-architect"])
 def test_the_design_roles_share_the_adr_clauses_and_add_their_challenges_and_self_test(role):
     names = [c.name.removeprefix(f"{role}: ") for c in ROLE_ROWS[role]]
-    architect = [c.name.removeprefix("systems-architect: ") for c in ROLE_ROWS["systems-architect"]]
+    architect = _architect_adr_clauses()
 
     assert names[: len(architect)] == architect
     assert len(names) == len(architect) + 2
@@ -146,7 +152,7 @@ def test_the_planner_shares_the_architects_adr_clauses_and_adds_its_own():
     names = [
         c.name.removeprefix("implementation-planner: ") for c in ROLE_ROWS["implementation-planner"]
     ]
-    architect = [c.name.removeprefix("systems-architect: ") for c in ROLE_ROWS["systems-architect"]]
+    architect = _architect_adr_clauses()
 
     assert names[: len(architect)] == architect
     assert len(names) == len(architect) + 3

@@ -407,7 +407,10 @@ DOC_ENGINEER_ROW: tuple[CheckDef, ...] = (
 # The systems-architect and the implementation-planner
 # ---------------------------------------------------------------------------
 
-ARCHITECT_ROW: tuple[CheckDef, ...] = adr_row("systems-architect")
+ARCHITECT_ROW: tuple[CheckDef, ...] = (
+    *adr_row("systems-architect"),
+    convention_check("systems-architect"),
+)
 
 PLANNER_STEPS = (
     "implementation-planner: every plan step carries its files and its done-when condition"

@@ -221,6 +221,7 @@ PILOT_ROLES: tuple[str, ...] = (
     "context-engineer",
     "implementer",
     "test-engineer",
+    "systems-architect",
 )
 # The wording a pilot task's convention asks every document to carry: the one thing the
 # convention check looks for, and the thing only the fixture's own instruction file states.
@@ -263,7 +264,12 @@ class RoleModes:
 
 # A role absent here has no modes.
 ROLE_MODES: Mapping[Role, RoleModes] = MappingProxyType(
-    {"test-engineer": RoleModes(("acceptance-design", "paired"), ("pre-refactor",))}
+    {
+        "test-engineer": RoleModes(("acceptance-design", "paired"), ("pre-refactor",)),
+        "systems-architect": RoleModes(
+            ("spec", "feature"), ("baseline-audit", "post-refactor-adaptation", "rework")
+        ),
+    }
 )
 
 

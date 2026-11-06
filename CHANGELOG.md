@@ -1,3 +1,11 @@
+## v0.58.1 (2026-11-06)
+
+### Fix
+
+- Complete a marketplace install on its real layout
+- State which subagents start without CLAUDE.md
+- Judge rule links against the manifest in --check
+
 ## v0.58.0 (2026-11-06)
 
 ### Feat

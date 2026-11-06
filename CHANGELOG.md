@@ -1,3 +1,19 @@
+## v0.58.0 (2026-11-06)
+
+### Feat
+
+- Measure the budget a directory's session loads
+- Deliver the four procedures to managed projects
+- Link only every-project rules at install
+- Switch the implementer to its kernel
+
+### Fix
+
+- Describe the managed delivery as built
+- Leave the frozen gating fixtures out of BC05
+- Keep confined kits' git off the hidden home
+- Approve shell commands the kit sandbox confines
+
 ## v0.57.0 (2026-11-03)
 
 ### Feat

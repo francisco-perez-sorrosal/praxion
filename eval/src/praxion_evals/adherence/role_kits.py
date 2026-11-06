@@ -1,13 +1,21 @@
 """The kit declarations: what each role is asked, and in which repositories.
 
-Declarations only. ``tasks`` builds the seeded task sets from them and re-exports
-``RoleKit`` and ``ROLE_KITS``, so ``tasks.ROLE_KITS`` and every importer of it keep working.
+Declarations, and the one resolver that turns a task's template into the declaration it
+reads. ``tasks`` builds the seeded task sets from them and re-exports ``RoleKit`` and
+``ROLE_KITS``, so ``tasks.ROLE_KITS`` and every importer of it keep working.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+from praxion_evals.adherence.model import KitMode, Role
+
+if TYPE_CHECKING:  # typing only: ``tasks`` imports this module at run time
+    from praxion_evals.adherence.tasks import Template
 
 
 @dataclass(frozen=True)
@@ -183,3 +191,18 @@ ROLE_KITS: Mapping[str, RoleKit] = {
         overlays=("ecosystem",),
     ),
 }
+
+
+# A role with modes is asked differently in each: one declaration per covered mode, and the
+# role is absent from ``ROLE_KITS`` so it carries no role-level prompt it never uses. Its
+# modes' fixtures and overlays are the same (``tasks.kit_for`` refuses a kit where they differ).
+MODED_KITS: Mapping[Role, Mapping[KitMode, RoleKit]] = MappingProxyType({})
+
+
+def kit_spec(role: Role, template: Template) -> RoleKit:
+    """The declaration a task built from ``template`` reads: its brief, prompt and fixture inputs."""
+    if role not in MODED_KITS:
+        return ROLE_KITS[role]
+    if template.mode is None:
+        raise ValueError(f"{role} template {template.template_id} declares no mode")
+    return MODED_KITS[role][template.mode]

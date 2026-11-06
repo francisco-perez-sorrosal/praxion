@@ -38,7 +38,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
-from typing import assert_never
+from typing import assert_never, cast, get_args
 
 import yaml
 
@@ -46,20 +46,23 @@ from praxion_evals.adherence.confinement import CONFINED_ROLES, Confinement, set
 from praxion_evals.adherence.model import (
     CONVENTION_MARKER,
     PILOT_ROLES,
+    ROLE_MODES,
     WEBFETCH_ROLES,
     Ambiguity,
     ArmBuild,
     EarlyStop,
     Injection,
+    KitMode,
     ProjectConvention,
     Role,
+    RoleModes,
     ScopeConflict,
     Standard,
     TaskSpec,
     TaskVariant,
     convention_check_name,
 )
-from praxion_evals.adherence.role_kits import ROLE_KITS, RoleKit
+from praxion_evals.adherence.role_kits import MODED_KITS, ROLE_KITS, RoleKit, kit_spec
 from praxion_evals.live.session import DEFAULT_TIMEOUT_S, SandboxPaths, SessionSpec
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -83,6 +86,8 @@ SLACK_DIVISOR = 5
 # Roles whose full task set is authored; every other role runs smoke tasks only.
 FULL_SET_ROLES: frozenset[str] = frozenset({"researcher", "verifier", "implementer"})
 MIN_TEMPLATES = 5
+# Each mode of a role with modes keeps this many templates, so a seeded draw cannot starve a mode.
+MIN_TEMPLATES_PER_MODE = 2
 
 # The harness floor for an early-stop cap: a lower cap stops a role before it can write
 # any partial form. Whether the early-stop check applies to a role is the check's call.
@@ -147,11 +152,14 @@ class Template:
     ambiguity: Ambiguity
     conflict: ScopeConflict
     inputs: tuple[tuple[str, str], ...]  # file name -> text, tokens unfilled
+    mode: KitMode | None = None  # declared by a role with modes, and only by one
 
 
 @dataclass(frozen=True)
 class Kit:
     role: Role
+    # The role-level declaration, for what every mode shares: fixtures and overlays. A brief,
+    # a prompt or fixture inputs are read per task through ``kit_spec``.
     spec: RoleKit
     templates: tuple[Template, ...]
 
@@ -177,22 +185,70 @@ def _variant_labels(role: Role) -> tuple[str, ...]:
 
 @cache
 def kit_for(role: Role) -> Kit:
-    spec = ROLE_KITS.get(role)
-    if spec is None:
-        raise ValueError(f"no task kit is authored for {role} yet")
+    specs = _specs_of(role)
     root = FIXTURES_DIR / role / "templates"
     templates = tuple(_load_template(path) for path in sorted(root.iterdir()) if path.is_dir())
+    require_kit_invariants(role, templates, ROLE_MODES, specs)
     if role in FULL_SET_ROLES and len(templates) < MIN_TEMPLATES:
         raise ValueError(f"{role} has {len(templates)} templates, fewer than {MIN_TEMPLATES}")
     for template in templates:
-        _require_brief(role, spec, template)
-    _require_fixture_material(role, spec)
-    kit = Kit(role, spec, templates)
+        _require_brief(role, kit_spec(role, template), template)
+    _require_fixture_material(role, tuple(specs.values()))
+    kit = Kit(role, next(iter(specs.values())), templates)
     if kit.producible < DEFAULT_TARGET:
         raise ValueError(
             f"{role} can produce {kit.producible} tasks, fewer than the {DEFAULT_TARGET} a kit owes"
         )
     return kit
+
+
+def _specs_of(role: Role) -> Mapping[KitMode | None, RoleKit]:
+    """A role's declarations by mode: one per covered mode, or the single one under ``None``."""
+    if role in MODED_KITS:
+        by_mode: dict[KitMode | None, RoleKit] = {**MODED_KITS[role]}
+        return by_mode
+    spec = ROLE_KITS.get(role)
+    if spec is None:
+        raise ValueError(f"no task kit is authored for {role} yet")
+    return {None: spec}
+
+
+def require_kit_invariants(
+    role: Role,
+    templates: Sequence[Template],
+    role_modes: Mapping[Role, RoleModes],
+    specs: Mapping[KitMode | None, RoleKit],
+) -> None:
+    """What a kit must hold for a task's mode to be a fact of its template, refused at load.
+
+    A role with modes: every template declares a covered mode, and each covered mode has
+    ``MIN_TEMPLATES_PER_MODE`` templates and a declaration. A role without: no template
+    declares a mode. Either way the declarations agree on fixtures and overlays, and no two
+    (template, fixture) pairs spell one slug, since a slug is how a graded run finds its task.
+    """
+    modes = role_modes.get(role)
+    covered = () if modes is None else modes.covered
+    allowed = covered or (None,)
+    for template in templates:
+        if template.mode not in allowed:
+            raise ValueError(
+                f"{role} template {template.template_id} declares mode {template.mode!r}, "
+                f"not one of {list(allowed)}"
+            )
+    for mode in covered:
+        count = sum(template.mode == mode for template in templates)
+        if count < MIN_TEMPLATES_PER_MODE:
+            raise ValueError(
+                f"{role} has {count} {mode} templates, fewer than {MIN_TEMPLATES_PER_MODE}"
+            )
+    if set(specs) != set(allowed):
+        raise ValueError(f"{role} declares kits for {list(specs)}, not for {list(allowed)}")
+    first, *rest = specs.values()
+    if any((one.fixtures, one.overlays) != (first.fixtures, first.overlays) for one in rest):
+        raise ValueError(f"{role} modes differ in their fixtures or overlays")
+    slugs = [task_slug(t.template_id, fixture) for t in templates for fixture in first.fixtures]
+    if len(set(slugs)) != len(slugs):
+        raise ValueError(f"{role} has two tasks that share a slug")
 
 
 def _require_brief(role: Role, spec: RoleKit, template: Template) -> None:
@@ -208,8 +264,10 @@ def _require_brief(role: Role, spec: RoleKit, template: Template) -> None:
             )
 
 
-def _require_fixture_material(role: Role, spec: RoleKit) -> None:
-    """Every fixture and overlay a kit names exists on disk with the inputs the role needs."""
+def _require_fixture_material(role: Role, specs: Sequence[RoleKit]) -> None:
+    """Every fixture and overlay a kit names exists on disk with the inputs any mode needs."""
+    spec = specs[0]  # the declarations agree on both (``require_kit_invariants``)
+    inputs = dict.fromkeys(name for one in specs for name in one.fixture_inputs)
     for overlay in spec.overlays:
         if not (OVERLAYS_DIR / overlay).is_dir():
             raise ValueError(f"{role} names overlay {overlay!r}, which has no directory")
@@ -218,7 +276,7 @@ def _require_fixture_material(role: Role, spec: RoleKit) -> None:
             raise ValueError(f"{role} names fixture {fixture!r}, which has no repository")
         if role in PILOT_CONVENTIONS:
             _require_instructions_template(role, fixture)
-        for name in spec.fixture_inputs:
+        for name in inputs:
             if not (_inputs_dir(role, fixture) / name).is_file():
                 raise ValueError(f"{role} fixture {fixture!r} lacks the input {name}")
 
@@ -249,7 +307,17 @@ def _load_template(directory: Path) -> Template:
         ambiguity=Ambiguity(manifest["ambiguity"]),
         conflict=ScopeConflict(manifest["conflict"]),
         inputs=inputs,
+        mode=_parse_mode(directory.name, manifest.get("mode")),
     )
+
+
+def _parse_mode(template_id: str, raw: object) -> KitMode | None:
+    """A manifest's raw ``mode`` string becomes a ``KitMode`` here, once."""
+    if raw is None:
+        return None
+    if raw not in get_args(KitMode):
+        raise ValueError(f"template {template_id} names the unknown mode {raw!r}")
+    return cast(KitMode, raw)
 
 
 # ---------------------------------------------------------------------------
@@ -299,10 +367,10 @@ def make_task(
         case _:
             assert_never(variant)
     kit = kit_for(role)
-    kit.template(template_id)
+    template = kit.template(template_id)
     if fixture_id not in kit.spec.fixtures:
         raise ValueError(f"{role} has no fixture {fixture_id!r}")
-    slug = f"{template_id}-{fixture_id}"
+    slug = task_slug(template_id, fixture_id)
     return TaskSpec(
         task_id=task_id(role, template_id, fixture_id, variant),
         role=role,
@@ -310,14 +378,42 @@ def make_task(
         fixture_id=fixture_id,
         variant=variant,
         slug=slug,
-        main_prompt=_task_prompt(role, slug),
+        main_prompt=_task_prompt(kit_spec(role, template), slug),
         seed=seed,
         project_convention=PILOT_CONVENTIONS.get(role),
+        mode=template.mode,
     )
 
 
-def _task_prompt(role: Role, slug: str) -> str:
-    spec = ROLE_KITS[role]
+def task_slug(template_id: str, fixture_id: str) -> str:
+    return f"{template_id}-{fixture_id}"
+
+
+def mode_of(role: Role, template_id: str) -> KitMode | None:
+    """The mode of a role's template; ``None`` for a role without modes or a template it lacks."""
+    if role not in ROLE_MODES:
+        return None
+    return next((t.mode for t in kit_for(role).templates if t.template_id == template_id), None)
+
+
+def mode_of_slug(role: Role, slug: str) -> KitMode | None:
+    """The mode of the task whose slug this is; ``None`` for a role without modes or a slug the
+    kit does not spell. An exact match over the kit's closed sets, never a parse of the slug."""
+    if role not in ROLE_MODES:
+        return None
+    kit = kit_for(role)
+    return next(
+        (
+            t.mode
+            for t in kit.templates
+            for fixture in kit.spec.fixtures
+            if task_slug(t.template_id, fixture) == slug
+        ),
+        None,
+    )
+
+
+def _task_prompt(spec: RoleKit, slug: str) -> str:
     return spec.prompt.format(slug=slug, brief=spec.brief)
 
 
@@ -425,9 +521,10 @@ def build_scratch_repo(task: TaskSpec, dest: Path, page_url: str | None = None) 
     for overlay in kit.spec.overlays:
         _copy_tree(OVERLAYS_DIR / overlay, dest)
     _write_instructions(task, dest)
-    if kit.spec.fixture_inputs:
+    template = kit.template(task.template_id)
+    if kit_spec(task.role, template).fixture_inputs:
         _copy_tree(_inputs_dir(task.role, task.fixture_id), dest / AI_WORK / task.slug)
-    for name, text in kit.template(task.template_id).inputs:
+    for name, text in template.inputs:
         target = dest / AI_WORK / task.slug / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_fill(text, task, page_url), encoding="utf-8")

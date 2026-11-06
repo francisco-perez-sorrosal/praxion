@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import tasks
+from praxion_evals.adherence import model, role_kits, tasks
 from praxion_evals.adherence.catalog_rows import DIFF_MODE, ON_DEMAND_MODE, SHADOWING_MODE
 from praxion_evals.adherence.checks_process import ACCEPTANCE_DESIGN_MODE, PARALLEL_MODE
 from praxion_evals.adherence.model import (
@@ -26,11 +26,13 @@ from praxion_evals.adherence.model import (
     ArmBuild,
     EarlyStop,
     Injection,
+    RoleModes,
     ScopeConflict,
     Standard,
     TaskSpec,
     convention_check_name,
 )
+from praxion_evals.adherence.role_kits import RoleKit
 from praxion_evals.live.session import SandboxPaths
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -828,3 +830,154 @@ def test_a_fixture_repository_puts_its_source_on_the_test_path(fixture):
     manifest = tomllib.loads((tasks.REPOS_DIR / fixture / "pyproject.toml.tmpl").read_text())
 
     assert manifest["tool"]["pytest"]["ini_options"]["pythonpath"] == ["src"]
+
+
+# ---------------------------------------------------------------------------
+# A task's mode: parsed from its template, checked at kit load, resolved per mode
+# ---------------------------------------------------------------------------
+
+# No role has modes yet, so these tests build a synthetic one. A moded role has the writers'
+# shape: two covered modes, one declaration each, and the same fixtures in both.
+MODED = "test-engineer"
+SPEC_ONLY = RoleKit(brief="A.md", prompt="Slug {slug}, brief {brief}, spec.", fixtures=("f",))
+FEATURE_ONLY = RoleKit(
+    brief="B.md", prompt="Slug {slug}, brief {brief}, feature.", fixtures=("f",), overlays=()
+)
+TWO_MODES = RoleModes(covered=("spec", "feature"), unmeasured=("paired",))
+SPECS = {"spec": SPEC_ONLY, "feature": FEATURE_ONLY}
+
+
+def _template(template_id: str, mode: str | None = None) -> tasks.Template:
+    return tasks.Template(
+        template_id, Ambiguity("a gap"), ScopeConflict("a conflict"), (("A.md", "@@PLANT@@"),), mode
+    )
+
+
+def _two_each() -> list[tasks.Template]:
+    return [_template(f"{mode}-{n}", mode) for mode in ("spec", "feature") for n in (1, 2)]
+
+
+def _check(templates, role=MODED, role_modes=None, specs=None):
+    in_play = {MODED: TWO_MODES} if role_modes is None else role_modes
+    tasks.require_kit_invariants(role, templates, in_play, SPECS if specs is None else specs)
+
+
+def test_a_moded_kit_with_enough_templates_in_each_mode_loads():
+    _check(_two_each())
+
+
+def test_a_moded_roles_template_without_a_mode_is_refused():
+    with pytest.raises(ValueError, match="spec-1 declares mode None"):
+        _check([_template("spec-1"), *_two_each()[1:]])
+
+
+def test_a_template_declaring_a_mode_the_kit_does_not_cover_is_refused():
+    with pytest.raises(ValueError, match="declares mode 'paired'"):
+        _check([*_two_each(), _template("paired-1", "paired")])
+
+
+def test_a_covered_mode_with_one_template_is_refused():
+    with pytest.raises(ValueError, match="1 feature templates, fewer than 2"):
+        _check(_two_each()[:3])
+
+
+def test_a_role_without_modes_refuses_a_template_that_declares_one():
+    with pytest.raises(ValueError, match="declares mode 'spec'"):
+        _check(
+            [_template("one", "spec")], role="researcher", role_modes={}, specs={None: SPEC_ONLY}
+        )
+
+
+def test_a_role_without_modes_loads_templates_that_declare_none():
+    _check(
+        [_template("one"), _template("two")],
+        role="researcher",
+        role_modes={},
+        specs={None: SPEC_ONLY},
+    )
+
+
+def test_a_moded_role_needs_one_declaration_per_covered_mode():
+    with pytest.raises(ValueError, match="declares kits for"):
+        _check(_two_each(), specs={"spec": SPEC_ONLY})
+
+
+def test_a_moded_role_without_modes_declared_cannot_hold_moded_declarations():
+    with pytest.raises(ValueError, match="declares kits for"):
+        _check([_template("one"), _template("two")], role_modes={}, specs=SPECS)
+
+
+@pytest.mark.parametrize("field", ["fixtures", "overlays"])
+def test_modes_that_differ_in_fixtures_or_overlays_are_refused(field):
+    other = {"fixtures": ("g",), "overlays": ("ecosystem",)}[field]
+    differing = {"spec": SPEC_ONLY, "feature": RoleKit(**{**vars(FEATURE_ONLY), field: other})}
+
+    with pytest.raises(ValueError, match="differ in their fixtures or overlays"):
+        _check(_two_each(), specs=differing)
+
+
+def test_two_templates_and_fixtures_that_spell_one_slug_are_refused():
+    # "spec-1" + "f" and "spec" + "1-f" both spell spec-1-f
+    colliding = RoleKit(brief="A.md", prompt="{slug}{brief}", fixtures=("f", "1-f"))
+    with pytest.raises(ValueError, match="share a slug"):
+        _check(
+            [_template("spec-1", "spec"), _template("spec", "spec"), *_two_each()[2:]],
+            specs={"spec": colliding, "feature": colliding},
+        )
+
+
+def test_a_manifests_mode_string_becomes_a_kit_mode_once(tmp_path):
+    manifest = 'ambiguity = "a gap"\nconflict = "a conflict"\n'
+    (tmp_path / "template.toml").write_text(manifest + 'mode = "paired"\n', encoding="utf-8")
+
+    assert tasks._load_template(tmp_path).mode == "paired"
+
+
+def test_a_manifest_without_a_mode_gives_a_template_without_one(tmp_path):
+    (tmp_path / "template.toml").write_text('ambiguity = "g"\nconflict = "c"\n', encoding="utf-8")
+
+    assert tasks._load_template(tmp_path).mode is None
+
+
+def test_a_manifest_naming_an_unknown_mode_is_refused(tmp_path):
+    manifest = 'ambiguity = "g"\nconflict = "c"\nmode = "improvise"\n'
+    (tmp_path / "template.toml").write_text(manifest, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unknown mode 'improvise'"):
+        tasks._load_template(tmp_path)
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_no_role_has_modes_yet_so_no_template_carries_one(role):
+    assert role not in model.ROLE_MODES
+    assert role not in role_kits.MODED_KITS
+    assert all(task.mode is None for task in tasks.generate(role, SEED, 3))
+    assert tasks.mode_of(role, "anything") is None
+    assert tasks.mode_of_slug(role, "anything-ledger-cli") is None
+
+
+@pytest.fixture
+def moded_role(monkeypatch):
+    """The test-engineer, made a role with two modes and two templates in each."""
+    kit = tasks.Kit(MODED, SPEC_ONLY, tuple(_two_each()))
+    monkeypatch.setattr(model, "ROLE_MODES", {MODED: TWO_MODES})
+    monkeypatch.setattr(tasks, "ROLE_MODES", {MODED: TWO_MODES})
+    monkeypatch.setattr(role_kits, "MODED_KITS", {MODED: SPECS})
+    monkeypatch.setattr(tasks, "kit_for", lambda role: kit)
+
+
+def test_a_task_carries_its_templates_mode_and_reads_that_modes_declaration(moded_role):
+    spec = tasks.make_task(MODED, "spec-1", "f", Standard(c3_plant=Ambiguity("a")), SEED)
+    feature = tasks.make_task(MODED, "feature-2", "f", Standard(c3_plant=Ambiguity("a")), SEED)
+
+    assert (spec.mode, feature.mode) == ("spec", "feature")
+    assert spec.main_prompt == "Slug spec-1-f, brief A.md, spec."
+    assert feature.main_prompt == "Slug feature-2-f, brief B.md, feature."
+
+
+def test_a_mode_is_resolved_from_a_template_id_or_the_exact_slug(moded_role):
+    assert tasks.mode_of(MODED, "feature-1") == "feature"
+    assert tasks.mode_of_slug(MODED, "spec-2-f") == "spec"
+    assert tasks.mode_of(MODED, "no-such-template") is None
+    assert tasks.mode_of_slug(MODED, "spec-2") is None  # a prefix is not a slug
+    assert tasks.mode_of_slug(MODED, "spec-2-f-extra") is None

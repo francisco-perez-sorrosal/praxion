@@ -9,6 +9,9 @@ import pytest
 
 from praxion_evals.adherence import grade
 from praxion_evals.adherence.catalog import (
+    ARCHITECT_FEATURE_SECTIONS,
+    ARCHITECT_PARTIAL,
+    ARCHITECT_SPEC_SECTIONS,
     RESEARCHER_DOCS_FIRST,
     RESEARCHER_SECTIONS,
     RESEARCHER_SOURCES,
@@ -31,7 +34,7 @@ from praxion_evals.adherence.catalog_rows import (
     VALIDATOR_PRE_MERGE,
     VALIDATOR_SECTIONS,
 )
-from praxion_evals.adherence.checks_adr import adr_row
+from praxion_evals.adherence.checks_adr import FILE_NAME, ID_FROM_NAME, adr_row
 from praxion_evals.adherence.checks_common import COMMON_CHECKS, synthetic_evidence
 from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT, section_body
 from praxion_evals.adherence.model import (
@@ -112,7 +115,7 @@ def test_the_only_judged_role_checks_are_the_adr_categories():
 
 @pytest.mark.parametrize(
     ("role", "clauses"),
-    [("implementer", 8), ("test-engineer", 6), ("doc-engineer", 3), ("systems-architect", 7)],
+    [("implementer", 8), ("test-engineer", 6), ("doc-engineer", 3), ("systems-architect", 10)],
 )
 def test_each_role_carries_one_check_per_clause_of_its_row(role, clauses):
     assert len(ROLE_ROWS[role]) == clauses
@@ -401,9 +404,9 @@ def _read_of(path: str) -> ToolUse:
     return ToolUse(f"toolu_read_{path}", "Read", {"file_path": path}, "canary-spawn")
 
 
-def _te_outcome(name: str, mode: str | None, *, forced_stop: bool = False, **kwargs):
+def _graded_outcome(role: str, name: str, mode: str | None, *, forced_stop: bool = False, **kwargs):
     facts = TaskFacts(forced_stop, False, False, None, None, None, mode=mode)
-    evidence = _gradable("test-engineer", slug="grade-task", facts=facts, **kwargs)
+    evidence = _gradable(role, slug="grade-task", facts=facts, **kwargs)
 
     status = grade.grade(evidence, [name], judge=None, setup=None)
 
@@ -468,12 +471,12 @@ GOOD_RECORDS = [
 def test_a_habit_record_of_the_test_engineers_mode_fails_its_check_for_that_mode(
     name, mode, record
 ):
-    assert isinstance(_te_outcome(name, mode, **record), Failed)
+    assert isinstance(_graded_outcome("test-engineer", name, mode, **record), Failed)
 
 
 @pytest.mark.parametrize(("name", "mode", "record"), GOOD_RECORDS)
 def test_a_record_in_the_form_its_rule_states_passes_the_check_for_that_mode(name, mode, record):
-    assert _te_outcome(name, mode, **record) == Passed()
+    assert _graded_outcome("test-engineer", name, mode, **record) == Passed()
 
 
 @pytest.mark.parametrize(
@@ -486,7 +489,9 @@ def test_a_record_in_the_form_its_rule_states_passes_the_check_for_that_mode(nam
 )
 def test_a_test_engineer_check_is_not_applicable_to_a_task_of_its_other_mode(name, other, record):
     # The prompt names acceptance design on every task: the task's mode alone gates the check.
-    outcome = _te_outcome(name, other, spawn_prompt="Mode: acceptance-design", **record)
+    outcome = _graded_outcome(
+        "test-engineer", name, other, spawn_prompt="Mode: acceptance-design", **record
+    )
 
     assert isinstance(outcome, NotApplicable)
 
@@ -498,7 +503,154 @@ def test_a_test_engineer_check_is_not_applicable_to_a_task_of_its_other_mode(nam
 def test_a_test_engineer_document_check_is_not_applicable_when_the_task_stopped_it_early(
     name, mode
 ):
-    assert isinstance(_te_outcome(name, mode, forced_stop=True), NotApplicable)
+    assert isinstance(_graded_outcome("test-engineer", name, mode, forced_stop=True), NotApplicable)
+
+
+# ---------------------------------------------------------------------------
+# The systems-architect's own process, by the task's kit mode
+# ---------------------------------------------------------------------------
+
+ARCHITECT = "systems-architect"
+PLAN = f"{TASK_DIR}/SYSTEMS_PLAN.md"
+ARCHITECT_MODES = ("spec", "feature")
+FIRST_READS = [_read_of(p) for p in ("TASK_BRIEF.md", "README.md", "pyproject.toml", "DESIGN.md")]
+SPEC_HABIT = (
+    "# Plan for the change\n\n## Overview\nWhat the change does.\n\n"
+    "## Requirements\n- the behaviour asked for.\n\n## Approach\nA new module.\n"
+)
+FEATURE_HABIT = (
+    "# Design for the change\n\n## Overview\nWhat the change does.\n\n"
+    "## Design\nA new module beside the existing ones.\n\n## Risks\nFew.\n"
+)
+SPEC_PLAN = (
+    "# Plan: tag filter\n\n## Goal\n\nList notes by tag.\n\n"
+    "## Acceptance Criteria\n\n- listing by an unknown tag lists nothing\n\n"
+    "## Behavioral Specification\n\n### Observable Surface\n\n- `notes list --tag`\n\n"
+    "### Requirements\n\n- listing by a tag shows only the notes that carry it\n\n"
+    "## Architecture\n\n[pending: design phase]\n"
+)
+FEATURE_PLAN = (
+    "# Plan: audit trail\n\n## Goal\n\nKeep a history of changes.\n\n"
+    "## Tech Stack\n\nPython 3.13\n\n## Acceptance Criteria\n\n- every change is listed\n\n"
+    "## Architecture\n\n### Components\n\n- a history store\n\n"
+    "## Codebase Readiness\n\n### Structural Issues\n\n- none\n\n"
+    "## Risk Assessment\n\n- the history grows without bound\n"
+)
+HAND_NAMED_DRAFT = {
+    ".ai-state/decisions/drafts/new-module.md": (
+        "---\nid: dec-draft-newmodul\nstatus: proposed\n---\n\nUse a new module.\n"
+    )
+}
+
+
+def _plan_written(opening: str, final: str, *, reads_before: int) -> dict:
+    """A record whose plan is first written after ``reads_before`` reads and left as ``final``."""
+    write = ToolUse("toolu_write_plan", "Write", {"file_path": PLAN, "content": opening}, None)
+    return {"tool_uses": [*FIRST_READS[:reads_before], write], "files": {PLAN: final}}
+
+
+@pytest.mark.parametrize("mode", ARCHITECT_MODES)
+@pytest.mark.parametrize(
+    ("record", "expected"),
+    [
+        pytest.param(
+            _plan_written("# Plan: x [PARTIAL]\n", "# Plan: x\n", reads_before=0),
+            Passed,
+            id="written first with the marker and finished unmarked",
+        ),
+        pytest.param(
+            _plan_written(SPEC_HABIT, SPEC_HABIT, reads_before=4),
+            Failed,
+            id="habit: written at call 5 and never marked",
+        ),
+        pytest.param(
+            _plan_written("# Plan: x [PARTIAL]\n", "# Plan: x\n", reads_before=4),
+            Failed,
+            id="marked but written at call 5",
+        ),
+        pytest.param(
+            _plan_written("# Plan: x [PARTIAL]\n", "# Plan: x [PARTIAL]\n", reads_before=0),
+            Failed,
+            id="marked first and never finished",
+        ),
+    ],
+)
+def test_the_architects_plan_is_scored_on_being_written_early_and_finished_last(
+    mode, record, expected
+):
+    outcome = _graded_outcome(ARCHITECT, ARCHITECT_PARTIAL, mode, **record)
+
+    assert isinstance(outcome, expected), outcome
+
+
+@pytest.mark.parametrize(
+    ("name", "mode", "plan"),
+    [
+        pytest.param(ARCHITECT_SPEC_SECTIONS, "spec", SPEC_HABIT, id="spec habit"),
+        pytest.param(
+            ARCHITECT_SPEC_SECTIONS,
+            "spec",
+            SPEC_PLAN.replace("### Observable Surface", "### Interfaces"),
+            id="spec without an observable surface",
+        ),
+        pytest.param(ARCHITECT_FEATURE_SECTIONS, "feature", FEATURE_HABIT, id="feature habit"),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            FEATURE_PLAN.replace("## Codebase Readiness", "## Readiness"),
+            id="feature without codebase readiness",
+        ),
+        pytest.param(ARCHITECT_FEATURE_SECTIONS, "feature", "", id="feature writes no plan"),
+    ],
+)
+def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, mode, plan):
+    files = {PLAN: plan} if plan else {}
+
+    assert isinstance(_graded_outcome(ARCHITECT, name, mode, files=files), Failed)
+
+
+@pytest.mark.parametrize(
+    ("name", "mode", "plan"),
+    [
+        (ARCHITECT_SPEC_SECTIONS, "spec", SPEC_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", FEATURE_PLAN),
+    ],
+    ids=["spec", "feature"],
+)
+def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):
+    assert _graded_outcome(ARCHITECT, name, mode, files={PLAN: plan}) == Passed()
+
+
+@pytest.mark.parametrize(
+    ("name", "other", "plan"),
+    [
+        (ARCHITECT_SPEC_SECTIONS, "feature", SPEC_HABIT),
+        (ARCHITECT_FEATURE_SECTIONS, "spec", FEATURE_HABIT),
+    ],
+    ids=["spec check on a feature task", "feature check on a spec task"],
+)
+def test_an_architect_section_check_is_not_applicable_to_a_task_of_its_other_mode(
+    name, other, plan
+):
+    # The prompt names spec mode on every task: the task's mode alone gates the check.
+    outcome = _graded_outcome(ARCHITECT, name, other, spawn_prompt="Mode: spec", files={PLAN: plan})
+
+    assert isinstance(outcome, NotApplicable)
+
+
+@pytest.mark.parametrize(
+    ("name", "mode"), [(ARCHITECT_SPEC_SECTIONS, "spec"), (ARCHITECT_FEATURE_SECTIONS, "feature")]
+)
+def test_an_architect_section_check_is_not_applicable_when_the_task_stopped_it_early(name, mode):
+    assert isinstance(_graded_outcome(ARCHITECT, name, mode, forced_stop=True), NotApplicable)
+
+
+@pytest.mark.parametrize("mode", ARCHITECT_MODES)
+@pytest.mark.parametrize("clause", [FILE_NAME, ID_FROM_NAME], ids=["file name", "derived id"])
+def test_a_hand_named_draft_with_a_made_up_id_still_fails_the_shared_adr_clauses(mode, clause):
+    name = clause.format(role=ARCHITECT)
+
+    assert isinstance(_graded_outcome(ARCHITECT, name, mode, files=HAND_NAMED_DRAFT), Failed)
 
 
 # ---------------------------------------------------------------------------

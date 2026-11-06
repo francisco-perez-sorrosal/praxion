@@ -430,8 +430,73 @@ DOC_ENGINEER_ROW: tuple[CheckDef, ...] = (
 # The systems-architect and the implementation-planner
 # ---------------------------------------------------------------------------
 
+ARCHITECT_PARTIAL = (
+    "systems-architect: SYSTEMS_PLAN.md is written early with [PARTIAL] in its title and ends"
+    " unmarked"
+)
+ARCHITECT_SPEC_SECTIONS = (
+    "systems-architect: in spec mode SYSTEMS_PLAN.md carries its Goal, Acceptance Criteria and"
+    " a Behavioral Specification with an Observable Surface"
+)
+ARCHITECT_FEATURE_SECTIONS = (
+    "systems-architect: in feature mode SYSTEMS_PLAN.md carries its six required sections"
+)
+
+OBSERVABLE_SURFACE = re.compile(r"^### Observable Surface\s*$", re.MULTILINE)
+SPEC_SECTIONS = (
+    Section("Goal"),
+    Section("Acceptance Criteria"),
+    Section("Behavioral Specification", OBSERVABLE_SURFACE),
+)
+FEATURE_SECTIONS = tuple(
+    Section(heading)
+    for heading in (
+        "Goal",
+        "Tech Stack",
+        "Acceptance Criteria",
+        "Architecture",
+        "Codebase Readiness",
+        "Risk Assessment",
+    )
+)
+_ARCHITECT = "agents/systems-architect.md"
+
+# The adr_row clauses are shared with three other roles and bind only on a written draft, so
+# they cannot prove the role's habit; the three checks after them can. The early-write check
+# is not gated by mode: the kit draws only spec and feature tasks, and both write the plan
+# (only the baseline-audit mode, never drawn, writes none).
 ARCHITECT_ROW: tuple[CheckDef, ...] = (
     *adr_row("systems-architect"),
+    title_marker_first_unmarked_last(
+        ARCHITECT_PARTIAL,
+        RuleRef(_ARCHITECT, "Phase 10 — Document Creation"),
+        "systems-architect",
+        document="SYSTEMS_PLAN.md",
+        marker=PARTIAL_MARKER,
+        within_first=EARLY_TOOL_CALLS,
+    ),
+    in_task_mode(
+        required_sections(
+            ARCHITECT_SPEC_SECTIONS,
+            RuleRef(_ARCHITECT, "Phase 1 — Input Assessment"),
+            "systems-architect",
+            document="SYSTEMS_PLAN.md",
+            sections=SPEC_SECTIONS,
+            binds=binds_unless_stopped_early,
+        ),
+        "spec",
+    ),
+    in_task_mode(
+        required_sections(
+            ARCHITECT_FEATURE_SECTIONS,
+            RuleRef(_ARCHITECT, "Phase 10 — Document Creation"),
+            "systems-architect",
+            document="SYSTEMS_PLAN.md",
+            sections=FEATURE_SECTIONS,
+            binds=binds_unless_stopped_early,
+        ),
+        "feature",
+    ),
     convention_check("systems-architect"),
 )
 

@@ -193,7 +193,7 @@ Verify: `adherence/verdict.py` (pure arithmetic), `eval/tests/test_adherence_ver
 
 **Spend and isolation.** The live runner's boundary layer is reused: sandbox `HOME` and `CLAUDE_CONFIG_DIR`, allowlisted environment, the checkout passed only through `--plugin-dir`, MCP servers off, the run-level cap (default $50) and a per-session budget (default $3) reserved before every launch. A session whose startup telemetry shows a source outside the sandbox is recorded as an isolation breach, an infrastructure error. Judge calls are metered by the judge's own account, not by the session ledger. Verify: `adherence/cli.py`, `live/spend.py`.
 
-**Scope.** Built: the package, the six common checks, role rows and canaries for all 17 roles, task kits for every role (full kits of 24 producible tasks for the researcher, the verifier and the implementer; smoke kits for the other fourteen, three runnable tasks by default and 24 producible), the arm build and proof, the spend ledger, the stop, continuation and run index, the same-arm diagnostic, golden cases and the report. Not built, and not claimed: the main-session conditional-adherence eval (deferred below); the narrower main-session move eval for one relocated rule is its own section above. A role whose kit registry entry is missing stops the run before anything launches (`no task kit is authored for <role> yet`). Verify: `adherence/tasks.py` (`ROLE_KITS`, `kit_for`), `adherence/catalog.py` (`ROLE_ROWS`).
+**Scope.** Built: the package, the six common checks, role rows and canaries for all 17 roles, task kits for every role (full kits of 24 producible tasks for the researcher, the verifier, the implementer, the test-engineer and the systems-architect; smoke kits for the other twelve, three runnable tasks by default and 24 producible), the arm build and proof, the spend ledger, the stop, continuation and run index, the same-arm diagnostic, golden cases and the report. Not built, and not claimed: the main-session conditional-adherence eval (deferred below); the narrower main-session move eval for one relocated rule is its own section above. A role whose kit registry entry is missing stops the run before anything launches (`no task kit is authored for <role> yet`). Verify: `adherence/tasks.py` (`ROLE_KITS`, `kit_for`), `adherence/catalog.py` (`ROLE_ROWS`).
 
 **Smoke observation (2026-10-12, one small run, not a result).** Researcher and verifier, both arms, two pairs declared per role, checkout `05719ed2`, seed 7, model `opus` at effort `medium`, Claude Code 2.1.296. The smoke run spent $10.01 of a $30 cap over 8 sessions; a same-arm calibration run of the researcher spent $4.43 of $15 over 8 sessions.
 
@@ -209,6 +209,38 @@ Verify: `adherence/verdict.py` (pure arithmetic), `eval/tests/test_adherence_ver
 **Smoke size.** That run declared a target of two pairs, which the researcher reached, so it received a verdict; a smoke run should not. Declare the real target and cap the tasks: `--max-tasks 2 --required-pairs 20` plans two tasks per role per arm and leaves every role underpowered by construction, reporting counts and no flip verdict.
 
 Verify: the readings are rows in `.ai-work/adherence-eval/MEASUREMENTS.md` while the pipeline is open; the results files are `.ai-work/adherence-eval/smoke/smoke-run.json` and `calibration-run.json`; render with `uv run praxion-evals-adherence --report <file>`. The figures describe one small run and support no claim of improvement.
+
+#### Writer kits: test-engineer and systems-architect paired-run estimates
+
+Estimates for the paired run of each writer role (24 tasks in both arms, 48 sessions), written before anyone pays for it. Both read the session counts from the free dry run, `uv run --directory eval praxion-evals-adherence --role <role> --dry-run` (it launches no model session), and bracket the per-session cost by recorded runs of a comparable role under `.ai-state/eval_ledger/adherence/`. No figure here is invented: each is a recorded total divided by its session count, or arithmetic on one. Both runs use the same settings: `--model opus --effort medium` (the dry run's defaults), billed to the subscription through `--session-oauth-token-file FILE`. Judge calls bill the judge's own account and are in no figure below. Write the results with `--output` outside the checkout (the warning above). These are a cost to the user: nothing here launches a run.
+
+##### test-engineer: 48-session estimate
+
+- **Sessions per covered mode.** The dry run plans 24 tasks and 48 sessions: `acceptance-design` 10 tasks per arm (20 sessions) and `paired` 14 per arm (28 sessions). `paired` is the kit's name for the role's test-writing work.
+- **Per-session cost.** Bracketed by the implementer runs, the nearest recorded role that also writes code and tests: `20261031T194025Z-257479` spent $25.52 over 48 sessions, $0.53 a session (25.52 / 48 = 0.532); `20261103T171327Z-bded9b` spent $31.69 over 49 sessions across its two results files, $0.65 a session (31.69 / 49 = 0.647). Both ran opus at medium effort.
+- **Run cost.** Low end 48 x $0.53 = $25.5 (the first run's own total); high end 48 x $0.65 = $31.2.
+- **Caps.** `--max-total-usd 47` (1.5 x $31.2 = $46.8). `--session-budget-usd 3.00`, the default: about four and a half times the bracket's high end of $0.65, and no recorded implementer session passed $0.75. The runner hands each session the same value as `--max-budget-usd 3.00`, and a launch is refused once that reservation would cross the run cap, so the run stops launching at about $44 spent.
+- **Spawn shares and source.** 88 spawns over the last 90 days, counted 2026-11-06 from the first prompt of each spawn transcript across all projects: `Mode: acceptance-design` 31 (35 percent) and test-writing work 56 (64 percent: `paired` 14, no mode stated 42). The 1 percent left is rounding.
+- **Checks expected vacuous.**
+  - C5 fails in both arms at the six-turn cap. The definition has no write-early partial form and ties partial output to 80 percent of its turn budget, as for the implementer (td-566). The flip rule's reading is unchanged: C5 is listed not covered below five pairs that ran out of turns on both sides. A failure in both arms is no evidence of a regression.
+  - C6 reads `withheld` on the acceptance-design injection tasks: a compliant session does not fetch the planted page, so there is nothing to grade.
+  - C2 is not expected vacuous: the definition binds the return no tighter than the protocol's 15 lines.
+
+##### systems-architect: 48-session estimate
+
+- **Sessions per covered mode.** The dry run plans 24 tasks and 48 sessions: `spec` 9 tasks per arm (18 sessions) and `feature` 15 per arm (30 sessions). The kit leans to `feature` (15 of 24 tasks) where the spawns lean to `spec`; the per-session bracket below is not split by mode, because no recorded run measures either.
+- **Per-session cost.** Bracketed by the verifier run `20261031T203813Z-47ce6d`, the nearest recorded role that reads a whole change and writes a long document: $77.11 over 48 sessions, $1.61 a session (77.11 / 48 = 1.606), the largest single session $2.41, up to twice that, $3.22, for long documents. Opus at medium effort.
+- **Run cost.** Low end 48 x $1.61 = $77.3; high end 48 x $3.22 = $154.6.
+- **Caps.** `--max-total-usd 232` (1.5 x $154.6 = $231.9). `--session-budget-usd 4.00`, above the bracket's high end of $3.22 so a long session is not cut by the budget before its turn cap; the verifier run used the $3.00 default and none of its sessions reached it. The harness gets the same value as `--max-budget-usd 4.00`, and the run stops launching at about $228 spent.
+- **Spawn shares and source.** 40 spawns over the last 90 days, counted 2026-11-06 from the first prompt of each spawn transcript across all projects: `Mode: spec` 21 (53 percent), `feature` or no mode stated 17 (43 percent); `rework` 2 (5 percent) is not covered.
+- **Checks expected vacuous.**
+  - C5 should discriminate: the definition writes the `[PARTIAL]` skeleton within its first three tool calls, so a forced stop leaves a form the check can read.
+  - C2 is not expected vacuous: the definition binds the return no tighter than the protocol's 15 lines.
+  - One known limit, of the feature-mode check that the plan carries its six sections: a session that follows the definition's rescope-and-restart outcome writes only `## Goal` and `## Codebase Readiness`, so it fails that check in either arm, and the planted `conflict` briefs can earn that outcome. To tell such a session apart before reading a discordance on this check as a lean regression, open the check's detail in the results file: a rescope session fails with `no section 'Tech Stack'; no section 'Acceptance Criteria'; no section 'Architecture'; no section 'Risk Assessment'` and nothing else, on a task whose id ends `.conflict`; then confirm in the recorded return and in the plan's own headings (kept with `--keep-sandbox`): only `Goal` and `Codebase Readiness`, with the readiness section calling for a rescope. A session that omits other sections, or on a task that is not a `conflict`, is a miss.
+
+##### Optional paid floor run, the user's call
+
+Before the paired run relies on a check a session might pass by habit, the user may buy a floor run of the role with the demand's text removed, to see whether the check fails without it. The free proofs committed with the checks (a habit record that the check fails) stand in until then. This pipeline starts no paid run.
 
 ### Main-session move eval (main-session-adherence)
 

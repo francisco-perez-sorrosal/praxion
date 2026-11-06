@@ -155,12 +155,105 @@ link_rules() {
     done < <(find "$rules_source_dir" -name '*.md' -type f | sort)
 }
 
-# Sweep <rules_target_dir> for symlinks that:
-#   - point into <rules_source_dir> (Praxion-managed), AND
-#   - are NOT in the current manifest as `install: symlink`.
+# The manifest's `install: symlink` set: the rules a rules directory should
+# link, one rules-dir-relative path per line.
 #
-# Removes them and prunes empty subdirectories left behind. External symlinks
-# (target outside <rules_source_dir>) are left untouched — mirror of
+# Fail-safe: returns non-zero (emitting nothing) when the manifest is absent or
+# yields an empty set. An empty result means the manifest was unreadable,
+# truncated, or its schema drifted — all indistinguishable from "no rule is
+# install:symlink", a state that never occurs in a healthy manifest — and an
+# empty keep set would judge every Praxion-managed link stale.
+#
+# Arguments:
+#   $1 — rules_source_dir: absolute path to the repo's rules/ directory
+_rule_symlink_keep_set() {
+    local keep_paths="" rc=0
+    # `|| rc=$?` is the canonical set-e-safe pattern: a plain `var=$(cmd)`
+    # would terminate the script before `rc=$?` could capture the exit code.
+    keep_paths=$(manifest_rule_paths "${1}/_manifest.yaml" symlink) || rc=$?
+    if [ "$rc" -ne 0 ] || [ -z "$keep_paths" ]; then
+        return 1
+    fi
+    printf '%s\n' "$keep_paths"
+}
+
+# Print the rules-dir-relative path a Praxion-managed rule link targets, or
+# return non-zero for a link Praxion does not manage. Praxion manages a link
+# into <rules_source_dir>, and a link into any version of the praxion plugin's
+# cached rules (`.../plugins/cache/<marketplace>/praxion/<version>/rules/`):
+# an install made from one version's cache leaves links into that version's
+# directory, which Claude Code keeps after an update, so judging only the
+# current source would read them as external and never sweep them.
+#
+# Arguments:
+#   $1 — rules_source_dir: absolute path to the repo's rules/ directory
+#   $2 — target: the link's target, as readlink prints it
+_managed_rule_rel_path() {
+    local rules_source_dir="$1" target="$2" rest
+    case "$target" in
+        "$rules_source_dir"/*)
+            printf '%s\n' "${target#"$rules_source_dir"/}" ;;
+        */plugins/cache/*/praxion/*/rules/*)
+            rest="${target#*/plugins/cache/*/praxion/}"
+            printf '%s\n' "${rest#*/rules/}" ;;
+        *)
+            return 1 ;;
+    esac
+}
+
+# Emit each stale rule symlink under <rules_target_dir>, one path per line: a
+# Praxion-managed link (see _managed_rule_rel_path) at a rule the manifest does
+# not list as `install: symlink`. External symlinks are never stale. This is
+# the one predicate both the sweep (which removes these links) and the install
+# check (which reports them) apply, so the two can never disagree about what a
+# stale link is.
+#
+# Returns non-zero (emitting nothing) when the manifest cannot give a keep set.
+#
+# Arguments:
+#   $1 — rules_source_dir: absolute path to the repo's rules/ directory
+#   $2 — rules_target_dir: absolute path to the destination rules directory
+stale_rule_symlinks() {
+    local rules_source_dir="$1"
+    local rules_target_dir="$2"
+    local keep_paths
+    keep_paths=$(_rule_symlink_keep_set "$rules_source_dir") || return 1
+    [ -d "$rules_target_dir" ] || return 0
+
+    local link rel_path
+    while IFS= read -r link; do
+        rel_path=$(_managed_rule_rel_path "$rules_source_dir" "$(readlink "$link")") \
+            || continue
+        echo "$keep_paths" | grep -qxF "$rel_path" || printf '%s\n' "$link"
+    done < <(find "$rules_target_dir" -type l 2>/dev/null)
+}
+
+# Emit each manifest `install: symlink` rule that has no working link under
+# <rules_target_dir>, one rules-dir-relative path per line: no symlink at its
+# place, or a symlink that no longer resolves.
+#
+# Returns non-zero (emitting nothing) when the manifest cannot give a keep set.
+#
+# Arguments:
+#   $1 — rules_source_dir: absolute path to the repo's rules/ directory
+#   $2 — rules_target_dir: absolute path to the destination rules directory
+missing_rule_symlinks() {
+    local rules_source_dir="$1"
+    local rules_target_dir="$2"
+    local keep_paths
+    keep_paths=$(_rule_symlink_keep_set "$rules_source_dir") || return 1
+
+    local rel_path link
+    while IFS= read -r rel_path; do
+        link="${rules_target_dir}/${rel_path}"
+        if [ ! -L "$link" ] || [ ! -e "$link" ]; then
+            printf '%s\n' "$rel_path"
+        fi
+    done <<< "$keep_paths"
+}
+
+# Sweep <rules_target_dir> for the stale rule symlinks `stale_rule_symlinks`
+# names, remove them, and prune empty subdirectories left behind. Mirror of
 # sweep_stale_script_symlinks for ~/.local/bin/. Idempotent; safe to call
 # every install.
 #
@@ -176,42 +269,16 @@ sweep_stale_rule_symlinks() {
     [ -d "$rules_target_dir" ] || return 0
     [ -d "$rules_source_dir" ] || return 0
 
-    local manifest_file="${rules_source_dir}/_manifest.yaml"
-    [ -f "$manifest_file" ] || return 0
+    local stale_links="" rc=0
+    stale_links=$(stale_rule_symlinks "$rules_source_dir" "$rules_target_dir") || rc=$?
+    [ "$rc" -eq 0 ] || return 0
 
-    local keep_paths="" rc=0
-    # `|| rc=$?` is the canonical set-e-safe pattern: a plain `var=$(cmd)`
-    # would terminate the script before `rc=$?` could capture the exit
-    # code, defeating the fail-safe bail-out a few lines below.
-    keep_paths=$(manifest_rule_paths "$manifest_file" symlink) || rc=$?
-    # Fail-safe: never derive an empty whitelist from a manifest we could not
-    # read, because an empty whitelist deletes every Praxion-managed symlink.
-    # An empty result means the manifest was unreadable, truncated, or its
-    # schema drifted — all indistinguishable from "no rule is install:symlink",
-    # a state that never occurs in a healthy manifest. Bail out either way.
-    if [ "$rc" -ne 0 ] || [ -z "$keep_paths" ]; then
-        return 0
-    fi
-
-    local link target rel_to_source removed=0
+    local link removed=0
     while IFS= read -r link; do
-        [ -L "$link" ] || continue
-        target="$(readlink "$link")"
-        # Only consider absolute symlinks pointing into the source rules dir;
-        # leave external links alone.
-        case "$target" in
-            "$rules_source_dir"/*) rel_to_source="${target#"$rules_source_dir"/}" ;;
-            *) continue ;;
-        esac
-        # Keep if the rule is still in the manifest as install: symlink.
-        # keep_paths is guaranteed non-empty — the bail-out above returned
-        # already if it were.
-        if echo "$keep_paths" | grep -qxF "$rel_to_source"; then
-            continue
-        fi
+        [ -n "$link" ] || continue
         rm "$link"
         removed=$((removed + 1))
-    done < <(find "$rules_target_dir" -type l 2>/dev/null)
+    done <<< "$stale_links"
 
     # Tidy up empty subdirs (e.g., vcs/ after both its rules went hook-deliver).
     find "$rules_target_dir" -mindepth 1 -type d -empty -delete 2>/dev/null || true

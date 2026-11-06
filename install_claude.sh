@@ -1123,18 +1123,29 @@ check_claude_code() {
     fi
 
     printf "\n  ${B}Rules:${R}\n"
+    # Judged against the manifest's install: symlink set with the predicate the
+    # sweep in link_rules applies, so a link the next install would remove (a
+    # rule now hook-delivered) or would add fails the check instead of counting
+    # as healthy.
     local rules_dir="${dest_dir}/rules"
-    if [ -d "$rules_dir" ]; then
-        local count
-        count=$(find "$rules_dir" -name '*.md' -type l 2>/dev/null | wc -l | tr -d ' ')
-        if [ "$count" -gt 0 ]; then
-            info "${count} rules linked"
-        else
-            warn "No rule symlinks found"
-            healthy=false
-        fi
+    local rules_src="${SCRIPT_DIR}/rules"
+    local stale_links="" missing_rules="" link rel_path
+    if ! stale_links=$(stale_rule_symlinks "$rules_src" "$rules_dir") \
+        || ! missing_rules=$(missing_rule_symlinks "$rules_src" "$rules_dir"); then
+        warn "Rules manifest unreadable (${rules_src}/_manifest.yaml) — cannot verify rule links"
+        healthy=false
+    elif [ -z "$stale_links" ] && [ -z "$missing_rules" ]; then
+        info "$(manifest_rule_paths "${rules_src}/_manifest.yaml" symlink | wc -l | tr -d ' ') rules linked, matching the manifest"
     else
-        warn "Rules directory not found"
+        while IFS= read -r link; do
+            [ -n "$link" ] || continue
+            warn "Stale rule link: ${link#"$rules_dir"/} (the manifest no longer links it)"
+        done <<< "$stale_links"
+        while IFS= read -r rel_path; do
+            [ -n "$rel_path" ] || continue
+            warn "Missing rule link: ${rel_path}"
+        done <<< "$missing_rules"
+        warn "Rule links differ from the manifest — run: bash install.sh --relink"
         healthy=false
     fi
 

@@ -37,7 +37,7 @@ from praxion_evals.live.session import SandboxPaths
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED = 7
-KIT_ROLES = ["researcher", "verifier", "implementer"]  # the full-set roles
+KIT_ROLES = sorted(tasks.FULL_SET_ROLES)
 SMOKE_ROLES = [role for role in ROLES if role not in tasks.FULL_SET_ROLES]
 SMOKE_LIST = 3
 ARM_WORDS = re.compile(r"lean|full", re.IGNORECASE)
@@ -66,6 +66,11 @@ def _find(role: str, *, label: str, template: str | None = None) -> TaskSpec:
     ]
     assert wanted, f"no {label} task for {role}"
     return wanted[0]
+
+
+def _brief_of_task(task: TaskSpec) -> str:
+    kit = tasks.kit_for(task.role)
+    return role_kits.kit_spec(task.role, kit.template(task.template_id)).brief
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +290,7 @@ def test_the_scratch_repository_holds_the_fixture_commit_and_the_inputs(role, tm
     assert commit == _git(dest, "rev-parse", "HEAD").strip()
     assert _git(dest, "rev-list", "--count", "HEAD").strip() == "1"
     assert _git(dest, "status", "--porcelain").strip() == ""
-    brief = tasks.ROLE_KITS[role].brief
+    brief = _brief_of_task(task)
     inputs = dest / ".ai-work" / task.slug
     assert (inputs / brief).is_file()
     assert (dest / "README.md").is_file()
@@ -409,7 +414,7 @@ def test_the_fixture_commit_ignores_the_hosts_git_configuration(role, tmp_path, 
     commit = tasks.build_scratch_repo(task, tmp_path / "scratch")
 
     held = _git(tmp_path / "scratch", "ls-tree", "-r", "--name-only", commit).splitlines()
-    assert f".ai-work/{task.slug}/{tasks.ROLE_KITS[role].brief}" in held
+    assert f".ai-work/{task.slug}/{_brief_of_task(task)}" in held
 
 
 def test_fixture_code_is_stored_only_as_template_files():
@@ -529,17 +534,29 @@ def fixtures_clone(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("role", KIT_ROLES)
 def test_a_template_without_the_roles_brief_refuses_the_kit(role, fixtures_clone):
-    brief = tasks.ROLE_KITS[role].brief
     last = sorted((fixtures_clone / role / "templates").iterdir())[-1]
+    brief = _brief_of(role, last)
     (last / brief).unlink()
 
     with pytest.raises(ValueError, match=f"{last.name} lacks {brief}"):
         tasks.kit_for(role)
 
 
-def _without_token(fixtures_clone, role, token):
-    brief = tasks.ROLE_KITS[role].brief
-    last = sorted((fixtures_clone / role / "templates").iterdir())[-1]
+def _brief_of(role, template_dir):
+    """The brief a template's task reads: its role's, or its mode's for a role with modes."""
+    if role in role_kits.ROLE_KITS:
+        return role_kits.ROLE_KITS[role].brief
+    mode = tomllib.loads((template_dir / tasks.TEMPLATE_MANIFEST).read_text())["mode"]
+    return role_kits.MODED_KITS[role][mode].brief
+
+
+def _without_token(fixtures_clone, role, token, template=None):
+    last = (
+        fixtures_clone / role / "templates" / template
+        if template
+        else sorted((fixtures_clone / role / "templates").iterdir())[-1]
+    )
+    brief = _brief_of(role, last)
     text = (last / brief).read_text(encoding="utf-8")
     (last / brief).write_text(text.replace(token, ""), encoding="utf-8")
     return last.name
@@ -647,7 +664,8 @@ def test_no_prompt_names_an_arm_or_puts_the_role_in_a_mode_it_was_not_given(role
         prompt = tasks.main_prompt(task)
         assert not ARM_WORDS.search(prompt), task.task_id
         assert not PARALLEL_MODE.pattern.search(prompt), task.task_id
-        assert not ACCEPTANCE_DESIGN_MODE.pattern.search(prompt), task.task_id
+        directed = task.mode == "acceptance-design"
+        assert directed == bool(ACCEPTANCE_DESIGN_MODE.pattern.search(prompt)), task.task_id
 
 
 @pytest.mark.parametrize("role", MODE_OF)
@@ -690,8 +708,9 @@ def test_every_template_builds_a_repository_with_its_inputs_and_overlays(role, t
 
         held = set(_git(dest, "ls-tree", "-r", "--name-only", commit).splitlines())
         inputs = f".ai-work/{task.slug}"
-        assert f"{inputs}/{kit.spec.brief}" in held
-        assert {f"{inputs}/{name}" for name in kit.spec.fixture_inputs} <= held
+        spec = role_kits.kit_spec(role, kit.template(template_id))
+        assert f"{inputs}/{spec.brief}" in held
+        assert {f"{inputs}/{name}" for name in spec.fixture_inputs} <= held
         for overlay in kit.spec.overlays:
             relative = {
                 path.relative_to(tasks.OVERLAYS_DIR / overlay).as_posix().removesuffix(".tmpl")
@@ -836,8 +855,8 @@ def test_a_fixture_repository_puts_its_source_on_the_test_path(fixture):
 # A task's mode: parsed from its template, checked at kit load, resolved per mode
 # ---------------------------------------------------------------------------
 
-# No role has modes yet, so these tests build a synthetic one. A moded role has the writers'
-# shape: two covered modes, one declaration each, and the same fixtures in both.
+# These tests replace the test-engineer's real modes with synthetic ones (its own kit is tested
+# in the last section). A moded role has the writers' shape: two covered modes, one declaration each, and the same fixtures in both.
 MODED = "test-engineer"
 SPEC_ONLY = RoleKit(brief="A.md", prompt="Slug {slug}, brief {brief}, spec.", fixtures=("f",))
 FEATURE_ONLY = RoleKit(
@@ -947,8 +966,8 @@ def test_a_manifest_naming_an_unknown_mode_is_refused(tmp_path):
         tasks._load_template(tmp_path)
 
 
-@pytest.mark.parametrize("role", ROLES)
-def test_no_role_has_modes_yet_so_no_template_carries_one(role):
+@pytest.mark.parametrize("role", [role for role in ROLES if role != MODED])
+def test_a_role_without_modes_has_no_moded_kit_and_no_template_carries_a_mode(role):
     assert role not in model.ROLE_MODES
     assert role not in role_kits.MODED_KITS
     assert all(task.mode is None for task in tasks.generate(role, SEED, 3))
@@ -981,3 +1000,90 @@ def test_a_mode_is_resolved_from_a_template_id_or_the_exact_slug(moded_role):
     assert tasks.mode_of(MODED, "no-such-template") is None
     assert tasks.mode_of_slug(MODED, "spec-2") is None  # a prefix is not a slug
     assert tasks.mode_of_slug(MODED, "spec-2-f-extra") is None
+
+
+# ---------------------------------------------------------------------------
+# The test-engineer's kit: two modes, five templates, one convention
+# ---------------------------------------------------------------------------
+
+ACCEPTANCE_TEMPLATES = ["acceptance-export-spec", "acceptance-limit-spec"]
+PAIRED_TEMPLATES = ["blank-guard-tests", "limit-tests", "summary-tests"]
+# The base commit's prompt for the role, which a paired task must still be given byte for byte.
+BASE_PAIRED_PROMPT = (
+    "Task slug: {slug}. Write the tests for the step assigned in .ai-work/{slug}/WIP.md; the "
+    "plan, the systems plan and the learnings are in the same directory and the tests go in the "
+    "repository you are in."
+)
+ACCEPTANCE_PROMPT = (
+    "Task slug: {slug}. Mode: acceptance-design. Base commit: HEAD. Design the acceptance tests "
+    "from the spec extract at .ai-work/{slug}/SPEC_EXTRACT.md."
+)
+
+
+def _test_engineer_tasks(mode: str) -> list[TaskSpec]:
+    return [task for task in _pool(MODED) if task.mode == mode]
+
+
+def test_the_test_engineers_kit_loads_its_five_templates_with_their_modes():
+    kit = tasks.kit_for(MODED)
+
+    modes = {template.template_id: template.mode for template in kit.templates}
+    assert modes == {
+        **dict.fromkeys(ACCEPTANCE_TEMPLATES, "acceptance-design"),
+        **dict.fromkeys(PAIRED_TEMPLATES, "paired"),
+    }
+    assert model.ROLE_MODES[MODED] == RoleModes(("acceptance-design", "paired"), ("pre-refactor",))
+
+
+def test_an_acceptance_design_task_is_prompted_with_the_directive_and_the_extract():
+    held = _test_engineer_tasks("acceptance-design")
+
+    assert held
+    for task in held:
+        assert ACCEPTANCE_PROMPT.format(slug=task.slug) in task.main_prompt, task.task_id
+
+
+def test_a_paired_task_is_prompted_as_the_base_commit_prompted_the_role():
+    held = _test_engineer_tasks("paired")
+
+    assert held
+    for task in held:
+        assert BASE_PAIRED_PROMPT.format(slug=task.slug) in task.main_prompt, task.task_id
+
+
+@pytest.mark.parametrize("mode", ["acceptance-design", "paired"])
+def test_each_test_engineer_mode_holds_at_least_a_third_of_a_default_plan(mode):
+    planned = tasks.generate(MODED, SEED, tasks.list_size(MODED))
+
+    assert 3 * sum(task.mode == mode for task in planned) >= len(planned)
+
+
+@pytest.mark.parametrize("fixture", ["ledger-cli", "notes-service"])
+def test_an_acceptance_design_scratch_repository_holds_none_of_the_paired_inputs(fixture, tmp_path):
+    task = next(t for t in _test_engineer_tasks("acceptance-design") if t.fixture_id == fixture)
+    paired_inputs = tasks.FIXTURES_DIR / MODED / "inputs" / fixture
+    dest = tmp_path / "scratch"
+
+    tasks.build_scratch_repo(task, dest)
+
+    work = dest / ".ai-work" / task.slug
+    assert {path.name for path in work.iterdir()} == {
+        "SPEC_EXTRACT.md",
+        "TASK_BRIEF.md",
+        "SYSTEMS_PLAN.md",
+    }
+    # the spec-phase SYSTEMS_PLAN.md shares a name with a paired input, so compare the text
+    copied = [
+        path.name
+        for path in paired_inputs.iterdir()
+        if (work / path.name).exists() and (work / path.name).read_text() == path.read_text()
+    ]
+    assert copied == []
+
+
+@pytest.mark.parametrize("token", ["@@PLANT@@", "@@SOURCES@@"])
+def test_an_acceptance_design_extract_that_lost_a_token_refuses_the_kit(token, fixtures_clone):
+    _without_token(fixtures_clone, MODED, token, template="acceptance-export-spec")
+
+    with pytest.raises(ValueError, match=f"acceptance-export-spec.*lacks the {token} token"):
+        tasks.kit_for(MODED)

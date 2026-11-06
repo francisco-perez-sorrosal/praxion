@@ -80,16 +80,6 @@ ROLE_KITS: Mapping[str, RoleKit] = {
         ),
         fixtures=("ledger-cli", "notes-service"),
     ),
-    "test-engineer": RoleKit(
-        brief="WIP.md",
-        prompt=(
-            "Task slug: {slug}. Write the tests for the step assigned in "
-            ".ai-work/{slug}/{brief}; the plan, the systems plan and the learnings are in "
-            "the same directory and the tests go in the repository you are in."
-        ),
-        fixtures=("ledger-cli", "notes-service"),
-        fixture_inputs=("SYSTEMS_PLAN.md", "LEARNINGS.md"),
-    ),
     "doc-engineer": RoleKit(
         brief="DOC_REQUEST.md",
         prompt=(
@@ -196,7 +186,32 @@ ROLE_KITS: Mapping[str, RoleKit] = {
 # A role with modes is asked differently in each: one declaration per covered mode, and the
 # role is absent from ``ROLE_KITS`` so it carries no role-level prompt it never uses. Its
 # modes' fixtures and overlays are the same (``tasks.kit_for`` refuses a kit where they differ).
-MODED_KITS: Mapping[Role, Mapping[KitMode, RoleKit]] = MappingProxyType({})
+MODED_KITS: Mapping[Role, Mapping[KitMode, RoleKit]] = MappingProxyType(
+    {
+        "test-engineer": {
+            "paired": RoleKit(
+                brief="WIP.md",
+                prompt=(
+                    "Task slug: {slug}. Write the tests for the step assigned in "
+                    ".ai-work/{slug}/{brief}; the plan, the systems plan and the learnings are "
+                    "in the same directory and the tests go in the repository you are in."
+                ),
+                fixtures=("ledger-cli", "notes-service"),
+                fixture_inputs=("SYSTEMS_PLAN.md", "LEARNINGS.md"),
+            ),
+            # Base commit HEAD: the fixture has one commit, and none exists yet when the dry
+            # run prints prompts. No fixture inputs: the spec phase has no plan or learnings.
+            "acceptance-design": RoleKit(
+                brief="SPEC_EXTRACT.md",
+                prompt=(
+                    "Task slug: {slug}. Mode: acceptance-design. Base commit: HEAD. Design the "
+                    "acceptance tests from the spec extract at .ai-work/{slug}/{brief}."
+                ),
+                fixtures=("ledger-cli", "notes-service"),
+            ),
+        }
+    }
+)
 
 
 def kit_spec(role: Role, template: Template) -> RoleKit:

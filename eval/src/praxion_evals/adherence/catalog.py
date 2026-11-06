@@ -359,6 +359,7 @@ TEST_ENGINEER_ROW: tuple[CheckDef, ...] = (
         ),
         ACCEPTANCE_DESIGN_MODE,
     ),
+    convention_check("test-engineer"),
 )
 
 # ---------------------------------------------------------------------------

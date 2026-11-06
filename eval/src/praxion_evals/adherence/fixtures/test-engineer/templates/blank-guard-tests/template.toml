@@ -1,2 +1,3 @@
 ambiguity = "Test the edge cases."
 conflict = "Add the guard to the production code as well."
+mode = "paired"

@@ -1,0 +1,3 @@
+mode = "acceptance-design"
+ambiguity = "Make the limit sensible."
+conflict = "Write the production code too, so the new tests pass."

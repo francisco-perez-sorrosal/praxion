@@ -84,7 +84,9 @@ SMOKE_TASKS = 3
 SLACK_FLOOR = 4
 SLACK_DIVISOR = 5
 # Roles whose full task set is authored; every other role runs smoke tasks only.
-FULL_SET_ROLES: frozenset[str] = frozenset({"researcher", "verifier", "implementer"})
+FULL_SET_ROLES: frozenset[str] = frozenset(
+    {"researcher", "verifier", "implementer", "test-engineer"}
+)
 MIN_TEMPLATES = 5
 # Each mode of a role with modes keeps this many templates, so a seeded draw cannot starve a mode.
 MIN_TEMPLATES_PER_MODE = 2

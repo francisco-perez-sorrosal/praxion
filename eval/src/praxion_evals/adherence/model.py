@@ -220,6 +220,7 @@ PILOT_ROLES: tuple[str, ...] = (
     "skill-genesis",
     "context-engineer",
     "implementer",
+    "test-engineer",
 )
 # The wording a pilot task's convention asks every document to carry: the one thing the
 # convention check looks for, and the thing only the fixture's own instruction file states.
@@ -260,8 +261,10 @@ class RoleModes:
         _require(not shared, f"a mode cannot be both covered and unmeasured: {shared}")
 
 
-# Empty until a writer role's kit declares its modes; a role absent here has no modes.
-ROLE_MODES: Mapping[Role, RoleModes] = MappingProxyType({})
+# A role absent here has no modes.
+ROLE_MODES: Mapping[Role, RoleModes] = MappingProxyType(
+    {"test-engineer": RoleModes(("acceptance-design", "paired"), ("pre-refactor",))}
+)
 
 
 def require_mode_fits(

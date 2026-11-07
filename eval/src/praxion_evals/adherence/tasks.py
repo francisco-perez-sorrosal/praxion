@@ -160,9 +160,10 @@ class Template:
 @dataclass(frozen=True)
 class Kit:
     role: Role
-    # The role-level declaration, for what every mode shares: fixtures and overlays. A brief,
-    # a prompt or fixture inputs are read per task through ``kit_spec``.
-    spec: RoleKit
+    # What every mode shares (``require_kit_invariants``). A brief, a prompt or fixture inputs
+    # differ by mode and are read per task through ``kit_spec``.
+    fixtures: tuple[str, ...]
+    overlays: tuple[str, ...]
     templates: tuple[Template, ...]
 
     @property
@@ -171,7 +172,7 @@ class Kit:
 
     @property
     def producible(self) -> int:
-        return len(self.templates) * len(self.spec.fixtures) * len(self.variants)
+        return len(self.templates) * len(self.fixtures) * len(self.variants)
 
     def template(self, template_id: str) -> Template:
         for template in self.templates:
@@ -196,7 +197,8 @@ def kit_for(role: Role) -> Kit:
     for template in templates:
         _require_brief(role, kit_spec(role, template), template)
     _require_fixture_material(role, tuple(specs.values()))
-    kit = Kit(role, next(iter(specs.values())), templates)
+    shared = next(iter(specs.values()))
+    kit = Kit(role, shared.fixtures, shared.overlays, templates)
     if kit.producible < DEFAULT_TARGET:
         raise ValueError(
             f"{role} can produce {kit.producible} tasks, fewer than the {DEFAULT_TARGET} a kit owes"
@@ -370,7 +372,7 @@ def make_task(
             assert_never(variant)
     kit = kit_for(role)
     template = kit.template(template_id)
-    if fixture_id not in kit.spec.fixtures:
+    if fixture_id not in kit.fixtures:
         raise ValueError(f"{role} has no fixture {fixture_id!r}")
     slug = task_slug(template_id, fixture_id)
     return TaskSpec(
@@ -408,7 +410,7 @@ def mode_of_slug(role: Role, slug: str) -> KitMode | None:
         (
             t.mode
             for t in kit.templates
-            for fixture in kit.spec.fixtures
+            for fixture in kit.fixtures
             if task_slug(t.template_id, fixture) == slug
         ),
         None,
@@ -467,7 +469,7 @@ def generate(role: Role, seed: int, n: int) -> list[TaskSpec]:
 def _pool(kit: Kit, template: Template, seed: int) -> list[TaskSpec]:
     """One template's tasks: every variant on one fixture first, then on the next."""
     rng = _rng(seed, kit.role, template.template_id)
-    fixtures = rng.sample(kit.spec.fixtures, len(kit.spec.fixtures))
+    fixtures = rng.sample(kit.fixtures, len(kit.fixtures))
     offset = rng.randrange(len(kit.variants))
     labels = (*kit.variants[offset:], *kit.variants[:offset])
     return [
@@ -520,7 +522,7 @@ def build_scratch_repo(task: TaskSpec, dest: Path, page_url: str | None = None) 
     kit = kit_for(task.role)
     dest.mkdir(parents=True, exist_ok=True)
     _copy_tree(REPOS_DIR / task.fixture_id, dest, skip=frozenset({INSTRUCTIONS_TEMPLATE}))
-    for overlay in kit.spec.overlays:
+    for overlay in kit.overlays:
         _copy_tree(OVERLAYS_DIR / overlay, dest)
     _write_instructions(task, dest)
     template = kit.template(task.template_id)

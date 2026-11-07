@@ -711,7 +711,7 @@ def test_every_template_builds_a_repository_with_its_inputs_and_overlays(role, t
         spec = role_kits.kit_spec(role, kit.template(template_id))
         assert f"{inputs}/{spec.brief}" in held
         assert {f"{inputs}/{name}" for name in spec.fixture_inputs} <= held
-        for overlay in kit.spec.overlays:
+        for overlay in kit.overlays:
             relative = {
                 path.relative_to(tasks.OVERLAYS_DIR / overlay).as_posix().removesuffix(".tmpl")
                 for path in (tasks.OVERLAYS_DIR / overlay).rglob("*")
@@ -978,7 +978,7 @@ def test_a_role_without_modes_has_no_moded_kit_and_no_template_carries_a_mode(ro
 @pytest.fixture
 def moded_role(monkeypatch):
     """The test-engineer, made a role with two modes and two templates in each."""
-    kit = tasks.Kit(MODED, SPEC_ONLY, tuple(_two_each()))
+    kit = tasks.Kit(MODED, SPEC_ONLY.fixtures, SPEC_ONLY.overlays, tuple(_two_each()))
     monkeypatch.setattr(model, "ROLE_MODES", {MODED: TWO_MODES})
     monkeypatch.setattr(tasks, "ROLE_MODES", {MODED: TWO_MODES})
     monkeypatch.setattr(role_kits, "MODED_KITS", {MODED: SPECS})

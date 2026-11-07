@@ -24,7 +24,7 @@ A new section in an always-loaded source needs an entry in `rules/_audience.yaml
 
 ## Put a role on trial
 
-1. Pick a role from `ELIGIBLE_ROLES` in `scripts/kernel_eligibility.py` (six roles: `researcher`, `verifier`, `discipline-consultant`, `skill-genesis`, `context-engineer`, `implementer`). The ledger holds no list of its own; see [Move the eligibility pin](#move-the-eligibility-pin).
+1. Pick a role from `ELIGIBLE_ROLES` in `scripts/kernel_eligibility.py` (eight roles: `researcher`, `verifier`, `discipline-consultant`, `skill-genesis`, `context-engineer`, `implementer`, `test-engineer`, `systems-architect`). The ledger holds no list of its own; see [Move the eligibility pin](#move-the-eligibility-pin).
 2. Add a record under `roles:`, in the block layout the hook reads line by line:
 
    ```yaml
@@ -219,11 +219,12 @@ Every move run needs the user's go, and none belongs to the pipeline that built 
 
 ## Move the eligibility pin
 
-The roles that may be switched are the literal `ELIGIBLE_ROLES` in `scripts/kernel_eligibility.py`: the five pilot roles and the `implementer`. The pin lives there, not in the adoption ledger, because a flip commit writes the ledger and the definitions and must not be able to widen the list it is judged against.
+The roles that may be switched are the literal `ELIGIBLE_ROLES` in `scripts/kernel_eligibility.py`: the five pilot roles, the `implementer` and the two writer roles (`test-engineer`, `systems-architect`). The pin lives there, not in the adoption ledger, because a flip commit writes the ledger and the definitions and must not be able to widen the list it is judged against.
 
 1. Edit only the tuple, in a commit of its own.
 2. The gate refuses a commit that changes the pin together with any adoption record or any definition's `omitClaudeMd` (`I9-eligible-with-move`, naming both). It judges a move to `switched` against the pin as it stood at the parent commit, so a role becomes switchable from the commit after (`I9-eligible-not-yet`). A ledger that carries an `eligible` key is refused (`I9-eligible-in-ledger`).
 3. The `implementer` is eligible and has no record in `.ai-state/kernel_adoption.yaml`: it receives nothing at spawn and still inherits the project instructions. Its trial record, and the one spawn that shows a `kernel_injected` row judged clean by `--liveness`, land with its run in the run-preparation commit after the merge, with the user's go. The implementer's fixtures state the project convention and each run's results files record the checks its verdict scored, so the gate refuses a switched record whose passing implementer run did not score it (`I9-run-convention-unscored`).
+4. The `test-engineer` and the `systems-architect` are eligible and have no record either: neither receives anything at spawn, and neither is switched.
 
 Verify: `uv run pytest tests/acceptance/test_flag_eligibility_and_liveness_gates.py -q`; `python3 -c "import sys; sys.path.insert(0, 'scripts'); import kernel_eligibility as k; print(k.ELIGIBLE_ROLES)"`.
 

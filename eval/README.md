@@ -72,7 +72,7 @@ See `eval/EVAL_PLAN.md` for the full design narrative, deferred families, and op
 > [!WARNING]
 > While a paid run writes into this checkout, every gated commit is refused with `I9-run-index-stale`. The runner checkpoints its results file into `.ai-state/eval_ledger/adherence/` after every session and writes the run index only when the run ends. Run with `--output` outside the checkout, or commit nothing until the run ends, and never `--reindex` an in-flight file.
 
-**Scope today.** Every role has its check rows and a task kit: the `researcher`, the `verifier` and the `implementer` have full kits (24 producible tasks each); the other fourteen have smoke kits (three runnable tasks by default, 24 producible). The main-session conditional-adherence eval is deferred (`EVAL_PLAN.md`).
+**Scope today.** Every role has its check rows and a task kit: the `researcher`, the `verifier`, the `implementer`, the `test-engineer` and the `systems-architect` have full kits (24 producible tasks each); the other twelve have smoke kits (three runnable tasks by default, 24 producible). The main-session conditional-adherence eval is deferred (`EVAL_PLAN.md`).
 
 ```sh
 cd eval

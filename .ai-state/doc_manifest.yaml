@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-06T06:31:14Z'
+generated_at: '2026-11-07T15:17:32Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-04'
+  last_modified: '2026-11-07'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -511,7 +511,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-07'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -521,7 +521,7 @@ surfaces:
   path: docs/lean-spawn-kernels.md
   type: markdown
   title: 'Lean spawn: role kernels and the adoption ledger'
-  last_modified: '2026-10-22'
+  last_modified: '2026-11-07'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-05'
+  last_modified: '2026-11-07'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-05'
+  last_modified: '2026-11-07'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -682,7 +682,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-05'
+  last_modified: '2026-11-07'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3651,6 +3651,24 @@ surfaces:
   title: The first-session completion installs from the plugin root and links rules through the installer's library, never re-pointing a live link
   last_modified: '2026-11-05'
   renderer: adr_card
+- id: ai-state-decisions-492-writer-kit-mode-role-checks
+  path: .ai-state/decisions/492-writer-kit-mode-role-checks.md
+  type: markdown
+  title: Writer kits grade each mode with pure form checks a habit record fails
+  last_modified: '2026-11-07'
+  renderer: adr_card
+- id: ai-state-decisions-493-writer-kit-task-mode
+  path: .ai-state/decisions/493-writer-kit-task-mode.md
+  type: markdown
+  title: 'Adherence kit modes: declared by the template, read back from the task''s identity'
+  last_modified: '2026-11-07'
+  renderer: adr_card
+- id: ai-state-decisions-494-writer-kits-run-confined
+  path: .ai-state/decisions/494-writer-kits-run-confined.md
+  type: markdown
+  title: The writer roles' kits run under dec-487's confinement; two named scripts get their executable bit
+  last_modified: '2026-11-07'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3922,6 +3940,12 @@ surfaces:
   - ai-state-decisions-457-startup-and-routing-instruments
   - ai-state-decisions-458-process-adherence-eval-family
   - ai-state-decisions-459-flip-rule-point-estimate-calibrated
+- id: ai-state-specs-spec-lean-writers-2026-11-07
+  path: .ai-state/specs/SPEC_lean-writers_2026-11-07.md
+  type: markdown
+  title: 'Spec: lean-writers (full process-adherence eval kits for the test-engineer and the systems-architect, each covering both of its major modes)'
+  last_modified: '2026-11-07'
+  renderer: default_markdown
 - id: ai-state-specs-spec-loop-gate-followups-2026-10-22
   path: .ai-state/specs/SPEC_loop-gate-followups_2026-10-22.md
   type: markdown
@@ -4590,6 +4614,9 @@ groups:
   - ai-state-decisions-489-constitutional-sentences-added-to-user-instructions
   - ai-state-decisions-490-managed-only-procedures-gated-hook-delivery
   - ai-state-decisions-491-first-session-completion-installs-from-the-plugin-root
+  - ai-state-decisions-492-writer-kit-mode-role-checks
+  - ai-state-decisions-493-writer-kit-task-mode
+  - ai-state-decisions-494-writer-kits-run-confined
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4635,6 +4662,7 @@ groups:
   - ai-state-specs-spec-gate-repairs-2026-10-27
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
+  - ai-state-specs-spec-lean-writers-2026-11-07
   - ai-state-specs-spec-loop-gate-followups-2026-10-22
   - ai-state-specs-spec-loop-gate-hardening-2026-10-20
   - ai-state-specs-spec-main-session-adherence-2026-10-28

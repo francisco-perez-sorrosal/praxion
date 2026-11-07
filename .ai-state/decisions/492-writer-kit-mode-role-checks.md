@@ -1,7 +1,8 @@
 ---
-id: dec-draft-1e989780
+id: dec-492
+draft_id: dec-draft-1e989780
 title: "Writer kits grade each mode with pure form checks a habit record fails"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-06
 summary: "Each covered mode of the test-engineer and the systems-architect gets at least one role check, built from an existing constructor, whose pass needs a form only the definition states: the acceptance-design sections, a paired TEST_RESULTS step section, the [PARTIAL]-first plan title, and the spec- and feature-mode required headings."

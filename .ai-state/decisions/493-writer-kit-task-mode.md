@@ -1,7 +1,8 @@
 ---
-id: dec-draft-276d3f8c
+id: dec-493
+draft_id: dec-draft-276d3f8c
 title: "Adherence kit modes: declared by the template, read back from the task's identity"
-status: proposed
+status: accepted
 category: implementation
 date: 2026-11-06
 summary: "A writer role's kit tasks carry a mode declared in each template's manifest, held on TaskSpec and TaskFacts, printed on the dry-run line, resolved by the grader from the task's slug and by the report from the recorded template id; no prompt is re-parsed."

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-f371452e
+id: dec-494
+draft_id: dec-draft-f371452e
 title: "The writer roles' kits run under dec-487's confinement; two named scripts get their executable bit"
-status: proposed
+status: accepted
 category: configuration
 date: 2026-11-06
 summary: "The test-engineer and the systems-architect join CONFINED_ROLES with their own prescribed commands, under the unchanged dec-487 contract; check_design_checkpoint.py and query_adrs.py become 100755 so a bare-name call resolves to the plugin copy."

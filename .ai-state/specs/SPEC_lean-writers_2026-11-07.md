@@ -186,9 +186,9 @@ Rendered from `traceability.yml` at archive (no fragments). Status from the fina
 
 ## Key Decisions
 
-- **Task mode** (`dec-draft-276d3f8c`, numbered at merge): a writer kit's task mode is declared by each template's manifest, held on `TaskSpec` and `TaskFacts`, printed on the dry-run line, resolved by the grader from the task's slug and by the report from the recorded template id; no prompt is re-parsed.
-- **Per-mode role checks** (`dec-draft-1e989780`, numbered at merge): each covered mode gets a pure form check, built from existing constructors, whose pass needs a form only the definition states.
-- **Confined writer kits** (`dec-draft-f371452e`, numbered at merge): both roles join the confined set under the unchanged confinement contract (dec-487) with their own prescribed commands; the two scripts get their executable bit at the source, never in the eval's copy.
+- **Task mode** (`dec-493`, numbered at merge): a writer kit's task mode is declared by each template's manifest, held on `TaskSpec` and `TaskFacts`, printed on the dry-run line, resolved by the grader from the task's slug and by the report from the recorded template id; no prompt is re-parsed.
+- **Per-mode role checks** (`dec-492`, numbered at merge): each covered mode gets a pure form check, built from existing constructors, whose pass needs a form only the definition states.
+- **Confined writer kits** (`dec-494`, numbered at merge): both roles join the confined set under the unchanged confinement contract (dec-487) with their own prescribed commands; the two scripts get their executable bit at the source, never in the eval's copy.
 - Plan-local: `ROLE_MODES` filled one role per kit step; no paired test-engineer step (light reviews on the check steps instead); function-level Read-only ownership; the pin's own unit test moves in the pin's commit (step 2 rev 2); a mode-only change runs by hand because the Check reads `git archive HEAD` (step 3); `Kit` holds only the role-level facts every mode shares (step 20).
 
 ## Verification and Rework

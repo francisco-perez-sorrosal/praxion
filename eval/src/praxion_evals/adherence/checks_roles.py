@@ -189,17 +189,26 @@ def required_sections(
     sections: Sequence[Section],
     binds: BindsFor | None = None,
     any_of: bool = False,
+    or_form: Sequence[Section] = (),
 ) -> MechanicalCheck:
-    """The document carries every one of ``sections``, or with ``any_of`` at least one."""
+    """The document carries every one of ``sections``, or with ``any_of`` at least one.
+
+    A rule that sanctions a second shape names it as ``or_form``: a document that carries
+    every section of that form passes too. The canary fills neither form.
+    """
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
         path, text = slug_document(evidence, document)
         if not text.strip():
             return Failed(f"{path} was never written or is empty")
-        problems = [problem for s in sections if (problem := _section_problem(text, s))]
-        if any_of and len(problems) < len(sections):
+        problems = _section_problems(text, sections)
+        if not problems or (any_of and len(problems) < len(sections)):
             return Passed()
-        return Failed(f"{path}: {'; '.join(problems)}") if problems else Passed()
+        other_problems = _section_problems(text, or_form)
+        if or_form and not other_problems:
+            return Passed()
+        other = f"; nor the other form: {'; '.join(other_problems)}" if or_form else ""
+        return Failed(f"{path}: {'; '.join(problems)}{other}")
 
     def violation() -> SessionEvidence:
         unfilled = "\n\n".join(f"## {s.heading}\n\n[pending]" for s in sections)
@@ -207,6 +216,10 @@ def required_sections(
         return synthetic_evidence(role, slug=CANARY_SLUG, files={path: unfilled})
 
     return clause(name, rule, binds, evaluate, violation)
+
+
+def _section_problems(text: str, sections: Sequence[Section]) -> list[str]:
+    return [problem for s in sections if (problem := _section_problem(text, s))]
 
 
 def _section_problem(text: str, section: Section) -> str | None:

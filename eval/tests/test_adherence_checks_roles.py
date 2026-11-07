@@ -640,6 +640,44 @@ def test_without_any_of_every_section_is_still_required():
     assert isinstance(check.evaluate(one), Failed)
 
 
+def _two_form_check():
+    return required_sections(
+        "s",
+        RULE,
+        "researcher",
+        document=DOC,
+        sections=(Section("One"), Section("Two")),
+        or_form=(Section("One"), Section("Three")),
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["## One\n\ntext\n\n## Two\n\ntext\n", "## One\n\ntext\n\n## Three\n\ntext\n"],
+    ids=["the required sections", "the other form"],
+)
+def test_a_document_in_either_form_passes(text):
+    evidence = synthetic_evidence("researcher", slug=SLUG, files={DOC_PATH: text})
+
+    assert _two_form_check().evaluate(evidence) == Passed()
+
+
+def test_a_document_in_neither_form_fails_and_names_what_each_form_lacks():
+    evidence = synthetic_evidence("researcher", slug=SLUG, files={DOC_PATH: "## One\n\ntext\n"})
+
+    outcome = _two_form_check().evaluate(evidence)
+
+    assert isinstance(outcome, Failed)
+    assert "'Two'" in outcome.detail
+    assert "'Three'" in outcome.detail
+
+
+def test_the_canary_of_a_two_form_check_still_fails():
+    check = _two_form_check()
+
+    assert isinstance(check.evaluate(check.violation()), Failed)
+
+
 def test_a_report_named_by_path_and_star_is_opened_marked_without_a_call_bound():
     check = title_marker_first_unmarked_last(
         "t", RULE, "sentinel", document=REPORT_GLOB, marker="[PARTIAL]"

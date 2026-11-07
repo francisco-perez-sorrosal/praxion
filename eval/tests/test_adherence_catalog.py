@@ -536,6 +536,11 @@ FEATURE_PLAN = (
     "## Codebase Readiness\n\n### Structural Issues\n\n- none\n\n"
     "## Risk Assessment\n\n- the history grows without bound\n"
 )
+RESCOPE_PLAN = (
+    "# Plan: audit trail\n\n## Goal\n\nKeep a history of changes.\n\n"
+    "## Codebase Readiness\n\n### Pre-Refactor Assessment\n\n"
+    "Outcome: `rescope-and-restart`. The notes store has no notion of a change to record.\n"
+)
 HAND_NAMED_DRAFT = {
     ".ai-state/decisions/drafts/new-module.md": (
         "---\nid: dec-draft-newmodul\nstatus: proposed\n---\n\nUse a new module.\n"
@@ -601,6 +606,24 @@ def test_the_architects_plan_is_scored_on_being_written_early_and_finished_last(
             id="feature without codebase readiness",
         ),
         pytest.param(ARCHITECT_FEATURE_SECTIONS, "feature", "", id="feature writes no plan"),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            RESCOPE_PLAN.replace("`rescope-and-restart`", "a rescope"),
+            id="feature rescope without the outcome token",
+        ),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            RESCOPE_PLAN.replace("### Pre-Refactor Assessment", "### Assessment"),
+            id="feature rescope token without the pre-refactor assessment",
+        ),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            RESCOPE_PLAN.replace("Keep a history of changes.", "[pending]"),
+            id="feature rescope with an empty goal",
+        ),
     ],
 )
 def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, mode, plan):
@@ -614,8 +637,9 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
     [
         (ARCHITECT_SPEC_SECTIONS, "spec", SPEC_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", FEATURE_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_PLAN),
     ],
-    ids=["spec", "feature"],
+    ids=["spec", "feature", "feature rescope-and-restart"],
 )
 def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):
     assert _graded_outcome(ARCHITECT, name, mode, files={PLAN: plan}) == Passed()
@@ -626,8 +650,13 @@ def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):
     [
         (ARCHITECT_SPEC_SECTIONS, "feature", SPEC_HABIT),
         (ARCHITECT_FEATURE_SECTIONS, "spec", FEATURE_HABIT),
+        (ARCHITECT_FEATURE_SECTIONS, "spec", RESCOPE_PLAN),
     ],
-    ids=["spec check on a feature task", "feature check on a spec task"],
+    ids=[
+        "spec check on a feature task",
+        "feature check on a spec task",
+        "feature check on a spec task's rescope plan",
+    ],
 )
 def test_an_architect_section_check_is_not_applicable_to_a_task_of_its_other_mode(
     name, other, plan

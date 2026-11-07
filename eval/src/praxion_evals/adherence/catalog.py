@@ -459,6 +459,12 @@ FEATURE_SECTIONS = tuple(
         "Risk Assessment",
     )
 )
+# The rescope-and-restart outcome writes only the Goal and the assessment that names it.
+RESCOPE_OUTCOME = "rescope-and-restart"
+RESCOPE_ASSESSMENT = re.compile(
+    rf"^### Pre-Refactor Assessment\s*$.*{re.escape(RESCOPE_OUTCOME)}", re.MULTILINE | re.DOTALL
+)
+RESCOPE_SECTIONS = (Section("Goal"), Section("Codebase Readiness", RESCOPE_ASSESSMENT))
 _ARCHITECT = "agents/systems-architect.md"
 
 # The adr_row clauses are shared with three other roles and bind only on a written draft, so
@@ -493,6 +499,7 @@ ARCHITECT_ROW: tuple[CheckDef, ...] = (
             "systems-architect",
             document="SYSTEMS_PLAN.md",
             sections=FEATURE_SECTIONS,
+            or_form=RESCOPE_SECTIONS,
             binds=binds_unless_stopped_early,
         ),
         "feature",

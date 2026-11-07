@@ -52,6 +52,7 @@ from praxion_evals.adherence.checks_roles import (
     steps_carry_fields,
     text_excludes,
     title_marker_first_unmarked_last,
+    titled_sections,
     tool_order,
 )
 from praxion_evals.adherence.model import (
@@ -464,9 +465,9 @@ FEATURE_SECTIONS = tuple(
     )
 )
 # The rescope-and-restart outcome writes the Goal, the Codebase Readiness and an assessment
-# that names the outcome in its own body, and no Architecture or Risk Assessment: a plan that
-# fills either is held to the six. A skeleton heading left [pending] writes nothing, and any
-# other section (such as the Tech Stack or Acceptance Criteria Phase 1 fills first) is allowed.
+# that names the outcome on its heading line or in its own body, and no Architecture or Risk
+# Assessment: a plan that fills either is held to the six. A skeleton heading left [pending]
+# writes nothing, and any other section (such as the Tech Stack or Acceptance Criteria Phase 1 fills first) is allowed.
 RESCOPE_OUTCOME = "rescope-and-restart"
 RESCOPE_SECTIONS = (Section("Goal"),)
 RESCOPE_PRESENT = "Codebase Readiness"
@@ -481,8 +482,8 @@ def rescope_problems(text: str) -> list[str]:
     problems = section_problems(text, RESCOPE_SECTIONS)
     if section_body(text, RESCOPE_PRESENT) is None:
         problems.append(f"no section {RESCOPE_PRESENT!r}")
-    assessments = section_bodies(text, RESCOPE_ASSESSMENT, RESCOPE_ASSESSMENT_LEVELS)
-    if not any(RESCOPE_OUTCOME in "\n".join(body) for body in assessments):
+    assessments = titled_sections(text, RESCOPE_ASSESSMENT, RESCOPE_ASSESSMENT_LEVELS)
+    if not any(RESCOPE_OUTCOME in "\n".join([title, *body]) for title, body in assessments):
         problems.append(f"no Pre-Refactor Assessment that names {RESCOPE_OUTCOME!r}")
     problems.extend(
         f"a section {heading!r} the outcome does not write"

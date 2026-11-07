@@ -101,10 +101,17 @@ def section_bodies(
     text: str, title: re.Pattern[str], levels: Collection[int] = HEADING_LEVELS
 ) -> list[list[str]]:
     """The body of each heading at one of ``levels`` whose whole title ``title`` matches."""
+    return [body for _, body in titled_sections(text, title, levels)]
+
+
+def titled_sections(
+    text: str, title: re.Pattern[str], levels: Collection[int] = HEADING_LEVELS
+) -> list[tuple[str, list[str]]]:
+    """``(title, body)`` of each heading at one of ``levels`` whose whole title matches."""
     lines = text.splitlines()
     marks = list(_heading_marks(lines))
     return [
-        lines[index + 1 : _section_end(marks, position, len(lines))]
+        (name, lines[index + 1 : _section_end(marks, position, len(lines))])
         for position, (index, level, name) in enumerate(marks)
         if level in levels and title.fullmatch(name)
     ]

@@ -547,6 +547,13 @@ RESCOPE_SIBLING_PLAN = RESCOPE_PLAN.replace(
 RESCOPE_SUFFIXED_PLAN = RESCOPE_PLAN.replace(
     "### Pre-Refactor Assessment", "#### Pre-Refactor Assessment (Phase 2.5)"
 )
+RESCOPE_HEADED_PLAN = RESCOPE_PLAN.replace(
+    "### Pre-Refactor Assessment\n\nOutcome: `rescope-and-restart`. The",
+    "### Pre-Refactor Assessment: `rescope-and-restart`\n\nThe",
+)
+RESCOPE_DASHED_PLAN = RESCOPE_HEADED_PLAN.replace(
+    ": `rescope-and-restart`", " — rescope-and-restart"
+)
 RESCOPE_SKELETON_PLAN = (
     RESCOPE_PLAN + "\n## Architecture\n\n[pending]\n\n## Risk Assessment\n\n[pending]\n"
 )
@@ -664,6 +671,12 @@ def test_the_architects_plan_is_scored_on_being_written_early_and_finished_last(
             ),
             id="feature rescope whose token sits after the assessment's own body",
         ),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            RESCOPE_HEADED_PLAN.replace("`rescope-and-restart`", "`proceed`"),
+            id="feature rescope whose heading line names another outcome",
+        ),
     ],
 )
 def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, mode, plan):
@@ -681,6 +694,8 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SIBLING_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SUFFIXED_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SKELETON_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_HEADED_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_DASHED_PLAN),
     ],
     ids=[
         "spec",
@@ -689,6 +704,8 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
         "feature rescope with the assessment as a sibling section",
         "feature rescope with a level-four suffixed assessment",
         "feature rescope keeping the skeleton's pending design sections",
+        "feature rescope naming the outcome on the assessment's heading line",
+        "feature rescope naming the outcome after a dash on the heading line",
     ],
 )
 def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):

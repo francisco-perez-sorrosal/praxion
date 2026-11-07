@@ -30,6 +30,7 @@ from praxion_evals.adherence.checks_roles import (
     section_body,
     section_problems,
     title_marker_first_unmarked_last,
+    titled_sections,
     tool_order,
     with_cwd,
 )
@@ -109,6 +110,12 @@ def test_section_bodies_are_those_of_every_heading_whose_whole_title_matches_at_
     assert section_bodies(text, note, (3,)) == [["", "two", ""]]
     assert len(section_bodies(text, note, (2, 3))) == 2
     assert section_bodies(text, note, (4,)) == []
+
+
+def test_titled_sections_pair_each_matching_heading_title_with_its_body():
+    text = "## Note\n\none\n\n### Note: more\n\ntwo\n\n## Notes\n\nthree\n"
+
+    assert titled_sections(text, re.compile(r"Note\b.*"), (3,)) == [("Note: more", ["", "two", ""])]
 
 
 @pytest.mark.parametrize(

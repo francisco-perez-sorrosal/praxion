@@ -42,6 +42,7 @@ from praxion_evals.adherence.checks_roles import (
     binds_unless_stopped_early,
     closed_tag_set,
     documents_produced,
+    has_content,
     path_scope,
     required_sections,
     script_exits_zero,
@@ -462,9 +463,10 @@ FEATURE_SECTIONS = tuple(
         "Risk Assessment",
     )
 )
-# The rescope-and-restart outcome writes only the Goal, the Codebase Readiness and an
-# assessment that names the outcome in its own body; a plan with any of the design sections
-# is held to the six.
+# The rescope-and-restart outcome writes the Goal, the Codebase Readiness and an assessment
+# that names the outcome in its own body, and no Architecture or Risk Assessment: a plan that
+# fills either is held to the six. A skeleton heading left [pending] writes nothing, and any
+# other section (such as the Tech Stack or Acceptance Criteria Phase 1 fills first) is allowed.
 RESCOPE_OUTCOME = "rescope-and-restart"
 RESCOPE_SECTIONS = (Section("Goal"),)
 RESCOPE_PRESENT = "Codebase Readiness"
@@ -485,7 +487,10 @@ def rescope_problems(text: str) -> list[str]:
     problems.extend(
         f"a section {heading!r} the outcome does not write"
         for heading in RESCOPE_ABSENT
-        if section_bodies(text, re.compile(re.escape(heading)), TOP_SECTION_LEVEL)
+        if any(
+            has_content(body)
+            for body in section_bodies(text, re.compile(re.escape(heading)), TOP_SECTION_LEVEL)
+        )
     )
     return problems
 

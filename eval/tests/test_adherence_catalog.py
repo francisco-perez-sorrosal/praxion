@@ -547,6 +547,9 @@ RESCOPE_SIBLING_PLAN = RESCOPE_PLAN.replace(
 RESCOPE_SUFFIXED_PLAN = RESCOPE_PLAN.replace(
     "### Pre-Refactor Assessment", "#### Pre-Refactor Assessment (Phase 2.5)"
 )
+RESCOPE_SKELETON_PLAN = (
+    RESCOPE_PLAN + "\n## Architecture\n\n[pending]\n\n## Risk Assessment\n\n[pending]\n"
+)
 FEATURE_RISKS = "## Risk Assessment\n\n- the history grows without bound\n"
 MENTIONED_RESCOPE = (
     "### Pre-Refactor Assessment\n\n`rescope-and-restart` was weighed and set aside.\n"
@@ -677,6 +680,7 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SIBLING_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SUFFIXED_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SKELETON_PLAN),
     ],
     ids=[
         "spec",
@@ -684,6 +688,7 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
         "feature rescope-and-restart",
         "feature rescope with the assessment as a sibling section",
         "feature rescope with a level-four suffixed assessment",
+        "feature rescope keeping the skeleton's pending design sections",
     ],
 )
 def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):

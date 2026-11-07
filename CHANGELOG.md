@@ -1,3 +1,9 @@
+## v0.58.2 (2026-11-07)
+
+### Fix
+
+- Make two prescribed scripts executable
+
 ## v0.58.1 (2026-11-06)
 
 ### Fix

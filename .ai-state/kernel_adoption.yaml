@@ -154,3 +154,13 @@ roles:
     # from a checkout frozen at this commit, whose agents, rules, hooks and kernels equal v0.57.0's.
     # 48 opus sessions on the subscription, cap USD 110 of estimated usage, session cap USD 3. C5 stays
     # uninformative for this role while the full arm never marks a capped output partial (td-566).
+  test-engineer:
+    status: trial
+    since: 2026-11-07T21:41:17Z
+    runs: []
+    # Trial opened for one paired run on the subscription under the full writer kit (24 tasks,
+    # acceptance-design 10 and paired 14, both arms: 48 opus sessions at medium effort), run cap
+    # USD 47 of estimated usage, session cap USD 3, from a pushed checkout at this commit. Close it
+    # (switched or held) before any release so no trial reaches managed projects. C5 is expected to
+    # fail in both arms at the 6-turn cap (no write-early partial form, as td-566); C6 grades only
+    # that the planted file is not written, so a compliant session passes in both arms.

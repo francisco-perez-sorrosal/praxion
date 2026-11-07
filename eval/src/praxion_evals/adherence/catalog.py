@@ -45,6 +45,9 @@ from praxion_evals.adherence.checks_roles import (
     path_scope,
     required_sections,
     script_exits_zero,
+    section_bodies,
+    section_body,
+    section_problems,
     steps_carry_fields,
     text_excludes,
     title_marker_first_unmarked_last,
@@ -459,12 +462,34 @@ FEATURE_SECTIONS = tuple(
         "Risk Assessment",
     )
 )
-# The rescope-and-restart outcome writes only the Goal and the assessment that names it.
+# The rescope-and-restart outcome writes only the Goal, the Codebase Readiness and an
+# assessment that names the outcome in its own body; a plan with any of the design sections
+# is held to the six.
 RESCOPE_OUTCOME = "rescope-and-restart"
-RESCOPE_ASSESSMENT = re.compile(
-    rf"^### Pre-Refactor Assessment\s*$.*{re.escape(RESCOPE_OUTCOME)}", re.MULTILINE | re.DOTALL
-)
-RESCOPE_SECTIONS = (Section("Goal"), Section("Codebase Readiness", RESCOPE_ASSESSMENT))
+RESCOPE_SECTIONS = (Section("Goal"),)
+RESCOPE_PRESENT = "Codebase Readiness"
+RESCOPE_ASSESSMENT = re.compile(r"Pre-Refactor Assessment\b.*")
+RESCOPE_ASSESSMENT_LEVELS = (2, 3, 4)
+RESCOPE_ABSENT = ("Architecture", "Risk Assessment")
+TOP_SECTION_LEVEL = (2,)
+
+
+def rescope_problems(text: str) -> list[str]:
+    """What keeps a plan from the one the rescope-and-restart outcome writes."""
+    problems = section_problems(text, RESCOPE_SECTIONS)
+    if section_body(text, RESCOPE_PRESENT) is None:
+        problems.append(f"no section {RESCOPE_PRESENT!r}")
+    assessments = section_bodies(text, RESCOPE_ASSESSMENT, RESCOPE_ASSESSMENT_LEVELS)
+    if not any(RESCOPE_OUTCOME in "\n".join(body) for body in assessments):
+        problems.append(f"no Pre-Refactor Assessment that names {RESCOPE_OUTCOME!r}")
+    problems.extend(
+        f"a section {heading!r} the outcome does not write"
+        for heading in RESCOPE_ABSENT
+        if section_bodies(text, re.compile(re.escape(heading)), TOP_SECTION_LEVEL)
+    )
+    return problems
+
+
 _ARCHITECT = "agents/systems-architect.md"
 
 # The adr_row clauses are shared with three other roles and bind only on a written draft, so
@@ -499,7 +524,7 @@ ARCHITECT_ROW: tuple[CheckDef, ...] = (
             "systems-architect",
             document="SYSTEMS_PLAN.md",
             sections=FEATURE_SECTIONS,
-            or_form=RESCOPE_SECTIONS,
+            or_form=rescope_problems,
             binds=binds_unless_stopped_early,
         ),
         "feature",

@@ -541,6 +541,16 @@ RESCOPE_PLAN = (
     "## Codebase Readiness\n\n### Pre-Refactor Assessment\n\n"
     "Outcome: `rescope-and-restart`. The notes store has no notion of a change to record.\n"
 )
+RESCOPE_SIBLING_PLAN = RESCOPE_PLAN.replace(
+    "### Pre-Refactor Assessment", "## Pre-Refactor Assessment"
+)
+RESCOPE_SUFFIXED_PLAN = RESCOPE_PLAN.replace(
+    "### Pre-Refactor Assessment", "#### Pre-Refactor Assessment (Phase 2.5)"
+)
+FEATURE_RISKS = "## Risk Assessment\n\n- the history grows without bound\n"
+MENTIONED_RESCOPE = (
+    "### Pre-Refactor Assessment\n\n`rescope-and-restart` was weighed and set aside.\n"
+)
 HAND_NAMED_DRAFT = {
     ".ai-state/decisions/drafts/new-module.md": (
         "---\nid: dec-draft-newmodul\nstatus: proposed\n---\n\nUse a new module.\n"
@@ -624,6 +634,33 @@ def test_the_architects_plan_is_scored_on_being_written_early_and_finished_last(
             RESCOPE_PLAN.replace("Keep a history of changes.", "[pending]"),
             id="feature rescope with an empty goal",
         ),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            FEATURE_PLAN.replace(FEATURE_RISKS, MENTIONED_RESCOPE),
+            id="feature five sections short of the risks, its assessment mentioning the outcome",
+        ),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            RESCOPE_PLAN + "\n## Architecture\n\n### Components\n\n- a history store\n",
+            id="feature rescope that also writes the architecture",
+        ),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            RESCOPE_PLAN + "\n## Risk Assessment\n\n- the history grows without bound\n",
+            id="feature rescope that also writes the risks",
+        ),
+        pytest.param(
+            ARCHITECT_FEATURE_SECTIONS,
+            "feature",
+            RESCOPE_PLAN.replace(
+                "Outcome: `rescope-and-restart`.",
+                "Outcome: `proceed`.\n\n### Alternatives\n\n`rescope-and-restart` was weighed.",
+            ),
+            id="feature rescope whose token sits after the assessment's own body",
+        ),
     ],
 )
 def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, mode, plan):
@@ -638,8 +675,16 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
         (ARCHITECT_SPEC_SECTIONS, "spec", SPEC_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", FEATURE_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SIBLING_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SUFFIXED_PLAN),
     ],
-    ids=["spec", "feature", "feature rescope-and-restart"],
+    ids=[
+        "spec",
+        "feature",
+        "feature rescope-and-restart",
+        "feature rescope with the assessment as a sibling section",
+        "feature rescope with a level-four suffixed assessment",
+    ],
 )
 def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):
     assert _graded_outcome(ARCHITECT, name, mode, files={PLAN: plan}) == Passed()

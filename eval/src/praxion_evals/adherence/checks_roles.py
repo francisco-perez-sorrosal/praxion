@@ -70,6 +70,7 @@ OUTPUT_TAIL_LINES = 6
 PIPELINE_STATE = (".ai-work/", ".ai-state/")  # where drafts and their records live
 
 ToolMatcher = Callable[[SessionEvidence, ToolUse], bool]
+FormProblems = Callable[[str], list[str]]  # what keeps a document from a form: none when in it
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +78,7 @@ ToolMatcher = Callable[[SessionEvidence, ToolUse], bool]
 # ---------------------------------------------------------------------------
 
 _HEADING = re.compile(r"^(#{1,6})\s+(\S.*?)\s*$")
+HEADING_LEVELS = range(1, 7)
 _FENCES = ("```", "~~~")
 PLACEHOLDERS = frozenset({"[pending]", "[not reached]"})  # what an unfilled skeleton holds
 
@@ -91,13 +93,27 @@ class Section:
 
 def section_body(text: str, heading: str) -> list[str] | None:
     """Lines under the heading titled ``heading``, to the next heading as high or higher."""
+    bodies = section_bodies(text, re.compile(re.escape(heading)))
+    return bodies[0] if bodies else None
+
+
+def section_bodies(
+    text: str, title: re.Pattern[str], levels: Collection[int] = HEADING_LEVELS
+) -> list[list[str]]:
+    """The body of each heading at one of ``levels`` whose whole title ``title`` matches."""
     lines = text.splitlines()
     marks = list(_heading_marks(lines))
-    for position, (index, level, title) in enumerate(marks):
-        if title == heading:
-            end = next((i for i, lvl, _ in marks[position + 1 :] if lvl <= level), len(lines))
-            return lines[index + 1 : end]
-    return None
+    return [
+        lines[index + 1 : _section_end(marks, position, len(lines))]
+        for position, (index, level, name) in enumerate(marks)
+        if level in levels and title.fullmatch(name)
+    ]
+
+
+def _section_end(marks: Sequence[tuple[int, int, str]], position: int, last: int) -> int:
+    """Where the section opened by ``marks[position]`` ends: the next heading as high or higher."""
+    level = marks[position][1]
+    return next((i for i, lvl, _ in marks[position + 1 :] if lvl <= level), last)
 
 
 def _heading_marks(lines: Sequence[str]) -> Iterator[tuple[int, int, str]]:
@@ -189,26 +205,28 @@ def required_sections(
     sections: Sequence[Section],
     binds: BindsFor | None = None,
     any_of: bool = False,
-    or_form: Sequence[Section] = (),
+    or_form: FormProblems | None = None,
 ) -> MechanicalCheck:
     """The document carries every one of ``sections``, or with ``any_of`` at least one.
 
-    A rule that sanctions a second shape names it as ``or_form``: a document that carries
-    every section of that form passes too. The canary fills neither form.
+    A rule that sanctions a second shape names it as ``or_form``: a document the form finds
+    no problem with passes too. The canary fills neither form.
     """
 
     def evaluate(evidence: SessionEvidence) -> CheckOutcome:
         path, text = slug_document(evidence, document)
         if not text.strip():
             return Failed(f"{path} was never written or is empty")
-        problems = _section_problems(text, sections)
+        problems = section_problems(text, sections)
         if not problems or (any_of and len(problems) < len(sections)):
             return Passed()
-        other_problems = _section_problems(text, or_form)
-        if or_form and not other_problems:
+        if or_form is None:
+            return Failed(f"{path}: {'; '.join(problems)}")
+        if not (other_problems := or_form(text)):
             return Passed()
-        other = f"; nor the other form: {'; '.join(other_problems)}" if or_form else ""
-        return Failed(f"{path}: {'; '.join(problems)}{other}")
+        return Failed(
+            f"{path}: {'; '.join(problems)}; nor the other form: {'; '.join(other_problems)}"
+        )
 
     def violation() -> SessionEvidence:
         unfilled = "\n\n".join(f"## {s.heading}\n\n[pending]" for s in sections)
@@ -218,7 +236,7 @@ def required_sections(
     return clause(name, rule, binds, evaluate, violation)
 
 
-def _section_problems(text: str, sections: Sequence[Section]) -> list[str]:
+def section_problems(text: str, sections: Sequence[Section]) -> list[str]:
     return [problem for s in sections if (problem := _section_problem(text, s))]
 
 

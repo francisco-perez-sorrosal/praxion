@@ -26,7 +26,9 @@ from praxion_evals.adherence.checks_roles import (
     path_scope,
     required_sections,
     script_exits_zero,
+    section_bodies,
     section_body,
+    section_problems,
     title_marker_first_unmarked_last,
     tool_order,
     with_cwd,
@@ -98,6 +100,15 @@ def test_a_section_runs_to_the_next_heading_as_high_or_higher():
 def test_a_heading_inside_a_fenced_block_is_not_a_section():
     assert section_body(DOCUMENT, "Fenced heading that is not a heading") is None
     assert section_body(DOCUMENT, "Missing") is None
+
+
+def test_section_bodies_are_those_of_every_heading_whose_whole_title_matches_at_a_level():
+    text = "## Note\n\none\n\n### Note (more)\n\ntwo\n\n## Notes\n\nthree\n"
+    note = re.compile(r"Note\b.*")
+
+    assert section_bodies(text, note, (3,)) == [["", "two", ""]]
+    assert len(section_bodies(text, note, (2, 3))) == 2
+    assert section_bodies(text, note, (4,)) == []
 
 
 @pytest.mark.parametrize(
@@ -647,7 +658,7 @@ def _two_form_check():
         "researcher",
         document=DOC,
         sections=(Section("One"), Section("Two")),
-        or_form=(Section("One"), Section("Three")),
+        or_form=lambda text: section_problems(text, (Section("One"), Section("Three"))),
     )
 
 

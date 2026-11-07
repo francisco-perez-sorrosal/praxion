@@ -554,6 +554,12 @@ RESCOPE_HEADED_PLAN = RESCOPE_PLAN.replace(
 RESCOPE_DASHED_PLAN = RESCOPE_HEADED_PLAN.replace(
     ": `rescope-and-restart`", " — rescope-and-restart"
 )
+RESCOPE_PHASE_TITLED_PLAN = RESCOPE_PLAN.replace(
+    "### Pre-Refactor Assessment", "### Phase 2.5 — Pre-Refactor Assessment"
+)
+RESCOPE_SENTENCE_CASE_PLAN = RESCOPE_PLAN.replace(
+    "### Pre-Refactor Assessment", "### Pre-refactor assessment"
+)
 RESCOPE_SKELETON_PLAN = (
     RESCOPE_PLAN + "\n## Architecture\n\n[pending]\n\n## Risk Assessment\n\n[pending]\n"
 )
@@ -696,6 +702,8 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SKELETON_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_HEADED_PLAN),
         (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_DASHED_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_PHASE_TITLED_PLAN),
+        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SENTENCE_CASE_PLAN),
     ],
     ids=[
         "spec",
@@ -706,6 +714,8 @@ def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, 
         "feature rescope keeping the skeleton's pending design sections",
         "feature rescope naming the outcome on the assessment's heading line",
         "feature rescope naming the outcome after a dash on the heading line",
+        "feature rescope under the definition's phase title",
+        "feature rescope with a sentence-case assessment heading",
     ],
 )
 def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):

@@ -471,7 +471,9 @@ FEATURE_SECTIONS = tuple(
 RESCOPE_OUTCOME = "rescope-and-restart"
 RESCOPE_SECTIONS = (Section("Goal"),)
 RESCOPE_PRESENT = "Codebase Readiness"
-RESCOPE_ASSESSMENT = re.compile(r"Pre-Refactor Assessment\b.*")
+# The assessment's name may sit anywhere in its title, in any case: the definition's own phase
+# title is `Phase 2.5 — Pre-Refactor Assessment`.
+RESCOPE_ASSESSMENT = re.compile(r".*\bPre-Refactor Assessment\b.*", re.IGNORECASE)
 RESCOPE_ASSESSMENT_LEVELS = (2, 3, 4)
 RESCOPE_ABSENT = ("Architecture", "Risk Assessment")
 TOP_SECTION_LEVEL = (2,)

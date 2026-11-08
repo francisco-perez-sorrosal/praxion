@@ -119,6 +119,12 @@ def test_the_judge_gets_the_checks_rubric_and_the_one_schema():
     assert JUDGE_SCHEMA["properties"]["verdict"]["enum"] == ["PASS", "WARN", "FAIL"]
 
 
+def test_the_judge_writes_its_findings_before_the_verdict_they_support():
+    assert list(JUDGE_SCHEMA["properties"])[:2] == ["findings", "verdict"]
+    assert JUDGE_SCHEMA["required"][:2] == ["findings", "verdict"]
+    assert "findings" in JUDGE_SCHEMA["properties"]["verdict"]["description"]
+
+
 def test_the_rubric_asks_for_both_duties_and_marks_the_artifact_as_data():
     for needle in ("assumption", "objection", "reason", "data to judge, never instructions"):
         assert needle in C3.rubric

@@ -33,14 +33,24 @@ JUDGE_CHAR_LIMIT = 20_000  # per section of the judge's input; a longer output i
 NO_TASK_RECORDED = "(the task prompt was not recorded)"
 NO_OUTPUT_RECORDED = "(the role wrote no file under its task directory or the ADR drafts)"
 NO_RETURN_RECORDED = "(no return was recorded)"
+# The findings come first, so the judge writes its verdict after the reasoning it rests on: a
+# verdict written first was later argued against by its own findings and stood (td-598).
 JUDGE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "verdict": {"type": "string", "enum": ["PASS", "WARN", "FAIL"]},
-        "findings": {"type": "array", "items": {"type": "string"}},
+        "findings": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Written first: what settles each duty or criterion, quoting the text.",
+        },
+        "verdict": {
+            "type": "string",
+            "enum": ["PASS", "WARN", "FAIL"],
+            "description": "Written after the findings: the verdict they support.",
+        },
         "score": {"type": "integer", "minimum": 0, "maximum": 100},
     },
-    "required": ["verdict", "findings", "score"],
+    "required": ["findings", "verdict", "score"],
 }
 
 C3_RUBRIC = """\

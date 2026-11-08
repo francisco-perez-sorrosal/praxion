@@ -276,6 +276,12 @@ def rewrite(root: Path, *records: AdoptionRecord) -> None:
     _write(root, records)
 
 
+def without_record(root: Path, role: str) -> None:
+    """Leave `role` with no record, uncommitted: a role before its first trial, whatever the
+    checkout's own ledger says of it today."""
+    _write(root, [], drop=role)
+
+
 def move(
     root: Path, role: str, before: AdoptionRecord | None, after: AdoptionRecord | None
 ) -> None:

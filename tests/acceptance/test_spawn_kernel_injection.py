@@ -86,6 +86,8 @@ def test_a_role_recorded_held_receives_nothing_at_spawn_and_leaves_no_row(
 def test_a_role_at_no_adoption_status_receives_nothing_at_spawn(
     sandbox: Sandbox, project: Path, role: str
 ) -> None:
+    kernel_adoption.without_record(sandbox.root, role)
+
     injection = spawn(sandbox.root, project, f"praxion:{role}")
 
     assert injection.strings == ()

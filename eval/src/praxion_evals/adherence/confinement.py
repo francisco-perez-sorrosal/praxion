@@ -25,7 +25,8 @@ module is a function of its arguments.
 The same module reads a broken confinement back from a session's record
 (``confinement_breach``): a sandbox that never started, a sandbox refusal after startup, a
 refused command the role's definition prescribes, or a prescribed command the sandbox blocked
-(``Operation not permitted``). Each means the grant, not the role, failed. A refused command
+(``Operation not permitted``, on a line no other program of the shell line reports as its own,
+as ``mktemp:`` does). Each means the grant, not the role, failed. A refused command
 that starts with a variable assignment is the exception: the harness sends it through the
 regular permission flow by design, so its refusal says nothing of the grant (the shell allow
 rule approves such a command, so one is no longer expected).
@@ -354,17 +355,45 @@ def refused_prescribed(role: Role, refused: Sequence[RefusedCommand]) -> Refused
 
 def blocked_prescribed(role: Role, shell_runs: Iterable[ShellRun]) -> ShellRun | None:
     """The first prescribed command whose output says the sandbox blocked it: the grant is too
-    narrow for work the role must do. The same output on any other command is the role's own."""
+    narrow for work the role must do. The same output on any other command is the role's own,
+    and so is a refusal line that another program of the same line reports as its own
+    (``mktemp: mkdtemp failed on ...: Operation not permitted`` beside a test run)."""
     prescribed = PRESCRIBED_COMMANDS.get(role, frozenset())
     return next(
         (
             run
             for run in shell_runs
-            if BLOCKED_BY_SANDBOX in run.output
-            and next(_prescribed_commands(run.command, prescribed), None) is not None
+            if next(_prescribed_commands(run.command, prescribed), None) is not None
+            and _reports_a_block(run, prescribed)
         ),
         None,
     )
+
+
+def _reports_a_block(run: ShellRun, prescribed: frozenset[str]) -> bool:
+    """Whether a line of the output reports the block other than as one of the line's own
+    programs, the word before the line's first colon."""
+    own = _own_programs(run.command, prescribed)
+    return any(
+        BLOCKED_BY_SANDBOX in line and line.split(":", 1)[0].strip() not in own
+        for line in run.output.splitlines()
+    )
+
+
+def _own_programs(line: str, prescribed: frozenset[str]) -> frozenset[str]:
+    """The programs a shell line runs apart from its prescribed commands. A chained command
+    that runs a prescribed one, itself or through a wrapper, lends every program it names to the
+    prescribed side, so a wrapper's report of the block is never read as the role's own."""
+    own: set[str] = set()
+    prescribed_side: set[str] = set()
+    for words in _simple_commands(line):
+        argv = list(dropwhile(_ENV_ASSIGNMENT.match, words))
+        if not argv:
+            continue
+        family = [argv, *(command.argv for command in _wrapped_commands(argv))]
+        side = prescribed_side if any(_runs_one_of(a, prescribed) for a in family) else own
+        side.update(os.path.basename(a[0]) for a in family)
+    return frozenset(own - prescribed_side)
 
 
 def _clip(text: str) -> str:

@@ -383,6 +383,40 @@ def test_the_command_in_the_evidence_is_bounded():
     assert command[: EVIDENCE_CHARS + 1] not in evidence
 
 
+MKTEMP_EPERM = "mktemp: mkdtemp failed on /var/folders/x5/T/tmp.c4vyIcX7pm: Operation not permitted"
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["cd tests && d=$(mktemp -d) && pytest -q", "D=$(mktemp -d) && cd $D && git status"],
+    ids=["beside-the-test-runner", "beside-a-git-read"],
+)
+def test_a_refusal_another_program_of_the_line_reports_is_the_roles_own(command):
+    assert _breach("test-engineer", runs=[ShellRun(command, MKTEMP_EPERM)]) is None
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        ShellRun("d=$(mktemp -d) && pytest -q", EPERM),
+        ShellRun("d=$(mktemp -d) && pytest -q", f"{MKTEMP_EPERM}\n{EPERM}"),
+        ShellRun(
+            "timeout 60 pytest -q",
+            "timeout: failed to run command 'pytest': Operation not permitted",
+        ),
+        ShellRun("bash -c 'mktemp -d && pytest -q'", MKTEMP_EPERM),
+    ],
+    ids=[
+        "named-by-no-program",
+        "one-refusal-left-unnamed",
+        "named-by-a-wrapper-of-the-runner",
+        "named-inside-a-shell-that-runs-the-runner",
+    ],
+)
+def test_a_refusal_no_other_program_of_the_line_reports_is_still_broken(run):
+    assert _breach("test-engineer", runs=[run]) is not None
+
+
 @pytest.mark.parametrize(
     "run",
     [

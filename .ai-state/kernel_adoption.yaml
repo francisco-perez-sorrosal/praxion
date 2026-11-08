@@ -155,7 +155,7 @@ roles:
     # 48 opus sessions on the subscription, cap USD 110 of estimated usage, session cap USD 3. C5 stays
     # uninformative for this role while the full arm never marks a capped output partial (td-566).
   test-engineer:
-    status: trial
+    status: switched
     since: 2026-11-07T21:41:17Z
     runs:
       - id: 20261107T214649Z-1fe196
@@ -182,6 +182,14 @@ roles:
         # Run-outs full 5, lean 4. Lean first-request median 43,174 vs full 57,100. USD 44.27 over both parts (cap 47):
         # sessions on the subscription at estimated usage, judge on the key.
         entry: praxion-evals-adherence
+    passing_run: 20261107T235257Z-a65559
+    probe_before_tokens: 63128
+    probe_after_tokens: 38219
+    flip_rule_ratified: true
+    flip_ratified: true
+    # Probe readings on 2026-11-08, Claude Code 2.1.319, profile praxion-repo|sonnet|default|no-mcp|plugin-dir|subscription
+    # (scripts/measure_startup_payload.py agent:test-engineer --strict-mcp-config --plugin-dir .). The user ratified the
+    # flip on 2026-11-08 after the lineage's report.
     # Trial opened for one paired run on the subscription under the full writer kit (24 tasks,
     # acceptance-design 10 and paired 14, both arms: 48 opus sessions at medium effort), run cap
     # USD 47 of estimated usage, session cap USD 3, from a pushed checkout at this commit. Close it

@@ -60,9 +60,11 @@ from tests.acceptance.drivers.scratch_projects import copy_home, impair_manifest
 KILL_SWITCH = "PRAXION_DISABLE_RULE_INJECTION"
 HEADLESS, INTERACTIVE = "sdk-cli", "cli"
 LEAN_ROLE = "researcher"
-# A role outside the eligibility pin, so no flip can make it lean: the implementer, named first,
-# was switched to its kernel on main (08ca61da).
-INHERITING_ROLE = "systems-architect"
+# A role outside the eligibility pin, so no flip can make it lean; a test holds it there. The
+# implementer, named first, was switched (08ca61da); the systems-architect, named next, entered
+# the pin with the writer kits (5aa85532) and was switched in its turn. The frozen inheriting
+# reading is the same for every role that inherits, so the example's name keys it and no more.
+INHERITING_ROLE = "sentinel"
 HOST_NATIVE = "general-purpose"
 NON_TRIVIAL_PROMPT = (
     "Please restructure the payment module so refunds and charges share one validation path, "

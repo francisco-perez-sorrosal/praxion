@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.acceptance.drivers import flip_gate as flip
 from tests.acceptance.drivers import gating_readings as readings
 from tests.acceptance.drivers import process_text_oracles as oracles
 from tests.acceptance.drivers import scratch_projects as places
@@ -90,6 +91,13 @@ def test_a_managed_project_with_current_instructions_receives_todays_process_tex
 
 
 # -- Its spawns -----------------------------------------------------------------------------------
+
+
+def test_the_inheriting_example_is_a_role_no_flip_can_make_lean():
+    assert gate.INHERITING_ROLE not in flip.eligible_roles(oracles.REPO_ROOT), (
+        f"{gate.INHERITING_ROLE} is in the eligibility pin, so a flip can make it lean and the"
+        " inheriting-spawn scenarios lose their premise; name a role outside the pin"
+    )
 
 
 @pytest.mark.parametrize("agent", [f"praxion:{gate.INHERITING_ROLE}", gate.HOST_NATIVE])

@@ -9,16 +9,21 @@ hooks' unit tests specify.
 
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import measure_token_budget as mtb
 import pytest
 from _budget_scope import loaded_rows
 
-# Importing `_budget_scope` puts the hooks directory on the path.
-from _project_scope import Managed, scope_of
-from _rule_delivery import AgentKind, Event, plan_delivery
-from test_project_scope import _LAYOUTS, _project
+SCRIPTS = Path(__file__).resolve().parent
+# The hooks' own modules, which this file holds the budget to, sit beside scripts/.
+sys.path.insert(0, str(SCRIPTS.parent / "hooks"))
+from _project_scope import Managed, scope_of  # noqa: E402 (after sys.path injection)
+from _rule_delivery import AgentKind, Event, plan_delivery  # noqa: E402
+from test_project_scope import _LAYOUTS, _project  # noqa: E402
 
 MANIFEST = """\
 version: 1
@@ -193,3 +198,30 @@ def test_a_managed_directory_counts_every_hook_delivery(
     (project / ".ai-state").mkdir()
 
     assert _hook_delivered_names(project) == ["swe/everywhere.md", "swe/procedure.md"]
+
+
+def _import_in_a_fresh_interpreter(scripts: Path, probe: str) -> subprocess.CompletedProcess[str]:
+    code = f"import sys; sys.path.insert(0, {str(scripts)!r}); {probe}"
+    return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+
+
+def test_importing_the_scope_reader_leaves_the_import_path_as_it_was() -> None:
+    probe = (
+        "before = list(sys.path); import _budget_scope; "
+        "print(sys.path == before, '_project_scope' in sys.modules)"
+    )
+
+    result = _import_in_a_fresh_interpreter(SCRIPTS, probe)
+
+    assert result.stdout.split() == ["True", "False"], result.stderr
+
+
+def test_a_copy_with_no_hooks_above_it_fails_naming_the_module_it_needs(tmp_path: Path) -> None:
+    copy = tmp_path / "scripts"
+    copy.mkdir()
+    shutil.copy2(SCRIPTS / "_budget_scope.py", copy / "_budget_scope.py")
+
+    result = _import_in_a_fresh_interpreter(copy, "import _budget_scope")
+
+    assert "ImportError" in result.stderr
+    assert "hooks/_project_scope.py" in result.stderr

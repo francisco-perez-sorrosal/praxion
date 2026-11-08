@@ -157,7 +157,31 @@ roles:
   test-engineer:
     status: trial
     since: 2026-11-07T21:41:17Z
-    runs: []
+    runs:
+      - id: 20261107T214649Z-1fe196
+        complete_pairs: 23
+        passes_flip_rule: true
+        # .ai-state/eval_ledger/adherence/20261107T214649Z-1fe196.json: part 1 of the passing lineage, from the freeze at
+        # fece969c, Claude Code 2.1.319, 1 session (USD 2.21), stopped on confinement_broken after that session had
+        # finished its work: an `Operation not permitted` in `cd tests/acceptance && d=$(mktemp -d) && python3 -c ...`
+        # read as a refused prescribed command. The continuation's kept sandbox shows the refusal is `mktemp -d` on the
+        # OS temp directory, which no definition prescribes (td-555); the lineage's standing is the tip's.
+        entry: praxion-evals-adherence
+      - id: 20261107T235257Z-a65559
+        complete_pairs: 23
+        passes_flip_rule: true
+        # .ai-state/eval_ledger/adherence/20261107T214649Z-1fe196-part2.json: part 2 (--continue, sandbox kept), same
+        # freeze and runner, 47 sessions, none errored; the 48th (lean, blank-guard-tests.ledger-cli.ambiguity) was
+        # refused at launch by the spend cap and the worst-case recount scores it a lean failure. Lineage: 23 complete
+        # pairs of 24 (20 required), flip verdict clear: no regression on C4 (23 of 23 each), C6 (7 of 7 each, 16 withheld
+        # for want of a fixture page), no production file (23 of 23 each), the acceptance-design inputs (10 of 10 each)
+        # and five sections (8 of 8 each), and the project convention (18 of 18 each); C3 non-inferior (lean 16 of 18,
+        # full 15 of 18; 2 of its 5 failures are one pair whose findings argue PASS under a FAIL, td-598). Not covered
+        # (allowance over the margin): C1 lean 21 vs full 20, C2 8 of 19 vs 9 of 18, RED tests 18 vs 18, the paired
+        # TEST_RESULTS.md step lean 9 vs full 10 of 10; C5 0 of 4 vs 0 of 5 (4 pairs ran out on both sides, 5 needed).
+        # Run-outs full 5, lean 4. Lean first-request median 43,174 vs full 57,100. USD 44.27 over both parts (cap 47):
+        # sessions on the subscription at estimated usage, judge on the key.
+        entry: praxion-evals-adherence
     # Trial opened for one paired run on the subscription under the full writer kit (24 tasks,
     # acceptance-design 10 and paired 14, both arms: 48 opus sessions at medium effort), run cap
     # USD 47 of estimated usage, session cap USD 3, from a pushed checkout at this commit. Close it

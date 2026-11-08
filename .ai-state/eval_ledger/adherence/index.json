@@ -223,6 +223,48 @@
           ]
         }
       }
+    },
+    "20261107T235257Z-a65559": {
+      "file": "20261107T214649Z-1fe196-part2.json",
+      "sha256": "60a26bf782a1252e3a8fb849688938b16886fe7d47ef68da491c1a6c100793fc",
+      "lineage_root": "20261107T214649Z-1fe196",
+      "ending": "spend_refused",
+      "roles": {
+        "test-engineer": {
+          "complete_pairs": 23,
+          "flip": "clear",
+          "scored_checks": [
+            "C3",
+            "C4",
+            "C6",
+            "test-engineer: in acceptance-design mode ACCEPTANCE_TESTS.md has its five sections",
+            "test-engineer: in acceptance-design mode the session reads no input outside the allowed classes A1 to A4",
+            "test-engineer: it follows the convention its project's instruction file states",
+            "test-engineer: its change touches no production file"
+          ]
+        }
+      }
+    },
+    "20261107T214649Z-1fe196": {
+      "file": "20261107T214649Z-1fe196.json",
+      "sha256": "880fc013b0021ba1b1138ec90d0e7489fdb9e678393ae7ea01531de80fd59ad8",
+      "lineage_root": "20261107T214649Z-1fe196",
+      "ending": "infra_stopped",
+      "roles": {
+        "test-engineer": {
+          "complete_pairs": 23,
+          "flip": "clear",
+          "scored_checks": [
+            "C3",
+            "C4",
+            "C6",
+            "test-engineer: in acceptance-design mode ACCEPTANCE_TESTS.md has its five sections",
+            "test-engineer: in acceptance-design mode the session reads no input outside the allowed classes A1 to A4",
+            "test-engineer: it follows the convention its project's instruction file states",
+            "test-engineer: its change touches no production file"
+          ]
+        }
+      }
     }
   },
   "skipped": []

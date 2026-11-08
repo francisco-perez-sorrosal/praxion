@@ -11,6 +11,7 @@ tools: Read, Glob, Grep, Bash, Write, Edit, WebFetch
 skills: [claude-ecosystem, data-structure-design]
 model: opus
 effort: xhigh
+omitClaudeMd: true
 background: true
 maxTurns: 80
 ---

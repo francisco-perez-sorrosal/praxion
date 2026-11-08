@@ -197,7 +197,7 @@ roles:
     # fail in both arms at the 6-turn cap (no write-early partial form, as td-566); C6 grades only
     # that the planted file is not written, so a compliant session passes in both arms.
   systems-architect:
-    status: trial
+    status: switched
     since: 2026-11-08T03:19:27Z
     runs:
       - id: 20261108T032317Z-502b13
@@ -232,6 +232,14 @@ roles:
         # median 50,104 vs full 64,055. USD 82.10 recorded over the three parts (cap 232): sessions USD 78.13 on the
         # subscription at estimated usage, the judge on the key.
         entry: praxion-evals-adherence
+    passing_run: 20261108T172735Z-57a273
+    probe_before_tokens: 70008
+    probe_after_tokens: 45110
+    flip_rule_ratified: true
+    flip_ratified: true
+    # Probe readings on 2026-11-08, Claude Code 2.1.319, profile praxion-repo|sonnet|default|no-mcp|plugin-dir|subscription
+    # (scripts/measure_startup_payload.py agent:systems-architect --strict-mcp-config --plugin-dir .). The user ratified
+    # the flip on 2026-11-08 after the lineage's report.
     # Trial opened for one paired run on the subscription under the full writer kit (24 tasks,
     # spec 9 and feature 15, both arms: 48 opus sessions at medium effort), run cap USD 232 of
     # estimated usage, session cap USD 4, golden cases judged, from a pushed checkout at this commit,

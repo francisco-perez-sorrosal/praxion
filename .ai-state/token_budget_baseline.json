@@ -215,8 +215,8 @@
     },
     {
       "date": "2026-11-07",
-      "governed_tokens": 19918,
-      "governed_bytes": 54583,
+      "governed_tokens": 19894,
+      "governed_bytes": 54541,
       "basis": "tokenizer",
       "ruler": "claude-sonnet-5-5"
     }

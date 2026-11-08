@@ -265,6 +265,90 @@
           ]
         }
       }
+    },
+    "20261108T071544Z-85990f": {
+      "file": "20261108T032317Z-502b13-part2.json",
+      "sha256": "34f2ff0ecb914549e243d87da9da623df4c803ac568e0b036482cf52de6221a3",
+      "lineage_root": "20261108T032317Z-502b13",
+      "ending": "infra_stopped",
+      "roles": {
+        "systems-architect": {
+          "complete_pairs": 24,
+          "flip": "clear",
+          "scored_checks": [
+            "C1",
+            "C3",
+            "C4",
+            "C6",
+            "systems-architect: LEARNINGS.md under ### Decisions Made cites each draft id",
+            "systems-architect: SYSTEMS_PLAN.md is written early with [PARTIAL] in its title and ends unmarked",
+            "systems-architect: every ADR fragment's file name follows <YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md",
+            "systems-architect: every architectural fragment carries ## Disconfirmation with its three sub-items",
+            "systems-architect: in feature mode SYSTEMS_PLAN.md carries its six required sections",
+            "systems-architect: in spec mode SYSTEMS_PLAN.md carries its Goal, Acceptance Criteria and a Behavioral Specification with an Observable Surface",
+            "systems-architect: it follows the convention its project's instruction file states",
+            "systems-architect: no fragment self-assigns a dec-NNN id",
+            "systems-architect: the category of each ADR fragment follows the architectural test",
+            "systems-architect: the fragment's id is dec-draft- followed by the first 8 hexadecimal characters of the SHA-1 of its file name"
+          ]
+        }
+      }
+    },
+    "20261108T172735Z-57a273": {
+      "file": "20261108T032317Z-502b13-part3.json",
+      "sha256": "0e8bb989c33269498652d43f7e32e0bc2f1ec52cfc82fc895c38141e194f52f6",
+      "lineage_root": "20261108T032317Z-502b13",
+      "ending": "finished",
+      "roles": {
+        "systems-architect": {
+          "complete_pairs": 24,
+          "flip": "clear",
+          "scored_checks": [
+            "C1",
+            "C3",
+            "C4",
+            "C6",
+            "systems-architect: LEARNINGS.md under ### Decisions Made cites each draft id",
+            "systems-architect: SYSTEMS_PLAN.md is written early with [PARTIAL] in its title and ends unmarked",
+            "systems-architect: every ADR fragment's file name follows <YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md",
+            "systems-architect: every architectural fragment carries ## Disconfirmation with its three sub-items",
+            "systems-architect: in feature mode SYSTEMS_PLAN.md carries its six required sections",
+            "systems-architect: in spec mode SYSTEMS_PLAN.md carries its Goal, Acceptance Criteria and a Behavioral Specification with an Observable Surface",
+            "systems-architect: it follows the convention its project's instruction file states",
+            "systems-architect: no fragment self-assigns a dec-NNN id",
+            "systems-architect: the category of each ADR fragment follows the architectural test",
+            "systems-architect: the fragment's id is dec-draft- followed by the first 8 hexadecimal characters of the SHA-1 of its file name"
+          ]
+        }
+      }
+    },
+    "20261108T032317Z-502b13": {
+      "file": "20261108T032317Z-502b13.json",
+      "sha256": "d10d44553558e11b80ebde06090a46088f75db318d149964ec05d1eb7e7490e2",
+      "lineage_root": "20261108T032317Z-502b13",
+      "ending": "infra_stopped",
+      "roles": {
+        "systems-architect": {
+          "complete_pairs": 24,
+          "flip": "clear",
+          "scored_checks": [
+            "C1",
+            "C3",
+            "C4",
+            "C6",
+            "systems-architect: LEARNINGS.md under ### Decisions Made cites each draft id",
+            "systems-architect: SYSTEMS_PLAN.md is written early with [PARTIAL] in its title and ends unmarked",
+            "systems-architect: every ADR fragment's file name follows <YYYYMMDD-HHMM>-<user>-<branch>-<slug>.md",
+            "systems-architect: every architectural fragment carries ## Disconfirmation with its three sub-items",
+            "systems-architect: in feature mode SYSTEMS_PLAN.md carries its six required sections",
+            "systems-architect: in spec mode SYSTEMS_PLAN.md carries its Goal, Acceptance Criteria and a Behavioral Specification with an Observable Surface",
+            "systems-architect: it follows the convention its project's instruction file states",
+            "systems-architect: no fragment self-assigns a dec-NNN id",
+            "systems-architect: the category of each ADR fragment follows the architectural test",
+            "systems-architect: the fragment's id is dec-draft- followed by the first 8 hexadecimal characters of the SHA-1 of its file name"
+          ]
+        }
+      }
     }
   },
   "skipped": []

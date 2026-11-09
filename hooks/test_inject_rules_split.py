@@ -25,6 +25,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from _rule_delivery import AUDIENCE_MANIFEST_PATH, SPAWN_SPLIT_PATH, rule_body  # noqa: E402
 from test_inject_rules import (  # noqa: E402
     HOOK_SCRIPT,
     _additional_context,
@@ -42,8 +43,8 @@ from test_rule_delivery_slots import (  # noqa: E402
 )
 
 _REPO = Path(__file__).resolve().parent.parent
-_ARTIFACT = "claude/kernels/spawn_split.json"
-_AUDIENCE = "rules/_audience.yaml"
+_ARTIFACT = SPAWN_SPLIT_PATH
+_AUDIENCE = AUDIENCE_MANIFEST_PATH
 _AUDIENCE_BYTES = b"version: 1\nentries: []\n"
 _SPLIT_UNIT_IDS = ("swe/swe-agent-coordination-protocol", "swe/agent-intermediate-documents")
 _PROTOCOL, _DOCUMENTS = _SPLIT_UNIT_IDS
@@ -52,6 +53,7 @@ _SPLIT_RECIPIENT = "praxion:systems-architect"
 _WRONG_DIGEST = "0" * 64
 _SLOT_CEILING = 16  # well past any plan here; probing stops at the first empty slot
 _INHERITING_FRONTMATTER = "---\nname: {name}\ndescription: x\n---\n\nBody.\n"
+_NO_USABLE_SPLIT = "no usable spawn split"
 
 
 def _sha256(data: str | bytes) -> str:
@@ -67,10 +69,11 @@ def _core_file(plugin_root: Path, unit_id: str) -> Path:
 
 
 def _valid_wire(plugin_root: Path) -> dict:
-    """The artifact the generator would write for this plugin: both split units, current."""
+    """The artifact the generator would write for this plugin: both split units, current, each
+    digested over its body read as the generator reads it (the bytes as written)."""
     units = {}
     for unit_id in _SPLIT_UNIT_IDS:
-        body = _core_file(plugin_root, unit_id).read_text(encoding="utf-8")
+        body = rule_body(_core_file(plugin_root, unit_id).read_bytes().decode("utf-8"))
         text = _split_text(unit_id)
         units[unit_id] = {
             "source": f"rules/{unit_id}.md",
@@ -110,7 +113,14 @@ def managed(tmp_path: Path) -> Path:
 
 
 def _slot(plugin_root: Path, cwd: Path, payload: dict, slot: int, impairment: str) -> str:
-    """One slot's additionalContext, the hook run as the harness runs it; `no-yaml` hides PyYAML."""
+    """One slot's additionalContext."""
+    return _additional_context(_run_slot(plugin_root, cwd, payload, slot, impairment))
+
+
+def _run_slot(
+    plugin_root: Path, cwd: Path, payload: dict, slot: int, impairment: str
+) -> subprocess.CompletedProcess[str]:
+    """One slot's run, the hook run as the harness runs it; `no-yaml` hides PyYAML."""
     block_yaml = "sys.modules['yaml'] = None; " if impairment == "no-yaml" else ""
     launcher = (
         f"import runpy, sys; {block_yaml}sys.argv = [{str(HOOK_SCRIPT)!r}, '--slot', '{slot}']; "
@@ -130,7 +140,18 @@ def _slot(plugin_root: Path, cwd: Path, payload: dict, slot: int, impairment: st
         timeout=10,
     )
     assert result.returncode == 0, result.stderr
-    return _additional_context(result)
+    return result
+
+
+def _spawn_stderr(plugin_root: Path, cwd: Path, agent_type: str) -> str:
+    """What slot 1 of a spawn of `agent_type` writes to stderr."""
+    payload = {
+        "session_id": "s",
+        "cwd": str(cwd),
+        "hook_event_name": "SubagentStart",
+        "agent_type": agent_type,
+    }
+    return _run_slot(plugin_root, cwd, payload, 1, "").stderr
 
 
 def _received_units(
@@ -244,6 +265,23 @@ def test_an_artifact_that_cannot_be_read_or_parsed_leaves_each_unit_whole(
     assert _as_split(units) == ["whole", "whole"]
 
 
+@pytest.mark.parametrize("impairment", ["", "kill-switch"])
+def test_a_split_text_no_digest_can_be_taken_over_leaves_every_unit_delivered_whole(
+    plugin_root: Path, managed: Path, impairment: str
+) -> None:
+    """A lone surrogate escape in a stored text with the unit's current body digest: the
+    artifact is not the schema, so the floor and the manifest path deliver every unit whole."""
+    wire = _valid_wire(plugin_root)
+    wire["units"][_PROTOCOL]["text"] = "## swe/swe-agent-coordination-protocol \ud800\n"
+    _write_artifact(plugin_root, wire)
+
+    units = _received_units(plugin_root, managed, _SPLIT_RECIPIENT, impairment)
+
+    assert list(units) == list(_CORE_UNIT_IDS)
+    assert _as_split(units) == ["whole", "whole"]
+    assert units[_ADR_RESIDENT] == _whole(_ADR_RESIDENT)
+
+
 def test_an_artifact_cut_under_another_audience_manifest_leaves_each_unit_whole(
     plugin_root: Path, managed: Path
 ) -> None:
@@ -275,6 +313,42 @@ def test_a_rule_edited_after_the_split_arrives_whole_while_the_other_keeps_its_s
 
     assert units[_PROTOCOL] == _split_text(_PROTOCOL)
     assert units[_DOCUMENTS] == _whole(_DOCUMENTS) + "\nA later line.\n"
+
+
+@pytest.mark.parametrize("digest", ["whole_sha256", "text_sha256"])
+def test_a_unit_whose_split_is_distrusted_is_named_on_stderr_and_the_other_is_not(
+    plugin_root: Path, managed: Path, digest: str
+) -> None:
+    wire = _valid_wire(plugin_root)
+    wire["units"][_PROTOCOL][digest] = _WRONG_DIGEST
+    _write_artifact(plugin_root, wire)
+
+    stderr = _spawn_stderr(plugin_root, managed, _SPLIT_RECIPIENT)
+
+    assert (f"spawn split of {_PROTOCOL} disagrees" in stderr) is True, stderr
+    assert (f"spawn split of {_DOCUMENTS}" in stderr) is False, stderr
+
+
+def test_a_missing_artifact_is_reported_for_a_managed_split_recipient(
+    plugin_root: Path, managed: Path
+) -> None:
+    (plugin_root / _ARTIFACT).unlink()
+
+    assert _NO_USABLE_SPLIT in _spawn_stderr(plugin_root, managed, _SPLIT_RECIPIENT)
+
+
+def test_a_missing_artifact_is_not_reported_for_an_unmanaged_split_recipient(
+    plugin_root: Path, tmp_path: Path
+) -> None:
+    """An unmanaged spawn receives no unit, so there is nothing the artifact could shorten."""
+    (plugin_root / _ARTIFACT).unlink()
+    project = tmp_path / "plain"
+    project.mkdir()
+
+    stderr = _spawn_stderr(plugin_root, project, _SPLIT_RECIPIENT)
+
+    assert (_NO_USABLE_SPLIT in stderr) is False, stderr
+    assert ("spawn split of" in stderr) is False, stderr
 
 
 @pytest.mark.parametrize("change", ["edited", "absent", "a-directory"])
@@ -316,6 +390,21 @@ def test_a_whole_recipient_on_the_impaired_floor_still_receives_the_units_whole(
 
 
 # -- The shipped files, read from a plugin root ---------------------------------------------
+
+
+def test_a_crlf_rule_is_trusted_by_the_digest_the_generator_takes_over_its_bytes(
+    plugin_root: Path, managed: Path
+) -> None:
+    """The hook reads a rule's bytes as written, as the generator does, so a carriage return
+    in a source does not turn a current split into an unexplained whole delivery."""
+    for unit_id in _SPLIT_UNIT_IDS:
+        rule = _core_file(plugin_root, unit_id)
+        rule.write_bytes(rule.read_bytes().replace(b"\n", b"\r\n"))
+    _write_artifact(plugin_root, _valid_wire(plugin_root))
+
+    units = _received_units(plugin_root, managed, _SPLIT_RECIPIENT)
+
+    assert _as_split(units) == ["split", "split"]
 
 
 def test_the_shipped_artifact_is_trusted_for_the_shipped_rules_read_from_the_plugin_root(

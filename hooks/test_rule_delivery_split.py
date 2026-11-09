@@ -27,6 +27,7 @@ from _rule_delivery import (  # noqa: E402
     Event,
     SpawnSplit,
     SplitEntry,
+    distrusted_units,
     parse_agent_kind,
     parse_spawn_split,
     plan_delivery,
@@ -189,6 +190,7 @@ NOT_PARSEABLE = {
     "units not a mapping": json.dumps(_with(("units",), [])),
     "entry not a mapping": json.dumps(_with(ENTRY, "text")),
     "text not a string": json.dumps(_with((*ENTRY, "text"), 7)),
+    "text a lone surrogate": json.dumps(_with((*ENTRY, "text"), "## A\n\ud800\n")),
     "source not a string": json.dumps(_with((*ENTRY, "source"), None)),
     "manifest digest not a string": json.dumps(_with(("manifest_sha256",), 12)),
     "manifest digest not hex": json.dumps(_with(("manifest_sha256",), "z" * 64)),
@@ -284,6 +286,29 @@ def test_choosing_mutates_neither_the_units_nor_the_split():
     spawn_units(units, split, _sha(MANIFEST))
     assert units == WHOLE
     assert split == before
+
+
+# -- the units whose stored split their sources no longer trust ---------------------------
+
+
+def test_a_trusted_split_distrusts_no_unit():
+    assert distrusted_units(WHOLE, _split(), _sha(MANIFEST)) == ()
+
+
+@pytest.mark.parametrize("override", MISMATCHES.values(), ids=MISMATCHES.keys())
+def test_a_unit_whose_digest_disagrees_is_named_alone(override):
+    split = _split({FIRST: _entry(FIRST, **override), SECOND: _entry(SECOND)})
+    assert distrusted_units(WHOLE, split, _sha(MANIFEST)) == (FIRST,)
+
+
+def test_a_split_cut_under_another_manifest_distrusts_every_unit_it_holds_in_order():
+    reversed_units = dict(reversed(WHOLE.items()))
+    assert distrusted_units(reversed_units, _split(), _sha("another manifest")) == (SECOND, FIRST)
+
+
+def test_a_unit_with_no_entry_is_never_named_while_a_stale_one_is():
+    split = _split({FIRST: _entry(FIRST, whole_sha256=_sha("an earlier body"))})
+    assert distrusted_units(WHOLE, split, _sha(MANIFEST)) == (FIRST,)
 
 
 def test_a_split_text_goes_through_the_unchanged_framing():

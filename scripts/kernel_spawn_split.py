@@ -34,11 +34,11 @@ import kernel_model as km
 import kernel_sources as ks
 
 # hooks/ sits beside scripts/; the hook's pure module is the one definition of the artifact's
-# shape and of the body a digest is taken over.
+# shape and path, of the manifest whose bytes are digested and of the body a digest is taken over.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 import _rule_delivery as rd  # noqa: E402  # pyright: ignore[reportMissingImports]
 
-SPAWN_SPLIT_PATH = "claude/kernels/spawn_split.json"
+SPAWN_SPLIT_PATH = rd.SPAWN_SPLIT_PATH
 
 
 class SplitCutError(ValueError):
@@ -120,6 +120,7 @@ def expected_split(root: Path, manifest: km.Manifest, unit: rd.CoreUnit) -> rd.S
     """
     if not (root / unit.path).is_file():
         return None
+    # The bytes as written, as the hook reads them (`inject_rules._read_rule_body`).
     body = rd.rule_body((root / unit.path).read_bytes().decode("utf-8"))
     text = split_text(body, ks.load_sections(root, unit.path), manifest.entries)
     if text == body:
@@ -134,5 +135,5 @@ def spawn_split_artifact(root: Path, manifest: km.Manifest) -> str:
         for unit in rd.MANAGED_CORE_UNITS
         if (entry := expected_split(root, manifest, unit)) is not None
     }
-    manifest_bytes = (root / km.MANIFEST_PATH).read_bytes()
+    manifest_bytes = (root / rd.AUDIENCE_MANIFEST_PATH).read_bytes()
     return render_spawn_split(sha256_hex(manifest_bytes), units)

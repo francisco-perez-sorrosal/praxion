@@ -36,6 +36,12 @@ FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
 
 # The spawn-split artifact's only schema; a hook reads any other as absent.
 SPLIT_SCHEMA = 1
+# Where the generator writes the spawn split and which file's bytes it digests, both relative
+# to the plugin root; the hook reads the same two. `scripts/kernel_model.py` names the audience
+# manifest on its own (`MANIFEST_PATH`, it imports no hook module): if you move it, move both;
+# `scripts/test_kernel_spawn_split.py` holds them equal.
+SPAWN_SPLIT_PATH = "claude/kernels/spawn_split.json"
+AUDIENCE_MANIFEST_PATH = "rules/_audience.yaml"
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 
 # A label never carries more digits than this in a position, so the room
@@ -248,8 +254,9 @@ class SpawnSplit:
 
 def parse_spawn_split(text: str) -> SpawnSplit | None:
     """The artifact's JSON as a `SpawnSplit`; None for anything that is not exactly the
-    schema, so the interior never sees a partial table. Extra keys are ignored: a later
-    writer may add them."""
+    schema, so the interior never sees a partial table. A text that cannot be encoded as
+    UTF-8 (a lone surrogate escape) is not the schema: no digest can be taken over it. Extra
+    keys are ignored: a later writer may add them."""
     try:
         wire = json.loads(text)
     except ValueError:
@@ -275,7 +282,7 @@ def _parse_entry(wire: object) -> SplitEntry | None:
         return None
     source, text = wire.get("source"), wire.get("text")
     whole, stored = wire.get("whole_sha256"), wire.get("text_sha256")
-    if not (isinstance(source, str) and isinstance(text, str)):
+    if not (isinstance(source, str) and isinstance(text, str) and _encodes_as_utf8(text)):
         return None
     if not (isinstance(whole, str) and isinstance(stored, str)):
         return None
@@ -286,6 +293,14 @@ def _parse_entry(wire: object) -> SplitEntry | None:
 
 def _is_digest(value: object) -> bool:
     return isinstance(value, str) and _DIGEST.fullmatch(value) is not None
+
+
+def _encodes_as_utf8(text: str) -> bool:
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def spawn_units(
@@ -305,12 +320,27 @@ def spawn_units(
     }
 
 
+def distrusted_units(
+    units: Mapping[str, str], split: SpawnSplit, manifest_sha: str
+) -> tuple[str, ...]:
+    """The units, in the order of ``units``, whose stored split exists but disagrees with
+    their current sources (a stale or hand-edited entry, or a split cut under another audience
+    manifest), so `spawn_units` gives each its whole body."""
+    current = split.manifest_sha256 == manifest_sha
+    return tuple(
+        unit_id
+        for unit_id, body in units.items()
+        if (entry := split.units.get(unit_id)) is not None
+        and not (current and _trusts(entry, body))
+    )
+
+
 def _trusted_text(entry: SplitEntry | None, body: str) -> str:
-    if entry is None:
-        return body
-    if entry.whole_sha256 != _sha256(body) or entry.text_sha256 != _sha256(entry.text):
-        return body
-    return entry.text
+    return entry.text if entry is not None and _trusts(entry, body) else body
+
+
+def _trusts(entry: SplitEntry, body: str) -> bool:
+    return entry.whole_sha256 == _sha256(body) and entry.text_sha256 == _sha256(entry.text)
 
 
 def _sha256(text: str) -> str:

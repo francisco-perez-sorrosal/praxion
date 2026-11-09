@@ -68,9 +68,11 @@ Behavior contract:
   session's other units. A whole recipient receives them whole. A split recipient
   receives each as its stored split (`claude/kernels/spawn_split.json`, without the
   text only the main session acts on) when the split's digests agree with the unit's
-  body, the bytes of `rules/_audience.yaml` and the stored text, else whole: one unit
-  at a time, and a missing, unreadable or malformed artifact or audience manifest
-  gives every unit whole. Only a split recipient reads either file. `Explore`, `Plan` and a spawn
+  body (its bytes as written, as the generator reads them), the bytes of
+  `rules/_audience.yaml` and the stored text, else whole: one unit at a time, and a
+  missing, unreadable or malformed artifact or audience manifest gives every unit
+  whole, as does any failure taking the split. Only a split recipient in a managed
+  scope reads either file. `Explore`, `Plan` and a spawn
   whose definition sets `omitClaudeMd` (this plugin's `agents/<role>.md` for
   `praxion:<role>`, else the project's `.claude/agents/<name>.md`, the start
   directory's before the managed root's, then the user's) receive nothing, and a
@@ -84,6 +86,8 @@ Visibility of misuse (turned silent no-ops into stderr warnings):
 - `version:` field with non-int value → warning, coerced to 1.
 - `.claude/settings.json` malformed JSON → louder warning naming the
   consequence (reconciliation skipped, disable list not applied).
+- A managed split recipient with no usable spawn split → warning; a unit whose stored
+  split disagrees with its sources → warning naming the unit (each arrives whole).
 """
 
 from __future__ import annotations
@@ -117,14 +121,17 @@ from _rule_blacklist import (
     ensure_template_present,
 )
 from _rule_delivery import (
+    AUDIENCE_MANIFEST_PATH,
     FRONTMATTER_RE,
     MANAGED_CORE_UNITS,
     PLUGIN_NAMESPACE,
+    SPAWN_SPLIT_PATH,
     AgentKind,
     Delivery,
     DeliveryPart,
     Event,
     SpawnSplit,
+    distrusted_units,
     parse_agent_kind,
     parse_spawn_split,
     plan_delivery,
@@ -152,11 +159,6 @@ _AGENT_NAME = re.compile(r"\w[\w.-]*")
 
 # `project_scope` manifest value delivered only inside a managed project.
 _MANAGED_ONLY = "managed"
-
-# The generator's split artifact (`scripts/kernel_spawn_split.py`) and the audience manifest
-# whose bytes it digested; both relative to the plugin root.
-SPAWN_SPLIT_PATH = "claude/kernels/spawn_split.json"
-AUDIENCE_MANIFEST_PATH = "rules/_audience.yaml"
 
 
 # -- YAML loading (stdlib fallback) --------------------------------------------
@@ -274,13 +276,15 @@ def _load_project_config(directory: Path) -> dict | None:
 def _read_rule_body(plugin_root: Path, rel_path: str) -> str:
     """Read a rule file and strip its frontmatter.
 
+    The bytes are decoded as written, with no newline translation: the generator digests the
+    same text (`scripts/kernel_spawn_split.py`), so a stored split's digest can match.
     Returns empty string on any I/O error.
     """
     if not rel_path:
         return ""
     rule_path = plugin_root / rel_path
     try:
-        raw = rule_path.read_text(encoding="utf-8")
+        raw = rule_path.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         print(
             f"[inject_rules] WARNING: could not read rule file {rule_path}: {exc}",
@@ -386,12 +390,29 @@ def _sets_omit_flag(definition: str) -> bool | None:
 
 
 def _received_units(
-    units: Mapping[str, str], plugin_root: Path, audience: Audience
+    units: Mapping[str, str], plugin_root: Path, scope: ProjectScope, audience: Audience
 ) -> Mapping[str, str]:
-    """The text each unit reaches `audience` as: a split recipient's stored split where the
-    artifact is trusted for that unit, anyone else's the unit's body, the artifact unread."""
-    if audience.agent is not AgentKind.SPLIT_RECIPIENT:
+    """The text each unit reaches `audience` as: a managed split recipient's stored split
+    where the artifact is trusted for that unit, anyone else's the unit's body, the artifact
+    unread (an unmanaged spawn receives no unit)."""
+    if audience.agent is not AgentKind.SPLIT_RECIPIENT or not isinstance(scope, Managed):
         return units
+    # The split only shortens a delivery: a failure the parser did not foresee costs the
+    # spawn its split, never its units, on the manifest path and the impaired floor alike.
+    try:
+        return _split_units(units, plugin_root)
+    except Exception as exc:
+        print(
+            f"[inject_rules] WARNING: could not apply the spawn split: {exc!r};"
+            " the core units arrive whole",
+            file=sys.stderr,
+        )
+        return units
+
+
+def _split_units(units: Mapping[str, str], plugin_root: Path) -> Mapping[str, str]:
+    """Each unit's stored split where the artifact is trusted for it, else its body; a warning
+    for no usable artifact and one naming each unit whose split its sources no longer trust."""
     split = _parsed_split(_read_bytes(plugin_root / SPAWN_SPLIT_PATH))
     manifest = _read_bytes(plugin_root / AUDIENCE_MANIFEST_PATH)
     if split is None or manifest is None:
@@ -400,7 +421,14 @@ def _received_units(
             f" ({SPAWN_SPLIT_PATH}, {AUDIENCE_MANIFEST_PATH}); the core units arrive whole",
             file=sys.stderr,
         )
-    manifest_sha = hashlib.sha256(manifest).hexdigest() if manifest is not None else None
+        return units
+    manifest_sha = hashlib.sha256(manifest).hexdigest()
+    for unit_id in distrusted_units(units, split, manifest_sha):
+        print(
+            f"[inject_rules] WARNING: the spawn split of {unit_id} disagrees with its sources"
+            " (stale or edited; regenerate with scripts/generate_kernels.py); it arrives whole",
+            file=sys.stderr,
+        )
     return spawn_units(units, split, manifest_sha)
 
 
@@ -530,7 +558,7 @@ def _floor_delivery(
 ) -> Delivery:
     """The impaired injection's delivery: the managed core units, read without the manifest."""
     bodies = {unit.unit_id: _read_rule_body(plugin_root, unit.path) for unit in MANAGED_CORE_UNITS}
-    units = _received_units(bodies, plugin_root, audience)
+    units = _received_units(bodies, plugin_root, scope, audience)
     return Delivery(notice, units, _plan(units, set(units), scope, set(), audience))
 
 
@@ -574,7 +602,7 @@ def _manifest_delivery(
         apply_symlink_exclusions(cwd, compute_symlink_exclusions(disable_set, rules))
 
     bodies, managed_only = _hook_delivered_units(rules, plugin_root)
-    units = _received_units(bodies, plugin_root, audience)
+    units = _received_units(bodies, plugin_root, scope, audience)
     delivery = Delivery(None, units, _plan(units, managed_only, scope, disable_set, audience))
     if effects:
         _log_injection_summary(rules, units, delivery, disable_set)

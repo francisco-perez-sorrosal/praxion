@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 
 import _rule_delivery as rd  # noqa: E402  # pyright: ignore[reportMissingImports]
+import inject_rules  # noqa: E402  # pyright: ignore[reportMissingImports]
 import kernel_model as km  # noqa: E402
 import kernel_sources as ks  # noqa: E402
 import kernel_spawn_split as kss  # noqa: E402
@@ -229,3 +230,20 @@ def test_the_artifact_lists_only_the_core_units_that_lose_something(tmp_path: Pa
 
     assert list(artifact["units"]) == [unit.unit_id]
     assert artifact["manifest_sha256"] == kss.sha256_hex(b"version: 1\n")
+
+
+def test_the_generator_reads_the_audience_manifest_the_hook_digests() -> None:
+    """The kernel model names the manifest it parses on its own (it imports no hook module),
+    so the two names are held equal here."""
+    assert km.MANIFEST_PATH == rd.AUDIENCE_MANIFEST_PATH
+
+
+def test_a_crlf_source_is_digested_over_the_body_the_hook_reads(tmp_path: Path) -> None:
+    manifest = build_repo(tmp_path)
+    source = tmp_path / SOURCE
+    source.write_bytes(source.read_bytes().replace(b"\n", b"\r\n"))
+
+    result = kss.expected_split(tmp_path, manifest, UNIT)
+
+    assert result is not None
+    assert result.whole_sha256 == kss.sha256_hex(inject_rules._read_rule_body(tmp_path, SOURCE))

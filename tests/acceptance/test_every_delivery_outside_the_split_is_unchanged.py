@@ -93,6 +93,7 @@ def test_an_impaired_main_session_receives_the_same_rule_strings_as_at_the_base(
 WHOLE_RECIPIENTS = (
     "general-purpose",
     "statusline-setup",
+    "fork",  # a fork: its payload names the agent type `fork`
     "other-plugin:verifier",
     "praxion:no-such-role",
     "release-reviewer",  # a project agent, defined in the project

@@ -38,8 +38,8 @@ fails, so the hooks' interpreter cannot import the parser.
 Bound here: the delivery, the oracle, the base arms and the commit-time kernel gate (through
 `kernel_sandbox.commit_gate`, which runs the `.pre-commit-config.yaml` hooks naming the kernel
 checkers). The regeneration a maintainer runs after editing a rule or the audience manifest is
-bound provisionally to the kernel generator. Unbound: the command that counts the text a split
-recipient sheds.
+bound provisionally to the kernel generator. The command that counts, at no cost, the text a split
+recipient sheds is bound to `scripts/count_spawn_shed.py --json`.
 """
 
 from __future__ import annotations
@@ -60,7 +60,6 @@ from tests.acceptance.drivers.kernel_sandbox import (
     AUDIENCE_MANIFEST,
     GateVerdict,
     Sandbox,
-    UnboundDriverError,
     commit_gate,
     isolated_env,
     normalize_plugin_location,
@@ -808,7 +807,7 @@ def other_unit(unit: Unit) -> Unit:
     return INTERMEDIATE if unit == PROTOCOL else PROTOCOL
 
 
-# -- The shed count (unbound) ------------------------------------------------------------------
+# -- The shed count ------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -853,13 +852,53 @@ def model_request_trap(scratch: Path) -> ModelRequestTrap:
     return ModelRequestTrap(bin_dir, calls)
 
 
+_NO_FIGURES = UnitCount(whole_chars=0, split_chars=0, difference=0, tokens=0, token_basis="")
+_COUNT_TIMEOUT = 120
+
+
 def shed_count(plugin_root: Path, scratch: Path, trap: ModelRequestTrap | None = None) -> ShedCount:
     """Run the no-cost count of the text a split recipient sheds, over `plugin_root`.
 
     With a `trap`, the command runs with `trap.bin_dir` first on PATH and `trap.env` applied.
+    A command that exits non-zero yields a `ShedCount` that carries its exit code and no figures.
     """
-    raise UnboundDriverError(
-        "the command that counts, at no cost, the characters a split recipient sheds per unit "
-        "and in total (whole, split, difference, and a token figure labelled with its basis) "
-        "is not bound yet: bind its invocation and its report's shape here"
+    environment = isolated_env(scratch)
+    if trap is not None:
+        environment["PATH"] = f"{trap.bin_dir}{os.pathsep}{environment['PATH']}"
+        environment.update(trap.env)
+    proc = subprocess.run(
+        ["python3", "scripts/count_spawn_shed.py", "--repo-root", str(plugin_root), "--json"],
+        cwd=plugin_root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=_COUNT_TIMEOUT,
     )
+    if proc.returncode != 0:
+        return ShedCount(proc.returncode, {}, _NO_FIGURES)
+    try:
+        return _parse_shed_report(proc.returncode, json.loads(proc.stdout))
+    except (ValueError, KeyError, TypeError) as error:
+        raise AssertionError(
+            f"the shed-count command exited 0 but its report cannot be read ({error!r}); "
+            f"stdout starts {proc.stdout[:200]!r}; stderr ends {proc.stderr[-500:]!r}"
+        ) from error
+
+
+def _parse_shed_report(exit_code: int, report: dict) -> ShedCount:
+    basis = report["tokens"]["basis"]
+
+    def unit_count(figures: dict, tokens: dict) -> UnitCount:
+        return UnitCount(
+            whole_chars=figures["whole_chars"],
+            split_chars=figures["split_chars"],
+            difference=figures["shed_chars"],
+            tokens=tokens["shed"],
+            token_basis=basis,
+        )
+
+    units = {
+        unit_id: unit_count(figures, figures["tokens"])
+        for unit_id, figures in report["units"].items()
+    }
+    return ShedCount(exit_code, units, unit_count(report["total"], report["tokens"]))

@@ -131,17 +131,21 @@ REFUSAL_WORDING = "Claude requested permissions to use Bash, but you haven't gra
 SPAWN = "toolu_spawn"
 
 
-def _assessed(monkeypatch, command: str, output: str):
-    """What `_assessed` makes of a confined session whose one shell command drew `output`."""
-    events = [
-        {"type": "system", "subtype": "init"},
+def _shell_use(use_id: str, command: str, output: str) -> list[dict]:
+    """One shell command of the role and the tool result it drew."""
+    return [
         {
             "type": "assistant",
             "parent_tool_use_id": SPAWN,
             "message": {
                 "role": "assistant",
                 "content": [
-                    {"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": command}}
+                    {
+                        "type": "tool_use",
+                        "id": use_id,
+                        "name": "Bash",
+                        "input": {"command": command},
+                    }
                 ],
             },
         },
@@ -150,9 +154,19 @@ def _assessed(monkeypatch, command: str, output: str):
             "parent_tool_use_id": SPAWN,
             "message": {
                 "role": "user",
-                "content": [{"type": "tool_result", "tool_use_id": "b1", "content": output}],
+                "content": [{"type": "tool_result", "tool_use_id": use_id, "content": output}],
             },
         },
+    ]
+
+
+def _assessed(monkeypatch, command: str, output: str, *, earlier: tuple[str, ...] = ()):
+    """What `_assessed` makes of a confined session whose last shell command drew `output`, after
+    the `earlier` commands each ran."""
+    events = [
+        {"type": "system", "subtype": "init"},
+        *(e for n, ran in enumerate(earlier) for e in _shell_use(f"e{n}", ran, "ok")),
+        *_shell_use("b1", command, output),
         {"type": "result", "subtype": "success", "is_error": False, "result": "done"},
     ]
     stream = "\n".join(json.dumps(event) for event in events) + "\n"
@@ -209,3 +223,24 @@ def test_the_block_on_a_command_no_definition_prescribes_is_the_roles_own(monkey
     )
 
     assert result == "assessed"
+
+
+SENSOR = "/work/plugin/scripts/mutation_sensor.py"
+
+
+def test_a_refused_spelling_of_a_script_the_session_ran_unrefused_is_the_roles_own(monkeypatch):
+    refused = "cd /work/task && cd src && python3 /work/plugin/x/../scripts/mutation_sensor.py -q"
+
+    result, kept = _assessed(
+        monkeypatch, refused, REFUSAL_WORDING, earlier=(f"python3 {SENSOR} --step 1",)
+    )
+
+    assert result == "assessed"
+    assert [r.command for r in kept] == [refused]
+
+
+def test_a_refused_command_is_never_its_own_unrefused_twin(monkeypatch):
+    result, _ = _assessed(monkeypatch, f"python3 {SENSOR} --step 1", REFUSAL_WORDING)
+
+    assert isinstance(result, Errored)
+    assert result.kind == "confinement_broken"

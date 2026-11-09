@@ -44,7 +44,7 @@ from praxion_evals.adherence.model import (
     Standard,
     TaskSpec,
 )
-from praxion_evals.adherence.transcript import refused_commands
+from praxion_evals.adherence.transcript import Refusal, refused_commands
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.materialize import install_user_scope
 from praxion_evals.live.report import CREDENTIAL_KEYS
@@ -379,13 +379,17 @@ def redacted_refusals(
 ) -> tuple[RefusedCommand, ...]:
     """The commands the harness refused the role, whole, with the credentials the session was
     given (and any API key shape) redacted: what the breach reading judges."""
-    final = evidence.envelope.final_result
-    denied = () if final is None else final.denied_commands
     secrets = _credentials(env)
     return tuple(
         RefusedCommand(_redacted(refusal.command, secrets), refusal.source)
-        for refusal in refused_commands(evidence.envelope, evidence.role_tool_uses, denied)
+        for refusal in _refusals(evidence)
     )
+
+
+def _refusals(evidence: SessionEvidence) -> tuple[Refusal, ...]:
+    final = evidence.envelope.final_result
+    denied = () if final is None else final.denied_commands
+    return refused_commands(evidence.envelope, evidence.role_tool_uses, denied)
 
 
 def clipped(
@@ -400,12 +404,17 @@ def _redacted(command: str, secrets: list[str]) -> str:
 
 
 def _shell_runs(evidence: SessionEvidence) -> tuple[ShellRun, ...]:
-    """Each shell command the role ran, with the output its tool result carried."""
+    """Each shell command the role ran, with the output its tool result carried. A command the
+    harness refused never ran, so it is none of them, matched whole before any redaction: the
+    breach reading takes these as the commands the grant let through."""
     results = evidence.envelope.tool_results
+    refused = {refusal.command for refusal in _refusals(evidence)}
     return tuple(
         ShellRun(use.input["command"], results.get(use.id, ""))
         for use in evidence.role_tool_uses
-        if use.name == "Bash" and isinstance(use.input.get("command"), str)
+        if use.name == "Bash"
+        and isinstance(use.input.get("command"), str)
+        and use.input["command"] not in refused
     )
 
 

@@ -464,3 +464,132 @@ def test_the_first_refused_prescribed_command_is_the_one_named():
     first, second = _refused("pytest -q"), _refused("ruff check .")
 
     assert refused_prescribed("implementer", (_refused("curl x"), first, second)) == first
+
+
+# -- A refusal the role's own spelling drew ----------------------------------------------------------
+#
+# The harness refuses a line its parser cannot trace (a second `cd`, a subshell, a `..` path) even
+# when it names no outside path, so a refused prescribed command is the role's own when the session
+# ran the same command unrefused against the same target. A refusal with no such twin is the grant's.
+
+ROOT = "/work/run/systems-architect"
+SCRIPT = f"{ROOT}/lean/scripts/extract_spec.py"
+DOTTED_SCRIPT = f"{ROOT}/sessions/s-1/fixture/../../../lean/scripts/extract_spec.py"
+FIXTURE = f"{ROOT}/sessions/s-1/fixture"
+DOTTED_REFUSAL = f"python3 {DOTTED_SCRIPT} tag-filter --check --repo-root {FIXTURE}"
+
+
+def _ran(command: str) -> ShellRun:
+    return ShellRun(command, "ok")
+
+
+@pytest.mark.parametrize(
+    ("role", "refused", "twin"),
+    [
+        (
+            "systems-architect",
+            DOTTED_REFUSAL,
+            f"python3 {SCRIPT} tag-filter --repo-root {FIXTURE}",
+        ),
+        (
+            "systems-architect",
+            f"cd {FIXTURE} && cd .. && python3 {SCRIPT} tag-filter --check",
+            f"timeout 60 python3 {ROOT}/lean/./scripts/extract_spec.py tag-filter",
+        ),
+        (
+            "systems-architect",
+            DOTTED_REFUSAL,
+            f"uv run python {SCRIPT} tag-filter",
+        ),
+        (
+            "verifier",
+            f"cd {FIXTURE} && cd src && git -C {FIXTURE} log --oneline -3",
+            f"git -C {FIXTURE}/ log -1",
+        ),
+        (
+            "verifier",
+            f"git -C {FIXTURE}/src/.. status",
+            f"git -C {FIXTURE} status --short",
+        ),
+    ],
+    ids=[
+        "a-script-spelled-with-dot-dot-segments",
+        "a-twin-inside-a-wrapper",
+        "a-twin-under-a-package-runner",
+        "a-git-read-in-a-line-that-changes-directory-twice",
+        "a-git-directory-spelled-with-dot-dot-segments",
+    ],
+)
+def test_a_refusal_whose_command_ran_unrefused_against_the_same_target_is_the_roles_own(
+    role, refused, twin
+):
+    assert _breach(role, refused=[_refused(refused, "transcript")], runs=[_ran(twin)]) is None
+
+
+@pytest.mark.parametrize(
+    ("role", "refused", "runs"),
+    [
+        ("systems-architect", DOTTED_REFUSAL, []),
+        (
+            "systems-architect",
+            DOTTED_REFUSAL,
+            [_ran("python3 /work/elsewhere/scripts/extract_spec.py tag-filter")],
+        ),
+        (
+            "systems-architect",
+            DOTTED_REFUSAL,
+            [_ran(f"python3 {ROOT}/lean/scripts/query_adrs.py --tag x")],
+        ),
+        (
+            "systems-architect",
+            f"P={ROOT}/full; cd $P/skills; grep -n x SKILL.md | head -80; "
+            "python3 $P/scripts/extract_spec.py tag-filter --check",
+            [_ran(f"python3 {ROOT}/full/scripts/extract_spec.py tag-filter --check")],
+        ),
+        (
+            "systems-architect",
+            "cd a && cd b && python3 ../scripts/extract_spec.py tag-filter",
+            [_ran("python3 ../scripts/extract_spec.py tag-filter")],
+        ),
+        ("implementer", "cd tests && cd .. && pytest -q", [_ran("pytest -q")]),
+        (
+            "implementer",
+            "cd tests && cd .. && /work/venv/bin/pytest -q",
+            [_ran("/work/venv/bin/pytest -q")],
+        ),
+        (
+            "systems-architect",
+            f"cd {FIXTURE}; cd ..; python3 {DOTTED_SCRIPT} tag-filter; git -C {FIXTURE} log -1",
+            [_ran(f"python3 {SCRIPT} tag-filter")],
+        ),
+        ("verifier", f"git -C {FIXTURE} log -3", [_ran("git -C /work/other log -3")]),
+        ("verifier", f"git -C {FIXTURE} log -3", [_ran(f"git -C {FIXTURE} status")]),
+        ("verifier", "cd a && cd b && git log -3", [_ran("git log -3")]),
+        (
+            "systems-architect",
+            "cd a && cd b && python3 /work/$ARM/scripts/extract_spec.py tag-filter",
+            [_ran("python3 /work/$ARM/scripts/extract_spec.py tag-filter")],
+        ),
+        ("verifier", "cd a && cd b && git -C src log -3", [_ran("git -C src log -3")]),
+    ],
+    ids=[
+        "no-twin",
+        "a-script-of-the-same-name-elsewhere",
+        "another-prescribed-script-in-the-same-place",
+        "a-target-spelled-through-a-variable",
+        "a-relative-spelling",
+        "a-program-run-by-name",
+        "a-program-run-by-its-path",
+        "one-of-two-prescribed-segments-without-a-twin",
+        "a-git-read-of-another-directory",
+        "another-git-read-of-the-same-directory",
+        "a-git-read-that-names-no-directory",
+        "an-absolute-path-spelled-through-an-expansion",
+        "a-git-directory-spelled-relative",
+    ],
+)
+def test_a_refusal_with_no_twin_against_the_same_target_is_still_broken(role, refused, runs):
+    evidence = _breach(role, refused=[_refused(refused, "transcript")], runs=runs)
+
+    assert evidence is not None
+    assert refused[:EVIDENCE_CHARS] in evidence

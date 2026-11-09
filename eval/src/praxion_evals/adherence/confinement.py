@@ -24,7 +24,9 @@ module is a function of its arguments.
 
 The same module reads a broken confinement back from a session's record
 (``confinement_breach``): a sandbox that never started, a sandbox refusal after startup, a
-refused command the role's definition prescribes, or a prescribed command the sandbox blocked
+refused command the role's definition prescribes that the session never ran unrefused against
+the same target (a refusal with such a twin is the role's spelling), or a prescribed command the
+sandbox blocked
 (``Operation not permitted``, on a line no other program of the shell line reports as its own,
 as ``mktemp:`` does). Each means the grant, not the role, failed. A refused command
 that starts with a variable assignment is the exception: the harness sends it through the
@@ -324,30 +326,53 @@ def confinement_breach(
     for text in tool_result_texts:
         if match := SANDBOX_REFUSAL.search(text):
             return _clip(match.group())
-    if (prescribed := refused_prescribed(role, refused)) is not None:
+    ran = tuple(shell_runs)
+    if (prescribed := refused_prescribed(role, refused, ran)) is not None:
         return (
             f"a command the role's definition prescribes was refused: {_clip(prescribed.command)}"
         )
-    if (blocked := blocked_prescribed(role, shell_runs)) is not None:
+    if (blocked := blocked_prescribed(role, ran)) is not None:
         return f"a command the role's definition prescribes met {BLOCKED_BY_SANDBOX!r}: " + _clip(
             blocked.command
         )
     return None
 
 
-def refused_prescribed(role: Role, refused: Sequence[RefusedCommand]) -> RefusedCommand | None:
-    """The first refused command that runs something `role`'s definition prescribes.
+def refused_prescribed(
+    role: Role, refused: Sequence[RefusedCommand], ran: Iterable[ShellRun] = ()
+) -> RefusedCommand | None:
+    """The first refused command that runs something `role`'s definition prescribes and has no
+    twin among the commands the session ran (`ran`, every one the harness let through).
+
+    Under ``blockReadsOutsideWorkingDirectories`` the harness also refuses a line its parser
+    cannot trace (a second ``cd``, a subshell, a ``..`` path) though it names no outside path
+    (permission-modes.md § Actions no mode auto-approves), so a refusal can be the role's
+    spelling rather than the grant. A refused prescribed command is the role's own when the
+    session ran the same command unrefused against the same target (`_target`); the record
+    holds nothing else that tells the two apart, so a command with no target, or none that
+    ran, is the grant's. Never the program alone: that would excuse a grant that admits a
+    program in one place and refuses it in another.
 
     A command that starts with a variable assignment goes through the regular permission flow
     by design (sandboxing.md § Auto-allow), so its refusal is not read: the fixtures declare
     ``pythonpath``, which leaves no prescribed form needing the prefix.
     """
     prescribed = PRESCRIBED_COMMANDS.get(role, frozenset())
+    admitted = frozenset(
+        target
+        for run in ran
+        for command in _prescribed_commands(run.command, prescribed)
+        if (target := _target(command.argv, prescribed)) is not None
+    )
     return next(
         (
             r
             for r in refused
-            if any(not c.env_prefixed for c in _prescribed_commands(r.command, prescribed))
+            if any(
+                _target(c.argv, prescribed) not in admitted
+                for c in _prescribed_commands(r.command, prescribed)
+                if not c.env_prefixed
+            )
         ),
         None,
     )
@@ -509,3 +534,76 @@ def _python_runs_one_of(args: list[str], prescribed: frozenset[str]) -> bool:
         if not arg.startswith("-"):
             return os.path.basename(arg) in prescribed
     return False
+
+
+class _Target(NamedTuple):
+    """A prescribed command and the place it acts on: a script's file name and path, or a git
+    read and its directory, the path with ``.`` and ``..`` collapsed."""
+
+    command: str
+    place: str
+
+
+# A place spelled through an expansion or a glob reaches what the shell made of it, which the
+# record does not hold.
+_EXPANDED = re.compile(r"[$`*?\[]")
+
+
+def _target(argv: list[str], prescribed: frozenset[str]) -> _Target | None:
+    """What a prescribed command acts on, when its own words name the place absolutely: a script
+    by its path, a git read by its ``-C`` directory. A program run by name, a module, an inline
+    script, and a place spelled relative or through an expansion name none, since where they
+    reach depends on a working directory or a value the record does not hold."""
+    program = os.path.basename(argv[0])
+    if program == "git":
+        return _placed(_git_subcommand(argv[1:]), _git_directory(argv[1:]))
+    if _PYTHON_PROGRAM.fullmatch(program):
+        return _script_target(_python_script(argv[1:]), prescribed)
+    if program in _PACKAGE_RUNNERS and "run" in argv:
+        start = argv.index("run") + 1
+        return next(
+            (
+                _target(argv[i:], prescribed)
+                for i in range(start, len(argv))
+                if _runs_one_of(argv[i:], prescribed)
+            ),
+            None,
+        )
+    return _script_target(argv[0], prescribed)
+
+
+def _script_target(path: str | None, prescribed: frozenset[str]) -> _Target | None:
+    if path is None or not path.endswith(".py") or os.path.basename(path) not in prescribed:
+        return None
+    return _placed(os.path.basename(path), path)
+
+
+def _placed(command: str, place: str | None) -> _Target | None:
+    if place is None or not os.path.isabs(place) or _EXPANDED.search(place):
+        return None
+    return _Target(command, os.path.normpath(place))
+
+
+def _python_script(args: list[str]) -> str | None:
+    """The script ``python`` runs; None for a module (``-m``) or an inline script (``-c``)."""
+    for arg in args:
+        if arg in ("-m", "-c"):
+            return None
+        if not arg.startswith("-"):
+            return arg
+    return None
+
+
+def _git_directory(args: list[str]) -> str | None:
+    """The directory ``git -C <dir>`` names, repeated ``-C`` composed as git composes them; None
+    without one."""
+    place: str | None = None
+    rest = iter(args)
+    for arg in rest:
+        if arg == "-C":
+            place = os.path.join(place or "", next(rest, ""))
+        elif arg == "-c":
+            next(rest, None)
+        elif not arg.startswith("-"):
+            break
+    return place

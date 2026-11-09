@@ -123,6 +123,16 @@ def test_the_live_checkout_delivers_its_split_as_its_sources_give_it(repo: Path)
     assert kinds(repo) & {DRIFT, UNREADABLE} == set()
 
 
+def test_a_crlf_checkout_delivers_the_split_its_lf_sources_give(repo: Path) -> None:
+    """The checker reads a source as the hook does, newlines translated, so the artifact
+    generated from LF sources is current on a checkout with CRLF line endings."""
+    for rel in (*SOURCES.values(), km.MANIFEST_PATH):
+        path = repo / rel
+        path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+
+    assert kinds(repo) & {DRIFT, UNREADABLE} == set()
+
+
 @pytest.mark.parametrize("name", NAMED_PLANTS)
 def test_a_disagreeing_split_is_refused_naming_each_unit_it_reaches(repo: Path, name: str) -> None:
     plant, named = NAMED_PLANTS[name]

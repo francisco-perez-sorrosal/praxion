@@ -108,6 +108,22 @@ def test_a_unit_whose_split_is_distrusted_is_counted_whole_and_named(plugin, cap
     assert INTERMEDIATE.unit_id in err
 
 
+def test_a_crlf_checkout_is_counted_as_its_lf_checkout_is(plugin, tmp_path_factory, capsys):
+    """The count reads the sources as the hook does, so a split cut from LF sources is still
+    trusted, and still counted split, on a checkout with CRLF line endings."""
+    lf_figures = json.loads(run(plugin, capsys, "--json")[1])["units"]
+    for unit in (PROTOCOL, INTERMEDIATE):
+        path = plugin / unit.path
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+    manifest = plugin / rd.AUDIENCE_MANIFEST_PATH
+    manifest.write_bytes(manifest.read_bytes().replace(b"\n", b"\r\n"))
+
+    code, out, err = run(plugin, capsys, "--json")
+
+    assert (code, json.loads(out)["units"]) == (0, lf_figures)
+    assert err == ""
+
+
 # -- The token figure ---------------------------------------------------------------------
 
 

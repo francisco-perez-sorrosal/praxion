@@ -127,6 +127,20 @@ class Delivery:
         return "\n\n".join(text for text in (self.notice, rules) if text)
 
 
+def decode_source(raw: bytes) -> str:
+    """A rule file or the audience manifest as text, newlines translated (CRLF and a lone CR
+    read as LF) as `Path.read_text` reads it: the one reading every edge uses, so the text the
+    main session receives, the text a digest is taken over and the text a split is cut from are
+    the same on a checkout with CRLF line endings as on one with LF."""
+    return raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def source_digest(raw: bytes) -> str:
+    """The sha256 of a source over its `decode_source` text: what the artifact records for
+    the audience manifest and what each edge compares it with."""
+    return _sha256(decode_source(raw))
+
+
 def rule_body(raw: str) -> str:
     """A rule file's text without its leading frontmatter: the body the hook delivers and
     the generator digests, one definition so their digests agree."""
@@ -147,12 +161,13 @@ def parse_agent_kind(
         return AgentKind.NO_INSTRUCTION_FILES
     if omit_claude_md is True:
         return AgentKind.LEAN
-    if plugin_definition_read and omit_claude_md is False and _is_plugin_role(agent_type):
+    if plugin_definition_read and omit_claude_md is False and is_plugin_role(agent_type):
         return AgentKind.SPLIT_RECIPIENT
     return AgentKind.WHOLE_RECIPIENT
 
 
-def _is_plugin_role(agent_type: str | None) -> bool:
+def is_plugin_role(agent_type: str | None) -> bool:
+    """Whether ``agent_type`` is ``praxion:<role>``, the name of an agent this plugin defines."""
     prefix = f"{PLUGIN_NAMESPACE}:"
     return (
         agent_type is not None and agent_type.startswith(prefix) and len(agent_type) > len(prefix)
@@ -306,17 +321,12 @@ def _encodes_as_utf8(text: str) -> bool:
 def spawn_units(
     units: Mapping[str, str], split: SpawnSplit | None, manifest_sha: str | None
 ) -> Mapping[str, str]:
-    """The text each unit reaches a split recipient as, in the order of ``units``.
-
-    A unit gets its stored split text only when its entry exists and three digests agree:
-    its current body against ``whole_sha256``, ``manifest_sha`` against the manifest the
-    split was cut under, and the stored text against ``text_sha256``. Each unit is judged
-    alone; any doubt, or no artifact, gives that unit its whole body.
-    """
-    if split is None or split.manifest_sha256 != manifest_sha:
-        return dict(units)
+    """The text each unit reaches a split recipient as, in the order of ``units``: its stored
+    split text where `trusted_splits` holds its entry, else its whole body."""
+    trusted = trusted_splits(units, split, manifest_sha)
     return {
-        unit_id: _trusted_text(split.units.get(unit_id), body) for unit_id, body in units.items()
+        unit_id: trusted[unit_id].text if unit_id in trusted else body
+        for unit_id, body in units.items()
     }
 
 
@@ -326,17 +336,26 @@ def distrusted_units(
     """The units, in the order of ``units``, whose stored split exists but disagrees with
     their current sources (a stale or hand-edited entry, or a split cut under another audience
     manifest), so `spawn_units` gives each its whole body."""
-    current = split.manifest_sha256 == manifest_sha
-    return tuple(
-        unit_id
+    trusted = trusted_splits(units, split, manifest_sha)
+    return tuple(unit_id for unit_id in units if unit_id in split.units and unit_id not in trusted)
+
+
+def trusted_splits(
+    units: Mapping[str, str], split: SpawnSplit | None, manifest_sha: str | None
+) -> Mapping[str, SplitEntry]:
+    """The one trust decision: the stored entry of each unit whose split may be delivered.
+
+    An entry is trusted only when three digests agree: ``manifest_sha`` against the manifest
+    the split was cut under, the unit's current body against ``whole_sha256``, and the stored
+    text against ``text_sha256``. Each unit is judged alone; no artifact trusts none.
+    """
+    if split is None or split.manifest_sha256 != manifest_sha:
+        return {}
+    return {
+        unit_id: entry
         for unit_id, body in units.items()
-        if (entry := split.units.get(unit_id)) is not None
-        and not (current and _trusts(entry, body))
-    )
-
-
-def _trusted_text(entry: SplitEntry | None, body: str) -> str:
-    return entry.text if entry is not None and _trusts(entry, body) else body
+        if (entry := split.units.get(unit_id)) is not None and _trusts(entry, body)
+    }
 
 
 def _trusts(entry: SplitEntry, body: str) -> bool:

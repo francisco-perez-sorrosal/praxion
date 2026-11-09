@@ -120,9 +120,10 @@ def expected_split(root: Path, manifest: km.Manifest, unit: rd.CoreUnit) -> rd.S
     """
     if not (root / unit.path).is_file():
         return None
-    # The bytes as written, as the hook reads them (`inject_rules._read_rule_body`).
-    body = rd.rule_body((root / unit.path).read_bytes().decode("utf-8"))
-    text = split_text(body, ks.load_sections(root, unit.path), manifest.entries)
+    # Read as the hook reads it (`inject_rules._read_rule_body`): newlines translated.
+    source = rd.decode_source((root / unit.path).read_bytes())
+    body = rd.rule_body(source)
+    text = split_text(body, ks.split_sections(unit.path, source), manifest.entries)
     if text == body:
         return None
     return rd.SplitEntry(unit.path, sha256_hex(body), text, sha256_hex(text))
@@ -135,5 +136,5 @@ def spawn_split_artifact(root: Path, manifest: km.Manifest) -> str:
         for unit in rd.MANAGED_CORE_UNITS
         if (entry := expected_split(root, manifest, unit)) is not None
     }
-    manifest_bytes = (root / rd.AUDIENCE_MANIFEST_PATH).read_bytes()
-    return render_spawn_split(sha256_hex(manifest_bytes), units)
+    manifest_sha256 = rd.source_digest((root / rd.AUDIENCE_MANIFEST_PATH).read_bytes())
+    return render_spawn_split(manifest_sha256, units)

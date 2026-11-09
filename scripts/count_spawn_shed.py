@@ -20,7 +20,6 @@ Exit: 0 counted; 2 an input error (an input absent or unusable, or the tokenizer
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -217,7 +216,7 @@ def _line(name: str, unit: Figures, basis: str) -> str:
 def _read_whole_bodies(root: Path, split: rd.SpawnSplit) -> dict[str, str]:
     """The body of each core unit the spawn split lists, as the hook reads it."""
     return {
-        unit.unit_id: rd.rule_body(_read_text(root, unit.path))
+        unit.unit_id: rd.rule_body(_read_text(root, unit.path, rd.decode_source))
         for unit in rd.MANAGED_CORE_UNITS
         if unit.unit_id in split.units
     }
@@ -227,8 +226,8 @@ def _read_split_bodies(
     root: Path, split: rd.SpawnSplit, wholes: Mapping[str, str]
 ) -> dict[str, str]:
     """The text a split recipient gets for each unit, trusting the artifact as the hook does."""
-    manifest = hashlib.sha256(_read_bytes(root, rd.AUDIENCE_MANIFEST_PATH))
-    return dict(rd.spawn_units(wholes, split, manifest.hexdigest()))
+    manifest_sha = rd.source_digest(_read_bytes(root, rd.AUDIENCE_MANIFEST_PATH))
+    return dict(rd.spawn_units(wholes, split, manifest_sha))
 
 
 def _read_spawn_split(root: Path) -> rd.SpawnSplit:
@@ -239,16 +238,18 @@ def _read_spawn_split(root: Path) -> rd.SpawnSplit:
 
 
 def _read_bytes(root: Path, relative: str) -> bytes:
-    """The file's raw bytes, as the hook digests them; its absence is an input error."""
+    """The file's raw bytes; its absence is an input error."""
     try:
         return (root / relative).read_bytes()
     except OSError as error:
         raise InputError(f"{relative} cannot be read under {root}: {error}") from error
 
 
-def _read_text(root: Path, relative: str) -> str:
+def _read_text(root: Path, relative: str, decode: Callable[[bytes], str] = bytes.decode) -> str:
+    """The file as text; a rule file is read as the hook reads it, newlines translated
+    (`_rule_delivery.decode_source`)."""
     try:
-        return _read_bytes(root, relative).decode("utf-8")
+        return decode(_read_bytes(root, relative))
     except UnicodeDecodeError as error:
         raise InputError(f"{relative} is not UTF-8: {error}") from error
 

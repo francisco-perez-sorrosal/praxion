@@ -70,7 +70,7 @@ def _core_file(plugin_root: Path, unit_id: str) -> Path:
 
 def _valid_wire(plugin_root: Path) -> dict:
     """The artifact the generator would write for this plugin: both split units, current, each
-    digested over its body read as the generator reads it (the bytes as written)."""
+    digested over its body read as the generator reads it (newlines translated; LF here)."""
     units = {}
     for unit_id in _SPLIT_UNIT_IDS:
         body = rule_body(_core_file(plugin_root, unit_id).read_bytes().decode("utf-8"))
@@ -392,15 +392,34 @@ def test_a_whole_recipient_on_the_impaired_floor_still_receives_the_units_whole(
 # -- The shipped files, read from a plugin root ---------------------------------------------
 
 
-def test_a_crlf_rule_is_trusted_by_the_digest_the_generator_takes_over_its_bytes(
+def _checked_out_with_crlf(plugin_root: Path) -> None:
+    """The rules and the audience manifest as a `core.autocrlf` checkout writes them; the
+    artifact stays what the generator wrote from the LF sources."""
+    for rel in (*(f"rules/{unit_id}.md" for unit_id in _SPLIT_UNIT_IDS), _AUDIENCE):
+        path = plugin_root / rel
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+
+
+def test_a_crlf_checkout_delivers_the_main_session_the_text_an_lf_checkout_does(
     plugin_root: Path, managed: Path
 ) -> None:
-    """The hook reads a rule's bytes as written, as the generator does, so a carriage return
-    in a source does not turn a current split into an unexplained whole delivery."""
-    for unit_id in _SPLIT_UNIT_IDS:
-        rule = _core_file(plugin_root, unit_id)
-        rule.write_bytes(rule.read_bytes().replace(b"\n", b"\r\n"))
-    _write_artifact(plugin_root, _valid_wire(plugin_root))
+    """Newline translation is how the rules were always read, so the session's bytes do not
+    move with the checkout's line endings."""
+    lf_units = _received_units(plugin_root, managed, None)
+    _checked_out_with_crlf(plugin_root)
+
+    units = _received_units(plugin_root, managed, None)
+
+    assert units == lf_units
+    assert not any("\r" in text for text in units.values())
+
+
+def test_a_crlf_checkout_still_trusts_the_split_the_generator_cut_from_its_lf_sources(
+    plugin_root: Path, managed: Path
+) -> None:
+    """The hook and the generator read a source the same way, so a carriage return in the
+    files on disk does not turn a current split into an unexplained whole delivery."""
+    _checked_out_with_crlf(plugin_root)
 
     units = _received_units(plugin_root, managed, _SPLIT_RECIPIENT)
 

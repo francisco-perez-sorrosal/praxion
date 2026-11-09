@@ -238,12 +238,35 @@ def test_the_generator_reads_the_audience_manifest_the_hook_digests() -> None:
     assert km.MANIFEST_PATH == rd.AUDIENCE_MANIFEST_PATH
 
 
+def checked_out_with_crlf(root: Path) -> None:
+    """The source and the audience manifest as a `core.autocrlf` checkout writes them."""
+    for path in (root / SOURCE, root / km.MANIFEST_PATH):
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+
+
 def test_a_crlf_source_is_digested_over_the_body_the_hook_reads(tmp_path: Path) -> None:
     manifest = build_repo(tmp_path)
-    source = tmp_path / SOURCE
-    source.write_bytes(source.read_bytes().replace(b"\n", b"\r\n"))
+    checked_out_with_crlf(tmp_path)
 
     result = kss.expected_split(tmp_path, manifest, UNIT)
 
     assert result is not None
     assert result.whole_sha256 == kss.sha256_hex(inject_rules._read_rule_body(tmp_path, SOURCE))
+
+
+def test_a_crlf_checkout_gives_the_artifact_its_lf_checkout_gives(tmp_path: Path) -> None:
+    """A checkout's line endings are no input: the digests the shipped artifact carries are
+    the ones the same sources cut with LF endings give."""
+    manifest = build_repo(tmp_path / "lf")
+    build_repo(tmp_path / "crlf")
+    unit = rd.MANAGED_CORE_UNITS[0]
+    for root in (tmp_path / "lf", tmp_path / "crlf"):
+        (root / unit.path).parent.mkdir(parents=True, exist_ok=True)
+        (root / unit.path).write_text(FRONTMATTER + TWO_SECTIONS, encoding="utf-8")
+    checked_out_with_crlf(tmp_path / "crlf")
+    crlf_unit = tmp_path / "crlf" / unit.path
+    crlf_unit.write_bytes(crlf_unit.read_bytes().replace(b"\n", b"\r\n"))
+
+    assert kss.spawn_split_artifact(tmp_path / "crlf", manifest) == kss.spawn_split_artifact(
+        tmp_path / "lf", manifest
+    )

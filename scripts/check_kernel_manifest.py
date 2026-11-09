@@ -547,13 +547,13 @@ def _spawn_reading(root: Path, manifest: km.Manifest) -> SpawnReading | ks.PartP
         )
     except ks.PartPrefixError as refusal:  # I1's orphan finding: judged, not raised, here
         return refusal
-    manifest_sha256 = kss.sha256_hex((root / rd.AUDIENCE_MANIFEST_PATH).read_bytes())
+    manifest_sha256 = rd.source_digest((root / rd.AUDIENCE_MANIFEST_PATH).read_bytes())
     return SpawnReading(_read_spawn_split(root), manifest_sha256, units)
 
 
 def _unit_reading(root: Path, manifest: km.Manifest, unit: rd.CoreUnit) -> UnitReading:
-    # The bytes as written, as the hook reads them (`inject_rules._read_rule_body`).
-    body = rd.rule_body((root / unit.path).read_bytes().decode("utf-8"))
+    # Read as the hook reads it (`inject_rules._read_rule_body`): newlines translated.
+    body = rd.rule_body(rd.decode_source((root / unit.path).read_bytes()))
     entry = kss.expected_split(root, manifest, unit)
     return UnitReading(unit, body, entry.text if entry is not None else body)
 

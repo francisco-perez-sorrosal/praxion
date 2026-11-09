@@ -92,7 +92,6 @@ Visibility of misuse (turned silent no-ops into stderr warnings):
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -131,11 +130,14 @@ from _rule_delivery import (
     DeliveryPart,
     Event,
     SpawnSplit,
+    decode_source,
     distrusted_units,
+    is_plugin_role,
     parse_agent_kind,
     parse_spawn_split,
     plan_delivery,
     rule_body,
+    source_digest,
     spawn_units,
 )
 
@@ -276,15 +278,16 @@ def _load_project_config(directory: Path) -> dict | None:
 def _read_rule_body(plugin_root: Path, rel_path: str) -> str:
     """Read a rule file and strip its frontmatter.
 
-    The bytes are decoded as written, with no newline translation: the generator digests the
-    same text (`scripts/kernel_spawn_split.py`), so a stored split's digest can match.
+    The text is read as every edge reads a source (`decode_source`): the main session receives
+    what it always has, and the generator digests the same text (`scripts/kernel_spawn_split.py`),
+    so a stored split's digest can match on a checkout with CRLF line endings.
     Returns empty string on any I/O error.
     """
     if not rel_path:
         return ""
     rule_path = plugin_root / rel_path
     try:
-        raw = rule_path.read_bytes().decode("utf-8")
+        raw = decode_source(rule_path.read_bytes())
     except (OSError, UnicodeDecodeError) as exc:
         print(
             f"[inject_rules] WARNING: could not read rule file {rule_path}: {exc}",
@@ -337,9 +340,7 @@ def _agent_kind(agent_type: object, plugin_root: Path, cwd: Path, scope: Project
     name = agent_type if isinstance(agent_type, str) else None
     candidates = _definition_candidates(name, plugin_root, cwd, scope) if name else ()
     omits = _omits_claude_md(candidates)
-    plugin_definition_read = (
-        omits is not None and name is not None and name.startswith(f"{PLUGIN_NAMESPACE}:")
-    )
+    plugin_definition_read = omits is not None and is_plugin_role(name)
     return parse_agent_kind(name, omits, plugin_definition_read)
 
 
@@ -422,7 +423,7 @@ def _split_units(units: Mapping[str, str], plugin_root: Path) -> Mapping[str, st
             file=sys.stderr,
         )
         return units
-    manifest_sha = hashlib.sha256(manifest).hexdigest()
+    manifest_sha = source_digest(manifest)
     for unit_id in distrusted_units(units, split, manifest_sha):
         print(
             f"[inject_rules] WARNING: the spawn split of {unit_id} disagrees with its sources"
@@ -433,8 +434,8 @@ def _split_units(units: Mapping[str, str], plugin_root: Path) -> Mapping[str, st
 
 
 def _read_bytes(path: Path) -> bytes | None:
-    """The file's bytes, or None when it cannot be read; raw bytes, as the generator digests
-    the audience manifest, so no newline translation separates the two digests."""
+    """The file's bytes, or None when it cannot be read; the caller reads them as a source
+    (`decode_source`), as the generator does."""
     try:
         return path.read_bytes()
     except OSError:

@@ -27,11 +27,14 @@ from _rule_delivery import (  # noqa: E402
     Event,
     SpawnSplit,
     SplitEntry,
+    decode_source,
     distrusted_units,
+    is_plugin_role,
     parse_agent_kind,
     parse_spawn_split,
     plan_delivery,
     rule_body,
+    source_digest,
     spawn_units,
 )
 
@@ -318,3 +321,35 @@ def test_a_split_text_goes_through_the_unchanged_framing():
         chosen, set(CORE_IDS), MANAGED, Event.SUBAGENT, AgentKind.SPLIT_RECIPIENT, (), ()
     )
     assert [part.text.partition("\n\n")[2] for part in plan] == list(SPLIT_TEXT.values())
+
+
+# -- Reading a source: one newline-translated text for the hook, the cutter and the checks ----
+
+
+def test_a_source_is_read_with_its_newlines_translated():
+    assert decode_source(b"one\r\ntwo\rthree\nfour") == "one\ntwo\nthree\nfour"
+
+
+def test_a_source_that_is_not_utf8_is_refused_not_replaced():
+    with pytest.raises(UnicodeDecodeError):
+        decode_source(b"\xff\xfe")
+
+
+def test_a_crlf_source_and_its_lf_twin_have_the_same_digest():
+    assert source_digest(b"version: 1\r\nentries: []\r\n") == _sha("version: 1\nentries: []\n")
+    assert source_digest(b"version: 1\nentries: []\n") == _sha("version: 1\nentries: []\n")
+
+
+@pytest.mark.parametrize(
+    ("agent_type", "expected"),
+    [
+        ("praxion:implementer", True),
+        ("praxion:", False),
+        ("praxionx:implementer", False),
+        ("other:implementer", False),
+        ("implementer", False),
+        (None, False),
+    ],
+)
+def test_only_a_name_in_this_plugins_namespace_is_a_plugin_role(agent_type, expected):
+    assert is_plugin_role(agent_type) is expected

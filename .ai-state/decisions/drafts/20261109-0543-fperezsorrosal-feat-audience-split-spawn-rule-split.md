@@ -65,6 +65,8 @@ Delivering by role would add a dimension that every later trial would have to me
   - Any manifest edit sends both units whole until regeneration. That is allowed, and uncommittable through the gate.
   - The generator and the hook must share one body definition (`_rule_delivery.rule_body`).
   - A plugin role added later is split with no audit row. That is a follow-up: an audited-role set where an unlisted role gets whole delivery, plus audit freshness when a recipient's definition changes.
+  - The hook trusts a stored split by its digests alone. A hand edit to `spawn_split.json` that also recomputes the digests is consistent at spawn time; only the commit gate's I11, which re-derives the split from the sources, refuses it. The plugin's own files are trusted at spawn, so this is a declared limit, not a guard to add.
+  - The verifier now reaches the tier signals through a pointer it has to follow. If it skips the read, its Calibration Verdict is judged without them, and no mechanical check catches that. Name this in the next verifier trial's notes.
 - **Activation:** no. A single load-bearing channel choice with an explicit runner-up was compared against the committed Boundary Assumptions. No lens sweep was needed beyond the Tier 1 self-review.
 
 ## Consumer Audit
@@ -86,6 +88,8 @@ This is the durable record of REQ-09. Each `orchestrator-only` entry was read ag
 | intermediate documents § `.ai-state/` [Lifecycle states] | yes | none | n/a |
 | intermediate documents § Document Lifecycle | yes | none (roadmap-planning's "session-persistent" names its own artifact) | n/a |
 | intermediate documents § Version Control and Cleanup | yes | none (the software-planning skill's end-of-feature cleanup is carried in the skill) | n/a |
+
+Near miss, recorded by the verifier's independent re-read: the implementation planner's `Spawn estimate: <n> of <budget>` line is the one place its work touches Process Calibration's envelope bullet. Its own definition names the figures' single source (`coordination-details.md` § Spawn Budget) and states the line it writes, so it acts on its own text, not the dropped bullet, and the bullet's figures reach it by that path.
 
 No entry is reclassified. Whole recipients (`general-purpose`, forks, project, user and other plugins' agents, and an unreadable `praxion:` definition) are outside the split and need no audit.
 

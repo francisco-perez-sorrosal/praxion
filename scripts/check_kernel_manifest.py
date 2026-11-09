@@ -518,7 +518,7 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *eligibility_findings(ELIGIBLE_ROLES, evidence.parent_flip, evidence.records, flags),
         *deletion_findings(evidence.parent, evidence.ledger),
         *misreading_findings(evidence.statuses, evidence.ledger_text),
-        # ...nor can the split be cut from them, so a drift there is I1's finding too
+        # nor can the spawn split be cut from sources that fail I1: that drift is I1's finding too
         *(() if totality else spawn_split_findings(evidence.spawn)),
     )
 

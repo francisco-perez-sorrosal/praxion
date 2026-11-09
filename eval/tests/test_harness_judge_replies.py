@@ -1,6 +1,7 @@
-"""A judge reply that stops short is named for what stopped it, never read as a malformed one.
+"""A judge reply is read only when whole; one that stops short is named for what stopped it.
 
-The Messages-API route reads the response's ``stop_reason``: a reply cut off at the output cap
+The Messages-API route asks for strict tool use, so a finished reply carries every required field
+(strict-tool-use.md), and reads the response's ``stop_reason``: a reply cut off at the output cap
 carries an incomplete tool input (handling-stop-reasons.md), so its fields are not read. The
 Agent-SDK route reads the result message: an error subtype, or a success that carries no
 structured output, is a failure the SDK names (agent-sdk/structured-outputs.md § Error handling).
@@ -96,6 +97,77 @@ def test_the_request_leaves_room_for_a_findings_first_reply(monkeypatch):
 
     assert request["max_tokens"] == judge_client._JUDGE_MAX_TOKENS
     assert judge_client._JUDGE_MAX_TOKENS >= 4096, "1,024 cut off findings-first replies"
+
+
+# -- Strict tool use --------------------------------------------------------------------------------
+#
+# Strict tool use takes only a subset of JSON Schema (structured-outputs.md § JSON Schema
+# limitations): every object closed, no numeric or string bounds. The client adapts each family's
+# schema at the boundary, so the families keep theirs.
+
+BOUNDED = {
+    "type": "object",
+    "properties": {
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"quote": {"type": "string", "maxLength": 200}},
+                "required": ["quote"],
+            },
+        },
+        "verdict": {"type": "string", "enum": ["PASS", "WARN", "FAIL"]},
+        "score": {"type": "integer", "minimum": 0, "maximum": 100, "description": "How well."},
+    },
+    "required": ["findings", "verdict", "score"],
+}
+
+
+def _sent_tool(monkeypatch, schema: dict) -> dict:
+    request = _messages_api(monkeypatch, COMPLETE, "tool_use")
+    judge_client.MessagesApiJudgeClient().judge("rubric", "artifact", schema)
+    (tool,) = request["tools"]
+    return tool
+
+
+def test_the_verdict_tool_is_asked_for_strictly(monkeypatch):
+    assert _sent_tool(monkeypatch, BOUNDED)["strict"] is True
+
+
+def test_every_object_of_the_sent_schema_is_closed(monkeypatch):
+    sent = _sent_tool(monkeypatch, BOUNDED)["input_schema"]
+
+    assert sent["additionalProperties"] is False
+    assert sent["properties"]["findings"]["items"]["additionalProperties"] is False
+
+
+def test_a_bound_strict_mode_rejects_moves_into_its_propertys_description(monkeypatch):
+    sent = _sent_tool(monkeypatch, BOUNDED)["input_schema"]["properties"]
+
+    assert {"minimum", "maximum"}.isdisjoint(sent["score"])
+    assert sent["score"]["description"] == "How well. minimum: 0; maximum: 100"
+    assert "maxLength" not in sent["findings"]["items"]["properties"]["quote"]
+    assert sent["findings"]["items"]["properties"]["quote"]["description"] == "maxLength: 200"
+
+
+def test_a_property_named_like_a_bound_is_kept(monkeypatch):
+    named = {
+        "type": "object",
+        "properties": {"maximum": {"type": "integer"}},
+        "required": ["maximum"],
+    }
+
+    sent = _sent_tool(monkeypatch, named)["input_schema"]
+
+    assert sent["properties"] == {"maximum": {"type": "integer"}}
+
+
+def test_the_callers_schema_is_left_as_it_was(monkeypatch):
+    before = repr(BOUNDED)
+
+    _sent_tool(monkeypatch, BOUNDED)
+
+    assert repr(BOUNDED) == before
 
 
 # -- The Agent-SDK route ----------------------------------------------------------------------------

@@ -48,6 +48,16 @@ _JUDGE_MAX_TOKENS = 4096
 # The stop reasons of a reply cut off before it finished (handling-stop-reasons.md): its tool
 # input is incomplete.
 _CUT_OFF_STOPS = frozenset({"max_tokens", "model_context_window_exceeded"})
+# The bounds strict tool use rejects with a 400 (structured-outputs.md § JSON Schema limitations).
+_STRICT_UNSUPPORTED = (
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "minLength",
+    "maxLength",
+)
 _SDK_SUCCESS = "success"
 _JUDGE_TIMEOUT_SECONDS = 120
 _NESTED_ENV = "CLAUDECODE"
@@ -229,7 +239,9 @@ class MessagesApiJudgeClient(JudgeClient):
                 {
                     "name": "verdict",
                     "description": "Structured evaluation verdict",
-                    "input_schema": schema,
+                    # Strict tool use: a finished reply carries every required field.
+                    "strict": True,
+                    "input_schema": _strict_schema(schema),
                 }
             ],
             tool_choice={"type": "tool", "name": "verdict"},
@@ -488,6 +500,33 @@ def _parse_verdict(raw: dict) -> JudgeVerdict:  # type: ignore[type-arg]
         score=int(raw["score"]),
         raw=raw,
     )
+
+
+def _strict_schema(node: Any) -> Any:
+    """`node` as strict tool use takes it, a new value: every object closed (``additionalProperties``
+    false) and each bound strict mode rejects moved into its property's description, where the
+    judge still reads it (structured-outputs.md § JSON Schema limitations). A ``properties`` map
+    is a map of names, so its keys are never read as keywords."""
+    if isinstance(node, list):
+        return [_strict_schema(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    adapted = {
+        key: (
+            {name: _strict_schema(sub) for name, sub in value.items()}
+            if key == "properties"
+            else _strict_schema(value)
+        )
+        for key, value in node.items()
+        if key not in _STRICT_UNSUPPORTED
+    }
+    bounds = "; ".join(f"{key}: {node[key]}" for key in _STRICT_UNSUPPORTED if key in node)
+    if bounds:
+        given = node.get("description")
+        adapted["description"] = f"{given} {bounds}" if given else bounds
+    if node.get("type") == "object" or "properties" in node:
+        adapted["additionalProperties"] = False
+    return adapted
 
 
 def _cut_off(stop_reason: str, raw: dict) -> str:  # type: ignore[type-arg]

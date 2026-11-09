@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-07T15:17:32Z'
+generated_at: '2026-11-09T15:48:55Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-06'
+  last_modified: '2026-11-09'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-07'
+  last_modified: '2026-11-09'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-07'
+  last_modified: '2026-11-09'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-07'
+  last_modified: '2026-11-09'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -676,13 +676,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-05'
+  last_modified: '2026-11-08'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-07'
+  last_modified: '2026-11-09'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3669,11 +3669,17 @@ surfaces:
   title: The writer roles' kits run under dec-487's confinement; two named scripts get their executable bit
   last_modified: '2026-11-07'
   renderer: adr_card
+- id: ai-state-decisions-495-audience-split-spawn-rule-split
+  path: .ai-state/decisions/495-audience-split-spawn-rule-split.md
+  type: markdown
+  title: Split recipients receive a build-time spawn text of the two managed core rules
+  last_modified: '2026-11-09'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-05'
+  last_modified: '2026-11-07'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3741,12 +3747,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-10-31'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-07_01-45-44.json
-  type: json
-  title: METRICS_REPORT_2026-09-07_01-45-44.json
-  last_modified: '2026-09-06'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-20_06-20-50.json
   type: json
@@ -3801,12 +3801,12 @@ surfaces:
   title: METRICS_REPORT_2026-10-26_12-19-04.json
   last_modified: '2026-10-26'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-07_01-45-44.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-09-06'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-11-09-15-17-14
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-11-09_15-17-14.json
+  type: json
+  title: METRICS_REPORT_2026-11-09_15-17-14.json
+  last_modified: '2026-11-09'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-20_06-20-50.md
   type: markdown
@@ -3861,6 +3861,12 @@ surfaces:
   title: Project Metrics Report
   last_modified: '2026-10-26'
   renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-11-09-15-17-14
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-11-09_15-17-14.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-11-09'
+  renderer: default_markdown
 - id: ai-state-specs-spec-adherence-eval-2026-10-12
   path: .ai-state/specs/SPEC_adherence-eval_2026-10-12.md
   type: markdown
@@ -3888,6 +3894,12 @@ surfaces:
   type: markdown
   title: 'Spec: apply-rule-moves (the ADR rule loads by path scope beside a one-line resident, and a deterministic gate refuses the decision records the late-arriving rule let through)'
   last_modified: '2026-10-31'
+  renderer: default_markdown
+- id: ai-state-specs-spec-audience-split-2026-11-09
+  path: .ai-state/specs/SPEC_audience-split_2026-11-09.md
+  type: markdown
+  title: 'Spec: audience-split (a plugin role''s spawn stops receiving the orchestrator-only text of the coordination protocol and the intermediate-documents rule)'
+  last_modified: '2026-11-09'
   renderer: default_markdown
 - id: ai-state-specs-spec-commands-to-skills-2026-10-10
   path: .ai-state/specs/SPEC_commands-to-skills_2026-10-10.md
@@ -4617,12 +4629,11 @@ groups:
   - ai-state-decisions-492-writer-kit-mode-role-checks
   - ai-state-decisions-493-writer-kit-task-mode
   - ai-state-decisions-494-writer-kits-run-confined
+  - ai-state-decisions-495-audience-split-spawn-rule-split
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
-  - ai-state-metrics-reports-metrics-report-2026-09-07-01-45-44
   - ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
   - ai-state-metrics-reports-metrics-report-2026-09-20-06-20-50
   - ai-state-metrics-reports-metrics-report-2026-09-20-15-21-06
@@ -4641,6 +4652,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-10-19-12-13-43
   - ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
   - ai-state-metrics-reports-metrics-report-2026-10-26-12-19-04
+  - ai-state-metrics-reports-metrics-report-2026-11-09-15-17-14
+  - ai-state-metrics-reports-metrics-report-2026-11-09-15-17-14
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
   - ai-state-sentinel-reports-sentinel-report-2026-09-04-22-41-32
@@ -4655,6 +4668,7 @@ groups:
   - ai-state-specs-spec-adr-move-readiness-2026-10-29
   - ai-state-specs-spec-agent-model-routing-2026-04-25
   - ai-state-specs-spec-apply-rule-moves-2026-10-31
+  - ai-state-specs-spec-audience-split-2026-11-09
   - ai-state-specs-spec-commands-to-skills-2026-10-10
   - ai-state-specs-spec-design-dialectic-2026-04-17
   - ai-state-specs-spec-diagrams-2026-04-30

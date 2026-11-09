@@ -1,15 +1,14 @@
 """Canaries for I11: a split recipient receives exactly the split its sources give it now.
 
 Each canary breaks one thing in a copy of the live inputs, shows the checker refuses it naming
-the unit (or exits non-zero when the artifact cannot be read), restores the copy and shows it
-passes again.
+the unit (or exits non-zero when the artifact cannot be read), writes back the bytes it changed
+and shows the copy passes again.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -41,6 +40,8 @@ DROPPED_HEADINGS = {
 DRIFT = "I11-spawn-split-drift"
 UNREADABLE = "I11-spawn-split-unreadable"
 PLANTED_LINE = "A planted line nobody regenerated.\n"
+# The files a plant may change: a restore writes each back to its bytes from before the plant.
+PLANTABLE = (*SOURCES.values(), km.MANIFEST_PATH, rd.SPAWN_SPLIT_PATH)
 
 
 # -- Plants: each leaves one kind of disagreement in the checkout --------------------------------
@@ -87,8 +88,11 @@ def text_and_digest_edited(entry: dict) -> None:
     entry["text_sha256"] = hashlib.sha256(entry["text"].encode("utf-8")).hexdigest()
 
 
-def garbage(root: Path) -> None:
-    (root / rd.SPAWN_SPLIT_PATH).write_bytes(b"\x00\xff not what was written here {[\n")
+def artifact_bytes(data: bytes) -> Callable[[Path], None]:
+    def plant(root: Path) -> None:
+        (root / rd.SPAWN_SPLIT_PATH).write_bytes(data)
+
+    return plant
 
 
 def missing(root: Path) -> None:
@@ -102,7 +106,13 @@ NAMED_PLANTS = {
     "split-text-edited": (edit_split(text_edited), [INTERMEDIATE]),
     "split-text-and-digest-edited": (edit_split(text_and_digest_edited), [INTERMEDIATE]),
 }
-UNREADABLE_PLANTS = {"garbage": garbage, "missing": missing}
+UNREADABLE_PLANTS = {
+    "not-utf-8": artifact_bytes(b"\x00\xff not what was written here {[\n"),
+    "text-not-json": artifact_bytes(b"not what was written here\n"),
+    "wrong-schema": artifact_bytes(b'{"schema": 0, "units": {}}\n'),
+    "nested-past-the-parser": artifact_bytes(b"[" * 100_000),
+    "missing": missing,
+}
 ALL_PLANTS = {**{name: plant for name, (plant, _) in NAMED_PLANTS.items()}, **UNREADABLE_PLANTS}
 
 
@@ -160,12 +170,37 @@ def test_the_command_exits_non_zero_on_an_artifact_that_cannot_be_read(
     assert kit.run_checker(repo).returncode == 1
 
 
+def snapshot(root: Path) -> dict[str, bytes | None]:
+    return {rel: (root / rel).read_bytes() if (root / rel).is_file() else None for rel in PLANTABLE}
+
+
+def restore(root: Path, original: dict[str, bytes | None]) -> None:
+    for rel, data in original.items():
+        if data is None:
+            (root / rel).unlink(missing_ok=True)
+        else:
+            (root / rel).write_bytes(data)
+
+
 @pytest.mark.parametrize("name", ALL_PLANTS)
-def test_a_checkout_restored_after_a_plant_passes(repo: Path, tmp_path: Path, name: str) -> None:
-    before = tmp_path / "before"
-    shutil.copytree(repo, before)
+def test_a_plant_is_refused_and_its_restore_passes(repo: Path, name: str) -> None:
+    original = snapshot(repo)
     ALL_PLANTS[name](repo)
-    shutil.rmtree(repo)
-    shutil.copytree(before, repo)
+    assert kinds(repo) & {DRIFT, UNREADABLE}, "the plant did not bite"
+
+    restore(repo, original)
 
     assert (cb.check(repo), kit.run_checker(repo).returncode) == ((), 0)
+
+
+def test_a_part_prefix_that_starts_no_line_is_i1s_finding_not_a_crash(repo: Path) -> None:
+    path = repo / SOURCES[INTERMEDIATE]
+    text = path.read_text(encoding="utf-8")
+    assert "- **Lifecycle states**" in text, "the manifest's part no longer starts a line"
+    path.write_text(text.replace("- **Lifecycle states**", "- **States of a life**"))
+
+    found = kinds(repo)
+
+    assert "I1-orphan" in found
+    assert {DRIFT, UNREADABLE} & found == set()
+    assert kit.run_checker(repo).returncode == 1

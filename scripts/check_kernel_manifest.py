@@ -317,12 +317,15 @@ class SpawnReading:
     units: tuple[UnitReading, ...]  # the core units whose source exists
 
 
-def spawn_split_findings(reading: SpawnReading) -> tuple[km.Finding, ...]:
+def spawn_split_findings(reading: SpawnReading | ks.PartPrefixError) -> tuple[km.Finding, ...]:
     """I11: what the hook delivers a split recipient is exactly the split of today's sources.
 
     A fallback to the whole unit is a finding too: the fallback keeps a spawn safe, and the gate
-    keeps the committed tree from relying on it.
+    keeps the committed tree from relying on it. Judge it only when I1 passes: I1 reports every
+    part prefix the cutter refuses, so a refusal here is an input I1 failed to read.
     """
+    if isinstance(reading, ks.PartPrefixError):
+        raise reading
     if reading.split is None:
         detail = "absent or not the artifact the generator writes: regenerate the kernels"
         return (km.Finding("I11-spawn-split-unreadable", rd.SPAWN_SPLIT_PATH, detail),)
@@ -454,7 +457,7 @@ class Evidence:
     records: Mapping[str, object]  # role -> adoption record as written; empty: no ledger
     parent_flip: kh.ParentFlip | None  # eligible roles, records and definitions at the parent
     runs: RunEvidence  # the results files read once, the ones unreadable, and the run index
-    spawn: SpawnReading  # the committed spawn split and what today's sources give each unit
+    spawn: SpawnReading | ks.PartPrefixError  # the split and today's units, or why no cut
 
 
 def gather(root: Path) -> Evidence:
@@ -515,7 +518,7 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *eligibility_findings(ELIGIBLE_ROLES, evidence.parent_flip, evidence.records, flags),
         *deletion_findings(evidence.parent, evidence.ledger),
         *misreading_findings(evidence.statuses, evidence.ledger_text),
-        # ...nor can it regenerate the split, so a drift there is I1's finding too
+        # ...nor can the split be cut from them, so a drift there is I1's finding too
         *(() if totality else spawn_split_findings(evidence.spawn)),
     )
 
@@ -535,12 +538,15 @@ def _gather_runs(root: Path) -> RunEvidence:
     return RunEvidence(reading.files, reading.unreadable, index)
 
 
-def _spawn_reading(root: Path, manifest: km.Manifest) -> SpawnReading:
-    units = tuple(
-        _unit_reading(root, manifest, unit)
-        for unit in rd.MANAGED_CORE_UNITS
-        if (root / unit.path).is_file()
-    )
+def _spawn_reading(root: Path, manifest: km.Manifest) -> SpawnReading | ks.PartPrefixError:
+    try:
+        units = tuple(
+            _unit_reading(root, manifest, unit)
+            for unit in rd.MANAGED_CORE_UNITS
+            if (root / unit.path).is_file()
+        )
+    except ks.PartPrefixError as refusal:  # I1's orphan finding: judged, not raised, here
+        return refusal
     manifest_sha256 = kss.sha256_hex((root / rd.AUDIENCE_MANIFEST_PATH).read_bytes())
     return SpawnReading(_read_spawn_split(root), manifest_sha256, units)
 

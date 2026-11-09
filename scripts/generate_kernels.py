@@ -19,6 +19,11 @@
   any role has plus a reserve for the working project's own `CLAUDE.md`. The index holds no
   adoption status: the hook reads the plugin's own ledger.
 
+`spawn_split.json` is written beside them: for each always-loaded rule a spawned agent receives
+(the coordination protocol and the intermediate-documents rule), the text with the manifest's
+`orchestrator-only` spans removed, under the digests that let the spawn hook trust it
+(`kernel_spawn_split`). It is not part of the hash that versions `index.json`.
+
 Two more artifacts derive from the same blocks, so nothing written by hand can drift from them:
 
 - every agent definition carries the three universal blocks as generated output (the fallback
@@ -54,6 +59,7 @@ from pathlib import Path
 import check_agent_shared_blocks as sb
 import kernel_model as km
 import kernel_sources as ks
+import kernel_spawn_split as kss
 from _markdown_tables import code_mask
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 
@@ -496,7 +502,10 @@ def plan_kernels(root: Path) -> KernelPlan:
     _refuse(km.check_totality(manifest, sections, ks.always_loaded_sources(root)))
     kernel = assemble(manifest, sections, _read_authored(root, manifest))
     plan = compose(kernel, manifest, definitions)
-    return KernelPlan({**plan.files, **derived_files(kernel, definitions)}, plan.roles)
+    # Beside the index, never inside its version hash: a rule or manifest edit moves the split
+    # without moving any kernel.
+    split = {kss.SPAWN_SPLIT_PATH: kss.spawn_split_artifact(root, manifest).encode("utf-8")}
+    return KernelPlan({**plan.files, **derived_files(kernel, definitions), **split}, plan.roles)
 
 
 def _refuse_misnamed(root: Path, definitions: Mapping[str, str]) -> None:

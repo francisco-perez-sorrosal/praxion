@@ -1,7 +1,7 @@
 """The kernel manifest checker: holds the always-loaded guidance, the manifest and the kernels together.
 
 `python3 scripts/check_kernel_manifest.py [--json] [--repo-root DIR]` is the commit gate behind the
-per-role kernels. It reads the repository once, then judges ten invariants; a finding's kind
+per-role kernels. It reads the repository once, then judges eleven invariants; a finding's kind
 names the invariant it breaks. Exit 0 clean, 1 findings, 2 input error (no manifest, no plugin
 checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its input never passes.
 (`--liveness` also exits 2 when its log is unknown, below.)
@@ -41,6 +41,8 @@ checkout, PyYAML absent, an unreadable file) -- a gate that cannot read its inpu
 | `I9-ledger-held-run-added`   | a role that stays held keeps its runs unchanged                         |
 | `I9-ledger-deleted`          | a ledger present at the parent commit is still there                    |
 | `I10-hook-misread`           | the spawn hook reads every role's ledger status as PyYAML does          |
+| `I11-spawn-split-drift`      | a split recipient receives, for each core unit, exactly the split its source and the audience manifest give now, never the whole unit a stale or edited entry falls back to (subject: the unit; detail: its source and the first differing line) |
+| `I11-spawn-split-unreadable` | `claude/kernels/spawn_split.json` exists and parses as the artifact's schema |
 
 `--liveness [--since REV] [--plugin-root DIR]` is a second mode, over an observation log instead
 of the kernels: `liveness-missing-row` names each spawn of a role at trial or switched (by the
@@ -55,7 +57,10 @@ nothing. Every report counts the spawns it judged, so a clean one never means th
 judged.
 
 The totality, pin, transition and group judgements are `kernel_model`'s; this module gathers the
-evidence, names the findings of I1 to I8 and renders every report. The ledger's findings (I9, I10)
+evidence, names the findings of I1 to I8 and I11 and renders every report. I11 judges the delivery
+with the hook's own `_rule_delivery.spawn_units` over the committed artifact, against the split
+`kernel_spawn_split.expected_split` cuts now, so the gate, the hook and the generator share one
+reading of the artifact and one cutter. The ledger's findings (I9, I10)
 are `kernel_ledger_checks`', over the run index `kernel_run_index` reads; the liveness judgement
 and its log reading are `kernel_liveness`'. The kernel index `claude/kernels/index.json` is read
 here as plain JSON, not through `kernel_model`, because the model refuses an over-cap string at
@@ -84,6 +89,7 @@ import kernel_model as km
 import kernel_run_evidence as kre
 import kernel_run_index as kri
 import kernel_sources as ks
+import kernel_spawn_split as kss
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from kernel_eligibility import ELIGIBLE_ROLES
 
@@ -109,6 +115,9 @@ from kernel_liveness import (
     liveness_report,  # noqa: F401
     reader,  # noqa: F401
 )
+
+# The hook's pure module, as the generator imports it (`kernel_spawn_split` puts hooks/ on the path).
+rd = kss.rd
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -287,6 +296,60 @@ def slot_findings(slots: int | None, entries: Sequence[SlotEntry] | None) -> tup
     return tuple(findings)
 
 
+# -- Pure: invariant I11 --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class UnitReading:
+    """One core unit as I11 judges it: its body now and the text a split recipient should get."""
+
+    unit: rd.CoreUnit
+    body: str
+    expected: str  # the unit's split as its sources give it now; the body when nothing is dropped
+
+
+@dataclass(frozen=True)
+class SpawnReading:
+    """The committed artifact and what the checkout's sources give each core unit now."""
+
+    split: rd.SpawnSplit | None  # None: absent, not UTF-8 or not the artifact's schema
+    manifest_sha256: str  # of the audience manifest's bytes, as the hook digests them
+    units: tuple[UnitReading, ...]  # the core units whose source exists
+
+
+def spawn_split_findings(reading: SpawnReading) -> tuple[km.Finding, ...]:
+    """I11: what the hook delivers a split recipient is exactly the split of today's sources.
+
+    A fallback to the whole unit is a finding too: the fallback keeps a spawn safe, and the gate
+    keeps the committed tree from relying on it.
+    """
+    if reading.split is None:
+        detail = "absent or not the artifact the generator writes: regenerate the kernels"
+        return (km.Finding("I11-spawn-split-unreadable", rd.SPAWN_SPLIT_PATH, detail),)
+    bodies = {each.unit.unit_id: each.body for each in reading.units}
+    delivered = rd.spawn_units(bodies, reading.split, reading.manifest_sha256)
+    return tuple(
+        km.Finding("I11-spawn-split-drift", each.unit.unit_id, _drift_detail(each, received))
+        for each in reading.units
+        if (received := delivered[each.unit.unit_id]) != each.expected
+    )
+
+
+def _drift_detail(reading: UnitReading, received: str) -> str:
+    what = "the whole unit" if received == reading.body else "a stored split"
+    # Lines keep their ends, so two texts that differ always differ in some line.
+    pairs = zip_longest(
+        received.splitlines(keepends=True), reading.expected.splitlines(keepends=True), fillvalue=""
+    )
+    number, got, wanted = next(
+        (n, line, split_line) for n, (line, split_line) in enumerate(pairs, 1) if line != split_line
+    )
+    return (
+        f"{reading.unit.path}: a split recipient receives {what}, not its split; first differing "
+        f"line {number}: receives {got!r}, the split has {wanted!r}: regenerate the kernels"
+    )
+
+
 def _identifying_texts(text: str) -> tuple[str, ...]:
     texts: list[str] = []
     for block in (b.strip() for b in re.split(r"\n\s*\n", text)):
@@ -391,6 +454,7 @@ class Evidence:
     records: Mapping[str, object]  # role -> adoption record as written; empty: no ledger
     parent_flip: kh.ParentFlip | None  # eligible roles, records and definitions at the parent
     runs: RunEvidence  # the results files read once, the ones unreadable, and the run index
+    spawn: SpawnReading  # the committed spawn split and what today's sources give each unit
 
 
 def gather(root: Path) -> Evidence:
@@ -419,6 +483,7 @@ def gather(root: Path) -> Evidence:
         kh.written_records(kh.ledger_mapping(ledger_text, km.LEDGER_PATH)),
         kh.parent_flip(root, definitions),
         _gather_runs(root),
+        _spawn_reading(root, manifest),
     )
 
 
@@ -450,6 +515,8 @@ def check(root: Path) -> tuple[km.Finding, ...]:
         *eligibility_findings(ELIGIBLE_ROLES, evidence.parent_flip, evidence.records, flags),
         *deletion_findings(evidence.parent, evidence.ledger),
         *misreading_findings(evidence.statuses, evidence.ledger_text),
+        # ...nor can it regenerate the split, so a drift there is I1's finding too
+        *(() if totality else spawn_split_findings(evidence.spawn)),
     )
 
 
@@ -466,6 +533,34 @@ def _gather_runs(root: Path) -> RunEvidence:
     index = kri.read_adherence(root)
     reading = kre.read_results(index.directory)
     return RunEvidence(reading.files, reading.unreadable, index)
+
+
+def _spawn_reading(root: Path, manifest: km.Manifest) -> SpawnReading:
+    units = tuple(
+        _unit_reading(root, manifest, unit)
+        for unit in rd.MANAGED_CORE_UNITS
+        if (root / unit.path).is_file()
+    )
+    manifest_sha256 = kss.sha256_hex((root / rd.AUDIENCE_MANIFEST_PATH).read_bytes())
+    return SpawnReading(_read_spawn_split(root), manifest_sha256, units)
+
+
+def _unit_reading(root: Path, manifest: km.Manifest, unit: rd.CoreUnit) -> UnitReading:
+    # The bytes as written, as the hook reads them (`inject_rules._read_rule_body`).
+    body = rd.rule_body((root / unit.path).read_bytes().decode("utf-8"))
+    entry = kss.expected_split(root, manifest, unit)
+    return UnitReading(unit, body, entry.text if entry is not None else body)
+
+
+def _read_spawn_split(root: Path) -> rd.SpawnSplit | None:
+    """The artifact as the hook parses it (`inject_rules._parsed_split`)."""
+    path = root / rd.SPAWN_SPLIT_PATH
+    if not path.is_file():
+        return None
+    try:
+        return rd.parse_spawn_split(path.read_bytes().decode("utf-8"))
+    except (UnicodeDecodeError, RecursionError):  # JSON nested past the parser's depth
+        return None
 
 
 def _read_text(path: Path) -> str | None:

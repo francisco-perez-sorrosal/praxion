@@ -226,7 +226,11 @@ def _read_split_bodies(
     root: Path, split: rd.SpawnSplit, wholes: Mapping[str, str]
 ) -> dict[str, str]:
     """The text a split recipient gets for each unit, trusting the artifact as the hook does."""
-    manifest_sha = rd.source_digest(_read_bytes(root, rd.AUDIENCE_MANIFEST_PATH))
+    raw_manifest = _read_bytes(root, rd.AUDIENCE_MANIFEST_PATH)
+    try:
+        manifest_sha = rd.source_digest(raw_manifest)
+    except UnicodeDecodeError as error:
+        raise InputError(f"{rd.AUDIENCE_MANIFEST_PATH} is not UTF-8: {error}") from error
     return dict(rd.spawn_units(wholes, split, manifest_sha))
 
 

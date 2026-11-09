@@ -221,6 +221,15 @@ def test_a_missing_input_is_an_input_error_naming_it(plugin, capsys, missing):
     assert missing in err
 
 
+def test_a_manifest_that_is_not_utf8_is_an_input_error(plugin, capsys):
+    (plugin / rd.AUDIENCE_MANIFEST_PATH).write_bytes(b"version: 1\n\xff\xfe broken\n")
+
+    code, _, err = run(plugin, capsys)
+
+    assert code == 2
+    assert rd.AUDIENCE_MANIFEST_PATH in err
+
+
 def test_an_unparseable_split_artifact_is_an_input_error(plugin, capsys):
     (plugin / rd.SPAWN_SPLIT_PATH).write_text("{not json", encoding="utf-8")
 

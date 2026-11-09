@@ -1,3 +1,17 @@
+## v0.59.0 (2026-11-09)
+
+### Feat
+
+- Switch the systems-architect to its kernel
+- Switch the test-engineer to its kernel
+
+### Fix
+
+- Load the budget's scope module without touching sys.path
+- Ask the judge for its findings before its verdict
+- Read a refusal another program reports as its own
+- Match the assessment name anywhere in its title
+
 ## v0.58.2 (2026-11-07)
 
 ### Fix

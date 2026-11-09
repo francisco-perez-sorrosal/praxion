@@ -971,7 +971,7 @@ wheels = [
 
 [[package]]
 name = "task-chronograph-mcp"
-version = "0.58.2"
+version = "0.59.0"
 source = { editable = "." }
 dependencies = [
     { name = "arize-phoenix-otel" },

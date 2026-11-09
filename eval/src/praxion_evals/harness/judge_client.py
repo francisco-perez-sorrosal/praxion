@@ -40,7 +40,15 @@ _ENV_OAUTH = "CLAUDE_CODE_OAUTH_TOKEN"
 _ENV_API_KEY = "ANTHROPIC_API_KEY"
 
 _DEFAULT_MODEL = "claude-haiku-5-5"
-_JUDGE_MAX_TOKENS = 1024
+# The output cap of a Messages-API judge call. The judged schemas write their findings first,
+# quoting the text that settles each criterion, so a long findings list spent the old 1,024 before
+# the verdict and score were written. A call bills only what it writes, so the 3,072 added tokens
+# cost $0.0015 at Haiku 5.5's output rate, and only on a reply that uses them.
+_JUDGE_MAX_TOKENS = 4096
+# The stop reasons of a reply cut off before it finished (handling-stop-reasons.md): its tool
+# input is incomplete.
+_CUT_OFF_STOPS = frozenset({"max_tokens", "model_context_window_exceeded"})
+_SDK_SUCCESS = "success"
 _JUDGE_TIMEOUT_SECONDS = 120
 _NESTED_ENV = "CLAUDECODE"
 _API_TIMEOUT_MS_MARGIN_MS = 5_000
@@ -61,6 +69,11 @@ _PRICE_USD_PER_MTOK: dict[str, tuple[float, float]] = {
 _CACHE_READ_DISCOUNT = 0.10  # cache reads bill at 10% of the input rate
 _CACHE_WRITE_PREMIUM = 1.25  # cache writes bill at 125% of the input rate
 _TOKENS_PER_MTOK = 1_000_000
+
+
+class JudgeReplyTruncatedError(ValueError):
+    """The judge's reply stopped at an output cap before its verdict was complete. Its fields
+    are never read: a cut-off number parses as a whole one."""
 
 
 # ---------------------------------------------------------------------------
@@ -154,14 +167,13 @@ class AgentSdkJudgeClient(JudgeClient):
             env={"API_TIMEOUT_MS": str(_JUDGE_TIMEOUT_SECONDS * 1000 + _API_TIMEOUT_MS_MARGIN_MS)},
         )
 
-        raw: dict = {}  # type: ignore[type-arg]
+        result: Any = None  # the run's result message, the one that carries structured_output
 
         async def _run() -> None:
-            nonlocal raw
+            nonlocal result
             async for message in sdk.query(prompt=prompt, options=options):
-                structured = getattr(message, "structured_output", None)
-                if structured is not None:
-                    raw = dict(structured)
+                if hasattr(message, "structured_output"):
+                    result = message
 
         async def _run_with_timeout() -> None:
             await asyncio.wait_for(_run(), timeout=_JUDGE_TIMEOUT_SECONDS)
@@ -171,14 +183,24 @@ class AgentSdkJudgeClient(JudgeClient):
         except TimeoutError as exc:
             raise TimeoutError(
                 f"Agent SDK judge call exceeded {_JUDGE_TIMEOUT_SECONDS} s.\n"
-                f"Tried: claude_agent_sdk.query(model={_DEFAULT_MODEL!r}, "
-                f"max_tokens={_JUDGE_MAX_TOKENS}) for {len(artifact)} chars.\n"
+                f"Tried: claude_agent_sdk.query(model={_DEFAULT_MODEL!r}) "
+                f"for {len(artifact)} chars.\n"
                 "No structured_output yielded within the budget.\n"
                 "To fix: inspect rate-limit / network state; if the SDK is healthy, "
                 "increase _JUDGE_TIMEOUT_SECONDS in "
                 "praxion_evals.harness.judge_client."
             ) from exc
-        return _parse_verdict(raw)
+        except Exception as exc:
+            # A single-shot query raises after it yields an error result; the result names why.
+            failure = None if result is None else _sdk_failure(result)
+            if failure is None:
+                raise
+            raise failure from exc
+        if result is None:
+            raise ValueError("The Agent SDK run yielded no result message, so no verdict.")
+        if (failure := _sdk_failure(result)) is not None:
+            raise failure
+        return _parse_verdict(dict(result.structured_output))
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +242,9 @@ class MessagesApiJudgeClient(JudgeClient):
                 raw = dict(block.input)
                 break
 
+        stop_reason = getattr(response, "stop_reason", None)
+        if stop_reason in _CUT_OFF_STOPS:
+            raise JudgeReplyTruncatedError(_cut_off(stop_reason, raw))
         verdict = _parse_verdict(raw)
         return dataclasses.replace(verdict, usage=_usage_from_response(response))
 
@@ -462,6 +487,35 @@ def _parse_verdict(raw: dict) -> JudgeVerdict:  # type: ignore[type-arg]
         findings=tuple(raw["findings"]),
         score=int(raw["score"]),
         raw=raw,
+    )
+
+
+def _cut_off(stop_reason: str, raw: dict) -> str:  # type: ignore[type-arg]
+    return (
+        f"The judge's reply was cut off ({stop_reason}) before its verdict was complete, so "
+        f"none of its fields is read. Got keys: {list(raw.keys())}. The output cap is "
+        f"{_JUDGE_MAX_TOKENS} tokens (_JUDGE_MAX_TOKENS in praxion_evals.harness.judge_client)."
+    )
+
+
+def _sdk_failure(result: Any) -> ValueError | None:
+    """The failure an Agent-SDK result message names, or None when it carries a verdict to read.
+
+    A result succeeds only with subtype ``success`` and a structured output; any other is a
+    failure (agent-sdk/structured-outputs.md § Error handling), named by its stop reason when the
+    reply was cut off and otherwise by its subtype and the errors the SDK lists.
+    """
+    stop_reason = getattr(result, "stop_reason", None)
+    output = getattr(result, "structured_output", None)
+    if stop_reason in _CUT_OFF_STOPS:
+        return JudgeReplyTruncatedError(_cut_off(stop_reason, dict(output or {})))
+    subtype = getattr(result, "subtype", None)
+    if subtype == _SDK_SUCCESS and output is not None:
+        return None
+    errors = "; ".join(getattr(result, "errors", None) or []) or "the SDK listed no errors"
+    return ValueError(
+        f"The Agent SDK run ended without a structured output (subtype {subtype!r}, "
+        f"stop_reason {stop_reason!r}): {errors}."
     )
 
 

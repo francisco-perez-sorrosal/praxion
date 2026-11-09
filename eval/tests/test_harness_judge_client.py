@@ -98,7 +98,8 @@ def test_agent_sdk_client_returns_valid_judge_verdict(monkeypatch):
 
     # The structured_output on the result message
     fake_result = types.SimpleNamespace(
-        structured_output={"verdict": "PASS", "findings": ["looks good"], "score": 90}
+        subtype="success",
+        structured_output={"verdict": "PASS", "findings": ["looks good"], "score": 90},
     )
     # query() is async; wrap in a coroutine
 
@@ -141,7 +142,9 @@ def test_agent_sdk_client_raises_on_missing_verdict_field(monkeypatch):
 
     fake_sdk = types.ModuleType("claude_agent_sdk")
     # Missing 'verdict' field
-    fake_result = types.SimpleNamespace(structured_output={"findings": ["ok"], "score": 80})
+    fake_result = types.SimpleNamespace(
+        subtype="success", structured_output={"findings": ["ok"], "score": 80}
+    )
 
     async def _fake_query(*_args, **_kwargs):
         yield fake_result
@@ -402,7 +405,7 @@ def test_judge_succeeds_within_timeout(monkeypatch):
 
     fake_sdk = types.ModuleType("claude_agent_sdk")
     fake_result = types.SimpleNamespace(
-        structured_output={"verdict": "PASS", "findings": ["ok"], "score": 95}
+        subtype="success", structured_output={"verdict": "PASS", "findings": ["ok"], "score": 95}
     )
 
     async def _fake_query(*_args, **_kwargs):
@@ -437,7 +440,7 @@ def test_api_timeout_ms_set_in_options_env(monkeypatch):
 
     fake_sdk = types.ModuleType("claude_agent_sdk")
     fake_result = types.SimpleNamespace(
-        structured_output={"verdict": "PASS", "findings": ["ok"], "score": 80}
+        subtype="success", structured_output={"verdict": "PASS", "findings": ["ok"], "score": 80}
     )
 
     async def _fake_query(*_args, **_kwargs):

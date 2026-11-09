@@ -98,7 +98,7 @@ def test_an_inheriting_spawn_with_the_injection_off_still_receives_todays_floor(
 
     text = gate.spawn_start(machine, project, agent, hooks="injection-off").process_text
 
-    assert oracles.missing_statements(unit, text) == [], f"{agent} lost the {unit}"
+    assert oracles.missing_floor_statements(agent, unit, text) == [], f"{agent} lost the {unit}"
 
 
 # -- The injector's inputs impaired, its hook still running ---------------------------------------
@@ -131,7 +131,8 @@ def test_an_inheriting_spawn_with_an_impaired_injector_still_receives_todays_flo
 
     text = gate.spawn_start(machine, project, agent).process_text
 
-    assert _lacks_floor(text) == [], f"{agent} lost its floor with the injector impaired ({how})"
+    lacking = [u for u in MANAGED_FLOOR if oracles.missing_floor_statements(agent, u, text)]
+    assert lacking == [], f"{agent} lost its floor with the injector impaired ({how})"
 
 
 @pytest.mark.parametrize("how", gate.IMPAIRMENTS)

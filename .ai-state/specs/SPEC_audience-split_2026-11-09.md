@@ -12,7 +12,7 @@
 **Base commit**: `f1f8adf1` · acceptance design `a7867bcd` (before the first production step) · first production commit `98e3aa8c` · first verified head `54a75662` · re-verified head `da259208` · archive head `f3f55f93`
 **Pipeline branch**: `feat/audience-split`
 **ADRs**: `dec-draft-25c1476d` (category: architectural -- a build-time spawn split of the two managed core rules; finalize rewrites the draft id to a stable `dec-NNN`)
-**Evidence base**: the ADR draft above under `.ai-state/decisions/drafts/` (its `## Consumer Audit` is the record of REQ-09); the spec digest `sha256:14edd768ff33` of `SPEC_EXTRACT.md` (the verifier read the extract fresh); the branch's 19 commits from the base; the footprint log (`MEASUREMENTS.md`) and the free shed count (`SHED_COUNT.md`), both taken at `54a75662` and re-checked at `f3f55f93`; the verifier's report and its re-verification at `da259208`. No model session ran and no startup probe was taken: spend was $0.
+**Evidence base**: the ADR draft above under `.ai-state/decisions/drafts/` (its `## Consumer Audit` is the record of REQ-09); the spec digest `sha256:14edd768ff33` of `SPEC_EXTRACT.md` (the verifier read the extract fresh); the branch's 19 commits from the base; the footprint log (`MEASUREMENTS.md`) and the free shed count (`SHED_COUNT.md`), both taken at `54a75662` and re-checked at `f3f55f93`; the verifier's report and its re-verification at `da259208`. No eval session ran. One approved before/after startup probe (two first-request sessions on the subscription) is recorded under Shed Count.
 
 ## Feature Summary
 
@@ -220,7 +220,16 @@ What one split recipient's `SubagentStart` delivery sheds, counted at no cost wi
 | `swe/agent-intermediate-documents` | 4,162 | 3,064 | 1,098 | 473 | 310 |
 | total | 22,920 | 7,754 | 15,166 | 5,808 | 4,246 |
 
-Reach: this project's log since 2026-10-10 shows 109 inheriting `praxion:` spawns, all split recipients, out of 111 inheriting spawns (the other two were one `general-purpose` and one fork). That is about 0.63M tokens a month no longer delivered (109 × 5,808). The protocol unit now fits one delivered part instead of two. Not measured: the paid startup probe on an inheriting role.
+Reach: this project's log since 2026-10-10 shows 109 inheriting `praxion:` spawns, all split recipients, out of 111 inheriting spawns (the other two were one `general-purpose` and one fork). That is about 0.63M tokens a month no longer delivered (109 × 5,808). The protocol unit now fits one delivered part instead of two.
+
+**Startup probe (approved by the user, 2026-11-09, subscription token, no API-key spend).** `measure_startup_payload.py agent:verifier --strict-mcp-config --cwd <main checkout> --plugin-dir <checkout> --json` was run once with the unmerged main checkout (`f1f8adf1`) and once with this branch (`f3f55f93`) as the plugin. It was not recorded to `startup_baseline.json`.
+
+| Target | Before | After | Change |
+|---|---|---|---|
+| main session | 60,954 | 60,954 | 0 |
+| `agent:verifier` (a split recipient) | 67,876 | 62,169 | -5,707 (-8.4%) |
+
+The probe's drop agrees with the free count, 5,808 tokens, to within about 100 tokens: the labels and joins of the delivered parts.
 
 ## Traceability
 

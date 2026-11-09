@@ -63,7 +63,10 @@ LEAN_ROLE = "researcher"
 # A role outside the eligibility pin, so no flip can make it lean; a test holds it there. The
 # implementer, named first, was switched (08ca61da); the systems-architect, named next, entered
 # the pin with the writer kits (5aa85532) and was switched in its turn. The frozen inheriting
-# reading is the same for every role that inherits, so the example's name keys it and no more.
+# reading is the whole delivery, the one every whole recipient (`general-purpose`, a project, user
+# or other plugin's agent) still receives, so the example's name keys it and no more. This role is
+# a split recipient: it is held to that reading less what the audience split removes
+# (`process_text_oracles.spawn_changes`).
 INHERITING_ROLE = "sentinel"
 HOST_NATIVE = "general-purpose"
 NON_TRIVIAL_PROMPT = (

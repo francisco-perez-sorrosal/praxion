@@ -9,6 +9,7 @@ paired with the synthetic canaries that prove the same checks bite.
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,11 +18,14 @@ import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 
+import _rule_delivery as rd  # noqa: E402  # pyright: ignore[reportMissingImports]
 import check_agent_shared_blocks as sb  # noqa: E402
 import generate_kernels as gk  # noqa: E402
 import kernel_model as km  # noqa: E402
 import kernel_sources as ks  # noqa: E402
+import kernel_spawn_split as kss  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CAP = km.MAX_STRING_CHARS
@@ -533,6 +537,94 @@ def test_a_plugin_cache_root_is_refused(tmp_path: Path, capsys) -> None:
     assert "plugin cache" in capsys.readouterr().err
 
 
+# -- The spawn split -------------------------------------------------------------------------------
+
+UNIT_PATH = rd.MANAGED_CORE_UNITS[0].path
+UNIT_ID = rd.MANAGED_CORE_UNITS[0].unit_id
+UNIT_TEXT = "## Acts\n\nEveryone acts on this.\n\n## Routing\n\nOnly the main session routes.\n"
+
+
+def split_repo(root: Path, unit_text: str = UNIT_TEXT) -> Path:
+    rows = manifest_rows()
+    rows["entries"] += [
+        core(UNIT_PATH, "Acts"),
+        entry(UNIT_PATH, "Routing", "orchestrator-only"),
+    ]
+    build_repo(root, manifest=rows)
+    write(root, UNIT_PATH, unit_text)
+    return root
+
+
+def written_split(root: Path) -> dict:
+    return json.loads((root / kss.SPAWN_SPLIT_PATH).read_text(encoding="utf-8"))
+
+
+def test_a_unit_that_loses_a_dropped_section_is_written_with_the_digests_the_hook_checks(
+    tmp_path: Path,
+) -> None:
+    root = split_repo(tmp_path / "plugin")
+
+    run(root)
+
+    written = written_split(root)
+    assert written["schema"] == rd.SPLIT_SCHEMA
+    assert written["manifest_sha256"] == kss.sha256_hex((root / km.MANIFEST_PATH).read_bytes())
+    assert written["units"][UNIT_ID] == {
+        "source": UNIT_PATH,
+        "whole_sha256": kss.sha256_hex(UNIT_TEXT),
+        "text": "## Acts\n\nEveryone acts on this.\n\n",
+        "text_sha256": kss.sha256_hex("## Acts\n\nEveryone acts on this.\n\n"),
+    }
+
+
+def test_a_repository_with_nothing_to_drop_writes_an_artifact_listing_no_unit(repo: Path) -> None:
+    run(repo)
+
+    assert written_split(repo)["units"] == {}
+
+
+def test_generating_edits_no_source_rule_and_no_manifest(tmp_path: Path) -> None:
+    root = split_repo(tmp_path / "plugin")
+    sources = {rel: (root / rel).read_bytes() for rel in (UNIT_PATH, SHARED_RULE, km.MANIFEST_PATH)}
+
+    run(root)
+
+    assert {rel: (root / rel).read_bytes() for rel in sources} == sources
+
+
+def test_an_edit_to_dropped_text_moves_the_split_and_no_kernel_or_the_index(tmp_path: Path) -> None:
+    root = split_repo(tmp_path / "plugin")
+    run(root)
+    before = disk_state(root)
+
+    write(root, UNIT_PATH, UNIT_TEXT.replace("main session routes", "main session decides"))
+    run(root)
+    after = disk_state(root)
+
+    changed = {rel for rel in before if before[rel] != after[rel]}
+    assert changed == {UNIT_PATH, kss.SPAWN_SPLIT_PATH}
+
+
+def test_check_bites_on_a_hand_edited_split_and_passes_once_regenerated(repo: Path) -> None:
+    split_root = split_repo(repo.parent / "split")
+    run(split_root)
+    assert run(split_root, "--check") == 0
+
+    artifact = split_root / kss.SPAWN_SPLIT_PATH
+    artifact.write_text(artifact.read_text().replace("Everyone acts", "Edited"))
+
+    assert run(split_root, "--check") == 1
+    run(split_root)
+    assert run(split_root, "--check") == 0
+
+
+def test_check_bites_on_an_absent_split(repo: Path) -> None:
+    run(repo)
+    (repo / kss.SPAWN_SPLIT_PATH).unlink()
+
+    assert run(repo, "--check") == 1
+
+
 # -- The real repository ---------------------------------------------------------------------
 
 
@@ -851,3 +943,20 @@ def test_the_live_preamble_is_todays_wording_within_todays_bound(live: gk.Kernel
     exec(live.files[gk.PREAMBLE_PATH].decode(), namespace)
 
     assert namespace["_PREAMBLE"] == TODAYS_PREAMBLE
+
+
+def test_the_live_split_is_what_the_hook_trusts_for_every_unit_it_lists() -> None:
+    split = rd.parse_spawn_split((REPO_ROOT / kss.SPAWN_SPLIT_PATH).read_text(encoding="utf-8"))
+    assert split is not None
+    manifest_sha = kss.sha256_hex((REPO_ROOT / km.MANIFEST_PATH).read_bytes())
+    units = {
+        unit.unit_id: rd.rule_body((REPO_ROOT / unit.path).read_text(encoding="utf-8"))
+        for unit in rd.MANAGED_CORE_UNITS
+    }
+
+    delivered = rd.spawn_units(units, split, manifest_sha)
+
+    assert {unit_id for unit_id in split.units if delivered[unit_id] != units[unit_id]} == set(
+        split.units
+    )
+    assert all(delivered[unit_id] == entry.text for unit_id, entry in split.units.items())

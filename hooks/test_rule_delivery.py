@@ -72,7 +72,7 @@ def _plan(
     units,
     scope=MANAGED,
     event=Event.SESSION,
-    agent=AgentKind.INHERITING,
+    agent=AgentKind.WHOLE_RECIPIENT,
     disabled=(),
     native=(),
     managed_only=MANAGED_ONLY_IDS,
@@ -333,7 +333,7 @@ def test_an_inheriting_spawn_in_a_managed_scope_plans_the_three_core_units_only(
     [
         (MANAGED, AgentKind.LEAN),
         (MANAGED, AgentKind.NO_INSTRUCTION_FILES),
-        (UNMANAGED, AgentKind.INHERITING),
+        (UNMANAGED, AgentKind.WHOLE_RECIPIENT),
         (UNMANAGED, AgentKind.LEAN),
         (UNMANAGED, AgentKind.NO_INSTRUCTION_FILES),
     ],
@@ -442,14 +442,14 @@ def test_a_real_managed_plan_reads_the_same_slot_by_slot_and_each_slot_prints_on
         ("Plan", None, AgentKind.NO_INSTRUCTION_FILES),
         ("Explore", True, AgentKind.NO_INSTRUCTION_FILES),
         ("researcher", True, AgentKind.LEAN),
-        ("researcher", False, AgentKind.INHERITING),
-        ("general-purpose", False, AgentKind.INHERITING),
-        ("custom-agent", None, AgentKind.INHERITING),
-        (None, None, AgentKind.INHERITING),
+        ("researcher", False, AgentKind.WHOLE_RECIPIENT),
+        ("general-purpose", False, AgentKind.WHOLE_RECIPIENT),
+        ("custom-agent", None, AgentKind.WHOLE_RECIPIENT),
+        (None, None, AgentKind.WHOLE_RECIPIENT),
         ("", True, AgentKind.LEAN),
     ],
 )
 def test_an_agent_kind_comes_from_its_type_and_its_definitions_omit_flag(
     agent_type, omit_claude_md, expected
 ):
-    assert parse_agent_kind(agent_type, omit_claude_md) is expected
+    assert parse_agent_kind(agent_type, omit_claude_md, False) is expected

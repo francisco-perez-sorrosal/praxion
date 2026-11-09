@@ -9,6 +9,7 @@
 #
 # scope: core (every agent), role (the named agents or groups), orchestrator-only and
 # no-actor (kept resident for the main session, never in a kernel; each gives a reason).
+# orchestrator-only text also stays out of a split recipient's spawn delivery.
 # form: verbatim (the source bytes) or condensed (an authored text under
 # claude/kernels/src/, pinned to the source it stands for, so a changed source forces
 # a review of the text). No section is removed from its source by being classified.
@@ -268,7 +269,7 @@ entries:
   - source: rules/swe/swe-agent-coordination-protocol.md
     heading: "Process Calibration"
     scope: orchestrator-only
-    reason: "Tier selection decides whether and how to spawn; a role is already spawned. A definition that points here (the retrospective cell convention) names a rule file readable by path."
+    reason: "Tier selection decides whether and how to spawn; a role is already spawned. The verifier (the Calibration Verdict sub-step judges the tier against its Signals column) and skill-genesis (the Retrospective cell convention) read it by path from their definitions."
   - source: rules/swe/swe-agent-coordination-protocol.md
     heading: "Pipeline Isolation"
     scope: orchestrator-only

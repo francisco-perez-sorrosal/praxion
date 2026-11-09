@@ -81,7 +81,7 @@ def _largest_supply() -> dict[str, str]:
 def _strings_needed(units: dict[str, str], event: Event) -> int:
     """The most strings one delivery prints: the whole managed plan, or the floor and the
     notice a session (never a spawn) is given beside it."""
-    plan = plan_delivery(units, set(units), MANAGED, event, AgentKind.INHERITING, set(), set())
+    plan = plan_delivery(units, set(units), MANAGED, event, AgentKind.WHOLE_RECIPIENT, set(), set())
     core = {unit.unit_id for unit in MANAGED_CORE_UNITS}
     floor = [part for part in plan if part.unit_id in core]
     notice = 1 if event is Event.SESSION else 0

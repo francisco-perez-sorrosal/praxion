@@ -12,10 +12,13 @@ Stdlib-only, like the hook modules that import it.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 
 from _project_scope import Managed, ProjectScope
 
@@ -24,6 +27,22 @@ MAX_PART_CHARS = 10_000
 
 # The injector's header, specialised per part: "<prefix>: <unit>, part k of n".
 LABEL_PREFIX = "## Praxion Rules (auto-injected)"
+
+# `<namespace>:<role>` names an agent of this plugin, defined in its `agents/<role>.md`.
+PLUGIN_NAMESPACE = "praxion"
+
+# The leading YAML block of a rule or agent definition; `rule_body` removes it.
+FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
+
+# The spawn-split artifact's only schema; a hook reads any other as absent.
+SPLIT_SCHEMA = 1
+# Where the generator writes the spawn split and which file's bytes it digests, both relative
+# to the plugin root; the hook reads the same two. `scripts/kernel_model.py` names the audience
+# manifest on its own (`MANIFEST_PATH`, it imports no hook module): if you move it, move both;
+# `scripts/test_kernel_spawn_split.py` holds them equal.
+SPAWN_SPLIT_PATH = "claude/kernels/spawn_split.json"
+AUDIENCE_MANIFEST_PATH = "rules/_audience.yaml"
+_DIGEST = re.compile(r"[0-9a-f]{64}")
 
 # A label never carries more digits than this in a position, so the room
 # reserved for it is an upper bound for every real label.
@@ -57,12 +76,15 @@ class Event(Enum):
 
 
 class AgentKind(Enum):
-    INHERITING = "inheriting"  # loads the full instruction hierarchy
+    # Both recipient kinds load the full instruction hierarchy and receive the core units.
+    SPLIT_RECIPIENT = "split-recipient"  # a plugin role read from its definition: may get the split
+    WHOLE_RECIPIENT = "whole-recipient"  # every other loader of the hierarchy: always whole
     LEAN = "lean"  # definition sets omitClaudeMd
     NO_INSTRUCTION_FILES = "no-instruction-files"  # Explore, Plan
 
 
 _NO_INSTRUCTION_FILE_AGENTS = frozenset({"Explore", "Plan"})
+_CORE_RECIPIENTS = frozenset({AgentKind.SPLIT_RECIPIENT, AgentKind.WHOLE_RECIPIENT})
 
 
 @dataclass(frozen=True)
@@ -105,17 +127,51 @@ class Delivery:
         return "\n\n".join(text for text in (self.notice, rules) if text)
 
 
-def parse_agent_kind(agent_type: str | None, omit_claude_md: bool | None) -> AgentKind:
-    """The kind of a spawn, from its type and its definition's ``omitClaudeMd``.
+def decode_source(raw: bytes) -> str:
+    """A rule file or the audience manifest as text, newlines translated (CRLF and a lone CR
+    read as LF) as `Path.read_text` reads it: the one reading every edge uses, so the text the
+    main session receives, the text a digest is taken over and the text a split is cut from are
+    the same on a checkout with CRLF line endings as on one with LF."""
+    return raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
 
-    ``omit_claude_md`` is None when the definition could not be read; the safe
-    direction is delivery, so that parses as `AgentKind.INHERITING`.
+
+def source_digest(raw: bytes) -> str:
+    """The sha256 of a source over its `decode_source` text: what the artifact records for
+    the audience manifest and what each edge compares it with."""
+    return _sha256(decode_source(raw))
+
+
+def rule_body(raw: str) -> str:
+    """A rule file's text without its leading frontmatter: the body the hook delivers and
+    the generator digests, one definition so their digests agree."""
+    return FRONTMATTER_RE.sub("", raw, count=1).lstrip("\n")
+
+
+def parse_agent_kind(
+    agent_type: str | None, omit_claude_md: bool | None, plugin_definition_read: bool
+) -> AgentKind:
+    """The kind of a spawn, from its type, its definition's ``omitClaudeMd`` and whether that
+    definition was read from this plugin.
+
+    The one place a spawn becomes a split recipient: a ``praxion:<role>`` type whose plugin
+    definition was read and keeps the instruction files. Anything unread, absent or
+    doubtful is a whole recipient, the safe direction.
     """
     if agent_type in _NO_INSTRUCTION_FILE_AGENTS:
         return AgentKind.NO_INSTRUCTION_FILES
     if omit_claude_md is True:
         return AgentKind.LEAN
-    return AgentKind.INHERITING
+    if plugin_definition_read and omit_claude_md is False and is_plugin_role(agent_type):
+        return AgentKind.SPLIT_RECIPIENT
+    return AgentKind.WHOLE_RECIPIENT
+
+
+def is_plugin_role(agent_type: str | None) -> bool:
+    """Whether ``agent_type`` is ``praxion:<role>``, the name of an agent this plugin defines."""
+    prefix = f"{PLUGIN_NAMESPACE}:"
+    return (
+        agent_type is not None and agent_type.startswith(prefix) and len(agent_type) > len(prefix)
+    )
 
 
 def plan_delivery(
@@ -161,7 +217,7 @@ def _wanted_ids(
     if event is Event.SESSION:
         return [unit_id for unit_id in ordered if managed or unit_id not in managed_only]
     # A spawn inherits only the managed core units, never the session's other text.
-    if managed and agent is AgentKind.INHERITING:
+    if managed and agent in _CORE_RECIPIENTS:
         return [
             unit_id for unit_id in ordered if unit_id in managed_only and unit_id in _CORE_ORDER
         ]
@@ -186,6 +242,128 @@ def chunk_budget(unit_id: str) -> int:
 
 def _label(unit_id: str, number: int, total: int) -> str:
     return f"{LABEL_PREFIX}: {unit_id}, part {number} of {total}\n\n"
+
+
+# -- The spawn split: a stored shorter text per unit, trusted one unit at a time ---------
+
+
+@dataclass(frozen=True)
+class SplitEntry:
+    """One unit's stored split: ``text`` is ``source``'s body (digest ``whole_sha256``) with
+    the spans a split recipient does not need removed."""
+
+    source: str
+    whole_sha256: str
+    text: str
+    text_sha256: str
+
+
+@dataclass(frozen=True)
+class SpawnSplit:
+    """The parsed artifact: its entries, cut under the audience manifest of ``manifest_sha256``.
+    Its one writer is the generator; the schema number is checked at parsing, not stored."""
+
+    manifest_sha256: str
+    units: Mapping[str, SplitEntry]
+
+
+def parse_spawn_split(text: str) -> SpawnSplit | None:
+    """The artifact's JSON as a `SpawnSplit`; None for anything that is not exactly the
+    schema, so the interior never sees a partial table. A text that cannot be encoded as
+    UTF-8 (a lone surrogate escape) is not the schema: no digest can be taken over it. Extra
+    keys are ignored: a later writer may add them."""
+    try:
+        wire = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(wire, dict) or type(wire.get("schema")) is not int:
+        return None
+    if wire["schema"] != SPLIT_SCHEMA or not _is_digest(wire.get("manifest_sha256")):
+        return None
+    wire_units = wire.get("units")
+    if not isinstance(wire_units, dict):
+        return None
+    entries: dict[str, SplitEntry] = {}
+    for unit_id, wire_entry in wire_units.items():
+        entry = _parse_entry(wire_entry)
+        if entry is None:
+            return None
+        entries[unit_id] = entry
+    return SpawnSplit(wire["manifest_sha256"], MappingProxyType(entries))
+
+
+def _parse_entry(wire: object) -> SplitEntry | None:
+    if not isinstance(wire, dict):
+        return None
+    source, text = wire.get("source"), wire.get("text")
+    whole, stored = wire.get("whole_sha256"), wire.get("text_sha256")
+    if not (isinstance(source, str) and isinstance(text, str) and _encodes_as_utf8(text)):
+        return None
+    if not (isinstance(whole, str) and isinstance(stored, str)):
+        return None
+    if not (_is_digest(whole) and _is_digest(stored)):
+        return None
+    return SplitEntry(source, whole, text, stored)
+
+
+def _is_digest(value: object) -> bool:
+    return isinstance(value, str) and _DIGEST.fullmatch(value) is not None
+
+
+def _encodes_as_utf8(text: str) -> bool:
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def spawn_units(
+    units: Mapping[str, str], split: SpawnSplit | None, manifest_sha: str | None
+) -> Mapping[str, str]:
+    """The text each unit reaches a split recipient as, in the order of ``units``: its stored
+    split text where `trusted_splits` holds its entry, else its whole body."""
+    trusted = trusted_splits(units, split, manifest_sha)
+    return {
+        unit_id: trusted[unit_id].text if unit_id in trusted else body
+        for unit_id, body in units.items()
+    }
+
+
+def distrusted_units(
+    units: Mapping[str, str], split: SpawnSplit, manifest_sha: str
+) -> tuple[str, ...]:
+    """The units, in the order of ``units``, whose stored split exists but disagrees with
+    their current sources (a stale or hand-edited entry, or a split cut under another audience
+    manifest), so `spawn_units` gives each its whole body."""
+    trusted = trusted_splits(units, split, manifest_sha)
+    return tuple(unit_id for unit_id in units if unit_id in split.units and unit_id not in trusted)
+
+
+def trusted_splits(
+    units: Mapping[str, str], split: SpawnSplit | None, manifest_sha: str | None
+) -> Mapping[str, SplitEntry]:
+    """The one trust decision: the stored entry of each unit whose split may be delivered.
+
+    An entry is trusted only when three digests agree: ``manifest_sha`` against the manifest
+    the split was cut under, the unit's current body against ``whole_sha256``, and the stored
+    text against ``text_sha256``. Each unit is judged alone; no artifact trusts none.
+    """
+    if split is None or split.manifest_sha256 != manifest_sha:
+        return {}
+    return {
+        unit_id: entry
+        for unit_id, body in units.items()
+        if (entry := split.units.get(unit_id)) is not None and _trusts(entry, body)
+    }
+
+
+def _trusts(entry: SplitEntry, body: str) -> bool:
+    return entry.whole_sha256 == _sha256(body) and entry.text_sha256 == _sha256(entry.text)
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 # -- Splitting: coarsest boundary that fits, finer ones only for an oversize piece ------

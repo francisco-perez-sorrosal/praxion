@@ -222,3 +222,56 @@ def declared_edits() -> list[dict[str, str]]:
 
 def base_reading(name: str) -> str:
     return fixture_json("base_readings.json")[name]
+
+
+# -- Split recipients ------------------------------------------------------------------------------
+# A spawn of one of this plugin's inheriting roles is a split recipient: it receives the
+# coordination protocol and the intermediate-documents rule without the spans the audience
+# manifest classifies orchestrator-only. Its frozen reading is still the whole one; it is held to
+# that reading less exactly the statements the split removes, computed by the split oracle of
+# `audience_split` from the sources and the manifest (never from the hooks). A whole recipient
+# (`general-purpose`, any non-plugin agent) stays held to the frozen whole reading as it is.
+
+
+def is_split_recipient(agent_type: str) -> bool:
+    from tests.acceptance.drivers import audience_split
+
+    role = agent_type.removeprefix("praxion:")
+    return agent_type.startswith("praxion:") and role in audience_split.SPLIT_ROLES
+
+
+def shed_statements() -> Counter:
+    """The statements the split removes from the two units, counted."""
+    from tests.acceptance.drivers import audience_split as split
+
+    shed: Counter = Counter()
+    for unit in split.SPLIT_UNITS:
+        kept = split.split_text(REPO_ROOT, unit)
+        assert kept is not None, f"the audience manifest gives {unit.id} no split text"
+        shed += statements(split.source_text(REPO_ROOT, unit)) - statements(kept)
+    return shed
+
+
+def split_recipient_changes(today: str, now: str) -> Changes:
+    """How `now` differs from the whole reading `today` less what the split removes."""
+    expected, after = statements(today) - shed_statements(), statements(now)
+    missing = sorted((expected - after).elements())
+    added = sorted((after - expected).elements())
+    return Changes(_unexcused(missing, "before"), _unexcused(added, "after"))
+
+
+def spawn_changes(agent_type: str, today: str, now: str) -> Changes:
+    """The unexplained changes of a spawn's reading, each recipient held to its own delivery."""
+    if is_split_recipient(agent_type):
+        return split_recipient_changes(today, now)
+    return unexplained_changes(today, now)
+
+
+def missing_floor_statements(agent_type: str, unit: str, text: str) -> list[str]:
+    """A floor unit's statements a spawn lacks, less, for a split recipient, what the split
+    removes: under an impairment either the split or the whole unit is acceptable."""
+    missing = missing_statements(unit, text)
+    if not is_split_recipient(agent_type):
+        return missing
+    shed = shed_statements()
+    return [s for s in missing if s not in shed]

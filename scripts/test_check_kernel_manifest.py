@@ -118,6 +118,8 @@ def moved_pair(repo: Path) -> Path:
         "reason": "probe text",
     }
     edit_manifest(repo, lambda m: m["entries"].append(entry))
+    # The manifest feeds the generated spawn split, so the edit is regenerated as a real one is.
+    kit.regenerate(repo)
     return repo
 
 

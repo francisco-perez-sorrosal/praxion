@@ -106,7 +106,7 @@ def test_an_inheriting_spawn_in_a_managed_project_receives_todays_process_text(
 ):
     spawned = gate.spawn_start(machine, project, agent)
 
-    changes = oracles.unexplained_changes(_today(f"managed-spawn-{agent}"), _now(spawned, machine))
+    changes = oracles.spawn_changes(agent, _today(f"managed-spawn-{agent}"), _now(spawned, machine))
 
     assert changes.none, f"missing: {changes.missing[:5]}\nadded: {changes.added[:5]}"
 

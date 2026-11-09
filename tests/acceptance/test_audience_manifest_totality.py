@@ -62,6 +62,8 @@ def test_the_same_new_heading_with_its_entry_passes(sandbox: Sandbox) -> None:
         sandbox.root,
         AudienceEntry(source, PROBE_HEADING, "no-actor", reason="probe text no agent acts on"),
     )
+    # The source feeds the generated spawn split, so the edit is regenerated as a real one is.
+    kernel_sandbox.regenerate(sandbox.root)
 
     verdict = commit_gate(sandbox.root)
 
@@ -144,6 +146,8 @@ def test_a_mixed_section_with_every_part_classified_passes(sandbox: Sandbox) -> 
             sandbox.root,
             AudienceEntry(source, PROBE_HEADING, scope, part=prefix, reason="probe text"),
         )
+    # The source feeds the generated spawn split, so the edit is regenerated as a real one is.
+    kernel_sandbox.regenerate(sandbox.root)
 
     verdict = commit_gate(sandbox.root)
 

@@ -61,14 +61,23 @@ Behavior contract:
 - Project scope: a hook-deliver rule whose manifest row says
   `project_scope: managed` is delivered only in a managed scope; any other
   value, or none, reads as `every`.
-- Spawns: a `SubagentStart` payload plans for the spawn instead. An inheriting
-  spawn in a managed scope receives the managed core units, impaired floor
-  included, and never the session's other units; `Explore`, `Plan` and a spawn
+- Spawns: a `SubagentStart` payload plans for the spawn instead. A recipient
+  (a plugin role whose definition was read and keeps the instruction files is a
+  split recipient, every other loader of them a whole recipient) in a managed
+  scope receives the managed core units, impaired floor included, and never the
+  session's other units. A whole recipient receives them whole. A split recipient
+  receives each as its stored split (`claude/kernels/spawn_split.json`, without the
+  text only the main session acts on) when the split's digests agree with the unit's
+  body (its bytes as written, as the generator reads them), the bytes of
+  `rules/_audience.yaml` and the stored text, else whole: one unit at a time, and a
+  missing, unreadable or malformed artifact or audience manifest gives every unit
+  whole, as does any failure taking the split. Only a split recipient in a managed
+  scope reads either file. `Explore`, `Plan` and a spawn
   whose definition sets `omitClaudeMd` (this plugin's `agents/<role>.md` for
   `praxion:<role>`, else the project's `.claude/agents/<name>.md`, the start
   directory's before the managed root's, then the user's) receive nothing, and a
   definition that cannot be read, or that spells the flag other than the literal
-  `true`, counts as inheriting. A spawn writes no file, logs no summary and gets
+  `true`, counts as a whole recipient. A spawn writes no file, logs no summary and gets
   no notice: its session did all three.
 
 Visibility of misuse (turned silent no-ops into stderr warnings):
@@ -77,6 +86,8 @@ Visibility of misuse (turned silent no-ops into stderr warnings):
 - `version:` field with non-int value → warning, coerced to 1.
 - `.claude/settings.json` malformed JSON → louder warning naming the
   consequence (reconciliation skipped, disable list not applied).
+- A managed split recipient with no usable spawn split → warning; a unit whose stored
+  split disagrees with its sources → warning naming the unit (each arrives whole).
 """
 
 from __future__ import annotations
@@ -109,13 +120,25 @@ from _rule_blacklist import (
     ensure_template_present,
 )
 from _rule_delivery import (
+    AUDIENCE_MANIFEST_PATH,
+    FRONTMATTER_RE,
     MANAGED_CORE_UNITS,
+    PLUGIN_NAMESPACE,
+    SPAWN_SPLIT_PATH,
     AgentKind,
     Delivery,
     DeliveryPart,
     Event,
+    SpawnSplit,
+    decode_source,
+    distrusted_units,
+    is_plugin_role,
     parse_agent_kind,
+    parse_spawn_split,
     plan_delivery,
+    rule_body,
+    source_digest,
+    spawn_units,
 )
 
 # -- Constants -----------------------------------------------------------------
@@ -129,8 +152,6 @@ CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
 REINSTALL_FIX = "Reinstall the Praxion plugin, then start a new session."
 # The harness's name for each event, as the payload carries it and the output must echo it.
 EVENT_NAMES = {Event.SESSION: "SessionStart", Event.SUBAGENT: "SubagentStart"}
-# `<namespace>:<role>` names an agent of this plugin, defined in its `agents/<role>.md`.
-PLUGIN_NAMESPACE = "praxion"
 # The only text that sets the flag, as the commit gate reads it (`kernel_ledger_checks.OMIT_SET`):
 # one reading of one fact, and any other spelling reads as inheriting, the safe direction.
 _OMIT_SET = "true"
@@ -140,18 +161,6 @@ _AGENT_NAME = re.compile(r"\w[\w.-]*")
 
 # `project_scope` manifest value delivered only inside a managed project.
 _MANAGED_ONLY = "managed"
-
-# Frontmatter delimiter pattern for stripping YAML blocks from rule files.
-_FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
-
-
-# -- Frontmatter stripping -----------------------------------------------------
-
-
-def _strip_frontmatter(text: str) -> str:
-    """Remove leading YAML frontmatter block (--- ... ---) from a rule file."""
-    stripped = _FRONTMATTER_RE.sub("", text, count=1)
-    return stripped.lstrip("\n")
 
 
 # -- YAML loading (stdlib fallback) --------------------------------------------
@@ -269,20 +278,23 @@ def _load_project_config(directory: Path) -> dict | None:
 def _read_rule_body(plugin_root: Path, rel_path: str) -> str:
     """Read a rule file and strip its frontmatter.
 
+    The text is read as every edge reads a source (`decode_source`): the main session receives
+    what it always has, and the generator digests the same text (`scripts/kernel_spawn_split.py`),
+    so a stored split's digest can match on a checkout with CRLF line endings.
     Returns empty string on any I/O error.
     """
     if not rel_path:
         return ""
     rule_path = plugin_root / rel_path
     try:
-        raw = rule_path.read_text(encoding="utf-8")
+        raw = decode_source(rule_path.read_bytes())
     except (OSError, UnicodeDecodeError) as exc:
         print(
             f"[inject_rules] WARNING: could not read rule file {rule_path}: {exc}",
             file=sys.stderr,
         )
         return ""
-    return _strip_frontmatter(raw)
+    return rule_body(raw)
 
 
 def _natively_installed(unit_ids: Collection[str]) -> frozenset[str]:
@@ -322,10 +334,14 @@ def _links_to_rule(user_rules: Path, unit_id: str) -> bool:
 
 
 def _agent_kind(agent_type: object, plugin_root: Path, cwd: Path, scope: ProjectScope) -> AgentKind:
-    """The spawn's kind; a definition that is absent or cannot be read counts as inheriting."""
+    """The spawn's kind; a definition that is absent or cannot be read counts as a whole
+    recipient. Only a `praxion:<role>` type has a plugin definition, and a flag reading of
+    None means that definition was not read (absent, unreadable or without frontmatter)."""
     name = agent_type if isinstance(agent_type, str) else None
     candidates = _definition_candidates(name, plugin_root, cwd, scope) if name else ()
-    return parse_agent_kind(name, _omits_claude_md(candidates))
+    omits = _omits_claude_md(candidates)
+    plugin_definition_read = omits is not None and is_plugin_role(name)
+    return parse_agent_kind(name, omits, plugin_definition_read)
 
 
 def _definition_candidates(
@@ -364,11 +380,76 @@ def _omits_claude_md(candidates: tuple[Path, ...]) -> bool | None:
 def _sets_omit_flag(definition: str) -> bool | None:
     """Whether the frontmatter's `omitClaudeMd` is the literal true, the last duplicate
     winning as in YAML; None with no frontmatter."""
-    frontmatter = _FRONTMATTER_RE.match(definition)
+    frontmatter = FRONTMATTER_RE.match(definition)
     if frontmatter is None:
         return None
     written = _OMIT_FLAG.findall(frontmatter.group(0))
     return bool(written) and written[-1] == _OMIT_SET
+
+
+# -- Spawns: the text a split recipient receives ----------------------------------
+
+
+def _received_units(
+    units: Mapping[str, str], plugin_root: Path, scope: ProjectScope, audience: Audience
+) -> Mapping[str, str]:
+    """The text each unit reaches `audience` as: a managed split recipient's stored split
+    where the artifact is trusted for that unit, anyone else's the unit's body, the artifact
+    unread (an unmanaged spawn receives no unit)."""
+    if audience.agent is not AgentKind.SPLIT_RECIPIENT or not isinstance(scope, Managed):
+        return units
+    # The split only shortens a delivery: a failure the parser did not foresee costs the
+    # spawn its split, never its units, on the manifest path and the impaired floor alike.
+    try:
+        return _split_units(units, plugin_root)
+    except Exception as exc:
+        print(
+            f"[inject_rules] WARNING: could not apply the spawn split: {exc!r};"
+            " the core units arrive whole",
+            file=sys.stderr,
+        )
+        return units
+
+
+def _split_units(units: Mapping[str, str], plugin_root: Path) -> Mapping[str, str]:
+    """Each unit's stored split where the artifact is trusted for it, else its body; a warning
+    for no usable artifact and one naming each unit whose split its sources no longer trust."""
+    split = _parsed_split(_read_bytes(plugin_root / SPAWN_SPLIT_PATH))
+    manifest = _read_bytes(plugin_root / AUDIENCE_MANIFEST_PATH)
+    if split is None or manifest is None:
+        print(
+            f"[inject_rules] WARNING: no usable spawn split under {plugin_root}"
+            f" ({SPAWN_SPLIT_PATH}, {AUDIENCE_MANIFEST_PATH}); the core units arrive whole",
+            file=sys.stderr,
+        )
+        return units
+    manifest_sha = source_digest(manifest)
+    for unit_id in distrusted_units(units, split, manifest_sha):
+        print(
+            f"[inject_rules] WARNING: the spawn split of {unit_id} disagrees with its sources"
+            " (stale or edited; regenerate with scripts/generate_kernels.py); it arrives whole",
+            file=sys.stderr,
+        )
+    return spawn_units(units, split, manifest_sha)
+
+
+def _read_bytes(path: Path) -> bytes | None:
+    """The file's bytes, or None when it cannot be read; the caller reads them as a source
+    (`decode_source`), as the generator does."""
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+def _parsed_split(raw: bytes | None) -> SpawnSplit | None:
+    """The artifact, or None for one that is absent, not UTF-8 or not the schema."""
+    if raw is None:
+        return None
+    try:
+        return parse_spawn_split(raw.decode("utf-8"))
+    except (UnicodeDecodeError, RecursionError):  # JSON nested past the parser's depth
+        return None
 
 
 # -- additionalContext emitter -------------------------------------------------
@@ -467,7 +548,7 @@ class Audience:
     """Who a delivery is planned for: the main session, or a spawn of one kind."""
 
     event: Event
-    agent: AgentKind = AgentKind.INHERITING  # a session's agent kind is moot
+    agent: AgentKind = AgentKind.WHOLE_RECIPIENT  # a session's agent kind is moot
 
 
 SESSION = Audience(Event.SESSION)
@@ -477,7 +558,8 @@ def _floor_delivery(
     plugin_root: Path, scope: ProjectScope, audience: Audience, notice: str | None
 ) -> Delivery:
     """The impaired injection's delivery: the managed core units, read without the manifest."""
-    units = {unit.unit_id: _read_rule_body(plugin_root, unit.path) for unit in MANAGED_CORE_UNITS}
+    bodies = {unit.unit_id: _read_rule_body(plugin_root, unit.path) for unit in MANAGED_CORE_UNITS}
+    units = _received_units(bodies, plugin_root, scope, audience)
     return Delivery(notice, units, _plan(units, set(units), scope, set(), audience))
 
 
@@ -520,7 +602,8 @@ def _manifest_delivery(
     if effects:
         apply_symlink_exclusions(cwd, compute_symlink_exclusions(disable_set, rules))
 
-    units, managed_only = _hook_delivered_units(rules, plugin_root)
+    bodies, managed_only = _hook_delivered_units(rules, plugin_root)
+    units = _received_units(bodies, plugin_root, scope, audience)
     delivery = Delivery(None, units, _plan(units, managed_only, scope, disable_set, audience))
     if effects:
         _log_injection_summary(rules, units, delivery, disable_set)

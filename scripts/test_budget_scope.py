@@ -141,7 +141,7 @@ def test_the_budget_counts_what_the_hooks_deliver_on_every_layout(
         managed_only,
         scope_of(start),
         Event.SESSION,
-        AgentKind.INHERITING,
+        AgentKind.WHOLE_RECIPIENT,
         (),
         (),
     )

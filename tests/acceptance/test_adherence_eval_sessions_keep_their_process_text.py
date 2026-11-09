@@ -30,9 +30,16 @@ def test_each_launched_session_receives_todays_process_text(run, arm):
     assert _unexplained(run.session_pairs(arm)) == {}
 
 
-@pytest.mark.parametrize("arm", ["full", "lean"])
-def test_the_role_each_session_spawns_receives_todays_process_text(run, arm):
-    assert _unexplained(run.role_pairs(arm)) == {}
+# The full arm's role inherits, so it is a split recipient; the lean arm's receives no rule text.
+@pytest.mark.parametrize(
+    ("arm", "spawned"),
+    [("full", "praxion:verifier"), ("lean", "praxion:researcher")],
+    ids=["full", "lean"],
+)
+def test_the_role_each_session_spawns_receives_todays_process_text(run, arm, spawned):
+    found = {k: oracles.spawn_changes(spawned, t, n) for k, (t, n) in run.role_pairs(arm).items()}
+
+    assert {k: c for k, c in found.items() if not c.none} == {}
 
 
 def test_the_eval_grades_the_same_checks_as_today(run):

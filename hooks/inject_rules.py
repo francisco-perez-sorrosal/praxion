@@ -61,14 +61,16 @@ Behavior contract:
 - Project scope: a hook-deliver rule whose manifest row says
   `project_scope: managed` is delivered only in a managed scope; any other
   value, or none, reads as `every`.
-- Spawns: a `SubagentStart` payload plans for the spawn instead. An inheriting
-  spawn in a managed scope receives the managed core units, impaired floor
-  included, and never the session's other units; `Explore`, `Plan` and a spawn
+- Spawns: a `SubagentStart` payload plans for the spawn instead. A recipient
+  (a plugin role whose definition was read and keeps the instruction files is a
+  split recipient, every other loader of them a whole recipient) in a managed
+  scope receives the managed core units, impaired floor included, and never the
+  session's other units; for now both kinds receive them whole; `Explore`, `Plan` and a spawn
   whose definition sets `omitClaudeMd` (this plugin's `agents/<role>.md` for
   `praxion:<role>`, else the project's `.claude/agents/<name>.md`, the start
   directory's before the managed root's, then the user's) receive nothing, and a
   definition that cannot be read, or that spells the flag other than the literal
-  `true`, counts as inheriting. A spawn writes no file, logs no summary and gets
+  `true`, counts as a whole recipient. A spawn writes no file, logs no summary and gets
   no notice: its session did all three.
 
 Visibility of misuse (turned silent no-ops into stderr warnings):
@@ -109,13 +111,16 @@ from _rule_blacklist import (
     ensure_template_present,
 )
 from _rule_delivery import (
+    FRONTMATTER_RE,
     MANAGED_CORE_UNITS,
+    PLUGIN_NAMESPACE,
     AgentKind,
     Delivery,
     DeliveryPart,
     Event,
     parse_agent_kind,
     plan_delivery,
+    rule_body,
 )
 
 # -- Constants -----------------------------------------------------------------
@@ -129,8 +134,6 @@ CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
 REINSTALL_FIX = "Reinstall the Praxion plugin, then start a new session."
 # The harness's name for each event, as the payload carries it and the output must echo it.
 EVENT_NAMES = {Event.SESSION: "SessionStart", Event.SUBAGENT: "SubagentStart"}
-# `<namespace>:<role>` names an agent of this plugin, defined in its `agents/<role>.md`.
-PLUGIN_NAMESPACE = "praxion"
 # The only text that sets the flag, as the commit gate reads it (`kernel_ledger_checks.OMIT_SET`):
 # one reading of one fact, and any other spelling reads as inheriting, the safe direction.
 _OMIT_SET = "true"
@@ -140,18 +143,6 @@ _AGENT_NAME = re.compile(r"\w[\w.-]*")
 
 # `project_scope` manifest value delivered only inside a managed project.
 _MANAGED_ONLY = "managed"
-
-# Frontmatter delimiter pattern for stripping YAML blocks from rule files.
-_FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
-
-
-# -- Frontmatter stripping -----------------------------------------------------
-
-
-def _strip_frontmatter(text: str) -> str:
-    """Remove leading YAML frontmatter block (--- ... ---) from a rule file."""
-    stripped = _FRONTMATTER_RE.sub("", text, count=1)
-    return stripped.lstrip("\n")
 
 
 # -- YAML loading (stdlib fallback) --------------------------------------------
@@ -282,7 +273,7 @@ def _read_rule_body(plugin_root: Path, rel_path: str) -> str:
             file=sys.stderr,
         )
         return ""
-    return _strip_frontmatter(raw)
+    return rule_body(raw)
 
 
 def _natively_installed(unit_ids: Collection[str]) -> frozenset[str]:
@@ -322,10 +313,16 @@ def _links_to_rule(user_rules: Path, unit_id: str) -> bool:
 
 
 def _agent_kind(agent_type: object, plugin_root: Path, cwd: Path, scope: ProjectScope) -> AgentKind:
-    """The spawn's kind; a definition that is absent or cannot be read counts as inheriting."""
+    """The spawn's kind; a definition that is absent or cannot be read counts as a whole
+    recipient. Only a `praxion:<role>` type has a plugin definition, and a flag reading of
+    None means that definition was not read (absent, unreadable or without frontmatter)."""
     name = agent_type if isinstance(agent_type, str) else None
     candidates = _definition_candidates(name, plugin_root, cwd, scope) if name else ()
-    return parse_agent_kind(name, _omits_claude_md(candidates))
+    omits = _omits_claude_md(candidates)
+    plugin_definition_read = (
+        omits is not None and name is not None and name.startswith(f"{PLUGIN_NAMESPACE}:")
+    )
+    return parse_agent_kind(name, omits, plugin_definition_read)
 
 
 def _definition_candidates(
@@ -364,7 +361,7 @@ def _omits_claude_md(candidates: tuple[Path, ...]) -> bool | None:
 def _sets_omit_flag(definition: str) -> bool | None:
     """Whether the frontmatter's `omitClaudeMd` is the literal true, the last duplicate
     winning as in YAML; None with no frontmatter."""
-    frontmatter = _FRONTMATTER_RE.match(definition)
+    frontmatter = FRONTMATTER_RE.match(definition)
     if frontmatter is None:
         return None
     written = _OMIT_FLAG.findall(frontmatter.group(0))
@@ -467,7 +464,7 @@ class Audience:
     """Who a delivery is planned for: the main session, or a spawn of one kind."""
 
     event: Event
-    agent: AgentKind = AgentKind.INHERITING  # a session's agent kind is moot
+    agent: AgentKind = AgentKind.WHOLE_RECIPIENT  # a session's agent kind is moot
 
 
 SESSION = Audience(Event.SESSION)

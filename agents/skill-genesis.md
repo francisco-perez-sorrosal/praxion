@@ -60,7 +60,7 @@ Consume all available learning sources in priority order. Skip any source that d
 3. **Latest SENTINEL_REPORT_*.md** (`.ai-state/sentinel_reports/`) -- ecosystem patterns and recurring findings
 4. **Latest IDEA_LEDGER_*.md** (`.ai-state/idea_ledgers/`) -- avoid re-proposing implemented or discarded ideas
 5. **ADR files** -- `.ai-state/decisions/DECISIONS_INDEX.md` is the scannable overview, but it grows unbounded. Prefer `python3 scripts/query_adrs.py --paths <files>` (or `--staged`) when the harvest scope is known; otherwise **pre-scan with `grep -in '<keyword>' .ai-state/decisions/DECISIONS_INDEX.md` before reading it whole**: read only the matching rows (via `offset`+`limit`). Recurring decision patterns across multiple features (same category, similar rationale in the summary column) are candidates for rule or skill formalization. Read the full ADR files for promising matches.
-6. **`.ai-state/calibration_log.md` `Retrospective` cells** newer than the last harvest -- Direct-tier learning/gotcha/debt/decision micro-notes captured via the commit-time convention (see `swe-agent-coordination-protocol.md` § Process Calibration).
+6. **`.ai-state/calibration_log.md` `Retrospective` cells** newer than the last harvest -- Direct-tier learning/gotcha/debt/decision micro-notes captured via the commit-time convention (see `rules/swe/swe-agent-coordination-protocol.md` § Process Calibration).
 
 For each source, extract discrete learning items. A learning item is a pattern, gotcha, convention, workflow, decision rationale, or recurring issue that appears actionable and reusable beyond its original context.
 

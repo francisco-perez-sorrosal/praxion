@@ -8,6 +8,12 @@
 # scripts/kernel_eligibility.py (ELIGIBLE_ROLES, the pin's home, changed only in a
 # commit of its own) may be switched; this file lists none. The commit
 # gate (scripts/check_kernel_manifest.py) holds every move.
+# From v0.60.0 (dec-495) a held role's full arm is the split delivery: an inheriting
+# praxion role receives the coordination protocol and the intermediate-documents rule
+# without their orchestrator-only spans (claude/kernels/spawn_split.json). The runs below
+# measured the full arm on the whole rules, so a re-trial from a later freeze compares its
+# lean arm against the split, and its full-arm figures are not comparable with theirs. This
+# note moves no role.
 version: 1
 roles:
   researcher:

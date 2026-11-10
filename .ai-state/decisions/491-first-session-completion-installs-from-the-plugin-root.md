@@ -12,6 +12,7 @@ agent_type: orchestrator
 branch: main
 pipeline_tier: lightweight
 supersedes_in_part: [dec-170]
+superseded_in_part_by: [dec-draft-9954b327]
 affected_files:
   - hooks/auto_complete_install.py
   - hooks/test_auto_complete_install.py

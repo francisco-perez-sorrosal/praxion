@@ -13,10 +13,13 @@ Otherwise, from the plugin this hook runs from (its own version directory,
 `.../praxion/<version>/`, never the unversioned cache parent):
   - Update path: the marker is present (an install ran before), the plugin root
     lies in a cache version directory and the surfaces are present. The update
-    steps run in order -- refresh the rule links, then the script links -- each
-    fail-open; the marker is written whatever happened. A fully successful run
-    prints nothing; a failure prints one stderr line carrying the exception type
-    and the command that completes the refresh by hand.
+    steps run in order -- carry the instructions forward (a link into another
+    cached version's render is re-rendered from this version's template with the
+    personal values that render carried), refresh the rule links, then the
+    script links -- each fail-open; the marker is written whatever happened. A
+    fully successful run prints nothing; a failure prints one stderr line
+    carrying the exception type and the command that completes the refresh by
+    hand.
   - Surfaces already present (CLAUDE.md symlink and the rules sentinel, both
     resolving) but no update path (a first session after a clone install, or a
     `--plugin-dir` checkout root): refresh the rule links -- sweep each stale
@@ -39,13 +42,14 @@ Exit 0 unconditionally — this hook must NEVER block session start.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
 import stat
 import subprocess
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -61,14 +65,18 @@ import render_claude_md as _render_mod  # noqa: E402 (after sys.path injection)
 sys.path.insert(0, str(Path(__file__).parent))
 from _install_refresh import (  # noqa: E402 (after sys.path injection)
     BinEntry,
+    CachedRender,
     EntryKind,
+    InstructionsSnapshot,
     Keep,
     Link,
     OfferedScript,
     Remove,
     Repoint,
     ScriptAction,
+    SnapshotKind,
     cache_version_dir,
+    classify_instructions,
     plan_script_links,
     unreachable,
 )
@@ -99,11 +107,12 @@ _BIN_SUBPATH = Path(".local") / "bin"
 _MERGE_DRIVER_PREFIX = "merge_driver_"
 _HOOK_SCRIPT_SUFFIX = "-hook.sh"
 
-# Ends the name of the link built beside a destination before it is renamed over it.
-_TEMPORARY_LINK_SUFFIX = ".refreshing"
+# Ends the name of the entry built beside a destination before it is renamed over it.
+_TEMPORARY_SUFFIX = ".refreshing"
 
 # Relative to the plugin root
 _TEMPLATE_RELATIVE = Path("claude") / "config" / "CLAUDE.md.tmpl"
+_RENDER_RELATIVE = Path("claude") / "config" / "CLAUDE.md"
 _SHARED_LIB_RELATIVE = Path("lib") / "install_shared.sh"
 
 # One rule-linking run: a few hundred symlinks at most, well inside the hook's
@@ -237,7 +246,7 @@ def _render_claude_md(home: Path, values: dict[str, str], root: Path) -> None:
     symlinks ~/.claude/CLAUDE.md to that rendered file.  Raises on any I/O error.
     """
     template_path = root / _TEMPLATE_RELATIVE
-    rendered_path = root / "claude" / "config" / "CLAUDE.md"
+    rendered_path = root / _RENDER_RELATIVE
 
     _render_mod.render_claude_md(template_path, rendered_path, values)
 
@@ -371,21 +380,26 @@ def snapshot_bin(bin_dir: Path) -> tuple[BinEntry, ...]:
     return tuple(entries)
 
 
-def _repoint(bin_dir: Path, name: str, target: str) -> None:
-    """Replace the link `name` by one to `target` in a single rename.
+def _replace_link(link: Path, target: str) -> None:
+    """Point `link` at `target` in a single rename, never leaving a moment with no link."""
+    _build_and_rename(link, lambda temporary: temporary.symlink_to(target))
 
-    The new link is built beside the old and renamed over it, so there is never
-    a moment with no link; it is removed again when the rename fails.
+
+def _build_and_rename(destination: Path, build: Callable[[Path], object]) -> None:
+    """Build an entry beside `destination` with `build`, then rename it over `destination`.
+
+    The rename is atomic, so `destination` holds the old entry or the new one,
+    never neither. When building or renaming fails the temporary is removed and
+    the original error is the one raised.
     """
-    temporary = bin_dir / f".{name}.{os.getpid()}{_TEMPORARY_LINK_SUFFIX}"
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}{_TEMPORARY_SUFFIX}")
     temporary.unlink(missing_ok=True)
-    temporary.symlink_to(target)
     try:
-        os.replace(temporary, bin_dir / name)
+        build(temporary)
+        os.replace(temporary, destination)
     except BaseException:
-        temporary.unlink(
-            missing_ok=True
-        )  # a concurrent session may have swept it; keep the original error
+        with contextlib.suppress(OSError):  # never built, or swept by a concurrent session
+            temporary.unlink()
         raise
 
 
@@ -409,7 +423,7 @@ def _apply_script_action(bin_dir: Path, action: ScriptAction) -> None:
     if isinstance(action, Keep):
         return
     if isinstance(action, Repoint):
-        _repoint(bin_dir, action.name, action.target)
+        _replace_link(bin_dir / action.name, action.target)
     elif isinstance(action, Remove):
         if (bin_dir / action.name).is_symlink():
             (bin_dir / action.name).unlink(
@@ -434,9 +448,82 @@ def refresh_scripts(home: Path, root: Path) -> None:
     apply_script_actions(bin_dir, actions)
 
 
+class UnrecoverableRenderError(Exception):
+    """A previous render is not its template filled with single-line values."""
+
+
+def snapshot_instructions(path: Path) -> InstructionsSnapshot:
+    """What `path` holds, read with `lstat` so a link is never followed to classify it."""
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return InstructionsSnapshot(SnapshotKind.ABSENT, "", False)
+    if stat.S_ISLNK(mode):
+        return InstructionsSnapshot(SnapshotKind.LINK, os.readlink(path), path.exists())
+    if stat.S_ISREG(mode):
+        return InstructionsSnapshot(SnapshotKind.FILE, "", False)
+    return InstructionsSnapshot(SnapshotKind.OTHER, "", False)
+
+
+def _update_instructions(home: Path, root: Path) -> None:
+    """Move a cached render of ~/.claude/CLAUDE.md to the plugin at `root`.
+
+    Only a live link into another cached version's render moves; a link already
+    into `root`'s version, a link elsewhere and anything that is not a link are
+    left as they are.
+    """
+    link = home / _CLAUDE_MD_SUBPATH
+    link_dir = str(link.parent)
+    state = classify_instructions(snapshot_instructions(link), link_dir)
+    running_version_dir = cache_version_dir(str(root), link_dir)
+    if isinstance(state, CachedRender) and state.version_dir != running_version_dir:
+        carry_forward_instructions(home, root, Path(state.version_dir))
+
+
+def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> None:
+    """Render `root`'s template with the values `version_dir`'s render carried, and link it.
+
+    Raises UnrecoverableRenderError, before anything is written, when the
+    previous render cannot be read back as its own template's: falling back to
+    defaults would replace the user's identity with today's derived one. The
+    render is renamed into place before the link is swapped, so ~/.claude/CLAUDE.md
+    resolves to a complete render, the previous one or the new one, whatever fails.
+    """
+    carried = _render_mod.recover_values(
+        (version_dir / _TEMPLATE_RELATIVE).read_text(encoding="utf-8"),
+        (version_dir / _RENDER_RELATIVE).read_text(encoding="utf-8"),
+    )
+    if carried is None:
+        raise UnrecoverableRenderError
+    template_path = root / _TEMPLATE_RELATIVE
+    values = _with_defaults_for_missing(template_path.read_text(encoding="utf-8"), carried)
+    rendered_path = root / _RENDER_RELATIVE
+    _build_and_rename(
+        rendered_path,
+        lambda temporary: _render_mod.render_claude_md(template_path, temporary, values),
+    )
+    _replace_link(home / _CLAUDE_MD_SUBPATH, str(rendered_path))
+
+
+def _with_defaults_for_missing(template_text: str, carried: dict[str, str]) -> dict[str, str]:
+    """The carried values, plus a derived default for each key of the template not carried.
+
+    Defaults are derived only when a key is missing, and fill only that key: they
+    read today's git identity, which never replaces a value the user carried.
+    """
+    keys = {
+        match.group()[2:-2] for match in _render_mod.PLACEHOLDER_PATTERN.finditer(template_text)
+    }
+    missing = keys - carried.keys()
+    if not missing:
+        return carried
+    defaults = _render_mod.derive_defaults()
+    return {**carried, **{key: defaults[key] for key in missing if key in defaults}}
+
+
 # The update path's steps, in the one place that orders them. Each takes
 # (home, plugin root) and runs on its own, so a failing step never costs the next.
-_UPDATE_STEPS = (_update_rules, refresh_scripts)
+_UPDATE_STEPS = (_update_instructions, _update_rules, refresh_scripts)
 
 
 def _is_update_run(home: Path, root: Path) -> bool:

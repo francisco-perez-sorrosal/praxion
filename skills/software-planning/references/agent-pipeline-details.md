@@ -100,6 +100,7 @@ When the pipeline completes (verifier done, or all steps marked complete):
 1. **Verify all `.ai-state/` artifacts are committed** — run `git status` in the worktree and confirm no untracked or modified files under `.ai-state/` (ADRs, specs, calibration log, sentinel reports). Commit any stragglers before exiting
 2. **End-of-feature archival** — if the planner performed spec archival or learnings merge, confirm those files are committed
 3. Commit all remaining changes in the pipeline worktree branch
+3.5. **Collect the suite at depth 1** — run `check_shallow_collection.py --ref <branch>` once per test pocket (`--cwd <pocket>` and the pocket's own collection command after `--`). CI usually clones at depth 1, so a test that reads git history while it is collected passes every local run and fails the whole suite there. A failure is a merge blocker: freeze what the test reads as a committed fixture, as the acceptance-design procedure requires, and re-run. `/merge-worktree` repeats the check at merge time
 4. Call `ExitWorktree` with `action: "keep"` — preserves the worktree and branch on disk
 5. Report to the user:
    - Branch name (e.g., `pipeline/<task-slug>`)

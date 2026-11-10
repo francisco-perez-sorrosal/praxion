@@ -8,6 +8,19 @@ effectful half of the refresh, `_install_refresh` the pure half: each step
 gathers a snapshot, asks the pure core what to do, then applies the answer with
 a rename, so no surface is ever left without a working entry.
 
+The update path runs when an install ran before (the marker) and the plugin runs
+from a cache version directory. It has three independent steps, each fail-open.
+The instructions step classifies `~/.claude/CLAUDE.md` into one of five states:
+
+- a live link into another cached version's render is re-rendered from this
+  version's template with the values that render carried;
+- nothing there, or a link into the cache that no longer resolves, is set up as
+  a first install sets it up, confirmation prompt included;
+- a regular file, or a link outside the cache (a clone's), is never replaced.
+
+The rules and scripts steps refresh: they re-point what lies in another cached
+version and add what is missing, and never take over a live link of a clone.
+
 The hook puts `scripts/` (for `render_claude_md`) and its own directory on
 `sys.path` before importing this module, which is why neither is injected here.
 Stdlib only and importable on Python 3.9, like the hook.
@@ -17,6 +30,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -28,14 +42,18 @@ from _install_refresh import (
     BinEntry,
     CachedRender,
     EntryKind,
+    ForeignLink,
     InstructionsSnapshot,
     Keep,
     Link,
+    MissingCachedRender,
+    NoInstructions,
     OfferedScript,
     Remove,
     Repoint,
     ScriptAction,
     SnapshotKind,
+    UserOwned,
     cache_version_dir,
     classify_instructions,
     plan_script_links,
@@ -47,6 +65,20 @@ from _install_refresh import (
 # ---------------------------------------------------------------------------
 
 _MARKER_FILENAME = ".praxion-complete-installed"
+_DECLINE_MARKER_FILENAME = ".praxion-install-declined"
+
+_AUTO_COMPLETE_FLAG = "PRAXION_AUTO_COMPLETE"
+_TRUTHY = frozenset({"1", "true", "yes"})
+
+# Interactive prompt timeout (seconds)
+_PROMPT_TIMEOUT_SECS = 30
+
+# What a first install writes when no git identity can be derived.
+_ANONYMOUS_VALUES = {
+    "USERNAME": "@anon",
+    "EMAIL": "anon@unknown",
+    "GITHUB_URL": "https://github.com/anon",
+}
 
 _CLAUDE_MD_SUBPATH = Path(".claude") / "CLAUDE.md"
 _BIN_SUBPATH = Path(".local") / "bin"
@@ -85,6 +117,125 @@ def _write_marker(home: Path) -> None:
     marker = home / ".claude" / _MARKER_FILENAME
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text("")
+
+
+def _write_decline_marker(home: Path) -> None:
+    """Write a soft-decline marker (operator chose not to install)."""
+    marker = home / ".claude" / _DECLINE_MARKER_FILENAME
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("")
+
+
+def _resolve_mode() -> bool:
+    """Return True when auto-complete mode is active (skip interactive prompt).
+
+    Auto-complete is active when PRAXION_AUTO_COMPLETE=1 is set, indicating
+    a non-interactive environment (CI, headless container) or operator opt-in.
+    """
+    return os.environ.get(_AUTO_COMPLETE_FLAG, "").strip().lower() in _TRUTHY
+
+
+def _default_values() -> dict[str, str]:
+    """The personal values a first install renders: derived from git, else anonymous."""
+    try:
+        return _render_mod.derive_defaults()
+    except Exception:
+        return dict(_ANONYMOUS_VALUES)
+
+
+def _render_claude_md(home: Path, values: dict[str, str], root: Path) -> None:
+    """Render ~/.claude/CLAUDE.md from the plugin's template.
+
+    Renders the template into a real file in the plugin's config dir, then
+    symlinks ~/.claude/CLAUDE.md to that rendered file.  Raises on any I/O error.
+    """
+    template_path = root / _TEMPLATE_RELATIVE
+    rendered_path = root / _RENDER_RELATIVE
+
+    _render_mod.render_claude_md(template_path, rendered_path, values)
+
+    claude_md_link = home / _CLAUDE_MD_SUBPATH
+    claude_md_link.parent.mkdir(parents=True, exist_ok=True)
+    if claude_md_link.exists() or claude_md_link.is_symlink():
+        claude_md_link.unlink()
+    claude_md_link.symlink_to(rendered_path)
+
+
+def _prompt_with_timeout(values: dict[str, str]) -> bool:
+    """Prompt the operator to confirm personal-info values.
+
+    Returns True to proceed (accept defaults or user confirmed), False to
+    decline.  On timeout, returns True (default-accept).  On EOF (non-
+    interactive or piped stdin), returns True immediately.
+    """
+    username = values.get("USERNAME", _ANONYMOUS_VALUES["USERNAME"])
+    email = values.get("EMAIL", _ANONYMOUS_VALUES["EMAIL"])
+    github = values.get("GITHUB_URL", _ANONYMOUS_VALUES["GITHUB_URL"])
+
+    msg = (
+        "\n[Praxion] First-session auto-install\n"
+        f"  username: {username}\n"
+        f"  email:    {email}\n"
+        f"  github:   {github}\n"
+        "\nProceed with install? [Y/n, auto-accepts in 30s]: "
+    )
+
+    accepted = True
+
+    def _on_timeout(signum: int, frame: object) -> None:
+        # Timeout fires — proceed with defaults
+        pass
+
+    try:
+        old_handler = signal.signal(signal.SIGALRM, _on_timeout)
+        signal.alarm(_PROMPT_TIMEOUT_SECS)
+        try:
+            sys.stderr.write(msg)
+            sys.stderr.flush()
+            line = sys.stdin.readline()
+            signal.alarm(0)  # Cancel alarm on successful read
+            stripped = line.strip().lower()
+            if stripped in ("n", "no"):
+                accepted = False
+        except (EOFError, OSError):
+            # stdin is EOF or not readable — auto-accept
+            signal.alarm(0)
+            accepted = True
+        finally:
+            signal.signal(signal.SIGALRM, old_handler)
+            signal.alarm(0)
+    except Exception:
+        # signal.SIGALRM may not be available on all platforms (e.g., Windows)
+        # Fall back to non-interactive accept
+        accepted = True
+
+    return accepted
+
+
+def _confirm_install(home: Path, values: dict[str, str], auto_complete: bool) -> bool:
+    """Whether a first install of `values` goes ahead.
+
+    Auto-complete mode skips the prompt. Otherwise the operator is asked (30s
+    timeout-accept, a prompt that cannot run counts as consent); a refusal
+    writes the soft-decline marker.
+    """
+    if auto_complete:
+        return True
+    try:
+        accepted = _prompt_with_timeout(values)
+    except Exception:
+        accepted = True
+    if not accepted:
+        try:
+            _write_decline_marker(home)
+        except Exception:
+            pass
+    return accepted
+
+
+def _report_install_complete() -> None:
+    sys.stderr.write("[Praxion] Auto-install complete.\n")
+    sys.stderr.flush()
 
 
 def _run_rule_linkers(home: Path, root: Path, functions: tuple[str, ...]) -> None:
@@ -253,18 +404,44 @@ def snapshot_instructions(path: Path) -> InstructionsSnapshot:
 
 
 def _update_instructions(home: Path, root: Path) -> None:
-    """Move a cached render of ~/.claude/CLAUDE.md to the plugin at `root`.
+    """Bring ~/.claude/CLAUDE.md to the plugin at `root`, by what it holds.
 
-    Only a live link into another cached version's render moves; a link already
-    into `root`'s version, a link elsewhere and anything that is not a link are
-    left as they are.
+    A regular file and a link outside the cache are never touched. A live link
+    into another cached version's render moves to `root`'s; one already into
+    `root`'s version stays. Nothing there, or a link into the cache that no
+    longer resolves, is set up as a first install sets it up.
     """
     link = home / _CLAUDE_MD_SUBPATH
     link_dir = str(link.parent)
     state = classify_instructions(snapshot_instructions(link), link_dir)
-    running_version_dir = cache_version_dir(str(root), link_dir)
-    if isinstance(state, CachedRender) and state.version_dir != running_version_dir:
-        carry_forward_instructions(home, root, Path(state.version_dir))
+    if isinstance(state, (UserOwned, ForeignLink)):
+        return
+    if isinstance(state, CachedRender):
+        if state.version_dir != cache_version_dir(str(root), link_dir):
+            carry_forward_instructions(home, root, Path(state.version_dir))
+        return
+    if isinstance(state, (NoInstructions, MissingCachedRender)):
+        _fresh_instructions_setup(home, root)
+        return
+    unreachable(state)
+
+
+class InstallDeclinedError(Exception):
+    """The operator refused the confirmation: nothing is set up, no completion is recorded."""
+
+
+def _fresh_instructions_setup(home: Path, root: Path) -> None:
+    """Set up ~/.claude/CLAUDE.md as the cold first install does, rules and scripts aside.
+
+    Derives the personal values, asks the operator to confirm them (unless
+    auto-complete mode is on), renders into `root` and links the render. The
+    prompt goes to the terminal only. Raises InstallDeclinedError on a refusal.
+    """
+    values = _default_values()
+    if not _confirm_install(home, values, _resolve_mode()):
+        raise InstallDeclinedError
+    _render_claude_md(home, values, root)
+    _report_install_complete()
 
 
 def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> None:
@@ -328,17 +505,23 @@ def _run_update_path(home: Path, root: Path) -> None:
 
     Every step runs and the first failure is remembered; the marker is written
     whatever happened, so a failing refresh is not retried at each session.
+    The exception is a refused first-install confirmation: it is no failure, and
+    it leaves the marker as it was, so the next session asks again.
     """
     first_failure: Exception | None = None
+    declined = False
     for step in _UPDATE_STEPS:
         try:
             step(home, root)
+        except InstallDeclinedError:
+            declined = True
         except Exception as exc:
             first_failure = first_failure or exc
-    try:
-        _write_marker(home)
-    except Exception:
-        pass
+    if not declined:
+        try:
+            _write_marker(home)
+        except Exception:
+            pass
     if first_failure is not None:
         _report_incomplete("Update refresh", first_failure)
 

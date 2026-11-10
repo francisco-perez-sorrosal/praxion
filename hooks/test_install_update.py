@@ -488,18 +488,36 @@ class TestUpdatePath:
 
         assert calls == []
 
-    def test_missing_surfaces_keep_the_cold_path(self, armed, plugin_root, monkeypatch):
+    def test_a_cache_root_with_a_marker_reaches_the_update_path_whatever_the_surfaces(
+        self, armed, monkeypatch
+    ):
         module = _fake_home_module(monkeypatch, armed)
-        _seed_template(plugin_root)
         (armed / ".claude" / "CLAUDE.md").unlink()
+        calls: list = []
+        self._recording_steps(monkeypatch, calls)
+
+        self._run_hook(module, monkeypatch)
+
+        assert calls == ["first", "second"]
+
+    def test_a_checkout_root_with_a_marker_and_missing_surfaces_keeps_the_cold_path(
+        self, armed, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, armed)
+        checkout = tmp_path / "checkout"
+        _seed_template(checkout)
+        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(checkout))
         monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
+        (armed / ".claude" / "CLAUDE.md").unlink()
         calls: list = []
         self._recording_steps(monkeypatch, calls)
 
         self._run_hook(module, monkeypatch)
 
         assert calls == []
-        assert (armed / ".claude" / "CLAUDE.md").is_symlink()
+        assert os.readlink(armed / ".claude" / "CLAUDE.md") == str(
+            checkout / "claude" / "config" / "CLAUDE.md"
+        )
 
     def test_a_failing_step_does_not_stop_the_next_one(self, armed, monkeypatch):
         module = _fake_home_module(monkeypatch, armed)
@@ -624,3 +642,159 @@ class TestDefaultsForMissingKeys:
         values = update._with_defaults(_CARRIED, frozenset({"SHELL_NAME"}), _TODAYS)
 
         assert values == _CARRIED
+
+
+def _dangling_cache_link(home: Path) -> Path:
+    """~/.claude/CLAUDE.md as a link into a removed cached version's render."""
+    gone = _cached_version(home, "9.9.8") / "claude" / "config" / "CLAUDE.md"
+    link = home / ".claude" / "CLAUDE.md"
+    link.symlink_to(gone)
+    return link
+
+
+class TestInstructionStates:
+    """Each of the five states of ~/.claude/CLAUDE.md reaches its own action."""
+
+    @pytest.fixture(autouse=True)
+    def _asks_nothing(self, monkeypatch):
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
+
+    def test_a_regular_file_is_left_byte_identical(self, fake_home, plugin_root):
+        _seed_template(plugin_root)
+        mine = fake_home / ".claude" / "CLAUDE.md"
+        mine.write_text("# my own notes\n", encoding="utf-8")
+        before = (mine.read_bytes(), mine.stat().st_ino)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert (mine.read_bytes(), mine.stat().st_ino) == before
+
+    def test_a_link_outside_the_cache_is_left_where_it_points(
+        self, fake_home, plugin_root, tmp_path
+    ):
+        _seed_template(plugin_root)
+        clone_render = tmp_path / "clone" / "claude" / "config" / "CLAUDE.md"
+        clone_render.parent.mkdir(parents=True)
+        clone_render.write_text("# the clone's render\n", encoding="utf-8")
+        link = fake_home / ".claude" / "CLAUDE.md"
+        link.symlink_to(clone_render)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(clone_render)
+
+    def test_a_dangling_cache_link_is_set_up_as_a_first_install_sets_it_up(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        _seed_template(plugin_root)
+        link = _dangling_cache_link(fake_home)
+        monkeypatch.setattr(update._render_mod, "derive_defaults", lambda: dict(_TODAYS))
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(plugin_root / "claude" / "config" / "CLAUDE.md")
+        assert link.read_text(encoding="utf-8") == (
+            f"user={_TODAYS['USERNAME']} mail={_TODAYS['EMAIL']}\n"
+        )
+
+    def test_a_missing_file_is_set_up_as_a_first_install_sets_it_up(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        _seed_template(plugin_root)
+        monkeypatch.setattr(update._render_mod, "derive_defaults", lambda: dict(_TODAYS))
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert (fake_home / ".claude" / "CLAUDE.md").read_text(encoding="utf-8") == (
+            f"user={_TODAYS['USERNAME']} mail={_TODAYS['EMAIL']}\n"
+        )
+
+    def test_a_state_the_dispatch_does_not_know_is_a_bug_not_a_silent_skip(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        monkeypatch.setattr(update, "classify_instructions", lambda *_: object())
+
+        with pytest.raises(AssertionError, match="unhandled case"):
+            update._update_instructions(fake_home, plugin_root)
+
+    def test_the_dangling_link_setup_leaves_a_clones_live_links_its_own(
+        self, fake_home, plugin_root, tmp_path
+    ):
+        _seed_template(plugin_root)
+        _seed_script(plugin_root / "scripts", "praxion-dashboard")
+        clone = tmp_path / "clone"
+        clone_script = _seed_script(clone / "scripts", "praxion-dashboard")
+        (fake_home / ".local" / "bin" / "praxion-dashboard").symlink_to(clone_script)
+        clone_rule = clone / "rules" / "swe" / "coding-style.md"
+        clone_rule.parent.mkdir(parents=True)
+        clone_rule.write_text("# the clone's rule\n", encoding="utf-8")
+        rule_link = _plant_link(fake_home, "swe/coding-style.md", clone_rule)
+        _dangling_cache_link(fake_home)
+
+        update._run_update_path(fake_home, plugin_root)
+
+        bin_link = fake_home / ".local" / "bin" / "praxion-dashboard"
+        assert (os.readlink(bin_link), os.readlink(rule_link)) == (
+            str(clone_script),
+            str(clone_rule),
+        )
+
+    def test_a_failed_setup_is_reported_once_and_the_marker_is_still_written(
+        self, fake_home, plugin_root, marker_path, capsys
+    ):
+        _dangling_cache_link(fake_home)  # no template is seeded: the render fails
+
+        update._run_update_path(fake_home, plugin_root)
+
+        assert capsys.readouterr().err == (
+            "[Praxion] Update refresh could not finish (FileNotFoundError); "
+            "run /praxion-complete-install to complete it.\n"
+        )
+        assert marker_path.exists()
+
+
+class TestInstructionSetupPrompt:
+    """The setup of a dangling link keeps the first install's confirmation prompt."""
+
+    @pytest.fixture
+    def dangling(self, fake_home, plugin_root, marker_path):
+        _seed_template(plugin_root)
+        _dangling_cache_link(fake_home)
+        marker_path.write_text("")
+        os.utime(marker_path, (1_000_000, 1_000_000))
+        return fake_home
+
+    def test_a_refusal_writes_the_decline_marker_and_no_completion_marker(
+        self, dangling, plugin_root, marker_path, monkeypatch
+    ):
+        monkeypatch.setattr(sys, "stdin", io.StringIO("n\n"))
+
+        update._run_update_path(dangling, plugin_root)
+
+        assert (dangling / ".claude" / ".praxion-install-declined").exists()
+        assert marker_path.stat().st_mtime == 1_000_000
+
+    def test_a_refusal_is_no_failure_and_the_rules_and_scripts_are_still_refreshed(
+        self, dangling, plugin_root, monkeypatch, capsys
+    ):
+        _seed_script(plugin_root / "scripts", "praxion-dashboard")
+        monkeypatch.setattr(sys, "stdin", io.StringIO("n\n"))
+
+        update._run_update_path(dangling, plugin_root)
+
+        assert "could not finish" not in capsys.readouterr().err
+        assert (dangling / ".local" / "bin" / "praxion-dashboard").is_symlink()
+
+    def test_the_prompt_shows_on_the_terminal_and_nowhere_else(
+        self, dangling, plugin_root, marker_path, monkeypatch, capsys
+    ):
+        monkeypatch.setattr(sys, "stdin", io.StringIO("\n"))
+        monkeypatch.setattr(update._render_mod, "derive_defaults", lambda: dict(_TODAYS))
+
+        update._run_update_path(dangling, plugin_root)
+
+        captured = capsys.readouterr()
+        assert _TODAYS["EMAIL"] in captured.err
+        assert captured.err.endswith("[Praxion] Auto-install complete.\n")
+        assert captured.out == ""
+        assert marker_path.stat().st_mtime > 1_000_000

@@ -1093,7 +1093,7 @@ class TestSurfacePresence:
     ):
         module = _fake_home_module(monkeypatch, fake_home)
 
-        assert module._surfaces_present(fake_home) is True
+        assert module._surfaces_installed(fake_home) is True
 
     def test_a_regular_claude_md_is_not_an_installed_surface(
         self, fake_home, rules_sentinel, monkeypatch
@@ -1104,14 +1104,14 @@ class TestSurfacePresence:
         # file permanently mistaken for a rendered one.
         (fake_home / ".claude" / "CLAUDE.md").write_text("# my own notes\n")
 
-        assert module._surfaces_present(fake_home) is False
+        assert module._surfaces_installed(fake_home) is False
 
     def test_missing_rules_sentinel_is_not_an_installed_surface(
         self, fake_home, claude_md_symlink, monkeypatch
     ):
         module = _fake_home_module(monkeypatch, fake_home)
 
-        assert module._surfaces_present(fake_home) is False
+        assert module._surfaces_installed(fake_home) is False
 
     def test_a_dangling_claude_md_link_is_not_an_installed_surface(
         self, fake_home, rules_sentinel, tmp_path, monkeypatch
@@ -1121,7 +1121,24 @@ class TestSurfacePresence:
         # Claude Code has since removed.
         (fake_home / ".claude" / "CLAUDE.md").symlink_to(tmp_path / "removed" / "CLAUDE.md")
 
-        assert module._surfaces_present(fake_home) is False
+        assert module._surfaces_installed(fake_home) is False
+
+    def test_a_live_link_into_the_cache_is_an_installed_surface(
+        self, fake_home, rules_sentinel, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _link_instructions(fake_home, _previous_render(fake_home))
+
+        assert module._surfaces_installed(fake_home) is True
+
+    def test_a_dangling_link_into_the_cache_is_not_an_installed_surface(
+        self, fake_home, rules_sentinel, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        removed = _cached_version(fake_home, "9.9.8") / "claude" / "config" / "CLAUDE.md"
+        _link_instructions(fake_home, removed)
+
+        assert module._surfaces_installed(fake_home) is False
 
 
 class TestMarkerWriting:
@@ -1135,9 +1152,7 @@ class TestMarkerWriting:
 
     def test_decline_marker_is_a_distinct_file(self, tmp_path, monkeypatch):
         home = tmp_path / "home"
-        module = _fake_home_module(monkeypatch, home)
-
-        module._write_decline_marker(home)
+        update._write_decline_marker(home)
 
         assert (home / ".claude" / ".praxion-install-declined").exists()
         assert not (home / ".claude" / ".praxion-complete-installed").exists()
@@ -1462,30 +1477,26 @@ class TestFullInstallSequence:
 class TestOperatorPrompt:
     @pytest.mark.parametrize("answer", ["n\n", "no\n", "N\n", "  No  \n"])
     def test_an_explicit_refusal_declines_the_install(self, answer, monkeypatch):
-        module = _load_module()
         monkeypatch.setattr(sys, "stdin", io.StringIO(answer))
 
-        assert module._prompt_with_timeout(_VALUES) is False
+        assert update._prompt_with_timeout(_VALUES) is False
 
     @pytest.mark.parametrize("answer", ["y\n", "\n", "yes\n", "anything else\n"])
     def test_anything_other_than_a_refusal_proceeds(self, answer, monkeypatch):
-        module = _load_module()
         monkeypatch.setattr(sys, "stdin", io.StringIO(answer))
 
-        assert module._prompt_with_timeout(_VALUES) is True
+        assert update._prompt_with_timeout(_VALUES) is True
 
     def test_the_prompt_shows_the_values_that_will_be_written(self, monkeypatch, capsys):
-        module = _load_module()
         monkeypatch.setattr(sys, "stdin", io.StringIO("\n"))
 
-        module._prompt_with_timeout(_VALUES)
+        update._prompt_with_timeout(_VALUES)
 
         prompt = capsys.readouterr().err
         assert "@someone" in prompt
         assert "someone@example.com" in prompt
 
     def test_unreadable_stdin_is_treated_as_consent(self, monkeypatch):
-        module = _load_module()
 
         class _Unreadable:
             def readline(self) -> str:
@@ -1495,17 +1506,16 @@ class TestOperatorPrompt:
 
         # A piped or headless session cannot answer; blocking it would wedge
         # session start, which this hook must never do.
-        assert module._prompt_with_timeout(_VALUES) is True
+        assert update._prompt_with_timeout(_VALUES) is True
 
     def test_a_platform_without_alarm_signals_still_proceeds(self, monkeypatch):
-        module = _load_module()
 
         def _no_alarm(*args: object, **kwargs: object):
             raise ValueError("signal only works in main thread")
 
-        monkeypatch.setattr(module.signal, "signal", _no_alarm)
+        monkeypatch.setattr(update.signal, "signal", _no_alarm)
 
-        assert module._prompt_with_timeout(_VALUES) is True
+        assert update._prompt_with_timeout(_VALUES) is True
 
 
 class TestAutoCompleteMode:
@@ -1575,7 +1585,7 @@ class TestPerformInstall:
         def _explodes(_values: dict) -> bool:
             raise RuntimeError("terminal is gone")
 
-        monkeypatch.setattr(module, "_prompt_with_timeout", _explodes)
+        monkeypatch.setattr(update, "_prompt_with_timeout", _explodes)
 
         module._perform_install(fake_home, _VALUES, auto_complete=False, root=plugin_root)
 
@@ -1679,7 +1689,7 @@ class TestRunFlow:
         def _no_identity() -> dict:
             raise OSError("git not on PATH")
 
-        monkeypatch.setattr(module._render_mod, "derive_defaults", _no_identity)
+        monkeypatch.setattr(update._render_mod, "derive_defaults", _no_identity)
 
         module._run()
 

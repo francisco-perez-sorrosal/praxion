@@ -1,10 +1,10 @@
 """The pure core of the install refresh after a plugin update.
 
-Two questions are answered here from values alone, with no filesystem read: which
-version directory of the plugin cache a link text points into, and which of five
-states the global instructions entry is in. The hook gathers a snapshot at its
-edge, calls these, and acts on the answer; nothing in this module touches a file,
-the environment or the clock.
+Three questions are answered here from values alone, with no filesystem read: which
+version directory of the plugin cache a link text points into, which of five
+states the global instructions entry is in, and what to do to each script link in
+the bin directory. The hook gathers a snapshot at its edge, calls these, and acts
+on the answer; nothing in this module touches a file, the environment or the clock.
 
 The cache rule mirrors the shell library's `_managed_rule_rel_path` glob
 (`*/plugins/cache/*/praxion/*/...`), and `tests/fixtures/plugin_cache_targets.tsv`
@@ -18,6 +18,7 @@ Stdlib only, and importable on Python 3.9, like the hook modules around it.
 from __future__ import annotations
 
 import posixpath
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from typing import NoReturn, Union
@@ -99,6 +100,103 @@ def _classify_link(snapshot: InstructionsSnapshot, link_dir: str) -> Instruction
     if version_dir is None:
         return ForeignLink()
     return CachedRender(version_dir) if snapshot.resolves else MissingCachedRender()
+
+
+# -- What to do to each script link ------------------------------------------------
+
+
+class EntryKind(Enum):
+    LINK = "link"
+    FILE = "file"
+    OTHER = "other"
+
+
+@dataclass(frozen=True)
+class BinEntry:
+    """One entry of the bin directory as the edge saw it.
+
+    `text` and `real` describe a link: its target as written, and the resolved path
+    (None when it dangles). They mean nothing for the other kinds.
+    """
+
+    name: str
+    kind: EntryKind
+    text: str
+    real: str | None
+
+
+@dataclass(frozen=True)
+class OfferedScript:
+    """A script the installed version offers, and the path its link must point to."""
+
+    name: str
+    path: str
+
+
+@dataclass(frozen=True)
+class Keep:
+    """The link already points to the offered script; its inode and text stay."""
+
+    name: str
+
+
+@dataclass(frozen=True)
+class Repoint:
+    name: str
+    target: str
+
+
+@dataclass(frozen=True)
+class Remove:
+    name: str
+
+
+@dataclass(frozen=True)
+class Link:
+    name: str
+    target: str
+
+
+ScriptAction = Union[Keep, Repoint, Remove, Link]  # noqa: UP007
+
+
+def plan_script_links(
+    entries: Iterable[BinEntry], offered: Iterable[OfferedScript], link_dir: str
+) -> tuple:
+    """The actions that bring the bin directory in line with the offered scripts.
+
+    The one choke point of the safety rule: only a link into the plugin cache is ever
+    named by anything but `Keep`. A regular file, a directory, and a link that points
+    anywhere else (a clone's included, live or dangling) get no action, whatever
+    name they sit under. Placements follow `offered`, then removals follow `entries`.
+    """
+    entries = tuple(entries)
+    offered = tuple(offered)
+    by_name = {entry.name: entry for entry in entries}
+    offered_names = {script.name for script in offered}
+    placements = (_place(script, by_name.get(script.name), link_dir) for script in offered)
+    removals = (
+        Remove(entry.name)
+        for entry in entries
+        if entry.name not in offered_names and _is_cache_link(entry, link_dir)
+    )
+    return tuple(action for action in placements if action is not None) + tuple(removals)
+
+
+def _place(script: OfferedScript, entry: BinEntry | None, link_dir: str):
+    """The action for one offered script given what sits under its name, or None to leave it."""
+    if entry is None:
+        return Link(script.name, script.path)
+    if entry.kind is not EntryKind.LINK:
+        return None
+    if script.path in (entry.text, entry.real):
+        return Keep(script.name)
+    return Repoint(script.name, script.path) if _is_cache_link(entry, link_dir) else None
+
+
+def _is_cache_link(entry: BinEntry, link_dir: str) -> bool:
+    """A link whose target lies in a cache version directory, live or dangling."""
+    return entry.kind is EntryKind.LINK and cache_version_dir(entry.text, link_dir) is not None
 
 
 # -- What counts as the plugin cache ----------------------------------------------

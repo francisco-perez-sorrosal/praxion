@@ -159,7 +159,9 @@ def test_the_installer_links_the_file_into_the_rules_directory(installed, rule_f
     linked = installed / Path(rule_file).relative_to("rules")
 
     assert linked.is_symlink(), linked
-    assert linked.resolve() == (REPO / rule_file).resolve(), linked
+    assert linked.resolve() == (move.stand_in_root(installed.parents[2]) / rule_file).resolve(), (
+        linked
+    )
 
 
 @pytest.mark.parametrize(

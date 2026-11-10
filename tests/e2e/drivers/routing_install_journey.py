@@ -23,6 +23,7 @@ class Installed:
     links: dict[str, Path]
     session_start_text: str
     check_output: str
+    checkout: Path  # the stand-in checkout the install ran from
 
 
 def installed(scratch: Path, *, over_an_old_install: bool = False) -> Installed:
@@ -45,6 +46,7 @@ def installed(scratch: Path, *, over_an_old_install: bool = False) -> Installed:
         links=move.linked_rules(rules),
         session_start_text="\n".join([*resident, injection.context]),
         check_output=checked.stdout + checked.stderr,
+        checkout=move.stand_in_root(scratch).resolve(),
     )
 
 

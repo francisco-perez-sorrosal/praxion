@@ -20,7 +20,7 @@ pytestmark = pytest.mark.skipif(
     hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores the permissions these break"
 )
 MIN_VALUE_LENGTH = 5  # shorter strings occur by chance in any output
-FINISH_BY_HAND = ("install.sh", "praxion-complete-install")
+FINISH_BY_HAND = "/praxion-complete-install"
 
 
 @pytest.fixture(scope="module")
@@ -73,7 +73,7 @@ def test_a_failed_refresh_reports_itself_in_one_line_naming_the_command_to_finis
     failed, _ = failed
     lines = failed.session.lines
     assert len(lines) == 1, f"expected one report line, got {len(lines)}: {lines}"
-    assert any(command in lines[0] for command in FINISH_BY_HAND), lines[0]
+    assert FINISH_BY_HAND in lines[0], lines[0]
 
 
 def test_a_failed_refresh_leaves_the_instructions_resolving_to_a_complete_render(failed):

@@ -60,7 +60,7 @@ def test_the_install_links_the_full_rule_and_not_the_session_start_text(journey,
     done: Installed = request.getfixturevalue(journey)
 
     assert _routing_links(done) == [FULL_RULE_LINK], _routing_links(done)
-    assert done.links[FULL_RULE_LINK] == (move.REPO_ROOT / move.RULE).resolve()
+    assert done.links[FULL_RULE_LINK] == (done.checkout / move.RULE).resolve()
 
 
 def test_the_linked_full_rule_loads_on_a_touch_of_an_agent_definition(fresh):

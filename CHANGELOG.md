@@ -1,3 +1,19 @@
+## v0.60.0 (2026-11-10)
+
+### Feat
+
+- Deliver the spawn split to plugin roles
+- Generate the spawn split beside the kernels
+
+### Fix
+
+- Freeze the audience split's damaged-file list
+- Refuse a non-UTF-8 manifest in the shed count
+- Read rule files with newline translation everywhere
+- Ask the judge for its verdict strictly
+- Name a judge reply cut off at its cap
+- Read a refusal with an unrefused twin as the role's
+
 ## v0.59.0 (2026-11-09)
 
 ### Feat

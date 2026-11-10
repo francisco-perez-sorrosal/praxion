@@ -1661,13 +1661,40 @@ class TestApplyScriptActions:
         bin_dir = fake_home / ".local" / "bin"
         tool = fake_home / "tool"
         (bin_dir / "stale").symlink_to(tool)
-        actions = (module.Repoint("stale", "/elsewhere"), module.Link("fresh", str(tool)))
+        (bin_dir / "own").write_text("mine\n", encoding="utf-8")
+        actions = (
+            module.Repoint("stale", "/elsewhere"),
+            module.Link("own", str(tool)),
+            module.Link("fresh", str(tool)),
+        )
         monkeypatch.setattr(module.os, "replace", _refuse)
 
         with pytest.raises(PermissionError):
             module.apply_script_actions(bin_dir, actions)
 
         assert os.readlink(bin_dir / "fresh") == str(tool)
+
+    def test_a_link_gone_before_its_removal_is_not_an_error(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        monkeypatch.setattr(module.Path, "is_symlink", lambda _self: True)
+
+        module.apply_script_actions(fake_home / ".local" / "bin", (module.Remove("gone"),))
+
+    def test_a_failed_repoint_raises_its_own_error_when_the_temporary_link_is_already_gone(
+        self, fake_home, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        (bin_dir / "stale").symlink_to(fake_home / "tool")
+
+        def lose_the_temporary_then_refuse(temporary, _destination):
+            Path(temporary).unlink()
+            raise PermissionError("refused")
+
+        monkeypatch.setattr(module.os, "replace", lose_the_temporary_then_refuse)
+
+        with pytest.raises(PermissionError):
+            module.apply_script_actions(bin_dir, (module.Repoint("stale", "/elsewhere"),))
 
     def test_a_failed_repoint_leaves_the_old_link_and_no_temporary_link(
         self, fake_home, monkeypatch

@@ -342,13 +342,14 @@ def _repoint(bin_dir: Path, name: str, target: str) -> None:
     a moment with no link; it is removed again when the rename fails.
     """
     temporary = bin_dir / f".{name}.{os.getpid()}{_TEMPORARY_LINK_SUFFIX}"
-    if temporary.is_symlink():
-        temporary.unlink()
+    temporary.unlink(missing_ok=True)
     temporary.symlink_to(target)
     try:
         os.replace(temporary, bin_dir / name)
     except BaseException:
-        temporary.unlink()
+        temporary.unlink(
+            missing_ok=True
+        )  # a concurrent session may have swept it; keep the original error
         raise
 
 
@@ -375,7 +376,9 @@ def _apply_script_action(bin_dir: Path, action: ScriptAction) -> None:
         _repoint(bin_dir, action.name, action.target)
     elif isinstance(action, Remove):
         if (bin_dir / action.name).is_symlink():
-            (bin_dir / action.name).unlink()
+            (bin_dir / action.name).unlink(
+                missing_ok=True
+            )  # gone since planning is the goal reached
     elif isinstance(action, Link):
         bin_dir.mkdir(parents=True, exist_ok=True)
         (bin_dir / action.name).symlink_to(action.target)

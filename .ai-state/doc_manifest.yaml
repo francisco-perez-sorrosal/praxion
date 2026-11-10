@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-09T15:48:55Z'
+generated_at: '2026-11-10T06:57:13Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-09'
+  last_modified: '2026-11-10'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -676,7 +676,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-08'
+  last_modified: '2026-11-09'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3675,11 +3675,23 @@ surfaces:
   title: Split recipients receive a build-time spawn text of the two managed core rules
   last_modified: '2026-11-09'
   renderer: adr_card
+- id: ai-state-decisions-496-intermediate-documents-rule-stays-reside
+  path: .ai-state/decisions/496-intermediate-documents-rule-stays-reside.md
+  type: markdown
+  title: The intermediate-documents rule stays resident in the managed main session; its point-of-use move is closed, not pursued
+  last_modified: '2026-11-09'
+  renderer: adr_card
+- id: ai-state-decisions-497-coordination-protocol-stays-resident-for
+  path: .ai-state/decisions/497-coordination-protocol-stays-resident-for.md
+  type: markdown
+  title: The coordination protocol stays resident in the managed main session; its pipeline-only half is not deferred to a trigger
+  last_modified: '2026-11-09'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-07'
+  last_modified: '2026-11-09'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4630,6 +4642,8 @@ groups:
   - ai-state-decisions-493-writer-kit-task-mode
   - ai-state-decisions-494-writer-kits-run-confined
   - ai-state-decisions-495-audience-split-spawn-rule-split
+  - ai-state-decisions-496-intermediate-documents-rule-stays-reside
+  - ai-state-decisions-497-coordination-protocol-stays-resident-for
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

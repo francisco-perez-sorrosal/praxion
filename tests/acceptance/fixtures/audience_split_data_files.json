@@ -1,0 +1,9 @@
+{
+  "_about": "The plugin data files (no code, no hooks/hooks.json, no source rule, no test file) the audience split added or changed under claude/, rules/ and hooks/: read once with git diff --name-only from the base commit to the merged change, so no scenario reads git history.",
+  "base_commit": "f1f8adf18d18967c368c1a70f35132650802cde0",
+  "read_at": "e442374e15b5d8ee1ccf4a0551c50284e53b582d",
+  "files": [
+    "claude/kernels/spawn_split.json",
+    "rules/_audience.yaml"
+  ]
+}

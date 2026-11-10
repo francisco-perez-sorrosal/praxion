@@ -8,14 +8,12 @@ is bound provisionally to the kernel generator.
 
 from __future__ import annotations
 
-import re
-import subprocess
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from tests.acceptance.drivers.audience_split_delivery import BASE_COMMIT, REPO_ROOT, spawn
+from tests.acceptance.drivers.audience_split_delivery import BASE_COMMIT, spawn
 from tests.acceptance.drivers.audience_split_oracle import (
-    CORE_UNITS,
     DROPPED,
     HEADING,
     INTERMEDIATE,
@@ -32,6 +30,10 @@ from tests.acceptance.drivers.kernel_sandbox import (
     Sandbox,
     commit_gate,
     regenerate,
+)
+
+DATA_FILES_FIXTURE = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "audience_split_data_files.json"
 )
 
 # -- Editing a plugin checkout ----------------------------------------------------------------
@@ -147,54 +149,18 @@ def restore(sandbox: Sandbox, before: dict[str, bytes]) -> None:
         sandbox.path(rel).write_bytes(data)
 
 
-def changed_data_files(root: Path = REPO_ROOT) -> list[str]:
-    """Plugin data files (no code, no registration, no source rule) added or changed since the base."""
-    changed = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(root),
-            "diff",
-            "--name-only",
-            BASE_COMMIT,
-            "--",
-            "claude",
-            "rules",
-            "hooks",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    ).stdout.split()
-    untracked = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(root),
-            "ls-files",
-            "--others",
-            "--exclude-standard",
-            "--",
-            "claude",
-            "rules",
-            "hooks",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    ).stdout.split()
-    sources = {u.source for u in CORE_UNITS}
-    return sorted(
-        rel
-        for rel in set(changed) | set(untracked)
-        if (root / rel).is_file()
-        and not rel.endswith(".py")
-        and rel != "hooks/hooks.json"
-        and rel not in sources
-        and not re.search(r"(?:^|/)test_[^/]*$", rel)
+def changed_data_files() -> list[str]:
+    """Plugin data files (no code, no registration, no source rule) the change added or changed.
+
+    The frozen reading in `DATA_FILES_FIXTURE`, taken once from the change's diff against the base
+    commit: a shallow clone holds no base commit, and a later change to the plugin's data must not
+    alter what the scenarios damage.
+    """
+    reading = json.loads(DATA_FILES_FIXTURE.read_text(encoding="utf-8"))
+    assert reading["base_commit"] == BASE_COMMIT, (
+        f"the frozen data-file reading is from {reading['base_commit']}, not {BASE_COMMIT}"
     )
+    return list(reading["files"])
 
 
 def damage(sandbox: Sandbox, rel: str, how: str) -> None:

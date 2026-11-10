@@ -12,7 +12,11 @@ branch: feat-install-refresh
 pipeline_tier: standard
 affected_files:
   - hooks/auto_complete_install.py
+  - hooks/_install_refresh.py
+  - hooks/_install_update.py
   - hooks/test_auto_complete_install.py
+  - hooks/test__install_refresh.py
+  - hooks/test_install_update.py
   - lib/install_shared.sh
   - README.md
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-07, REQ-09, REQ-10, REQ-14, REQ-15, REQ-16, REQ-19, REQ-20, REQ-21, REQ-22, REQ-23, REQ-24, REQ-25]

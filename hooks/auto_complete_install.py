@@ -496,7 +496,9 @@ def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> Non
     if carried is None:
         raise UnrecoverableRenderError
     template_path = root / _TEMPLATE_RELATIVE
-    values = _with_defaults_for_missing(template_path.read_text(encoding="utf-8"), carried)
+    missing = _missing_keys(template_path.read_text(encoding="utf-8"), carried)
+    # Derived only when a key is missing: it reads today's git identity.
+    values = _with_defaults(carried, missing, _render_mod.derive_defaults()) if missing else carried
     rendered_path = root / _RENDER_RELATIVE
     _build_and_rename(
         rendered_path,
@@ -505,19 +507,27 @@ def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> Non
     _replace_link(home / _CLAUDE_MD_SUBPATH, str(rendered_path))
 
 
-def _with_defaults_for_missing(template_text: str, carried: dict[str, str]) -> dict[str, str]:
-    """The carried values, plus a derived default for each key of the template not carried.
+# Each placeholder is its name inside `{{` and `}}`, as PLACEHOLDER_PATTERN reads it.
+_PLACEHOLDER_BRACE_WIDTH = len("{{")
 
-    Defaults are derived only when a key is missing, and fill only that key: they
-    read today's git identity, which never replaces a value the user carried.
-    """
-    keys = {
-        match.group()[2:-2] for match in _render_mod.PLACEHOLDER_PATTERN.finditer(template_text)
+
+def _missing_keys(template_text: str, carried: dict[str, str]) -> frozenset[str]:
+    """The placeholder names `template_text` holds that `carried` has no value for."""
+    width = _PLACEHOLDER_BRACE_WIDTH
+    names = {
+        m.group()[width:-width] for m in _render_mod.PLACEHOLDER_PATTERN.finditer(template_text)
     }
-    missing = keys - carried.keys()
-    if not missing:
-        return carried
-    defaults = _render_mod.derive_defaults()
+    return frozenset(names - carried.keys())
+
+
+def _with_defaults(
+    carried: dict[str, str], missing: frozenset[str], defaults: dict[str, str]
+) -> dict[str, str]:
+    """The carried values plus a default for each missing key, and only those keys.
+
+    A default never replaces a carried value; a missing key with no default stays
+    out, so its placeholder survives the render as a named residual.
+    """
     return {**carried, **{key: defaults[key] for key in missing if key in defaults}}
 
 

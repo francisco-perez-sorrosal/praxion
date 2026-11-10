@@ -2298,6 +2298,20 @@ def _record_derivations(monkeypatch, module, values: dict[str, str]) -> list:
     return calls
 
 
+def _files_holding(root: Path, values, excluding: set[Path]) -> list[str]:
+    """The regular files under `root`, other than `excluding`, that contain any of `values`."""
+    regular = (p for p in root.rglob("*") if p.is_file() and not p.is_symlink())
+    return [
+        str(path.relative_to(root))
+        for path in regular
+        if path not in excluding and any(v in path.read_text(errors="replace") for v in values)
+    ]
+
+
+def _values_in(text: str, values) -> list[str]:
+    return [value for value in values if value in text]
+
+
 def _refuse_replacing(monkeypatch, module, destination: Path) -> None:
     """Make the rename over `destination`, and only that one, fail."""
     real_replace = os.replace
@@ -2355,6 +2369,38 @@ class TestSnapshotInstructions:
         snapshot = module.snapshot_instructions(tmp_path / "CLAUDE.md")
 
         assert snapshot == module.InstructionsSnapshot(module.SnapshotKind.LINK, "gone.md", False)
+
+
+class TestDefaultsForMissingKeys:
+    """Which keys need a default, and how defaults join the carried values: no effects."""
+
+    def test_the_missing_keys_are_the_template_names_not_carried(self):
+        module = _load_module()
+        carried = {"USERNAME": "@first-person"}
+
+        missing = module._missing_keys("{{USERNAME}} {{EMAIL}} {{EMAIL}} {{SHELL_NAME}}", carried)
+
+        assert missing == {"EMAIL", "SHELL_NAME"}
+
+    def test_nothing_is_missing_when_every_template_key_was_carried(self):
+        module = _load_module()
+
+        assert module._missing_keys(_NEW_TEMPLATE, _CARRIED) == frozenset()
+
+    def test_a_default_fills_only_a_missing_key_and_never_a_carried_one(self):
+        module = _load_module()
+        carried = {"USERNAME": _CARRIED["USERNAME"]}
+
+        values = module._with_defaults(carried, frozenset({"EMAIL"}), _TODAYS)
+
+        assert values == {"USERNAME": _CARRIED["USERNAME"], "EMAIL": _TODAYS["EMAIL"]}
+
+    def test_a_missing_key_without_a_default_stays_out(self):
+        module = _load_module()
+
+        values = module._with_defaults(_CARRIED, frozenset({"SHELL_NAME"}), _TODAYS)
+
+        assert values == _CARRIED
 
 
 class TestInstructionsCarryForward:
@@ -2607,8 +2653,7 @@ class TestInstructionsCarryForward:
         module._update_instructions(fake_home, plugin_root)
 
         output = "".join(capsys.readouterr())
-        printed = [v for v in (*_CARRIED.values(), *_TODAYS.values()) if v in output]
-        assert printed == []
+        assert _values_in(output, (*_CARRIED.values(), *_TODAYS.values())) == []
 
     def test_no_personal_value_is_written_outside_the_two_renders(
         self, updated, fake_home, plugin_root, tmp_path
@@ -2618,15 +2663,7 @@ class TestInstructionsCarryForward:
         module._update_instructions(fake_home, plugin_root)
 
         renders = {previous, plugin_root / "claude" / "config" / "CLAUDE.md"}
-        holding = [
-            str(path.relative_to(tmp_path))
-            for path in tmp_path.rglob("*")
-            if path.is_file()
-            and not path.is_symlink()
-            and path not in renders
-            and any(v in path.read_text(errors="replace") for v in _CARRIED.values())
-        ]
-        assert holding == []
+        assert _files_holding(tmp_path, _CARRIED.values(), excluding=renders) == []
 
 
 class TestRealInstallLayout:

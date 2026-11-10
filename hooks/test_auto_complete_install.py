@@ -44,6 +44,8 @@ REPO_ROOT = next(p for p in HOOKS_DIR.parents if (p / "lib" / "install_shared.sh
 # The hook finds `render_claude_md` beside its own directory; a relocated copy does not.
 _SCRIPTS_DIR = REPO_ROOT / "scripts"
 sys.path.insert(0, str(_SCRIPTS_DIR))
+sys.path.insert(0, str(HOOKS_DIR))
+import _install_update as update  # noqa: E402 (after sys.path injection)
 
 # ---------------------------------------------------------------------------
 # Module-level import: deferred to inside each test body so pytest collection
@@ -1377,83 +1379,6 @@ class TestRuleRefresh:
         assert own.read_text(encoding="utf-8") == "# the operator's own rule\n"
 
 
-class TestRuleUpdate:
-    """On the update path a rule link into another cached version moves to this one."""
-
-    @staticmethod
-    def _previous_version_rule(plugin_root: Path, rel: str) -> Path:
-        previous = plugin_root.parent / "9.9.8" / "rules" / rel
-        previous.parent.mkdir(parents=True)
-        previous.write_text("# the rule, as the previous version linked it\n", encoding="utf-8")
-        return previous
-
-    def test_repoints_a_live_link_into_the_previous_version(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        rel = "swe/coding-style.md"
-        _plant_link(fake_home, rel, self._previous_version_rule(plugin_root, rel))
-
-        module._update_rules(fake_home, plugin_root)
-
-        assert _rule_links(fake_home)[rel] == (plugin_root / "rules" / rel).resolve()
-
-    def test_leaves_a_live_link_into_a_checkout_as_it_is(
-        self, fake_home, plugin_root, tmp_path, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        checkout_rule = tmp_path / "checkout" / "rules" / "swe" / "coding-style.md"
-        checkout_rule.parent.mkdir(parents=True)
-        checkout_rule.write_text("# coding style, from a clone install\n", encoding="utf-8")
-        _plant_link(fake_home, "swe/coding-style.md", checkout_rule)
-
-        module._update_rules(fake_home, plugin_root)
-
-        assert _rule_links(fake_home)["swe/coding-style.md"] == checkout_rule.resolve()
-
-    def test_still_sweeps_and_links_as_the_refresh_does(self, fake_home, plugin_root, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        stale_rel = "swe/agent-model-routing-resident.md"
-        stale = _plant_link(
-            fake_home, stale_rel, self._previous_version_rule(plugin_root, stale_rel)
-        )
-
-        module._update_rules(fake_home, plugin_root)
-
-        assert not stale.is_symlink()
-        assert "swe/coding-style.md" in _rule_links(fake_home)
-
-    def test_the_refresh_alone_leaves_a_live_link_into_another_version(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        rel = "swe/coding-style.md"
-        previous = self._previous_version_rule(plugin_root, rel)
-        _plant_link(fake_home, rel, previous)
-
-        module._refresh_rules(fake_home, plugin_root)
-
-        # The flow for a root that is not a cache version never re-points a live link.
-        assert _rule_links(fake_home)[rel] == previous.resolve()
-
-    def test_a_single_function_runs_as_it_did(self, fake_home, plugin_root, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-
-        module._run_rule_linker(fake_home, plugin_root, "link_rules")
-
-        assert "swe/coding-style.md" in _rule_links(fake_home)
-
-    def test_the_first_failing_function_ends_the_sequence_and_raises(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-
-        with pytest.raises(subprocess.CalledProcessError):
-            module._run_rule_linkers(fake_home, plugin_root, ("no_such_function", "link_rules"))
-
-        assert _rule_links(fake_home) == {}
-
-
 def _seed_script(scripts_src: Path, name: str, executable: bool = True) -> Path:
     scripts_src.mkdir(parents=True, exist_ok=True)
     script = scripts_src / name
@@ -1519,323 +1444,6 @@ def _cached_version(home: Path, version: str) -> Path:
     root = home / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion" / version
     (root / "scripts").mkdir(parents=True)
     return root
-
-
-def _refuse(*_args):
-    raise PermissionError("refused")
-
-
-class TestOfferedScripts:
-    def test_names_the_executable_user_facing_scripts_with_their_paths(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
-
-        offered = module.offered_scripts(plugin_root)
-
-        assert [(o.name, o.path) for o in offered] == [("praxion-dashboard", str(script))]
-
-    @pytest.mark.parametrize(
-        ("name", "executable"),
-        [
-            ("helper.py", False),
-            ("merge_driver_observations.py", True),
-            ("post-merge-hook.sh", True),
-        ],
-    )
-    def test_leaves_out_what_the_operator_does_not_run(
-        self, fake_home, plugin_root, monkeypatch, name, executable
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        _seed_script(plugin_root / "scripts", name, executable=executable)
-
-        assert module.offered_scripts(plugin_root) == ()
-
-    def test_leaves_out_a_directory(self, fake_home, plugin_root, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        (plugin_root / "scripts" / "praxion-tools").mkdir(mode=0o755)
-
-        assert module.offered_scripts(plugin_root) == ()
-
-    def test_a_plugin_without_scripts_offers_none(self, fake_home, plugin_root, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        plugin_root.joinpath("scripts").rmdir()
-
-        assert module.offered_scripts(plugin_root) == ()
-
-
-class TestSnapshotBin:
-    def test_tells_a_link_a_file_and_another_kind_apart(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        target = fake_home / "target-tool"
-        target.write_text("#!/bin/sh\n", encoding="utf-8")
-        (bin_dir / "linked").symlink_to(target)
-        (bin_dir / "plain").write_text("mine\n", encoding="utf-8")
-        (bin_dir / "folder").mkdir()
-
-        kinds = {entry.name: entry.kind for entry in module.snapshot_bin(bin_dir)}
-
-        assert kinds == {
-            "linked": module.EntryKind.LINK,
-            "plain": module.EntryKind.FILE,
-            "folder": module.EntryKind.OTHER,
-        }
-
-    def test_a_link_carries_its_text_and_its_real_path(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        target = fake_home / "target-tool"
-        target.write_text("#!/bin/sh\n", encoding="utf-8")
-        (bin_dir / "linked").symlink_to(target)
-
-        (entry,) = module.snapshot_bin(bin_dir)
-
-        assert (entry.text, entry.real) == (str(target), str(target.resolve()))
-
-    def test_a_dangling_link_has_no_real_path(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        (bin_dir / "orphan").symlink_to(fake_home / "removed-tool")
-
-        (entry,) = module.snapshot_bin(bin_dir)
-
-        assert (entry.kind, entry.text, entry.real) == (
-            module.EntryKind.LINK,
-            str(fake_home / "removed-tool"),
-            None,
-        )
-
-    def test_a_file_and_another_kind_carry_no_link_data(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        (bin_dir / "plain").write_text("mine\n", encoding="utf-8")
-        (bin_dir / "folder").mkdir()
-
-        entries = {entry.name: entry for entry in module.snapshot_bin(bin_dir)}
-
-        assert entries == {
-            "plain": module.BinEntry("plain", module.EntryKind.FILE, "", None),
-            "folder": module.BinEntry("folder", module.EntryKind.OTHER, "", None),
-        }
-
-    def test_a_missing_directory_has_no_entries(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-
-        assert module.snapshot_bin(fake_home / "nowhere") == ()
-
-
-class TestRefreshScripts:
-    def test_a_cache_link_is_repointed_to_the_offered_script(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        old_root = _cached_version(fake_home, "0.1.0")
-        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
-        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
-        dest.symlink_to(_seed_script(old_root / "scripts", "praxion-dashboard"))
-
-        module.refresh_scripts(fake_home, plugin_root)
-
-        assert os.readlink(dest) == str(script)
-
-    def test_a_relative_cache_link_is_repointed_too(self, fake_home, plugin_root, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        old_root = _cached_version(fake_home, "0.1.0")
-        _seed_script(old_root / "scripts", "praxion-dashboard")
-        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
-        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
-        dest.symlink_to(os.path.relpath(old_root / "scripts" / "praxion-dashboard", dest.parent))
-
-        module.refresh_scripts(fake_home, plugin_root)
-
-        assert os.readlink(dest) == str(script)
-
-    def test_a_repointed_link_outlives_the_removal_of_the_old_version(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        old_root = _cached_version(fake_home, "0.1.0")
-        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
-        dest.symlink_to(_seed_script(old_root / "scripts", "praxion-dashboard"))
-        _seed_script(plugin_root / "scripts", "praxion-dashboard")
-
-        module.refresh_scripts(fake_home, plugin_root)
-        shutil.rmtree(old_root)
-
-        assert dest.exists()
-
-    def test_a_cache_link_for_a_dropped_script_is_removed(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        old_root = _cached_version(fake_home, "0.1.0")
-        dest = fake_home / ".local" / "bin" / "retired-tool"
-        dest.symlink_to(_seed_script(old_root / "scripts", "retired-tool"))
-
-        module.refresh_scripts(fake_home, plugin_root)
-
-        assert not dest.is_symlink()
-
-    def test_a_free_name_is_linked_and_the_directory_created(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
-        (fake_home / ".local" / "bin").rmdir()
-        (fake_home / ".local").rmdir()
-
-        module.refresh_scripts(fake_home, plugin_root)
-
-        assert os.readlink(fake_home / ".local" / "bin" / "praxion-dashboard") == str(script)
-
-    def test_a_regular_file_and_a_clone_link_are_left_as_they_were(
-        self, fake_home, plugin_root, tmp_path, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        _seed_script(plugin_root / "scripts", "praxion-dashboard")
-        _seed_script(plugin_root / "scripts", "praxion-status")
-        bin_dir = fake_home / ".local" / "bin"
-        own = bin_dir / "praxion-dashboard"
-        own.write_text("#!/bin/sh\necho mine\n", encoding="utf-8")
-        clone_tool = _seed_script(tmp_path / "clone" / "praxion" / "scripts", "praxion-status")
-        clone_link = bin_dir / "praxion-status"
-        clone_link.symlink_to(clone_tool)
-
-        def observe():
-            return (
-                own.read_bytes(),
-                own.lstat().st_ino,
-                os.readlink(clone_link),
-                clone_link.lstat().st_ino,
-            )
-
-        before = observe()
-        module.refresh_scripts(fake_home, plugin_root)
-
-        assert observe() == before
-
-    def test_a_link_already_to_the_offered_script_keeps_its_inode(
-        self, fake_home, plugin_root, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
-        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
-        dest.symlink_to(script)
-        inode = dest.lstat().st_ino
-
-        module.refresh_scripts(fake_home, plugin_root)
-
-        assert dest.lstat().st_ino == inode
-
-
-class TestApplyScriptActions:
-    def test_every_action_is_applied_and_the_first_error_raised_after_the_loop(
-        self, fake_home, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        tool = fake_home / "tool"
-        (bin_dir / "stale").symlink_to(tool)
-        (bin_dir / "own").write_text("mine\n", encoding="utf-8")
-        actions = (
-            module.Repoint("stale", "/elsewhere"),
-            module.Link("own", str(tool)),
-            module.Link("fresh", str(tool)),
-        )
-        monkeypatch.setattr(module.os, "replace", _refuse)
-
-        with pytest.raises(PermissionError):
-            module.apply_script_actions(bin_dir, actions)
-
-        assert os.readlink(bin_dir / "fresh") == str(tool)
-
-    def test_a_link_gone_before_its_removal_is_not_an_error(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        monkeypatch.setattr(module.Path, "is_symlink", lambda _self: True)
-
-        module.apply_script_actions(fake_home / ".local" / "bin", (module.Remove("gone"),))
-
-    def test_a_failed_repoint_raises_its_own_error_when_the_temporary_link_is_already_gone(
-        self, fake_home, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        (bin_dir / "stale").symlink_to(fake_home / "tool")
-
-        def lose_the_temporary_then_refuse(temporary, _destination):
-            Path(temporary).unlink()
-            raise PermissionError("refused")
-
-        monkeypatch.setattr(module.os, "replace", lose_the_temporary_then_refuse)
-
-        with pytest.raises(PermissionError):
-            module.apply_script_actions(bin_dir, (module.Repoint("stale", "/elsewhere"),))
-
-    def test_a_failed_repoint_leaves_the_old_link_and_no_temporary_link(
-        self, fake_home, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        tool = fake_home / "tool"
-        (bin_dir / "stale").symlink_to(tool)
-        monkeypatch.setattr(module.os, "replace", _refuse)
-
-        with pytest.raises(PermissionError):
-            module.apply_script_actions(bin_dir, (module.Repoint("stale", "/elsewhere"),))
-
-        assert sorted(p.name for p in bin_dir.iterdir()) == ["stale"]
-        assert os.readlink(bin_dir / "stale") == str(tool)
-
-    def test_a_successful_repoint_leaves_no_temporary_link(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        (bin_dir / "stale").symlink_to(fake_home / "tool")
-
-        module.apply_script_actions(bin_dir, (module.Repoint("stale", "/elsewhere"),))
-
-        assert sorted(p.name for p in bin_dir.iterdir()) == ["stale"]
-        assert os.readlink(bin_dir / "stale") == "/elsewhere"
-
-    def test_remove_unlinks_a_link_only(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        own = bin_dir / "own"
-        own.write_text("mine\n", encoding="utf-8")
-        (bin_dir / "stale").symlink_to(fake_home / "tool")
-
-        module.apply_script_actions(bin_dir, (module.Remove("own"), module.Remove("stale")))
-
-        assert own.read_text(encoding="utf-8") == "mine\n"
-        assert not (bin_dir / "stale").is_symlink()
-
-    def test_remove_of_a_missing_name_is_not_an_error(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-
-        module.apply_script_actions(fake_home / ".local" / "bin", (module.Remove("gone"),))
-
-    def test_link_never_overwrites_what_sits_under_its_name(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        own = bin_dir / "own"
-        own.write_text("mine\n", encoding="utf-8")
-
-        with pytest.raises(FileExistsError):
-            module.apply_script_actions(bin_dir, (module.Link("own", "/elsewhere"),))
-
-        assert own.read_text(encoding="utf-8") == "mine\n"
-
-    def test_keep_does_nothing(self, fake_home, monkeypatch):
-        module = _fake_home_module(monkeypatch, fake_home)
-        bin_dir = fake_home / ".local" / "bin"
-        link = bin_dir / "kept"
-        link.symlink_to(fake_home / "tool")
-        inode = link.lstat().st_ino
-
-        module.apply_script_actions(bin_dir, (module.Keep("kept"),))
-
-        assert link.lstat().st_ino == inode
 
 
 class TestFullInstallSequence:
@@ -2080,167 +1688,6 @@ class TestRunFlow:
         assert "anon@unknown" in rendered
 
 
-class TestUpdatePath:
-    """A re-armed run from a cache version directory refreshes, quietly and fail-open."""
-
-    @pytest.fixture
-    def armed(self, fake_home, plugin_cache_dir, marker_path, claude_md_symlink, rules_sentinel):
-        """Surfaces installed, completion marker present but older than the cache."""
-        marker_path.write_text("")
-        os.utime(marker_path, (1_000_000, 1_000_000))
-        os.utime(plugin_cache_dir, (2_000_000, 2_000_000))
-        return fake_home
-
-    @staticmethod
-    def _recording_steps(
-        monkeypatch, module, calls: list, fail: dict | None = None, arguments: list | None = None
-    ):
-        def _step(name: str):
-            def run(home: Path, root: Path) -> None:
-                calls.append(name)
-                if arguments is not None:
-                    arguments.append((home, root))
-                if fail and name in fail:
-                    raise fail[name]
-
-            return run
-
-        monkeypatch.setattr(module, "_UPDATE_STEPS", (_step("first"), _step("second")))
-
-    def _run_hook(self, module, monkeypatch) -> None:
-        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
-        module._run()
-
-    def test_the_steps_are_the_instructions_then_the_rules_then_the_scripts(
-        self, monkeypatch, fake_home
-    ):
-        module = _fake_home_module(monkeypatch, fake_home)
-
-        assert module._UPDATE_STEPS == (
-            module._update_instructions,
-            module._update_rules,
-            module.refresh_scripts,
-        )
-
-    def test_a_marked_cache_install_with_surfaces_runs_the_update_steps(self, armed, monkeypatch):
-        module = _fake_home_module(monkeypatch, armed)
-        calls: list = []
-        self._recording_steps(monkeypatch, module, calls)
-
-        self._run_hook(module, monkeypatch)
-
-        assert calls == ["first", "second"]
-
-    def test_each_step_receives_the_home_and_the_plugin_root(self, armed, plugin_root, monkeypatch):
-        module = _fake_home_module(monkeypatch, armed)
-        arguments: list = []
-        self._recording_steps(monkeypatch, module, [], arguments=arguments)
-
-        self._run_hook(module, monkeypatch)
-
-        assert arguments == [(armed, plugin_root)] * 2
-
-    def test_a_checkout_root_never_reaches_the_update_path(self, armed, tmp_path, monkeypatch):
-        module = _fake_home_module(monkeypatch, armed)
-        checkout = tmp_path / "checkout"
-        checkout.mkdir()
-        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(checkout))
-        calls: list = []
-        self._recording_steps(monkeypatch, module, calls)
-
-        self._run_hook(module, monkeypatch)
-
-        assert calls == []
-
-    def test_a_first_install_without_a_marker_never_reaches_the_update_path(
-        self, armed, marker_path, monkeypatch
-    ):
-        module = _fake_home_module(monkeypatch, armed)
-        marker_path.unlink()
-        calls: list = []
-        self._recording_steps(monkeypatch, module, calls)
-
-        self._run_hook(module, monkeypatch)
-
-        assert calls == []
-
-    def test_missing_surfaces_keep_the_cold_path(self, armed, plugin_root, monkeypatch):
-        module = _fake_home_module(monkeypatch, armed)
-        _seed_template(plugin_root)
-        (armed / ".claude" / "CLAUDE.md").unlink()
-        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
-        calls: list = []
-        self._recording_steps(monkeypatch, module, calls)
-
-        self._run_hook(module, monkeypatch)
-
-        assert calls == []
-        assert (armed / ".claude" / "CLAUDE.md").is_symlink()
-
-    def test_a_failing_step_does_not_stop_the_next_one(self, armed, monkeypatch):
-        module = _fake_home_module(monkeypatch, armed)
-        calls: list = []
-        self._recording_steps(monkeypatch, module, calls, fail={"first": OSError("disk")})
-
-        self._run_hook(module, monkeypatch)
-
-        assert calls == ["first", "second"]
-
-    def test_a_failure_prints_one_line_with_the_exception_type_only(
-        self, armed, monkeypatch, capsys
-    ):
-        module = _fake_home_module(monkeypatch, armed)
-        secret = "/home/someone/private-value"
-        self._recording_steps(monkeypatch, module, [], fail={"first": PermissionError(secret)})
-
-        self._run_hook(module, monkeypatch)
-
-        captured = capsys.readouterr()
-        assert captured.out == ""
-        assert captured.err == (
-            "[Praxion] Update refresh could not finish (PermissionError); "
-            "run /praxion-complete-install to complete it.\n"
-        )
-
-    def test_the_first_of_several_failures_is_the_one_reported(self, armed, monkeypatch, capsys):
-        module = _fake_home_module(monkeypatch, armed)
-        fail = {"first": KeyError("a"), "second": OSError("b")}
-        self._recording_steps(monkeypatch, module, [], fail=fail)
-
-        self._run_hook(module, monkeypatch)
-
-        assert capsys.readouterr().err.count("(KeyError)") == 1
-
-    def test_the_marker_is_rewritten_after_a_failure(self, armed, marker_path, monkeypatch):
-        module = _fake_home_module(monkeypatch, armed)
-        self._recording_steps(monkeypatch, module, [], fail={"first": OSError("disk")})
-
-        self._run_hook(module, monkeypatch)
-
-        assert marker_path.stat().st_mtime > 1_000_000
-
-    def test_a_fully_successful_run_prints_nothing(self, armed, monkeypatch, capsys):
-        module = _fake_home_module(monkeypatch, armed)
-        self._recording_steps(monkeypatch, module, [])
-
-        self._run_hook(module, monkeypatch)
-
-        captured = capsys.readouterr()
-        assert (captured.out, captured.err) == ("", "")
-
-    def test_an_unwritable_marker_after_a_failure_still_reports_the_failure(
-        self, armed, marker_path, monkeypatch, capsys
-    ):
-        module = _fake_home_module(monkeypatch, armed)
-        marker_path.unlink()
-        marker_path.mkdir()
-        self._recording_steps(monkeypatch, module, [], fail={"second": OSError("disk")})
-
-        module._run_update_path(armed, armed)
-
-        assert "(OSError)" in capsys.readouterr().err
-
-
 # Made-up identities: the one the previous version's render carried, and the one a
 # fresh derivation would give today. Neither is a real person's.
 _PREVIOUS_VERSION = "9.9.8"
@@ -2287,14 +1734,14 @@ def _file_state(path: Path) -> tuple:
     return path.read_bytes(), status.st_ino, status.st_mtime_ns
 
 
-def _record_derivations(monkeypatch, module, values: dict[str, str]) -> list:
+def _record_derivations(monkeypatch, values: dict[str, str]) -> list:
     calls: list = []
 
     def derive() -> dict[str, str]:
         calls.append("derived")
         return dict(values)
 
-    monkeypatch.setattr(module._render_mod, "derive_defaults", derive)
+    monkeypatch.setattr(update._render_mod, "derive_defaults", derive)
     return calls
 
 
@@ -2312,7 +1759,7 @@ def _values_in(text: str, values) -> list[str]:
     return [value for value in values if value in text]
 
 
-def _refuse_replacing(monkeypatch, module, destination: Path) -> None:
+def _refuse_replacing(monkeypatch, destination: Path) -> None:
     """Make the rename over `destination`, and only that one, fail."""
     real_replace = os.replace
 
@@ -2321,86 +1768,12 @@ def _refuse_replacing(monkeypatch, module, destination: Path) -> None:
             raise OSError("refused")
         real_replace(source, target)
 
-    monkeypatch.setattr(module.os, "replace", replace)
+    monkeypatch.setattr(os, "replace", replace)
 
 
 _not_as_root = pytest.mark.skipif(
     hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores the permissions these break"
 )
-
-
-class TestSnapshotInstructions:
-    def test_a_missing_entry_is_absent(self, tmp_path):
-        module = _load_module()
-
-        snapshot = module.snapshot_instructions(tmp_path / "CLAUDE.md")
-
-        assert snapshot == module.InstructionsSnapshot(module.SnapshotKind.ABSENT, "", False)
-
-    def test_a_regular_file_is_a_file(self, tmp_path):
-        module = _load_module()
-        (tmp_path / "CLAUDE.md").write_text("# mine\n", encoding="utf-8")
-
-        snapshot = module.snapshot_instructions(tmp_path / "CLAUDE.md")
-
-        assert snapshot == module.InstructionsSnapshot(module.SnapshotKind.FILE, "", False)
-
-    def test_a_directory_is_another_kind(self, tmp_path):
-        module = _load_module()
-        (tmp_path / "CLAUDE.md").mkdir()
-
-        snapshot = module.snapshot_instructions(tmp_path / "CLAUDE.md")
-
-        assert snapshot == module.InstructionsSnapshot(module.SnapshotKind.OTHER, "", False)
-
-    def test_a_live_link_carries_its_text_and_resolves(self, tmp_path):
-        module = _load_module()
-        (tmp_path / "render.md").write_text("# render\n", encoding="utf-8")
-        (tmp_path / "CLAUDE.md").symlink_to("render.md")
-
-        snapshot = module.snapshot_instructions(tmp_path / "CLAUDE.md")
-
-        assert snapshot == module.InstructionsSnapshot(module.SnapshotKind.LINK, "render.md", True)
-
-    def test_a_dangling_link_carries_its_text_and_does_not_resolve(self, tmp_path):
-        module = _load_module()
-        (tmp_path / "CLAUDE.md").symlink_to("gone.md")
-
-        snapshot = module.snapshot_instructions(tmp_path / "CLAUDE.md")
-
-        assert snapshot == module.InstructionsSnapshot(module.SnapshotKind.LINK, "gone.md", False)
-
-
-class TestDefaultsForMissingKeys:
-    """Which keys need a default, and how defaults join the carried values: no effects."""
-
-    def test_the_missing_keys_are_the_template_names_not_carried(self):
-        module = _load_module()
-        carried = {"USERNAME": "@first-person"}
-
-        missing = module._missing_keys("{{USERNAME}} {{EMAIL}} {{EMAIL}} {{SHELL_NAME}}", carried)
-
-        assert missing == {"EMAIL", "SHELL_NAME"}
-
-    def test_nothing_is_missing_when_every_template_key_was_carried(self):
-        module = _load_module()
-
-        assert module._missing_keys(_NEW_TEMPLATE, _CARRIED) == frozenset()
-
-    def test_a_default_fills_only_a_missing_key_and_never_a_carried_one(self):
-        module = _load_module()
-        carried = {"USERNAME": _CARRIED["USERNAME"]}
-
-        values = module._with_defaults(carried, frozenset({"EMAIL"}), _TODAYS)
-
-        assert values == {"USERNAME": _CARRIED["USERNAME"], "EMAIL": _TODAYS["EMAIL"]}
-
-    def test_a_missing_key_without_a_default_stays_out(self):
-        module = _load_module()
-
-        values = module._with_defaults(_CARRIED, frozenset({"SHELL_NAME"}), _TODAYS)
-
-        assert values == _CARRIED
 
 
 class TestInstructionsCarryForward:
@@ -2431,14 +1804,14 @@ class TestInstructionsCarryForward:
     ):
         module, _, link = updated
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
 
     def test_the_link_points_at_this_versions_render(self, updated, fake_home, plugin_root):
         module, _, link = updated
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert os.readlink(link) == str(plugin_root / "claude" / "config" / "CLAUDE.md")
 
@@ -2446,32 +1819,32 @@ class TestInstructionsCarryForward:
         module, previous, _ = updated
         before = _file_state(previous)
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert _file_state(previous) == before
 
     def test_a_relative_link_into_the_previous_version_is_carried_forward(
         self, fake_home, plugin_root, monkeypatch
     ):
-        module = _fake_home_module(monkeypatch, fake_home)
+        monkeypatch.setenv("HOME", str(fake_home))
         previous = _previous_render(fake_home)
         link = _link_instructions(fake_home, previous.relative_to(fake_home / ".claude"))
         _seed_template(plugin_root, _NEW_TEMPLATE)
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
 
     def test_a_default_fills_only_the_key_the_previous_render_never_carried(
         self, fake_home, plugin_root, monkeypatch
     ):
-        module = _fake_home_module(monkeypatch, fake_home)
+        monkeypatch.setenv("HOME", str(fake_home))
         without_web = _PREVIOUS_TEMPLATE.replace("web: {{GITHUB_URL}}\n", "")
         link = _link_instructions(fake_home, _previous_render(fake_home, without_web))
         _seed_template(plugin_root, _NEW_TEMPLATE)
-        _record_derivations(monkeypatch, module, _TODAYS)
+        _record_derivations(monkeypatch, _TODAYS)
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         expected = {**_CARRIED, "GITHUB_URL": _TODAYS["GITHUB_URL"]}
         assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, expected)
@@ -2480,9 +1853,9 @@ class TestInstructionsCarryForward:
         self, updated, fake_home, plugin_root, monkeypatch
     ):
         module, _, _ = updated
-        calls = _record_derivations(monkeypatch, module, _TODAYS)
+        calls = _record_derivations(monkeypatch, _TODAYS)
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert calls == []
 
@@ -2491,9 +1864,9 @@ class TestInstructionsCarryForward:
     ):
         module, _, link = updated
         _seed_template(plugin_root, _NEW_TEMPLATE + "shell: {{SHELL_NAME}}\n")
-        _record_derivations(monkeypatch, module, _TODAYS)
+        _record_derivations(monkeypatch, _TODAYS)
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert link.read_text(encoding="utf-8").endswith("shell: {{SHELL_NAME}}\n")
         assert "{{SHELL_NAME}}" in capsys.readouterr().err
@@ -2504,8 +1877,8 @@ class TestInstructionsCarryForward:
         module, previous, _ = updated
         previous.write_text(previous.read_text(encoding="utf-8") + "a line edited by hand\n")
 
-        with pytest.raises(module.UnrecoverableRenderError):
-            module._update_instructions(fake_home, plugin_root)
+        with pytest.raises(update.UnrecoverableRenderError):
+            update._update_instructions(fake_home, plugin_root)
 
     def test_an_unrecoverable_render_keeps_the_previous_link_and_writes_no_render(
         self, updated, fake_home, plugin_root
@@ -2513,8 +1886,8 @@ class TestInstructionsCarryForward:
         module, previous, link = updated
         previous.write_text(previous.read_text(encoding="utf-8") + "a line edited by hand\n")
 
-        with pytest.raises(module.UnrecoverableRenderError):
-            module._update_instructions(fake_home, plugin_root)
+        with pytest.raises(update.UnrecoverableRenderError):
+            update._update_instructions(fake_home, plugin_root)
 
         assert os.readlink(link) == str(previous)
         assert sorted(p.name for p in (plugin_root / "claude" / "config").iterdir()) == [
@@ -2526,9 +1899,9 @@ class TestInstructionsCarryForward:
     ):
         module, previous, _ = updated
         previous.write_text("# rewritten by hand\n", encoding="utf-8")
-        monkeypatch.setattr(module, "_UPDATE_STEPS", (module._update_instructions,))
+        monkeypatch.setattr(update, "_UPDATE_STEPS", (update._update_instructions,))
 
-        module._run_update_path(fake_home, plugin_root)
+        update._run_update_path(fake_home, plugin_root)
 
         assert capsys.readouterr().err == (
             "[Praxion] Update refresh could not finish (UnrecoverableRenderError); "
@@ -2544,7 +1917,7 @@ class TestInstructionsCarryForward:
         template.chmod(0o000)
         try:
             with pytest.raises(PermissionError):
-                module._update_instructions(fake_home, plugin_root)
+                update._update_instructions(fake_home, plugin_root)
         finally:
             template.chmod(0o644)
 
@@ -2562,7 +1935,7 @@ class TestInstructionsCarryForward:
         config.chmod(0o555)
         try:
             with pytest.raises(PermissionError):
-                module._update_instructions(fake_home, plugin_root)
+                update._update_instructions(fake_home, plugin_root)
         finally:
             config.chmod(0o755)
 
@@ -2574,10 +1947,10 @@ class TestInstructionsCarryForward:
     ):
         module, previous, link = updated
         config = plugin_root / "claude" / "config"
-        _refuse_replacing(monkeypatch, module, config / "CLAUDE.md")
+        _refuse_replacing(monkeypatch, config / "CLAUDE.md")
 
         with pytest.raises(OSError, match="refused"):
-            module._update_instructions(fake_home, plugin_root)
+            update._update_instructions(fake_home, plugin_root)
 
         assert os.readlink(link) == str(previous)
         assert sorted(p.name for p in config.iterdir()) == ["CLAUDE.md.tmpl"]
@@ -2587,10 +1960,10 @@ class TestInstructionsCarryForward:
     ):
         module, previous, link = updated
         before = sorted(p.name for p in link.parent.iterdir())
-        _refuse_replacing(monkeypatch, module, link)
+        _refuse_replacing(monkeypatch, link)
 
         with pytest.raises(OSError, match="refused"):
-            module._update_instructions(fake_home, plugin_root)
+            update._update_instructions(fake_home, plugin_root)
 
         assert (os.readlink(link), link.read_text(encoding="utf-8")) == (
             str(previous),
@@ -2601,21 +1974,21 @@ class TestInstructionsCarryForward:
     def test_a_link_already_into_this_version_is_left_as_it_is(
         self, fake_home, plugin_root, monkeypatch
     ):
-        module = _fake_home_module(monkeypatch, fake_home)
+        monkeypatch.setenv("HOME", str(fake_home))
         _seed_template(plugin_root, _NEW_TEMPLATE)
         render = plugin_root / "claude" / "config" / "CLAUDE.md"
         render.write_text(_fill(_NEW_TEMPLATE, _CARRIED), encoding="utf-8")
         link = _link_instructions(fake_home, render)
         before = (os.readlink(link), _file_state(render))
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert (os.readlink(link), _file_state(render)) == before
 
     def test_a_clone_link_and_its_render_are_left_as_they_are(
         self, fake_home, plugin_root, tmp_path, monkeypatch
     ):
-        module = _fake_home_module(monkeypatch, fake_home)
+        monkeypatch.setenv("HOME", str(fake_home))
         _seed_template(plugin_root, _NEW_TEMPLATE)
         clone_render = tmp_path / "dev" / "praxion" / "claude" / "config" / "CLAUDE.md"
         clone_render.parent.mkdir(parents=True)
@@ -2623,7 +1996,7 @@ class TestInstructionsCarryForward:
         link = _link_instructions(fake_home, clone_render)
         before = (os.readlink(link), _file_state(clone_render))
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert (os.readlink(link), _file_state(clone_render)) == before
         assert not (plugin_root / "claude" / "config" / "CLAUDE.md").exists()
@@ -2639,7 +2012,7 @@ class TestInstructionsCarryForward:
 
         monkeypatch.setattr(sys, "stdin", _NoAnswers())
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
 
@@ -2648,9 +2021,9 @@ class TestInstructionsCarryForward:
     ):
         module, _, _ = updated
         _seed_template(plugin_root, _NEW_TEMPLATE + "shell: {{SHELL_NAME}}\n")
-        _record_derivations(monkeypatch, module, _TODAYS)
+        _record_derivations(monkeypatch, _TODAYS)
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         output = "".join(capsys.readouterr())
         assert _values_in(output, (*_CARRIED.values(), *_TODAYS.values())) == []
@@ -2660,7 +2033,7 @@ class TestInstructionsCarryForward:
     ):
         module, previous, _ = updated
 
-        module._update_instructions(fake_home, plugin_root)
+        update._update_instructions(fake_home, plugin_root)
 
         renders = {previous, plugin_root / "claude" / "config" / "CLAUDE.md"}
         assert _files_holding(tmp_path, _CARRIED.values(), excluding=renders) == []

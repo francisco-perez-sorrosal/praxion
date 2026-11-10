@@ -241,6 +241,8 @@ When the step involves refactoring existing tests (not writing new ones), apply 
 - `.ai-state/decisions/drafts/`;
 - any working-tree file that differs from the Base commit.
 
+**Existing tests first.** Before designing, search the Base commit for tests that exercise a name under `### Observable Surface`, directly or through a driver: `git grep -l <name> <base> -- tests/acceptance tests/e2e`, once per name. List each hit under Sources Read; when nothing matches, list one `existing tests` line naming the searched names. Do not edit a hit. Raise each one whose assertion the spec contradicts as a round-0 Spec Question naming the test node and the requirement; the spec as written answers it, and your resume then amends or retires that test. **Running a Base-commit entry point** (its `--help`, or the base's code over a fixture), only while `git diff --quiet <base>` holds, is an A3 read: it reads output, never function bodies, and is listed with its command. Its output may supply the expected value of a guard whose requirement says the behavior stays unchanged, never of a red scenario; the requirement stays the oracle's authority.
+
 Oracles come from the spec, never from reading an existing implementation: an oracle read from code copies the code's actual behavior. **Paired sites:** the authoritative copy is [`skills/software-planning/references/coordination-details.md § Acceptance-Design Stage`](../skills/software-planning/references/coordination-details.md#acceptance-design-stage); `agents/verifier.md` names the class names only. Change all three together.
 
 ### Output
@@ -256,7 +258,7 @@ Write `.ai-work/<task-slug>/ACCEPTANCE_TESTS.md` and RED tests: scenarios under 
 ## Sources Read
 - `.ai-work/<slug>/SPEC_EXTRACT.md` (sha256:<12 hex>)
 - `.ai-work/<slug>/INTERFACE_DESIGN.md § Public Contract`   # only if read
-- `<path>@<base-sha7>` — <why: public entry point | existing tests | manifest | archived spec>
+- `<path>@<base-sha7>` — <why: public entry point | existing tests | base entry point run: <command> | manifest | archived spec>
 - `<source>` — A4: <procedure | injected skill or rule | input-format tooling | harness isolation>   # listed, never an oracle
 ## Scenarios
 ### REQ-NN — <title from the spec>
@@ -286,7 +288,9 @@ A footprint row (`FC-NN` in `### Footprint Criteria`, or a declared footprint) g
 
 An empty section reads `_None._`. The skipped form keeps all five sections; `## Sources Read` and `## Scenarios` read `_None — stage skipped._`. Every REQ of the extract lands in `Scenarios` or `Not Black-Box Testable` (in both only when the Not Black-Box Testable entry names the part no scenario can drive), and every `Needs: BA-NN` resolves to a Boundary Assumption.
 
-**Procedure.** Use the spec's Observable Surface names only. Run the tests and confirm each is RED for the right reason (behavior missing or driver unbound, never a syntax or collection error). A surprise green outside `guard` is a Register Objection. An unbound driver raises with the assumption's words, never its id. For ambiguous requirement wording, raise a Spec Question with a provisional or `withheld` scenario rather than guessing. **On a Spec-Question resume,** re-read only the regenerated extract, turn `withheld` scenarios into executable ones, set each `Resolution:`, and (for a question raised by the implementer) record it as such.
+**No git history at collection.** CI usually clones at depth 1, so a parametrize list or module constant built from a commit other than the checked-out one (`git diff`, `git log`, `git show <base>:…`, `HEAD~N`) fails the whole suite there while every local run in a full clone passes. Freeze a before-state as a committed fixture that records its base commit. A test that must read the base at run time (run its code, `git show` it) skips, naming the missing commit, when the commit is absent; use that only when no fixture can hold the before-state, since a skipped guard guards nothing in CI. You cannot check this yourself (the check reads committed state and you never commit): the orchestrator collects the suite at depth 1 after the AD commit, and a failure returns to you as a resume carrying the printed errors. Answer it by freezing the offending value as a fixture and changing nothing else. Sites: `coordination-details.md § Git History at Collection`.
+
+**Procedure.** Use the spec's Observable Surface names only. Run the tests and confirm each is RED for the right reason (behavior missing or driver unbound, never a syntax or collection error). A surprise green outside `guard` is a Register Objection. An unbound driver raises with the assumption's words, never its id. For ambiguous requirement wording, raise a Spec Question with a provisional or `withheld` scenario rather than guessing. **On a Spec-Question resume,** re-read only the regenerated extract, turn `withheld` scenarios into executable ones, amend or retire each existing outer-loop test the answer says the spec supersedes, set each `Resolution:`, and (for a question raised by the implementer) record it as such.
 
 ### Anti-instructions
 

@@ -130,6 +130,17 @@ def test_a_link_already_into_the_current_version_keeps_its_inode(new_rules, targ
     assert link.lstat().st_ino == before.st_ino
 
 
+def test_a_relative_link_already_into_the_current_version_keeps_its_inode(new_rules, target):
+    link = target / LINKED
+    link.symlink_to(os.path.relpath(new_rules / LINKED, link.parent))
+    before = link.lstat()
+
+    _repoint(new_rules, target)
+
+    assert os.readlink(link) == os.path.relpath(new_rules / LINKED, link.parent)
+    assert link.lstat().st_ino == before.st_ino
+
+
 def test_a_live_link_outside_the_cache_is_left_as_it_is(new_rules, tmp_path, target):
     clone_rule = tmp_path / "src" / "praxion" / "rules" / LINKED
     clone_rule.parent.mkdir(parents=True)
@@ -179,17 +190,25 @@ def test_a_rule_the_new_version_lacks_is_not_repointed_to_nothing(new_rules, old
     assert os.readlink(link) == str(old_rules / LINKED)
 
 
-@pytest.mark.parametrize("manifest", [None, ""], ids=["absent", "empty"])
-def test_an_unreadable_manifest_changes_nothing_and_succeeds(
-    new_rules, old_rules, target, manifest
-):
-    manifest_path = new_rules / "_manifest.yaml"
-    if manifest is None:
-        manifest_path.unlink()
-    else:
-        manifest_path.write_text(manifest, encoding="utf-8")
+def _link_into_old_version(old_rules: Path, target: Path) -> Path:
     link = target / LINKED
     link.symlink_to(old_rules / LINKED)
+    return link
+
+
+def test_an_absent_manifest_changes_nothing_and_succeeds(new_rules, old_rules, target):
+    (new_rules / "_manifest.yaml").unlink()
+    link = _link_into_old_version(old_rules, target)
+
+    result = _repoint(new_rules, target)
+
+    assert result.returncode == 0, result.stderr
+    assert os.readlink(link) == str(old_rules / LINKED)
+
+
+def test_an_empty_manifest_changes_nothing_and_succeeds(new_rules, old_rules, target):
+    (new_rules / "_manifest.yaml").write_text("", encoding="utf-8")
+    link = _link_into_old_version(old_rules, target)
 
     result = _repoint(new_rules, target)
 

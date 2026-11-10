@@ -348,10 +348,9 @@ repoint_cached_rule_symlinks() {
         [ -f "${rules_source_dir}/${rel_path}" ] || continue
         link="${rules_target_dir}/${rel_path}"
         [ -L "$link" ] || continue
+        # Same file as the new version's rule, however the link is spelled.
+        [ "$link" -ef "${rules_source_dir}/${rel_path}" ] && continue
         target=$(readlink "$link")
-        case "$target" in
-            "$rules_source_dir"/*) continue ;;
-        esac
         _managed_rule_rel_path "$rules_source_dir" "$target" >/dev/null || continue
         ln -sfn "${rules_source_dir}/${rel_path}" "$link"
     done <<< "$keep_paths"

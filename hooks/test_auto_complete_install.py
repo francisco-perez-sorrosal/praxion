@@ -1377,6 +1377,83 @@ class TestRuleRefresh:
         assert own.read_text(encoding="utf-8") == "# the operator's own rule\n"
 
 
+class TestRuleUpdate:
+    """On the update path a rule link into another cached version moves to this one."""
+
+    @staticmethod
+    def _previous_version_rule(plugin_root: Path, rel: str) -> Path:
+        previous = plugin_root.parent / "9.9.8" / "rules" / rel
+        previous.parent.mkdir(parents=True)
+        previous.write_text("# the rule, as the previous version linked it\n", encoding="utf-8")
+        return previous
+
+    def test_repoints_a_live_link_into_the_previous_version(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        rel = "swe/coding-style.md"
+        _plant_link(fake_home, rel, self._previous_version_rule(plugin_root, rel))
+
+        module._update_rules(fake_home, plugin_root)
+
+        assert _rule_links(fake_home)[rel] == (plugin_root / "rules" / rel).resolve()
+
+    def test_leaves_a_live_link_into_a_checkout_as_it_is(
+        self, fake_home, plugin_root, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        checkout_rule = tmp_path / "checkout" / "rules" / "swe" / "coding-style.md"
+        checkout_rule.parent.mkdir(parents=True)
+        checkout_rule.write_text("# coding style, from a clone install\n", encoding="utf-8")
+        _plant_link(fake_home, "swe/coding-style.md", checkout_rule)
+
+        module._update_rules(fake_home, plugin_root)
+
+        assert _rule_links(fake_home)["swe/coding-style.md"] == checkout_rule.resolve()
+
+    def test_still_sweeps_and_links_as_the_refresh_does(self, fake_home, plugin_root, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        stale_rel = "swe/agent-model-routing-resident.md"
+        stale = _plant_link(
+            fake_home, stale_rel, self._previous_version_rule(plugin_root, stale_rel)
+        )
+
+        module._update_rules(fake_home, plugin_root)
+
+        assert not stale.is_symlink()
+        assert "swe/coding-style.md" in _rule_links(fake_home)
+
+    def test_the_refresh_alone_leaves_a_live_link_into_another_version(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        rel = "swe/coding-style.md"
+        previous = self._previous_version_rule(plugin_root, rel)
+        _plant_link(fake_home, rel, previous)
+
+        module._refresh_rules(fake_home, plugin_root)
+
+        # The flow for a root that is not a cache version never re-points a live link.
+        assert _rule_links(fake_home)[rel] == previous.resolve()
+
+    def test_a_single_function_runs_as_it_did(self, fake_home, plugin_root, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        module._run_rule_linker(fake_home, plugin_root, "link_rules")
+
+        assert "swe/coding-style.md" in _rule_links(fake_home)
+
+    def test_the_first_failing_function_ends_the_sequence_and_raises(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        with pytest.raises(subprocess.CalledProcessError):
+            module._run_rule_linkers(fake_home, plugin_root, ("no_such_function", "link_rules"))
+
+        assert _rule_links(fake_home) == {}
+
+
 def _seed_script(scripts_src: Path, name: str, executable: bool = True) -> Path:
     scripts_src.mkdir(parents=True, exist_ok=True)
     script = scripts_src / name
@@ -2034,10 +2111,10 @@ class TestUpdatePath:
         monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
         module._run()
 
-    def test_the_steps_are_the_rule_refresh_then_the_script_refresh(self, monkeypatch, fake_home):
+    def test_the_steps_are_the_rule_update_then_the_script_refresh(self, monkeypatch, fake_home):
         module = _fake_home_module(monkeypatch, fake_home)
 
-        assert module._UPDATE_STEPS == (module._refresh_rules, module.refresh_scripts)
+        assert module._UPDATE_STEPS == (module._update_rules, module.refresh_scripts)
 
     def test_a_marked_cache_install_with_surfaces_runs_the_update_steps(self, armed, monkeypatch):
         module = _fake_home_module(monkeypatch, armed)

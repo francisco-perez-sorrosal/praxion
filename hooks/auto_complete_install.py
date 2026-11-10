@@ -110,6 +110,13 @@ _SHARED_LIB_RELATIVE = Path("lib") / "install_shared.sh"
 # registered 35-second budget alongside the 30-second prompt.
 _LINKER_TIMEOUT_SECS = 20
 
+# The shell for `_run_rule_linkers`: $1 the library, $2 the rules source, $3 the
+# rules target, then the functions to call with the two directories, in order.
+_LINKER_SCRIPT = (
+    'source "$1" && source_dir=$2 && target_dir=$3 && shift 3 && '
+    'for function; do "$function" "$source_dir" "$target_dir" || exit $?; done'
+)
+
 # Interactive prompt timeout (seconds)
 _PROMPT_TIMEOUT_SECS = 30
 
@@ -251,13 +258,23 @@ def _run_rule_linker(home: Path, root: Path, function: str) -> None:
     never decides which rules get linked. A plugin without the library or a
     rules directory links nothing.
     """
+    _run_rule_linkers(home, root, (function,))
+
+
+def _run_rule_linkers(home: Path, root: Path, functions: tuple[str, ...]) -> None:
+    """Run several rule-linking functions of the shell library, in order, in one shell.
+
+    Each gets the plugin's rules directory and `~/.claude/rules`; the first to
+    fail ends the run. One shell keeps a single timeout and the one `HOME`
+    override for the whole sequence.
+    """
     rules_src = root / "rules"
     library = root / _SHARED_LIB_RELATIVE
     if not rules_src.is_dir() or not library.is_file():
         return
     subprocess.run(
-        ["bash", "-c", 'source "$1" && "$2" "$3" "$4"', "auto_complete_install"]
-        + [str(library), function, str(rules_src), str(home / ".claude" / "rules")],
+        ["bash", "-c", _LINKER_SCRIPT, "auto_complete_install"]
+        + [str(library), str(rules_src), str(home / ".claude" / "rules"), *functions],
         env={**os.environ, "HOME": str(home)},
         capture_output=True,
         timeout=_LINKER_TIMEOUT_SECS,
@@ -283,6 +300,16 @@ def _refresh_rules(home: Path, root: Path) -> None:
     that has no working link. An existing live link is left as it is.
     """
     _run_rule_linker(home, root, "refresh_rule_symlinks")
+
+
+def _update_rules(home: Path, root: Path) -> None:
+    """Bring installed rule links to the cached version at `root`.
+
+    First re-points each rule link that lies in another cached version's rules,
+    then refreshes as `_refresh_rules` does. A live link outside the cache is
+    still never taken over.
+    """
+    _run_rule_linkers(home, root, ("repoint_cached_rule_symlinks", "refresh_rule_symlinks"))
 
 
 def offered_scripts(root: Path) -> tuple[OfferedScript, ...]:
@@ -409,7 +436,7 @@ def refresh_scripts(home: Path, root: Path) -> None:
 
 # The update path's steps, in the one place that orders them. Each takes
 # (home, plugin root) and runs on its own, so a failing step never costs the next.
-_UPDATE_STEPS = (_refresh_rules, refresh_scripts)
+_UPDATE_STEPS = (_update_rules, refresh_scripts)
 
 
 def _is_update_run(home: Path, root: Path) -> bool:

@@ -130,6 +130,9 @@ jobs:
         run: echo "count=${{ strategy.job-total }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
+        # Depth 1 on purpose (td-609): it is the canary for a test that reads git history at
+        # collection, the default most managed projects' CI inherits. Guards that compare with a
+        # pinned base commit skip here, naming the commit, and run in every full-history run.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up uv (manages Python 3.11)

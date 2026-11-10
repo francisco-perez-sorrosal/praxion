@@ -2003,6 +2003,161 @@ class TestRunFlow:
         assert "anon@unknown" in rendered
 
 
+class TestUpdatePath:
+    """A re-armed run from a cache version directory refreshes, quietly and fail-open."""
+
+    @pytest.fixture
+    def armed(self, fake_home, plugin_cache_dir, marker_path, claude_md_symlink, rules_sentinel):
+        """Surfaces installed, completion marker present but older than the cache."""
+        marker_path.write_text("")
+        os.utime(marker_path, (1_000_000, 1_000_000))
+        os.utime(plugin_cache_dir, (2_000_000, 2_000_000))
+        return fake_home
+
+    @staticmethod
+    def _recording_steps(
+        monkeypatch, module, calls: list, fail: dict | None = None, arguments: list | None = None
+    ):
+        def _step(name: str):
+            def run(home: Path, root: Path) -> None:
+                calls.append(name)
+                if arguments is not None:
+                    arguments.append((home, root))
+                if fail and name in fail:
+                    raise fail[name]
+
+            return run
+
+        monkeypatch.setattr(module, "_UPDATE_STEPS", (_step("first"), _step("second")))
+
+    def _run_hook(self, module, monkeypatch) -> None:
+        monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+        module._run()
+
+    def test_the_steps_are_the_rule_refresh_then_the_script_refresh(self, monkeypatch, fake_home):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        assert module._UPDATE_STEPS == (module._refresh_rules, module.refresh_scripts)
+
+    def test_a_marked_cache_install_with_surfaces_runs_the_update_steps(self, armed, monkeypatch):
+        module = _fake_home_module(monkeypatch, armed)
+        calls: list = []
+        self._recording_steps(monkeypatch, module, calls)
+
+        self._run_hook(module, monkeypatch)
+
+        assert calls == ["first", "second"]
+
+    def test_each_step_receives_the_home_and_the_plugin_root(self, armed, plugin_root, monkeypatch):
+        module = _fake_home_module(monkeypatch, armed)
+        arguments: list = []
+        self._recording_steps(monkeypatch, module, [], arguments=arguments)
+
+        self._run_hook(module, monkeypatch)
+
+        assert arguments == [(armed, plugin_root)] * 2
+
+    def test_a_checkout_root_never_reaches_the_update_path(self, armed, tmp_path, monkeypatch):
+        module = _fake_home_module(monkeypatch, armed)
+        checkout = tmp_path / "checkout"
+        checkout.mkdir()
+        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(checkout))
+        calls: list = []
+        self._recording_steps(monkeypatch, module, calls)
+
+        self._run_hook(module, monkeypatch)
+
+        assert calls == []
+
+    def test_a_first_install_without_a_marker_never_reaches_the_update_path(
+        self, armed, marker_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, armed)
+        marker_path.unlink()
+        calls: list = []
+        self._recording_steps(monkeypatch, module, calls)
+
+        self._run_hook(module, monkeypatch)
+
+        assert calls == []
+
+    def test_missing_surfaces_keep_the_cold_path(self, armed, plugin_root, monkeypatch):
+        module = _fake_home_module(monkeypatch, armed)
+        _seed_template(plugin_root)
+        (armed / ".claude" / "CLAUDE.md").unlink()
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
+        calls: list = []
+        self._recording_steps(monkeypatch, module, calls)
+
+        self._run_hook(module, monkeypatch)
+
+        assert calls == []
+        assert (armed / ".claude" / "CLAUDE.md").is_symlink()
+
+    def test_a_failing_step_does_not_stop_the_next_one(self, armed, monkeypatch):
+        module = _fake_home_module(monkeypatch, armed)
+        calls: list = []
+        self._recording_steps(monkeypatch, module, calls, fail={"first": OSError("disk")})
+
+        self._run_hook(module, monkeypatch)
+
+        assert calls == ["first", "second"]
+
+    def test_a_failure_prints_one_line_with_the_exception_type_only(
+        self, armed, monkeypatch, capsys
+    ):
+        module = _fake_home_module(monkeypatch, armed)
+        secret = "/home/someone/private-value"
+        self._recording_steps(monkeypatch, module, [], fail={"first": PermissionError(secret)})
+
+        self._run_hook(module, monkeypatch)
+
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == (
+            "[Praxion] Update refresh could not finish (PermissionError); "
+            "run /praxion-complete-install to complete it.\n"
+        )
+
+    def test_the_first_of_several_failures_is_the_one_reported(self, armed, monkeypatch, capsys):
+        module = _fake_home_module(monkeypatch, armed)
+        fail = {"first": KeyError("a"), "second": OSError("b")}
+        self._recording_steps(monkeypatch, module, [], fail=fail)
+
+        self._run_hook(module, monkeypatch)
+
+        assert capsys.readouterr().err.count("(KeyError)") == 1
+
+    def test_the_marker_is_rewritten_after_a_failure(self, armed, marker_path, monkeypatch):
+        module = _fake_home_module(monkeypatch, armed)
+        self._recording_steps(monkeypatch, module, [], fail={"first": OSError("disk")})
+
+        self._run_hook(module, monkeypatch)
+
+        assert marker_path.stat().st_mtime > 1_000_000
+
+    def test_a_fully_successful_run_prints_nothing(self, armed, monkeypatch, capsys):
+        module = _fake_home_module(monkeypatch, armed)
+        self._recording_steps(monkeypatch, module, [])
+
+        self._run_hook(module, monkeypatch)
+
+        captured = capsys.readouterr()
+        assert (captured.out, captured.err) == ("", "")
+
+    def test_an_unwritable_marker_after_a_failure_still_reports_the_failure(
+        self, armed, marker_path, monkeypatch, capsys
+    ):
+        module = _fake_home_module(monkeypatch, armed)
+        marker_path.unlink()
+        marker_path.mkdir()
+        self._recording_steps(monkeypatch, module, [], fail={"second": OSError("disk")})
+
+        module._run_update_path(armed, armed)
+
+        assert "(OSError)" in capsys.readouterr().err
+
+
 class TestRealInstallLayout:
     """On the layout Claude Code installs, a first session completes the install.
 

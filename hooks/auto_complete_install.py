@@ -11,10 +11,18 @@ Fast-skip conditions (exit 0, silent):
 
 Otherwise, from the plugin this hook runs from (its own version directory,
 `.../praxion/<version>/`, never the unversioned cache parent):
+  - Update path: the marker is present (an install ran before), the plugin root
+    lies in a cache version directory and the surfaces are present. The update
+    steps run in order -- refresh the rule links, then the script links -- each
+    fail-open; the marker is written whatever happened. A fully successful run
+    prints nothing; a failure prints one stderr line carrying the exception type
+    and the command that completes the refresh by hand.
   - Surfaces already present (CLAUDE.md symlink and the rules sentinel, both
-    resolving): refresh the rule links -- sweep each stale Praxion link and link
-    each manifest rule that has none -- then write the marker. An existing live
-    link is never re-pointed, so a clone install's links stay its own.
+    resolving) but no update path (a first session after a clone install, or a
+    `--plugin-dir` checkout root): refresh the rule links -- sweep each stale
+    Praxion link and link each manifest rule that has none -- then write the
+    marker. An existing live link is never re-pointed, so a clone install's links
+    stay its own.
   - Otherwise (cold path): derive personal-info defaults, optionally prompt the
     operator (30s timeout-accept), run install steps, write marker.
 
@@ -60,6 +68,7 @@ from _install_refresh import (  # noqa: E402 (after sys.path injection)
     Remove,
     Repoint,
     ScriptAction,
+    cache_version_dir,
     plan_script_links,
     unreachable,
 )
@@ -398,6 +407,56 @@ def refresh_scripts(home: Path, root: Path) -> None:
     apply_script_actions(bin_dir, actions)
 
 
+# The update path's steps, in the one place that orders them. Each takes
+# (home, plugin root) and runs on its own, so a failing step never costs the next.
+_UPDATE_STEPS = (_refresh_rules, refresh_scripts)
+
+
+def _is_update_run(home: Path, root: Path) -> bool:
+    """True when a completed install meets a newer cache version directory.
+
+    The marker says an install ran before, the root lying in a cache version
+    directory rules out a checkout (`--plugin-dir`, a clone), and the surfaces
+    say there is something to refresh. The root is read lexically, so a root
+    that is itself a link into the cache counts as the cache.
+    """
+    marker = home / ".claude" / _MARKER_FILENAME
+    in_cache = cache_version_dir(str(root), str(home / ".claude")) is not None
+    return marker.exists() and in_cache and _surfaces_present(home)
+
+
+def _run_update_path(home: Path, root: Path) -> None:
+    """Refresh a completed install to the plugin at `root`, never raising.
+
+    Every step runs and the first failure is remembered; the marker is written
+    whatever happened, so a failing refresh is not retried at each session.
+    """
+    first_failure: Exception | None = None
+    for step in _UPDATE_STEPS:
+        try:
+            step(home, root)
+        except Exception as exc:
+            first_failure = first_failure or exc
+    try:
+        _write_marker(home)
+    except Exception:
+        pass
+    if first_failure is not None:
+        _report_incomplete("Update refresh", first_failure)
+
+
+def _report_incomplete(what: str, failure: Exception) -> None:
+    """One stderr line naming `what` stopped, the exception type and the way to finish.
+
+    The type only: a message or value could carry a path or a personal detail.
+    """
+    sys.stderr.write(
+        f"[Praxion] {what} could not finish ({type(failure).__name__}); "
+        "run /praxion-complete-install to complete it.\n"
+    )
+    sys.stderr.flush()
+
+
 def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
     """Run the full install sequence: render CLAUDE.md, link rules, link scripts."""
     _render_claude_md(home, values, root)
@@ -522,16 +581,13 @@ def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, ro
 
     if failure is None:
         sys.stderr.write("[Praxion] Auto-install complete.\n")
+        sys.stderr.flush()
     else:
-        sys.stderr.write(
-            f"[Praxion] Auto-install could not finish ({type(failure).__name__}); "
-            "run /praxion-complete-install to complete it.\n"
-        )
-    sys.stderr.flush()
+        _report_incomplete("Auto-install", failure)
 
 
 def _run() -> None:
-    """Core logic: fast-skip guards then cold path."""
+    """Core logic: fast-skip guards, the update path, then the install paths."""
     # Drain stdin (required to avoid SIGPIPE; payload not needed for install logic)
     try:
         sys.stdin.read()
@@ -554,8 +610,12 @@ def _run() -> None:
         # session, once the plugin is resolvable, still completes the install.
         return
 
-    # Surfaces present (an install or an update ran before): refresh the rule
-    # links to this version, then record completion.
+    if _is_update_run(home, root):
+        _run_update_path(home, root)
+        return
+
+    # Surfaces present without an update path (a clone install, or a checkout
+    # root): refresh the rule links to this version, then record completion.
     if _surfaces_present(home):
         try:
             _refresh_rules(home, root)

@@ -391,3 +391,106 @@ def test_derive_defaults_returns_nonempty_strings(monkeypatch):
     defaults = mod.derive_defaults()
     for key, value in defaults.items():
         assert value.strip(), f"derive_defaults returned empty value for {key}"
+
+
+# ---------------------------------------------------------------------------
+# recover_values() — the inverse of render_claude_md
+# ---------------------------------------------------------------------------
+
+
+def _find_shipped_template() -> Path:
+    """Walk up from this file to the checkout holding the shipped template
+    (the mutation sensor runs this test one directory deeper, in a copy)."""
+    relative = Path("claude") / "config" / "CLAUDE.md.tmpl"
+    return next(p / relative for p in SCRIPTS_DIR.parents if (p / relative).is_file())
+
+
+SHIPPED_TEMPLATE = _find_shipped_template()
+
+# Made-up single-line values; the regex metacharacters prove no pattern is
+# built from the render text.
+METACHARACTER_VALUES = {
+    "USERNAME": "@pat.q+x(1)[a]*",
+    "EMAIL": "pat.q+x@mail.example",
+    "GITHUB_URL": "https://github.com/pat.q+x$^|?",
+}
+
+
+def test_recover_values_round_trips_the_shipped_template(tmp_path):
+    """Recovering from a render of the shipped template returns exactly the
+    values that render used, metacharacters included."""
+    mod = _load_module()
+    out = _make_output_path(tmp_path)
+    mod.render_claude_md(SHIPPED_TEMPLATE, out, METACHARACTER_VALUES)
+    recovered = mod.recover_values(
+        SHIPPED_TEMPLATE.read_text(encoding="utf-8"), out.read_text(encoding="utf-8")
+    )
+    assert recovered == METACHARACTER_VALUES
+
+
+def test_recover_values_returns_none_when_line_counts_differ():
+    mod = _load_module()
+    assert mod.recover_values("a\n{{EMAIL}}\n", "a\nx@y.example\nextra\n") is None
+
+
+def test_recover_values_returns_none_when_a_literal_line_differs():
+    mod = _load_module()
+    assert mod.recover_values("title\nmail {{EMAIL}}\n", "other\nmail x@y.example\n") is None
+
+
+def test_recover_values_returns_none_when_prefix_does_not_match():
+    mod = _load_module()
+    assert mod.recover_values("mail: {{EMAIL}}\n", "mail= x@y.example\n") is None
+
+
+def test_recover_values_returns_none_when_suffix_does_not_match():
+    mod = _load_module()
+    assert mod.recover_values("`{{EMAIL}}` (work)\n", "`x@y.example` (home)\n") is None
+
+
+def test_recover_values_returns_none_when_one_key_carries_two_values():
+    mod = _load_module()
+    template = "first {{EMAIL}}\nsecond {{EMAIL}}\n"
+    assert mod.recover_values(template, "first a@y.example\nsecond b@y.example\n") is None
+
+
+def test_recover_values_accepts_one_key_repeated_with_one_value():
+    mod = _load_module()
+    template = "first {{EMAIL}}\nsecond {{EMAIL}}\n"
+    recovered = mod.recover_values(template, "first a@y.example\nsecond a@y.example\n")
+    assert recovered == {"EMAIL": "a@y.example"}
+
+
+def test_recover_values_returns_empty_dict_for_template_without_placeholders():
+    mod = _load_module()
+    assert mod.recover_values("# static\nbody\n", "# static\nbody\n") == {}
+
+
+def test_recover_values_recovers_an_empty_value_as_empty_string():
+    mod = _load_module()
+    assert mod.recover_values("mail: {{EMAIL}}\n", "mail: \n") == {"EMAIL": ""}
+
+
+def test_recover_values_returns_none_when_prefix_and_suffix_would_overlap():
+    mod = _load_module()
+    assert mod.recover_values("ab{{EMAIL}}bc\n", "abc\n") is None
+
+
+def test_recover_values_returns_none_when_a_value_holds_a_newline():
+    mod = _load_module()
+    assert mod.recover_values("mail: {{EMAIL}}\nend\n", "mail: a\nb\nend\n") is None
+
+
+def test_recover_values_returns_none_for_a_line_with_two_placeholders():
+    mod = _load_module()
+    assert mod.recover_values("{{USERNAME}} {{EMAIL}}\n", "@a x@y.example\n") is None
+
+
+def test_recover_values_returns_none_when_render_has_fewer_lines():
+    mod = _load_module()
+    assert mod.recover_values("a\n{{EMAIL}}\nb\n", "a\nx@y.example\n") is None
+
+
+def test_recover_values_returns_none_for_two_placeholders_even_if_suffix_aligns():
+    mod = _load_module()
+    assert mod.recover_values("{{USERNAME}}{{EMAIL}}\n", "@a{{EMAIL}}\n") is None

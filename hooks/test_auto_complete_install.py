@@ -38,7 +38,12 @@ import pytest
 # ---------------------------------------------------------------------------
 
 HOOKS_DIR = Path(__file__).resolve().parent
-REPO_ROOT = HOOKS_DIR.parent
+# The mutation sensor runs a copy of this directory one level down, so the checkout
+# root is the nearest ancestor that holds the installer's shared library.
+REPO_ROOT = next(p for p in HOOKS_DIR.parents if (p / "lib" / "install_shared.sh").is_file())
+# The hook finds `render_claude_md` beside its own directory; a relocated copy does not.
+_SCRIPTS_DIR = REPO_ROOT / "scripts"
+sys.path.insert(0, str(_SCRIPTS_DIR))
 
 # ---------------------------------------------------------------------------
 # Module-level import: deferred to inside each test body so pytest collection
@@ -67,6 +72,13 @@ def _load_module():
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _render_module_reachable_by_the_hook_subprocess(monkeypatch):
+    """The tests that run the hook as a process need `render_claude_md` too."""
+    ambient = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(filter(None, (str(_SCRIPTS_DIR), ambient))))
 
 
 @pytest.fixture(autouse=True)
@@ -1423,6 +1435,303 @@ class TestScriptLinking:
         module._link_scripts(fake_home, plugin_root)
 
         assert dest.resolve() == script.resolve()
+
+
+def _cached_version(home: Path, version: str) -> Path:
+    """A version directory of the plugin cache, other than the running one."""
+    root = home / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion" / version
+    (root / "scripts").mkdir(parents=True)
+    return root
+
+
+def _refuse(*_args):
+    raise PermissionError("refused")
+
+
+class TestOfferedScripts:
+    def test_names_the_executable_user_facing_scripts_with_their_paths(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
+
+        offered = module.offered_scripts(plugin_root)
+
+        assert [(o.name, o.path) for o in offered] == [("praxion-dashboard", str(script))]
+
+    @pytest.mark.parametrize(
+        ("name", "executable"),
+        [
+            ("helper.py", False),
+            ("merge_driver_observations.py", True),
+            ("post-merge-hook.sh", True),
+        ],
+    )
+    def test_leaves_out_what_the_operator_does_not_run(
+        self, fake_home, plugin_root, monkeypatch, name, executable
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_script(plugin_root / "scripts", name, executable=executable)
+
+        assert module.offered_scripts(plugin_root) == ()
+
+    def test_leaves_out_a_directory(self, fake_home, plugin_root, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        (plugin_root / "scripts" / "praxion-tools").mkdir(mode=0o755)
+
+        assert module.offered_scripts(plugin_root) == ()
+
+    def test_a_plugin_without_scripts_offers_none(self, fake_home, plugin_root, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        plugin_root.joinpath("scripts").rmdir()
+
+        assert module.offered_scripts(plugin_root) == ()
+
+
+class TestSnapshotBin:
+    def test_tells_a_link_a_file_and_another_kind_apart(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        target = fake_home / "target-tool"
+        target.write_text("#!/bin/sh\n", encoding="utf-8")
+        (bin_dir / "linked").symlink_to(target)
+        (bin_dir / "plain").write_text("mine\n", encoding="utf-8")
+        (bin_dir / "folder").mkdir()
+
+        kinds = {entry.name: entry.kind for entry in module.snapshot_bin(bin_dir)}
+
+        assert kinds == {
+            "linked": module.EntryKind.LINK,
+            "plain": module.EntryKind.FILE,
+            "folder": module.EntryKind.OTHER,
+        }
+
+    def test_a_link_carries_its_text_and_its_real_path(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        target = fake_home / "target-tool"
+        target.write_text("#!/bin/sh\n", encoding="utf-8")
+        (bin_dir / "linked").symlink_to(target)
+
+        (entry,) = module.snapshot_bin(bin_dir)
+
+        assert (entry.text, entry.real) == (str(target), str(target.resolve()))
+
+    def test_a_dangling_link_has_no_real_path(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        (bin_dir / "orphan").symlink_to(fake_home / "removed-tool")
+
+        (entry,) = module.snapshot_bin(bin_dir)
+
+        assert (entry.kind, entry.text, entry.real) == (
+            module.EntryKind.LINK,
+            str(fake_home / "removed-tool"),
+            None,
+        )
+
+    def test_a_file_and_another_kind_carry_no_link_data(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        (bin_dir / "plain").write_text("mine\n", encoding="utf-8")
+        (bin_dir / "folder").mkdir()
+
+        entries = {entry.name: entry for entry in module.snapshot_bin(bin_dir)}
+
+        assert entries == {
+            "plain": module.BinEntry("plain", module.EntryKind.FILE, "", None),
+            "folder": module.BinEntry("folder", module.EntryKind.OTHER, "", None),
+        }
+
+    def test_a_missing_directory_has_no_entries(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        assert module.snapshot_bin(fake_home / "nowhere") == ()
+
+
+class TestRefreshScripts:
+    def test_a_cache_link_is_repointed_to_the_offered_script(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        old_root = _cached_version(fake_home, "0.1.0")
+        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
+        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
+        dest.symlink_to(_seed_script(old_root / "scripts", "praxion-dashboard"))
+
+        module.refresh_scripts(fake_home, plugin_root)
+
+        assert os.readlink(dest) == str(script)
+
+    def test_a_relative_cache_link_is_repointed_too(self, fake_home, plugin_root, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        old_root = _cached_version(fake_home, "0.1.0")
+        _seed_script(old_root / "scripts", "praxion-dashboard")
+        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
+        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
+        dest.symlink_to(os.path.relpath(old_root / "scripts" / "praxion-dashboard", dest.parent))
+
+        module.refresh_scripts(fake_home, plugin_root)
+
+        assert os.readlink(dest) == str(script)
+
+    def test_a_repointed_link_outlives_the_removal_of_the_old_version(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        old_root = _cached_version(fake_home, "0.1.0")
+        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
+        dest.symlink_to(_seed_script(old_root / "scripts", "praxion-dashboard"))
+        _seed_script(plugin_root / "scripts", "praxion-dashboard")
+
+        module.refresh_scripts(fake_home, plugin_root)
+        shutil.rmtree(old_root)
+
+        assert dest.exists()
+
+    def test_a_cache_link_for_a_dropped_script_is_removed(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        old_root = _cached_version(fake_home, "0.1.0")
+        dest = fake_home / ".local" / "bin" / "retired-tool"
+        dest.symlink_to(_seed_script(old_root / "scripts", "retired-tool"))
+
+        module.refresh_scripts(fake_home, plugin_root)
+
+        assert not dest.is_symlink()
+
+    def test_a_free_name_is_linked_and_the_directory_created(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
+        (fake_home / ".local" / "bin").rmdir()
+        (fake_home / ".local").rmdir()
+
+        module.refresh_scripts(fake_home, plugin_root)
+
+        assert os.readlink(fake_home / ".local" / "bin" / "praxion-dashboard") == str(script)
+
+    def test_a_regular_file_and_a_clone_link_are_left_as_they_were(
+        self, fake_home, plugin_root, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _seed_script(plugin_root / "scripts", "praxion-dashboard")
+        _seed_script(plugin_root / "scripts", "praxion-status")
+        bin_dir = fake_home / ".local" / "bin"
+        own = bin_dir / "praxion-dashboard"
+        own.write_text("#!/bin/sh\necho mine\n", encoding="utf-8")
+        clone_tool = _seed_script(tmp_path / "clone" / "praxion" / "scripts", "praxion-status")
+        clone_link = bin_dir / "praxion-status"
+        clone_link.symlink_to(clone_tool)
+
+        def observe():
+            return (
+                own.read_bytes(),
+                own.lstat().st_ino,
+                os.readlink(clone_link),
+                clone_link.lstat().st_ino,
+            )
+
+        before = observe()
+        module.refresh_scripts(fake_home, plugin_root)
+
+        assert observe() == before
+
+    def test_a_link_already_to_the_offered_script_keeps_its_inode(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        script = _seed_script(plugin_root / "scripts", "praxion-dashboard")
+        dest = fake_home / ".local" / "bin" / "praxion-dashboard"
+        dest.symlink_to(script)
+        inode = dest.lstat().st_ino
+
+        module.refresh_scripts(fake_home, plugin_root)
+
+        assert dest.lstat().st_ino == inode
+
+
+class TestApplyScriptActions:
+    def test_every_action_is_applied_and_the_first_error_raised_after_the_loop(
+        self, fake_home, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        tool = fake_home / "tool"
+        (bin_dir / "stale").symlink_to(tool)
+        actions = (module.Repoint("stale", "/elsewhere"), module.Link("fresh", str(tool)))
+        monkeypatch.setattr(module.os, "replace", _refuse)
+
+        with pytest.raises(PermissionError):
+            module.apply_script_actions(bin_dir, actions)
+
+        assert os.readlink(bin_dir / "fresh") == str(tool)
+
+    def test_a_failed_repoint_leaves_the_old_link_and_no_temporary_link(
+        self, fake_home, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        tool = fake_home / "tool"
+        (bin_dir / "stale").symlink_to(tool)
+        monkeypatch.setattr(module.os, "replace", _refuse)
+
+        with pytest.raises(PermissionError):
+            module.apply_script_actions(bin_dir, (module.Repoint("stale", "/elsewhere"),))
+
+        assert sorted(p.name for p in bin_dir.iterdir()) == ["stale"]
+        assert os.readlink(bin_dir / "stale") == str(tool)
+
+    def test_a_successful_repoint_leaves_no_temporary_link(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        (bin_dir / "stale").symlink_to(fake_home / "tool")
+
+        module.apply_script_actions(bin_dir, (module.Repoint("stale", "/elsewhere"),))
+
+        assert sorted(p.name for p in bin_dir.iterdir()) == ["stale"]
+        assert os.readlink(bin_dir / "stale") == "/elsewhere"
+
+    def test_remove_unlinks_a_link_only(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        own = bin_dir / "own"
+        own.write_text("mine\n", encoding="utf-8")
+        (bin_dir / "stale").symlink_to(fake_home / "tool")
+
+        module.apply_script_actions(bin_dir, (module.Remove("own"), module.Remove("stale")))
+
+        assert own.read_text(encoding="utf-8") == "mine\n"
+        assert not (bin_dir / "stale").is_symlink()
+
+    def test_remove_of_a_missing_name_is_not_an_error(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+
+        module.apply_script_actions(fake_home / ".local" / "bin", (module.Remove("gone"),))
+
+    def test_link_never_overwrites_what_sits_under_its_name(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        own = bin_dir / "own"
+        own.write_text("mine\n", encoding="utf-8")
+
+        with pytest.raises(FileExistsError):
+            module.apply_script_actions(bin_dir, (module.Link("own", "/elsewhere"),))
+
+        assert own.read_text(encoding="utf-8") == "mine\n"
+
+    def test_keep_does_nothing(self, fake_home, monkeypatch):
+        module = _fake_home_module(monkeypatch, fake_home)
+        bin_dir = fake_home / ".local" / "bin"
+        link = bin_dir / "kept"
+        link.symlink_to(fake_home / "tool")
+        inode = link.lstat().st_ino
+
+        module.apply_script_actions(bin_dir, (module.Keep("kept"),))
+
+        assert link.lstat().st_ino == inode
 
 
 class TestFullInstallSequence:

@@ -34,8 +34,10 @@ from __future__ import annotations
 import json
 import os
 import signal
+import stat
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -45,6 +47,22 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 import render_claude_md as _render_mod  # noqa: E402 (after sys.path injection)
+
+# The hook's own directory: the suite loads this file by path, so its sibling
+# modules are not importable without it.
+sys.path.insert(0, str(Path(__file__).parent))
+from _install_refresh import (  # noqa: E402 (after sys.path injection)
+    BinEntry,
+    EntryKind,
+    Keep,
+    Link,
+    OfferedScript,
+    Remove,
+    Repoint,
+    ScriptAction,
+    plan_script_links,
+    unreachable,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -66,6 +84,14 @@ _INSTALLED_PLUGINS_SUBPATH = Path(".claude") / "plugins" / "installed_plugins.js
 _PLUGIN_KEY_PREFIX = "praxion@"
 _RULES_SENTINEL_SUBPATH = Path(".claude") / "rules" / "swe" / "agent-behavioral-contract.md"
 _CLAUDE_MD_SUBPATH = Path(".claude") / "CLAUDE.md"
+_BIN_SUBPATH = Path(".local") / "bin"
+
+# Scripts git invokes, never the operator: merge drivers and hook scripts.
+_MERGE_DRIVER_PREFIX = "merge_driver_"
+_HOOK_SCRIPT_SUFFIX = "-hook.sh"
+
+# Ends the name of the link built beside a destination before it is renamed over it.
+_TEMPORARY_LINK_SUFFIX = ".refreshing"
 
 # Relative to the plugin root
 _TEMPLATE_RELATIVE = Path("claude") / "config" / "CLAUDE.md.tmpl"
@@ -250,26 +276,123 @@ def _refresh_rules(home: Path, root: Path) -> None:
     _run_rule_linker(home, root, "refresh_rule_symlinks")
 
 
+def offered_scripts(root: Path) -> tuple[OfferedScript, ...]:
+    """The user-facing scripts the plugin at `root` offers, in name order.
+
+    A regular, executable file under `scripts/` that is neither a git merge
+    driver nor a git hook script. The first install and the update path read
+    this one predicate, so they never disagree on which scripts reach the PATH.
+    """
+    scripts_src = root / "scripts"
+    if not scripts_src.is_dir():
+        return ()
+    return tuple(
+        OfferedScript(script.name, str(script))
+        for script in sorted(scripts_src.iterdir())
+        if script.is_file()
+        and os.access(script, os.X_OK)
+        and not script.name.startswith(_MERGE_DRIVER_PREFIX)
+        and not script.name.endswith(_HOOK_SCRIPT_SUFFIX)
+    )
+
+
 def _link_scripts(home: Path, root: Path) -> None:
     """Symlink user-facing scripts from the plugin into ~/.local/bin/."""
-    scripts_src = root / "scripts"
-    bin_dest = home / ".local" / "bin"
-
-    if not scripts_src.is_dir():
+    if not (root / "scripts").is_dir():
         return
 
+    bin_dest = home / _BIN_SUBPATH
     bin_dest.mkdir(parents=True, exist_ok=True)
 
-    for script in scripts_src.iterdir():
-        if not script.is_file() or not os.access(script, os.X_OK):
-            continue
-        name = script.name
-        if name.startswith("merge_driver_") or name.endswith("-hook.sh"):
-            continue
-        dest = bin_dest / name
+    for script in offered_scripts(root):
+        dest = bin_dest / script.name
         if dest.is_symlink():
             dest.unlink()
-        dest.symlink_to(script)
+        dest.symlink_to(script.path)
+
+
+def snapshot_bin(bin_dir: Path) -> tuple[BinEntry, ...]:
+    """One `BinEntry` per entry of `bin_dir`; a missing directory has none.
+
+    Reads each entry with `lstat`, so a link is never followed to classify it;
+    a link also carries its text and its real path (None when it dangles).
+    """
+    if not bin_dir.is_dir():
+        return ()
+    entries = []
+    for path in sorted(bin_dir.iterdir()):
+        try:
+            mode = path.lstat().st_mode
+            if stat.S_ISLNK(mode):
+                real = os.path.realpath(path) if path.exists() else None
+                entries.append(BinEntry(path.name, EntryKind.LINK, os.readlink(path), real))
+            elif stat.S_ISREG(mode):
+                entries.append(BinEntry(path.name, EntryKind.FILE, "", None))
+            else:
+                entries.append(BinEntry(path.name, EntryKind.OTHER, "", None))
+        except FileNotFoundError:
+            continue  # removed between the listing and the read: nothing to plan for
+    return tuple(entries)
+
+
+def _repoint(bin_dir: Path, name: str, target: str) -> None:
+    """Replace the link `name` by one to `target` in a single rename.
+
+    The new link is built beside the old and renamed over it, so there is never
+    a moment with no link; it is removed again when the rename fails.
+    """
+    temporary = bin_dir / f".{name}.{os.getpid()}{_TEMPORARY_LINK_SUFFIX}"
+    if temporary.is_symlink():
+        temporary.unlink()
+    temporary.symlink_to(target)
+    try:
+        os.replace(temporary, bin_dir / name)
+    except BaseException:
+        temporary.unlink()
+        raise
+
+
+def apply_script_actions(bin_dir: Path, actions: Iterable[ScriptAction]) -> None:
+    """Apply every action, then raise the first error met, if any.
+
+    One failing link never stops the rest. `Remove` unlinks a link and nothing
+    else; `Link` creates `bin_dir` when it is missing and never overwrites.
+    """
+    first_error: OSError | None = None
+    for action in actions:
+        try:
+            _apply_script_action(bin_dir, action)
+        except OSError as error:
+            first_error = first_error or error
+    if first_error is not None:
+        raise first_error
+
+
+def _apply_script_action(bin_dir: Path, action: ScriptAction) -> None:
+    if isinstance(action, Keep):
+        return
+    if isinstance(action, Repoint):
+        _repoint(bin_dir, action.name, action.target)
+    elif isinstance(action, Remove):
+        if (bin_dir / action.name).is_symlink():
+            (bin_dir / action.name).unlink()
+    elif isinstance(action, Link):
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        (bin_dir / action.name).symlink_to(action.target)
+    else:
+        unreachable(action)
+
+
+def refresh_scripts(home: Path, root: Path) -> None:
+    """Bring the script links in ~/.local/bin to the plugin at `root`.
+
+    Gathers the bin directory, plans from it, then applies the plan: a link into
+    another cached version moves to `root`, a free name is linked, and nothing
+    the plugin cache does not own is touched.
+    """
+    bin_dir = home / _BIN_SUBPATH
+    actions = plan_script_links(snapshot_bin(bin_dir), offered_scripts(root), str(bin_dir))
+    apply_script_actions(bin_dir, actions)
 
 
 def _run_install(home: Path, values: dict[str, str], root: Path) -> None:

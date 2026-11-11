@@ -35,10 +35,9 @@
       }
     },
     "likec4": {
-      "command": "npx",
+      "command": "python3",
       "args": [
-        "-y",
-        "@likec4/mcp"
+        "${CLAUDE_PLUGIN_ROOT}/scripts/likec4_mcp_gate.py"
       ],
       "env": {
         "LIKEC4_WORKSPACE": "docs/diagrams/"

@@ -94,7 +94,8 @@ The tool table is in [`references/mcp-tool-recipes.md`](references/mcp-tool-reci
 - **`read-project-summary` is expensive for narrow lookups.** Use `read-element`, `search-element` or
   `query-by-tags` for a single element or a narrow tag query.
 - **MCP lags behind unsaved edits and may be absent.** Re-read the source when recent edits matter; with no
-  MCP in the session, fall back to direct `.c4` reads for every query.
+  MCP in the session, fall back to direct `.c4` reads for every query. The plugin starts the server only where
+  `docs/diagrams/` already holds a `.c4` source, so a project's first model gets it from the next session.
 - **A stale render is a defect, not style drift.** Regenerate after every model edit; the CI drift gate
   fails on any difference between `rendered/` and a fresh regeneration.
 - **The version pins are exact.** [`render-and-regen.md`](references/render-and-regen.md) states them for the

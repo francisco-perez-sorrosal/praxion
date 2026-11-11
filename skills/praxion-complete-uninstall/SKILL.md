@@ -25,9 +25,9 @@ try:
     with open(registry, encoding="utf-8") as f:
         plugins = json.load(f)["plugins"]
     entries = [e for key, listed in plugins.items() if key.startswith("praxion@") for e in listed]
-    entries.sort(key=lambda e: e["scope"] != "user")
+    entries.sort(key=lambda e: e.get("scope") != "user")
     print(next(e["installPath"] for e in entries
-               if isinstance(e["installPath"], str) and os.path.isdir(e["installPath"])))
+               if isinstance(e.get("installPath"), str) and os.path.isdir(e["installPath"])))
 except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration):
     pass
 PY

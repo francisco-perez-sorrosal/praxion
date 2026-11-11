@@ -29,9 +29,9 @@ try:
     with open(registry, encoding="utf-8") as f:
         plugins = json.load(f)["plugins"]
     entries = [e for key, listed in plugins.items() if key.startswith("praxion@") for e in listed]
-    entries.sort(key=lambda e: e["scope"] != "user")
+    entries.sort(key=lambda e: e.get("scope") != "user")
     print(next(e["installPath"] for e in entries
-               if isinstance(e["installPath"], str) and os.path.isdir(e["installPath"])))
+               if isinstance(e.get("installPath"), str) and os.path.isdir(e["installPath"])))
 except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration):
     pass
 PY
@@ -62,9 +62,9 @@ The underlying operations are idempotent — running the printed command a secon
 
 ## Reversal
 
-To undo what the printed command sets up, run `/praxion-complete-uninstall` (or equivalently `install.sh code --complete-uninstall`, in your own terminal). The plugin body itself is preserved; remove it separately with `claude plugin uninstall praxion`.
+To undo the rule and script links the printed command sets up, run `/praxion-complete-uninstall` (or equivalently `install.sh code --complete-uninstall`, in your own terminal). It leaves `~/.claude/CLAUDE.md` as it is. The plugin body itself is preserved; remove it separately with `claude plugin uninstall praxion`.
 
 ## When to use this vs. `./install.sh code`
 
-- **`/praxion-complete-install`** — you installed via the marketplace (`claude plugin install praxion@bit-agora`) and don't have a local Praxion checkout. This skill finds the plugin in its cache and gives you the command to finish the setup from there.
+- **`/praxion-complete-install`** — you installed via the marketplace (`claude plugin install praxion@bit-agora`) and don't have a local Praxion checkout. This skill finds the installed plugin and gives you the command to finish the setup from there.
 - **`./install.sh code`** — you cloned Praxion. Run the full installer directly in your terminal; `--complete-install` is unnecessary because the regular install flow already covers these surfaces.

@@ -21,7 +21,7 @@ UNINSTALL_COMMAND = REPO_ROOT / "skills" / "praxion-complete-uninstall" / "SKILL
 COMMAND_FILES = (INSTALL_COMMAND, UNINSTALL_COMMAND)
 
 NOT_FOUND_LINE = "Praxion plugin not found"
-FORBIDDEN_IN_THE_BODY = ("ls -d", "head -1", "${CLAUDE_PLUGIN_ROOT:-")
+FORBIDDEN_IN_THE_BODY = ("ls -d", "head -1", "${CLAUDE_PLUGIN_ROOT:-", "plugins/cache")
 
 _BASH_FENCE_RE = re.compile(r"^```bash[ \t]*\n(.*?)^```[ \t]*$", re.MULTILINE | re.DOTALL)
 

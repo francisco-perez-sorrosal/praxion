@@ -41,6 +41,7 @@ from _install_refresh import (  # noqa: E402 (after sys.path injection)
     FailureKind,
     HandPathOutcome,
     HandPathPlan,
+    InstructionsState,
     LeaveAlone,
     LeaveAloneReason,
     LeftAlone,
@@ -146,7 +147,7 @@ def run_instructions_step(
         return Failed(failure.kind), None
 
 
-def _decide(home: Path, root: str):
+def _decide(home: Path, root: str) -> tuple[InstructionsState, HandPathPlan]:
     """What the instructions hold and what to do about them: reads, and changes nothing."""
     link_dir = str(home / _CLAUDE_MD_SUBPATH.parent)
     with _phase(FailureKind.READING):
@@ -156,7 +157,7 @@ def _decide(home: Path, root: str):
         return state, plan_hand_path_instructions(state, readback, is_cache_version, root)
 
 
-def _read_back_when_needed(state, root: str, is_cache_version: bool) -> Readback:
+def _read_back_when_needed(state: InstructionsState, root: str, is_cache_version: bool) -> Readback:
     """The plan reads the read-back only for a cache render run from a cache version."""
     if is_cache_version and isinstance(state, CachedRender):
         return read_back(state, Path(root))

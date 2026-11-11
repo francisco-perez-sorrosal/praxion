@@ -165,17 +165,20 @@ class TestValues:
     DEFAULTS = {"USERNAME": "@derived", "EMAIL": "derived@example.invalid", "GITHUB_URL": "u://d"}
 
     def test_enter_at_each_prompt_takes_the_derived_value(self):
-        stderr = io.StringIO()
-
-        values = hand_path.ask_values(self.DEFAULTS, io.StringIO("\n\n\n"), stderr)
+        values = hand_path.ask_values(self.DEFAULTS, io.StringIO("\n\n\n"), io.StringIO())
 
         assert values == self.DEFAULTS
-        for prompt in (
-            "Username [@derived]: ",
-            "Email [derived@example.invalid]: ",
-            "GitHub URL [u://d]: ",
-        ):
-            assert prompt in stderr.getvalue()
+
+    @pytest.mark.parametrize(
+        "prompt",
+        ["Username [@derived]: ", "Email [derived@example.invalid]: ", "GitHub URL [u://d]: "],
+    )
+    def test_each_prompt_shows_its_derived_value_in_brackets(self, prompt):
+        stderr = io.StringIO()
+
+        hand_path.ask_values(self.DEFAULTS, io.StringIO("\n\n\n"), stderr)
+
+        assert prompt in stderr.getvalue()
 
     def test_a_typed_value_wins_and_is_stripped(self):
         answers = "  @typed  \n\ntyped@example.invalid\n"
@@ -316,6 +319,11 @@ class TestCarryForward:
 
 
 class TestAskForValues:
+    SKIPPED_LINE = (
+        f"{INSTRUCTIONS} skipped (run this command again, `install.sh code "
+        "--complete-install`, and accept the instructions step)"
+    )
+
     def _unreadable(self, fake_home, previous):
         _ruin(previous)
         _link_instructions(fake_home, previous)
@@ -323,7 +331,7 @@ class TestAskForValues:
     def _answers(self, offer="1", values=("", "", ""), confirm=""):
         return "".join(f"{line}\n" for line in (offer, *values, confirm))
 
-    def test_the_given_values_are_written_and_each_is_asked_with_its_default(
+    def test_the_given_values_are_written_and_the_earlier_render_left_as_it_was(
         self, fake_home, previous, installed
     ):
         self._unreadable(fake_home, previous)
@@ -333,14 +341,21 @@ class TestAskForValues:
         ran = Ran(fake_home, installed, answers)
 
         assert _link(fake_home).read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TYPED)
-        for label, key in (
-            ("Username", "USERNAME"),
-            ("Email", "EMAIL"),
-            ("GitHub URL", "GITHUB_URL"),
-        ):
-            assert f"{label} [{_TODAYS[key]}]: " in ran.err
         assert _state(previous) == ruined
         assert (ran.status, ran.line) == (0, f"{INSTRUCTIONS} set up (with the values given)")
+
+    @pytest.mark.parametrize(
+        ("label", "key"),
+        [("Username", "USERNAME"), ("Email", "EMAIL"), ("GitHub URL", "GITHUB_URL")],
+    )
+    def test_each_value_is_asked_with_todays_derived_value_as_its_default(
+        self, fake_home, previous, installed, label, key
+    ):
+        self._unreadable(fake_home, previous)
+
+        ran = Ran(fake_home, installed, self._answers())
+
+        assert f"{label} [{_TODAYS[key]}]: " in ran.err
 
     def test_enter_at_each_prompt_renders_the_derived_values(self, fake_home, previous, installed):
         self._unreadable(fake_home, previous)
@@ -385,12 +400,14 @@ class TestAskForValues:
         assert _link(fake_home).read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TYPED)
         assert ran.status == 0
 
-    @pytest.mark.parametrize("dangling", [False, True], ids=["absent", "dangling"])
-    def test_missing_instructions_are_set_up_with_the_given_values(
-        self, fake_home, installed, dangling
-    ):
-        if dangling:
-            _link_instructions(fake_home, installed / "claude/config/CLAUDE.md")
+    def test_absent_instructions_are_set_up_with_the_given_values(self, fake_home, installed):
+        ran = Ran(fake_home, installed, self._answers(values=tuple(_TYPED.values())))
+
+        assert _link(fake_home).read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TYPED)
+        assert ran.line == f"{INSTRUCTIONS} set up (with the values given)"
+
+    def test_a_dangling_link_is_set_up_with_the_given_values(self, fake_home, installed):
+        _link_instructions(fake_home, installed / "claude/config/CLAUDE.md")
 
         ran = Ran(fake_home, installed, self._answers(values=tuple(_TYPED.values())))
 
@@ -429,14 +446,38 @@ class TestAskForValues:
         assert _state(_link(fake_home)) == [None]
         assert ran.status == 3
 
-    def test_the_offer_says_why_for_each_state(self, fake_home, previous, installed):
+    def test_the_offer_for_an_unreadable_render_says_it_cannot_be_read_back(
+        self, fake_home, previous, installed
+    ):
         self._unreadable(fake_home, previous)
-        unreadable = Ran(fake_home, installed, "").err
-        _link(fake_home).unlink()
-        missing = Ran(fake_home, installed, "").err
 
-        assert "cannot be read back" in unreadable
-        assert "is missing" in missing
+        assert "cannot be read back" in Ran(fake_home, installed, "").err
+
+    def test_the_offer_for_missing_instructions_says_they_are_missing(self, fake_home, installed):
+        assert "is missing" in Ran(fake_home, installed, "").err
+
+    def test_declining_the_offer_for_an_unreadable_render_asks_nothing_and_writes_nothing(
+        self, fake_home, previous, installed
+    ):
+        self._unreadable(fake_home, previous)
+        before = _state(_link(fake_home), previous)
+
+        ran = Ran(fake_home, installed, "2\n")
+
+        assert _state(_link(fake_home), previous) == before
+        assert not (installed / "claude/config/CLAUDE.md").exists()
+        assert "Username [" not in ran.err
+        assert (ran.status, ran.line) == (3, self.SKIPPED_LINE)
+
+    def test_declining_the_offer_for_missing_instructions_asks_nothing_and_creates_no_link(
+        self, fake_home, installed
+    ):
+        ran = Ran(fake_home, installed, "2\n")
+
+        assert _state(_link(fake_home)) == [None]
+        assert not (installed / "claude/config/CLAUDE.md").exists()
+        assert "Username [" not in ran.err
+        assert (ran.status, ran.line) == (3, self.SKIPPED_LINE)
 
 
 # -- Current, not owned, checkout -----------------------------------------------------------------
@@ -470,14 +511,17 @@ class TestNoQuestion:
             f"{INSTRUCTIONS} left alone: your own regular file",
         )
 
-    @pytest.mark.parametrize("live", [True, False], ids=["live", "dangling"])
-    def test_a_link_outside_the_cache_is_left_alone_live_or_dangling(
-        self, fake_home, installed, tmp_path, live
-    ):
+    def test_a_live_link_outside_the_cache_is_left_alone(self, fake_home, installed, tmp_path):
         clone = tmp_path / "clone" / "CLAUDE.md"
-        if live:
-            clone.parent.mkdir()
-            clone.write_text("a clone's render\n", encoding="utf-8")
+        clone.parent.mkdir()
+        clone.write_text("a clone's render\n", encoding="utf-8")
+
+        self._assert_left_alone(fake_home, installed, clone)
+
+    def test_a_dangling_link_outside_the_cache_is_left_alone(self, fake_home, installed, tmp_path):
+        self._assert_left_alone(fake_home, installed, tmp_path / "clone" / "CLAUDE.md")
+
+    def _assert_left_alone(self, fake_home, installed, clone):
         _link_instructions(fake_home, clone)
         before = _state(_link(fake_home), clone)
 
@@ -491,14 +535,25 @@ class TestNoQuestion:
             "`install.sh code` sets up",
         )
 
-    @pytest.mark.parametrize("held", ["absent", "cache-render"])
-    def test_a_checkout_leaves_the_instructions_alone_and_names_its_own_installer(
-        self, fake_home, previous, tmp_path, held
-    ):
+    @pytest.fixture
+    def checkout(self, tmp_path):
         checkout = tmp_path / "checkout"
         _seed_template(checkout, _NEW_TEMPLATE)
-        if held == "cache-render":
-            _link_instructions(fake_home, previous)
+        return checkout
+
+    def test_a_checkout_leaves_absent_instructions_alone_and_names_its_own_installer(
+        self, fake_home, previous, checkout
+    ):
+        self._assert_checkout_leaves_alone(fake_home, previous, checkout)
+
+    def test_a_checkout_leaves_a_cache_render_alone_and_names_its_own_installer(
+        self, fake_home, previous, checkout
+    ):
+        _link_instructions(fake_home, previous)
+
+        self._assert_checkout_leaves_alone(fake_home, previous, checkout)
+
+    def _assert_checkout_leaves_alone(self, fake_home, previous, checkout):
         before = _state(_link(fake_home), previous)
 
         ran = Ran(fake_home, checkout, "")

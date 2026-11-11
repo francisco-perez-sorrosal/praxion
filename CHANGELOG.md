@@ -1,3 +1,10 @@
+## v0.61.0 (2026-11-11)
+
+### Feat
+
+- Teach acceptance design the history and reuse rules
+- Collect the suite at depth 1 before a merge
+
 ## v0.60.0 (2026-11-10)
 
 ### Feat

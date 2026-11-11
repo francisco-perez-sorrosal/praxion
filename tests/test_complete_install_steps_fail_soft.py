@@ -54,3 +54,18 @@ def test_a_step_outside_the_fail_soft_set_still_stops_the_command(step: str) -> 
 
     assert done.returncode != 0, done.stdout
     assert "ran complete_install_instructions_step" not in done.stdout, done.stdout
+
+
+def test_a_cleanup_that_fails_mid_way_stops_before_its_later_commands() -> None:
+    """The cleanup's own errexit holds: end of input at its prompt must never fall through to a removal."""
+    function = _FUNCTION_RE.search(INSTALLER.read_text(encoding="utf-8")).group(0)
+    stubs = "".join(f'{name}() {{ echo "ran {name}"; }}\n' for name in _STEPS)
+    stubs += 'warn() { echo "warn: $*"; }\n'
+    stubs += 'legacy_chub_cleanup_claude() { false; echo "removed the leftover state"; }\n'
+    script = "set -euo pipefail\n" + stubs + function + "complete_install_from_plugin\n"
+
+    done = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+
+    assert done.returncode == 0, done.stderr
+    assert "removed the leftover state" not in done.stdout, done.stdout
+    assert "ran complete_install_report" in done.stdout, done.stdout

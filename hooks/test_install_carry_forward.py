@@ -224,6 +224,31 @@ class TestInstructionsCarryForward:
         assert os.readlink(link) == str(alternate)
         assert not (plugin_root / "claude" / "config" / "CLAUDE.md").exists()
 
+    def test_a_link_naming_a_directory_cannot_be_read_back_and_writes_nothing(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, link = updated
+        link.unlink()
+        _link_instructions(fake_home, previous.parent)
+
+        with pytest.raises(update.UnrecoverableRenderError):
+            update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(previous.parent)
+        assert not (plugin_root / "claude" / "config" / "CLAUDE.md").exists()
+
+    def test_a_render_that_cannot_be_decoded_cannot_be_read_back_and_writes_nothing(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, link = updated
+        previous.write_bytes(previous.read_bytes() + b"\xff\xfe")
+
+        with pytest.raises(update.UnrecoverableRenderError):
+            update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(previous)
+        assert not (plugin_root / "claude" / "config" / "CLAUDE.md").exists()
+
     def test_an_unrecoverable_render_raises_its_own_error_type(
         self, updated, fake_home, plugin_root
     ):
@@ -454,3 +479,16 @@ class TestWriteInstructions:
             "CLAUDE.md",
             "CLAUDE.md.tmpl",
         ]
+
+    def test_a_key_neither_given_nor_derivable_is_warned_of_by_the_renderer_alone(
+        self, seeded, fake_home, plugin_root, monkeypatch, capsys
+    ):
+        _seed_template(plugin_root, _NEW_TEMPLATE + "shell: {{SHELL_NAME}}\n")
+        _record_derivations(monkeypatch, _TODAYS)
+
+        update.write_instructions(fake_home, plugin_root, _CARRIED)
+
+        output = capsys.readouterr()
+        assert output.out == ""
+        assert output.err.count("{{SHELL_NAME}}") == 1
+        assert seeded.read_text(encoding="utf-8").endswith("shell: {{SHELL_NAME}}\n")

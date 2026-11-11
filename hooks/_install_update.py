@@ -454,12 +454,15 @@ def carry_forward_instructions(home: Path, root: Path, state: CachedRender) -> N
     The values are read back from `state.render`, the file the link names, not from
     the version's primary render: a second render beside it can be the live one.
     Raises UnrecoverableRenderError, before anything is written, when that render
-    cannot be read back as its version's template: falling back to defaults would
-    replace the user's identity with today's derived one.
+    cannot be opened, decoded or read back as its version's template: falling back
+    to defaults would replace the user's identity with today's derived one.
     """
+    try:
+        render_text = Path(state.render).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise UnrecoverableRenderError from error
     carried = _render_mod.recover_values(
-        (Path(state.version_dir) / _TEMPLATE_RELATIVE).read_text(encoding="utf-8"),
-        Path(state.render).read_text(encoding="utf-8"),
+        (Path(state.version_dir) / _TEMPLATE_RELATIVE).read_text(encoding="utf-8"), render_text
     )
     if carried is None:
         raise UnrecoverableRenderError
@@ -472,8 +475,9 @@ def write_instructions(home: Path, root: Path, values: dict[str, str]) -> None:
     A key `values` lacks is filled from today's derived values; a derived value
     never replaces one given. The render is renamed into place before the link is
     swapped, so ~/.claude/CLAUDE.md resolves to a complete render, the previous
-    one or the new one, whatever fails. Prints nothing and saves no other copy of
-    the values: the terminal path shares this writer.
+    one or the new one, whatever fails. Prints nothing of its own and saves no other
+    copy of the values: the terminal path shares this writer. `render_claude_md`
+    still warns on stderr, naming the placeholders, of a key left unfilled.
     """
     template_path = root / _TEMPLATE_RELATIVE
     missing = _missing_keys(template_path.read_text(encoding="utf-8"), values)

@@ -9,6 +9,7 @@ which keeps the two implementations of "what counts as the cache" equal.
 from __future__ import annotations
 
 import dataclasses
+import posixpath
 import sys
 from pathlib import Path
 
@@ -144,7 +145,7 @@ def test_every_cache_row_names_a_render_inside_its_version_directory(link_dir, t
         assert state == ForeignLink()
         return
     assert state.version_dir == cache_version_dir(target, link_dir)
-    assert state.render.startswith(state.version_dir + "/") or state.render == state.version_dir
+    assert state.render == posixpath.normpath(posixpath.join(link_dir, target))
 
 
 @pytest.mark.parametrize(

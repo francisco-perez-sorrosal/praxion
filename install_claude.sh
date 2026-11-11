@@ -569,7 +569,25 @@ EOF
     return 0
 }
 
+# The hand path for marketplace-only installs, run in the person's own terminal. Each step
+# fails soft and records its outcome in <STEP>_STATE (done, skipped, behind or failed) and
+# <STEP>_LINE, so one step's failure costs no other. The instructions step runs last: an
+# input that ends there meets no later `ask`, which would abort the run under set -e.
+# Returns 1 when a step failed; a step the person declined is no failure.
 complete_install_from_plugin() {
+    complete_install_intro
+    complete_install_rules_step
+    complete_install_scripts_step
+
+    # ---- LEGACY-CHUB-CLEANUP: offer to remove any leftover context-hub state ----
+    printf "\n"
+    legacy_chub_cleanup_claude offer
+
+    complete_install_instructions_step
+    complete_install_report
+}
+
+complete_install_intro() {
     header "Praxion Complete Install"
 
     printf "\n  This finishes the Praxion setup for marketplace-only installs.\n"
@@ -577,67 +595,154 @@ complete_install_from_plugin() {
     printf "  the plugin body (skills, agents, hooks, MCP servers). This\n"
     printf "  command adds the surfaces the plugin mechanism does not cover natively:\n"
     printf "    • Rules (auto-loaded by Claude Code — shape agent behavior globally)\n"
-    printf "    • CLI scripts on \$PATH (detector, praxion-parallel, chronograph-ctl, etc.)\n\n"
+    printf "    • CLI scripts on \$PATH (detector, praxion-parallel, chronograph-ctl, etc.)\n"
+    printf "    • ~/.claude/CLAUDE.md (your global instructions, brought to this version)\n\n"
     printf "  You will be prompted before each system-level change. Re-run anytime;\n"
     printf "  the operations are idempotent.\n\n"
+}
 
-    # ---- Rules ----
+complete_install_rules_step() {
     printf "  ${B}[1] Symlink rules to ~/.claude/rules/?${R}\n"
     printf "      ${D}Auto-loaded by Claude Code. Shapes agent behavior globally\n"
     printf "      across every project — coding style, coordination protocols,\n"
     printf "      id-citation-discipline, ADR conventions, etc.${R}\n"
     printf "  ${B}[2] Skip rules${R}\n"
     ask 1 2
-    if [ "$REPLY" -eq 1 ]; then
-        link_rules "${SCRIPT_DIR}/rules" "${HOME}/.claude/rules"
-        info "Rules: ${LINK_RULES_COUNT} files linked"
-    else
+    if [ "$REPLY" -eq 2 ]; then
         step "Rules skipped"
+        RULES_STATE=skipped
+        RULES_LINE="Rules skipped (run \`install.sh code --complete-install\` again and accept the rules step)"
+        return 0
     fi
+    run_fail_soft link_rules_and_count "${SCRIPT_DIR}/rules" "${HOME}/.claude/rules"
+    if [ "$FAIL_SOFT_STATUS" -ne 0 ]; then
+        RULES_STATE=failed
+        RULES_LINE="Rules could not be linked into ~/.claude/rules (see the error above, then run \`install.sh code --complete-install\` again)"
+        return 0
+    fi
+    RULES_STATE="done"
+    RULES_LINE="Rules: ${FAIL_SOFT_OUTPUT} files linked"
+    info "$RULES_LINE"
+}
 
-    # ---- CLI scripts ----
+complete_install_scripts_step() {
     printf "\n  ${B}[1] Symlink CLI scripts to ~/.local/bin/?${R}\n"
     printf "      ${D}check_id_citation_discipline.py, praxion-parallel (multi-session launcher),\n"
     printf "      chronograph-ctl, phoenix-ctl, onboard-project — runnable from any\n"
     printf "      shell. Filters internal helpers (merge drivers, git hooks).${R}\n"
     printf "  ${B}[2] Skip scripts${R}\n"
     ask 1 2
-    if [ "$REPLY" -eq 1 ]; then
-        local scripts_src="${SCRIPT_DIR}/scripts"
-        local bin_dir="${HOME}/.local/bin"
-        mkdir -p "$bin_dir"
-        local scripts_count=0
-        for script in "$scripts_src"/*; do
-            script_is_user_facing "$script" || continue
-            local name
-            name="$(basename "$script")"
-            ln -sf "$script" "${bin_dir}/${name}"
-            scripts_count=$((scripts_count + 1))
-        done
-        info "Scripts: ${scripts_count} files linked"
-
-        # onboard-project (also linked by the generic scripts/ loop above;
-        # kept explicit for clarity since it is the single onboarding entry point)
-        if [ -f "${SCRIPT_DIR}/scripts/onboard-project" ] && [ -x "${SCRIPT_DIR}/scripts/onboard-project" ]; then
-            ln -sf "${SCRIPT_DIR}/scripts/onboard-project" "${bin_dir}/onboard-project"
-            info "onboard-project: linked"
-        fi
-
-        if [[ ":$PATH:" != *":${HOME}/.local/bin:"* ]]; then
-            warn "~/.local/bin is not in PATH"
-            step "Add to ~/.zshrc:  export PATH=\"\$HOME/.local/bin:\$PATH\""
-        fi
-    else
+    if [ "$REPLY" -eq 2 ]; then
         step "Scripts skipped"
+        SCRIPTS_STATE=skipped
+        SCRIPTS_LINE="Scripts skipped (run \`install.sh code --complete-install\` again and accept the scripts step)"
+        return 0
     fi
+    run_fail_soft link_user_scripts
+    if [ "$FAIL_SOFT_STATUS" -ne 0 ]; then
+        SCRIPTS_STATE=failed
+        SCRIPTS_LINE="Scripts could not be linked into ~/.local/bin (see the error above, then run \`install.sh code --complete-install\` again)"
+        return 0
+    fi
+    SCRIPTS_STATE="done"
+    SCRIPTS_LINE="Scripts: ${FAIL_SOFT_OUTPUT} files linked"
+    info "$SCRIPTS_LINE"
+    if [[ ":$PATH:" != *":${HOME}/.local/bin:"* ]]; then
+        warn "~/.local/bin is not in PATH"
+        step "Add to ~/.zshrc:  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    fi
+}
 
-    # ---- LEGACY-CHUB-CLEANUP: offer to remove any leftover context-hub state ----
-    printf "\n"
-    legacy_chub_cleanup_claude offer
+# The Python entry owns the instructions' conversation and the identity, so no personal
+# value passes through bash. It prints one outcome line; its status is 0 when done, 1 when
+# it failed and 3 when it left the instructions behind.
+complete_install_instructions_step() {
+    local status=0
+    INSTRUCTIONS_LINE=$(python3 "${SCRIPT_DIR}/hooks/_install_hand_path.py" --root "$SCRIPT_DIR") || status=$?
+    case "$status" in
+        0) INSTRUCTIONS_STATE="done" ;;
+        1) INSTRUCTIONS_STATE=failed ;;
+        3) INSTRUCTIONS_STATE=behind ;;
+        *) INSTRUCTIONS_LINE="" ;;
+    esac
+    if [ -z "$INSTRUCTIONS_LINE" ]; then
+        # No python3, a crash before the line, or a status the entry never gives: the
+        # words of the entry's own unexpected-failure line.
+        INSTRUCTIONS_STATE=failed
+        INSTRUCTIONS_LINE="~/.claude/CLAUDE.md could not be set up (unexpected error; run \`/praxion-complete-install\` again)"
+    fi
+}
 
+# One line per step, then the done line only when no step failed and the instructions are
+# not left behind; a skipped rules or scripts step still allows it, named above.
+complete_install_report() {
+    header "Summary"
+    report_step "$INSTRUCTIONS_STATE" "$INSTRUCTIONS_LINE"
+    report_step "$RULES_STATE" "$RULES_LINE"
+    report_step "$SCRIPTS_STATE" "$SCRIPTS_LINE"
     printf "\n"
-    info "Praxion complete install done"
-    step "Start a new Claude Code session to pick up the rules"
+    local failed=false
+    case " $INSTRUCTIONS_STATE $RULES_STATE $SCRIPTS_STATE " in
+        *" failed "*) failed=true ;;
+    esac
+    if ! $failed && [ "$INSTRUCTIONS_STATE" != behind ]; then
+        info "Praxion complete install done"
+    else
+        warn "Praxion complete install not finished: each step above says how to finish it"
+    fi
+    if [ "$RULES_STATE" = "done" ]; then
+        step "Start a new Claude Code session to pick up the rules"
+    fi
+    if $failed; then
+        return 1
+    fi
+}
+
+report_step() {
+    case "$1" in
+        "done") info "$2" ;;
+        failed) printf "  ✗ %s\n" "$2" ;;
+        *)      warn "$2" ;;
+    esac
+}
+
+# Runs "$@" in a subshell that its first failing command ends, and sets FAIL_SOFT_OUTPUT to
+# what it printed and FAIL_SOFT_STATUS to how it ended. Errexit is switched off around the
+# subshell instead of calling it from an `if` or `||`: bash 5 then ignores the subshell's own
+# `set -e`, and a link that failed mid-way would hide behind a later one that worked.
+run_fail_soft() {
+    set +e
+    FAIL_SOFT_OUTPUT=$(set -e; "$@")
+    FAIL_SOFT_STATUS=$?
+    set -e
+}
+
+link_rules_and_count() {
+    link_rules "$1" "$2"
+    printf '%s' "$LINK_RULES_COUNT"
+}
+
+# Links the user-facing scripts into ~/.local/bin and prints how many: standard output
+# carries the count alone, for run_fail_soft.
+link_user_scripts() {
+    local scripts_src="${SCRIPT_DIR}/scripts"
+    local bin_dir="${HOME}/.local/bin"
+    local scripts_count=0 script name
+    mkdir -p "$bin_dir"
+    for script in "$scripts_src"/*; do
+        script_is_user_facing "$script" || continue
+        name="$(basename "$script")"
+        ln -sf "$script" "${bin_dir}/${name}"
+        scripts_count=$((scripts_count + 1))
+    done
+
+    # onboard-project (also linked by the generic scripts/ loop above;
+    # kept explicit for clarity since it is the single onboarding entry point)
+    if [ -f "${SCRIPT_DIR}/scripts/onboard-project" ] && [ -x "${SCRIPT_DIR}/scripts/onboard-project" ]; then
+        ln -sf "${SCRIPT_DIR}/scripts/onboard-project" "${bin_dir}/onboard-project"
+        info "onboard-project: linked" >&2
+    fi
+    printf '%s' "$scripts_count"
 }
 
 complete_uninstall_from_plugin() {
@@ -1548,6 +1653,7 @@ fi
 # generic flow so they exit cleanly without triggering the full interactive
 # install.
 if $COMPLETE_INSTALL; then
+    # Returns 1 when a step failed, after its report: errexit ends the run with that status.
     complete_install_from_plugin
     exit 0
 fi

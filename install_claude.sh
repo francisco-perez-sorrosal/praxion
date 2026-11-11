@@ -1222,17 +1222,17 @@ check_claude_code() {
     local hooks_json="${SCRIPT_DIR}/hooks/hooks.json"
     if [ -f "$hooks_json" ]; then
         info "Hooks provided by plugin hooks.json"
-        # hooks.json runs the first python3 on PATH; without PyYAML the rule
-        # injection hook skips every hook-delivered rule.
-        local hook_python
+        # hooks.json runs the first python3 on PATH; below the floor the hooks
+        # declare (hooks/_interpreter_floor.py) each one degrades on its own.
+        local hook_python floor_line
         hook_python="$(command -v python3 || true)"
         if [ -z "$hook_python" ]; then
             warn "No python3 on PATH — every plugin hook will fail"
             healthy=false
-        elif "$hook_python" -c "import yaml" 2>/dev/null; then
-            info "Hook interpreter ${hook_python} imports PyYAML"
+        elif floor_line="$("$hook_python" "${SCRIPT_DIR}/hooks/_interpreter_floor.py" 2>&1)"; then
+            info "Hook interpreter ${hook_python} meets the hooks' floor"
         else
-            warn "Hook interpreter ${hook_python} lacks PyYAML — hook-delivered rules are skipped, managed core procedures are still delivered; put a python3 with PyYAML first on PATH"
+            warn "${floor_line:-Hook interpreter ${hook_python} cannot run hooks/_interpreter_floor.py}"
             healthy=false
         fi
         # Warn only about hooks earlier Praxion versions registered in

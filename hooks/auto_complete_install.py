@@ -82,6 +82,7 @@ from _install_update import (  # noqa: E402 (after sys.path injection)
     offered_scripts,
     snapshot_instructions,
 )
+from _interpreter_floor import notice as interpreter_notice  # noqa: E402 (after sys.path injection)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -252,6 +253,19 @@ def _is_update_run(home: Path, root: Path) -> bool:
     return marker.exists() and in_cache
 
 
+def _tell_user_of_a_shortfall() -> None:
+    """Name a `python3` below the hooks' floor as a `systemMessage`.
+
+    JSON on stdout, the one channel a SessionStart hook has to the user: its
+    stderr on exit 0 reaches neither Claude nor the user.
+    """
+    line = interpreter_notice()
+    if line is None:
+        return
+    sys.stdout.write(json.dumps({"systemMessage": f"[Praxion] {line}"}) + "\n")
+    sys.stdout.flush()
+
+
 def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
     """Run the full install sequence: render CLAUDE.md, link rules, link scripts."""
     _render_claude_md(home, values, root)
@@ -328,6 +342,9 @@ def _run() -> None:
         # Nothing to install from: leave the marker unwritten so a later
         # session, once the plugin is resolvable, still completes the install.
         return
+
+    # Every path below writes a marker, so this names a shortfall once per version.
+    _tell_user_of_a_shortfall()
 
     if _is_update_run(home, root):
         _run_update_path(home, root)

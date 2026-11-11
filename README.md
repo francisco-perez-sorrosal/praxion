@@ -178,6 +178,8 @@ See [Multi-Session Workflows](docs/multi-session.md) for the full reference: web
 
 The main entry point is `install.sh`, which routes to `install_claude.sh` (Claude Code/Desktop), `install_cursor.sh` (Cursor), or `install_codex.sh` (Codex / AGENTS.md-aware agents). The interactive installer defaults to the recommended option at each step.
 
+**Requirement:** the plugin's hooks run under the first `python3` on `PATH`, which must be Python 3.11 or newer with PyYAML. Stock macOS ships Python 3.9 without PyYAML. `./install.sh --check` names a shortfall, and so does the first Claude Code session after an install or update.
+
 ```bash
 ./install.sh                    # Claude Code (default)
 ./install.sh desktop            # Claude Desktop

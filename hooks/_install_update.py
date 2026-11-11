@@ -477,12 +477,19 @@ _PLACEHOLDER_BRACE_WIDTH = len("{{")
 
 
 def _missing_keys(template_text: str, carried: dict[str, str]) -> frozenset[str]:
-    """The placeholder names `template_text` holds that `carried` has no value for."""
+    """The placeholder names `template_text` holds that `carried` has no value for.
+
+    A carried value equal to its own placeholder is no value: the previous render
+    left that key unfilled, so a default may fill it now.
+    """
     width = _PLACEHOLDER_BRACE_WIDTH
-    names = {
-        m.group()[width:-width] for m in _render_mod.PLACEHOLDER_PATTERN.finditer(template_text)
+    placeholders = {
+        m.group()[width:-width]: m.group()
+        for m in _render_mod.PLACEHOLDER_PATTERN.finditer(template_text)
     }
-    return frozenset(names - carried.keys())
+    return frozenset(
+        name for name, token in placeholders.items() if carried.get(name, token) == token
+    )
 
 
 def _with_defaults(

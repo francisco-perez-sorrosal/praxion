@@ -153,6 +153,27 @@ class TestInstructionsCarryForward:
         expected = {**_CARRIED, "GITHUB_URL": _TODAYS["GITHUB_URL"]}
         assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, expected)
 
+    def test_a_value_equal_to_its_own_placeholder_counts_as_missing(self):
+        carried = {**_CARRIED, "GITHUB_URL": "{{GITHUB_URL}}"}
+
+        assert update._missing_keys(_NEW_TEMPLATE, carried) == frozenset({"GITHUB_URL"})
+
+    def test_a_default_fills_a_key_the_previous_render_left_as_its_placeholder(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        monkeypatch.setenv("HOME", str(fake_home))
+        previous = _previous_render(fake_home)
+        unfilled = {**_CARRIED, "GITHUB_URL": "{{GITHUB_URL}}"}
+        previous.write_text(_fill(_PREVIOUS_TEMPLATE, unfilled), encoding="utf-8")
+        link = _link_instructions(fake_home, previous)
+        _seed_template(plugin_root, _NEW_TEMPLATE)
+        _record_derivations(monkeypatch, _TODAYS)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        expected = {**_CARRIED, "GITHUB_URL": _TODAYS["GITHUB_URL"]}
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, expected)
+
     def test_no_default_is_derived_when_every_key_was_carried(
         self, updated, fake_home, plugin_root, monkeypatch
     ):

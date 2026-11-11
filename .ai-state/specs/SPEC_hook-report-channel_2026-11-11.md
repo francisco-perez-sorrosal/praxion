@@ -3,13 +3,13 @@
 **Task slug**: `hook-report-channel`
 **Created**: 2026-11-10
 **Pipeline run**: 2026-11-10 to 2026-11-11 (one session: intake, acceptance design with one Spec-Question resume, four plan steps plus one rework step, verification and a narrow re-verification)
-**Archived**: 2026-11-11 (pre-merge, on branch `fix/hook-report-channel`; the merge to main finalizes the ADR draft named below)
+**Archived**: 2026-11-11 (pre-merge, on branch `fix/hook-report-channel`; merged to main at `13cd3c5f`, which promoted the ADR draft to dec-501)
 **Status**: completed -- final verdict PASS WITH FINDINGS (the first run FAILed once, on an acceptance-independence audit: the designer read git history; accepted by the orchestrator as a recorded deviation because every oracle traces to the spec, procedure gap filed as td-621)
 **Tier**: Standard (the calibration verdict reads `correct`: five requirements across two production modules and a split of a 2,153-line test module were too much for Lightweight, and nothing needed Full)
 **Complexity**: medium (5 requirements, 2 production modules, 9 hook files and 3 outer-loop files changed)
 **Base commit**: `e83fc846` · acceptance design `6adcfd60` · split `259fa10e` · first production commit `12d55689` · `433799b3` · rework `7be59770`
 **Pipeline branch**: `fix/hook-report-channel`
-**ADR**: the draft `.ai-state/decisions/drafts/20261111-0507-fperezsorrosal-fix-hook-report-channel-first-session-reports-as-one-system-message.md` (category: behavioral; extends dec-500 from the floor notice to every report). Finalize rewrites it to `dec-NNN` at merge.
+**ADRs**: `dec-501` (category: behavioral -- every first-session report goes to the user as one systemMessage per run; it extends dec-500 from the floor notice to every report; promoted at merge from `dec-draft-09b8d460`)
 **Related spec**: `SPEC_install-refresh_2026-11-10.md`. Its REQ-14 was amended through its SQ-06, and its frozen refresh acceptance test gained two channel tests.
 
 ## Feature Summary
@@ -121,7 +121,7 @@ Rendered from the reconciled `traceability.yml` (single file, no fragments), wit
 
 ## Key Decisions
 
-- **The channel:** `systemMessage` only, one object per run, no stderr copy, no `additionalContext`. See the ADR draft named above.
+- **The channel:** `systemMessage` only, one object per run, no stderr copy, no `additionalContext`. See dec-501.
   - **Dissent:** Claude never learns of a failure.
   - **Reversal trigger:** an interactive session that does not display a plugin SessionStart `systemMessage` (unproven live, 7/10).
 - **Split first, as a pure move:**

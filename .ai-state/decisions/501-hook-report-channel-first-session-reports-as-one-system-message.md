@@ -1,7 +1,8 @@
 ---
-id: dec-draft-09b8d460
+id: dec-501
+draft_id: dec-draft-09b8d460
 title: The first-session hook sends every report to the user as one systemMessage per run
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-10
 summary: "The first-session hook's reports (a first install's completion line, a first install's or an update refresh's failure line naming /praxion-complete-install, and dec-500's interpreter-floor notice) are gathered over the run and written once, as the systemMessage of exactly one JSON object that is the hook's whole standard output, or not at all. Standard error carries no report, because Claude Code shows a hook's stderr on exit 0 to no one. Extends dec-500 from the floor notice to every report."

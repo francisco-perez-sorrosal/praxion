@@ -10,11 +10,12 @@ newline and then waits; it is recognized by what it asks about:
   (`[Y/n]`, `[y/N]`, `(y/n)`): the first one that names `CLAUDE.md`, the instructions or a
   personal value is the instructions offer; any later one that does is a question about the
   personal values; one naming the rules or the scripts offers those; any other is skipped;
-- a free-text line naming the username, the email or `GitHub` asks for that personal value; an
-  empty answer accepts the default it offers;
+- a free-text line whose label (the words before its bracketed default) names the username, the
+  email or `GitHub` asks for that personal value, whatever the default it shows holds; an empty
+  answer accepts that default;
 - a question about the values after the last value line is the confirmation: it shows the values
-  the command will write; "y" confirms and "n" declines. Declining the values means that "n";
-  any question about them before the value lines is accepted.
+  the command will write; "y" confirms and "n" declines, whatever words its lines hold. Declining
+  the values means that "n"; any question about them before the value lines is accepted.
 
 Accepting a choice picks its first option not labelled "Skip"; declining picks the "Skip" one.
 An input that ends is a Ctrl-D on an empty line, and every later prompt gets one too. The closing
@@ -58,6 +59,7 @@ _CHOICE = re.compile(r"Choice\s*(\[[^\]]*\])?\s*:?\s*$")
 _YES_NO = re.compile(r"\[(y/n|yes/no)\]|\((y/n|yes/no)\)", re.IGNORECASE)
 _OPTION = re.compile(r"^\s*\[(\d+)\]\s*(.*)$", re.MULTILINE)
 _VALUE_WORDS = ("email", "github", "username", "personal value", "identity")
+_LABEL = re.compile(r"^\s*([^\[:]*)")  # the words before the bracketed default
 
 
 # -- The person -----------------------------------------------------------------------------------
@@ -106,11 +108,8 @@ class _Conversation:
     def _topic(self, kind: str, text: str) -> str:
         low = text.lower()
         if kind == "text":
-            for word, name in (("email", "EMAIL"), ("github", "GITHUB_URL"), ("user", "USERNAME"),
-                               ("name", "USERNAME")):  # fmt: skip
-                if word in low:
-                    return f"value:{name}"
-            return "other"
+            name = _value_name(text)
+            return f"value:{name}" if name else "other"
         if "claude.md" in low or "instructions" in low or any(w in low for w in _VALUE_WORDS):
             if not self.offered:
                 self.offered = True
@@ -134,10 +133,19 @@ class _Conversation:
             return f"{(p.values or {}).get(name, '')}\n".encode()
         own_values = topic == "values" and p.values is not None and intent == "accept"
         if kind == "yes-no":
-            asks_defaults = topic == "values" and "default" in text.lower()
-            yes = intent == "accept" and not (asks_defaults and own_values)
-            return b"y\n" if yes else b"n\n"
+            return b"y\n" if intent == "accept" else b"n\n"
         return f"{_option(text, intent, prefer_own=own_values)}\n".encode()
+
+
+def _value_name(prompt: str) -> str | None:
+    """The personal value a free-text prompt asks for, read from its label alone: a derived default
+    that holds `github` or `email` must not turn the Username line into another question."""
+    label = _LABEL.match(prompt).group(1).lower()
+    for word, name in (("email", "EMAIL"), ("github", "GITHUB_URL"), ("user", "USERNAME"),
+                       ("name", "USERNAME")):  # fmt: skip
+        if word in label:
+            return name
+    return None
 
 
 def _options_block(lines: list[str]) -> str:

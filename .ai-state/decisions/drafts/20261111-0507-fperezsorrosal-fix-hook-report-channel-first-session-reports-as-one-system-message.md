@@ -14,6 +14,8 @@ affected_files:
   - hooks/auto_complete_install.py
   - hooks/_install_update.py
   - tests/acceptance/test_plugin_update_fails_open_and_quietly.py
+  - tests/acceptance/test_hook_reports_reach_the_user.py
+  - hooks/test_install_reports.py
   - .ai-state/specs/SPEC_install-refresh_2026-11-10.md
 affected_reqs: [REQ-14]
 dissent: "Claude never learns that the install failed, so it cannot repeat the hand path to a user who missed the message; adding additionalContext would let it."
@@ -31,6 +33,7 @@ dec-500 had already put the interpreter-floor notice on stdout as a `systemMessa
 - A non-empty report is written as exactly one JSON object, `{"systemMessage": "<lines joined by newlines>"}`, followed by a newline. That object is the hook's whole standard output. An empty report writes nothing on either stream.
 - No report is written to stderr.
 - Lines gathered before an unexpected exception are still written. The hook never raises into the harness, and the floor notice must not be lost to a later failure.
+- A write that fails (a reader that closed the pipe) is absorbed, and standard output is pointed at the null device so the interpreter's shutdown flush cannot fail: the hook still exits 0.
 - The line texts are unchanged.
 
 ## Considered Options
@@ -45,4 +48,4 @@ dec-500 had already put the interpreter-floor notice on stdout as a `systemMessa
 - A user now sees the failure line and the hand path at the start of the session that failed, and sees a first install's completion line.
 - The frozen acceptance test of install-refresh's REQ-14 was channel-blind: it joined both streams. It is amended through SQ-06 of that spec to assert the channel.
 - The premise is unproven live, as dec-500's is. **Reversal trigger:** an interactive session that does not display a plugin SessionStart `systemMessage`. Then the reports move to plain-text stdout, as context Claude relays.
-- The first install's confirmation prompt still writes to stderr and cannot be answered (stdin is drained first). It is recorded as its own ledger row and not decided here.
+- The first install's confirmation prompt still writes to stderr and cannot be answered (stdin is drained first). It is td-620, not decided here; the render module's own unresolved-placeholder warning on stderr is td-623.

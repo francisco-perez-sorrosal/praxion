@@ -301,7 +301,7 @@ class TestConsecutiveUpdatesAfterAnAlternateWrite:
         that still assumed the primary recovers the wrong one.
         """
         primary = installed / "claude" / "config" / "CLAUDE.md"
-        primary.write_text(_fill(_NEW_TEMPLATE, _TODAYS), encoding="utf-8")
+        primary.write_text(_fill(_NEW_TEMPLATE, _CARRIED), encoding="utf-8")
         link = _link_instructions(fake_home, primary)
         update.write_instructions(fake_home, installed, _TODAYS)
         return link

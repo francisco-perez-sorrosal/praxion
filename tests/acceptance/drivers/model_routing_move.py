@@ -41,8 +41,27 @@ from pathlib import Path
 import yaml
 
 from tests.acceptance.drivers.kernel_sandbox import isolated_env
+from tests.acceptance.drivers.plugin_update import shipped_tree
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+STAND_IN = "checkout"
+
+
+def stand_in_root(scratch: Path) -> Path:
+    """The stand-in copy of this checkout's shipped tree that installs into `scratch`'s HOME. The
+    installer renders into the checkout it runs from, so it never runs from this one."""
+    return scratch / STAND_IN
+
+
+def _stand_in(scratch: Path) -> Path:
+    root = stand_in_root(scratch)
+    if not (root / "install.sh").exists():
+        shipped_tree(root)
+    return root
+
+
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "model_routing_move"
 RULE = "rules/swe/agent-model-routing.md"
 RULE_ID = "swe/agent-model-routing"
@@ -389,11 +408,11 @@ def session_start(
 
 
 def install(scratch: Path) -> subprocess.CompletedProcess[str]:
-    """`bash install.sh code --relink` from this checkout into `scratch`'s HOME, never a session."""
+    """`bash install.sh code --relink` from a stand-in copy of this checkout into `scratch`'s HOME, never a session."""
     env = isolated_env(scratch)
     env["PATH"] = f"{stand_in_claude(scratch)}:{env['PATH']}"
     return subprocess.run(
-        ["bash", str(REPO_ROOT / "install.sh"), "code", "--relink"],
+        ["bash", str(_stand_in(scratch) / "install.sh"), "code", "--relink"],
         input="Y\nY\nY\n",
         cwd=scratch,
         env=env,
@@ -408,7 +427,7 @@ def install_check(scratch: Path) -> subprocess.CompletedProcess[str]:
     env = isolated_env(scratch)
     env["PATH"] = f"{stand_in_claude(scratch)}:{env['PATH']}"
     return subprocess.run(
-        ["bash", str(REPO_ROOT / "install.sh"), "code", "--check"],
+        ["bash", str(_stand_in(scratch) / "install.sh"), "code", "--check"],
         cwd=scratch,
         env=env,
         capture_output=True,
@@ -429,12 +448,14 @@ def linked_rules(rules: Path) -> dict[str, Path]:
 
 
 def plant_old_install(scratch: Path) -> None:
-    """The user rules directory an install made at the base left behind: the base's links."""
+    """The user rules directory an install made at the base left behind: the base's links, into
+    the checkout that install ran from."""
     rules = rules_dir(scratch)
+    checkout = _stand_in(scratch)
     for rel in fixture_json("base_links.json"):
         link = rules / rel
         link.parent.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(REPO_ROOT / "rules" / rel)
+        link.symlink_to(checkout / "rules" / rel)
 
 
 def marketplace_complete(scratch: Path) -> Path:

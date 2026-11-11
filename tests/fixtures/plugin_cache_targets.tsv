@@ -1,0 +1,16 @@
+label	link_dir	target_text	is_cache
+absolute cache path	/home/example/.claude/rules/swe	/home/example/.claude/plugins/cache/example-market/praxion/0.60.0/rules/swe/x.md	true
+relative text resolving into the cache	/home/example/.claude/rules/swe	../../plugins/cache/example-market/praxion/0.60.0/rules/swe/x.md	true
+another marketplace name	/home/example/.claude/rules	/home/example/.claude/plugins/cache/other-market/praxion/0.60.0/rules/x.md	true
+dangling-looking cache text	/home/example/.local/bin	/home/example/.claude/plugins/cache/example-market/praxion/0.59.0/scripts/gone.py	true
+plugin root itself	/home/example/.claude/rules	/home/example/.claude/plugins/cache/example-market/praxion/0.60.0	true
+clone checkout	/home/example/.claude/rules	/home/example/src/praxion/rules/swe/x.md	false
+cache without a praxion segment	/home/example/.claude/rules	/home/example/.claude/plugins/cache/example-market/other-plugin/1.2.0/rules/x.md	false
+cache path with no version segment	/home/example/.claude/rules	/home/example/.claude/plugins/cache/example-market/praxion	false
+path outside any cache	/home/example/.local/bin	/opt/tools/bin/x.py	false
+dangling-looking relative text	/home/example/.local/bin	missing/target.py	false
+clone directory named praxion	/home/example/.claude/rules	/home/example/dev/praxion/rules/swe/x.md	false
+pipeline worktree inside a clone	/home/example/.local/bin	/home/example/dev/praxion/.claude/worktrees/w/scripts/x.py	false
+version-shaped directory inside a clone	/home/example/.local/bin	/home/example/dev/praxion/0.60.0/scripts/x.py	false
+cache directory that is not the plugins cache	/home/example/.local/bin	/home/example/cache/praxion/0.60.0/scripts/x.py	false
+relative text escaping the cache upward	/home/example/.claude/plugins/cache/example-market/praxion/0.60.0/rules	../../../../../../../../opt/x.md	false

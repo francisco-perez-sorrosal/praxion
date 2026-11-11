@@ -536,12 +536,11 @@ For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wr
 
 ### Post-update refresh
 
-`claude plugin update praxion` replaces the cache directory entirely. Existing symlinks in `~/.claude/rules/` and `~/.local/bin/` continue pointing to the old cache version. Refresh by either:
-- Start a fresh Claude Code session (triggers auto-completion automatically), OR
-- Explicitly run `/praxion-complete-install` and then, in your own terminal, the command it prints to re-link against the new version, OR
-- For clone-based installs: run `./install.sh code --relink`
+`claude plugin update praxion@bit-agora` replaces the cache directory entirely. For a marketplace install, the update and a restart are enough: the first session of the new version (the `SessionStart` hook `hooks/auto_complete_install.py`) re-points the script and rule links in `~/.local/bin/` and `~/.claude/rules/` at the new cache version, removes links to scripts and rules the new version dropped, and re-renders `~/.claude/CLAUDE.md` from the new template with the existing personal values. It does nothing after the first session of a version, and it never blocks a session.
 
-No automatic refresh hook exists today because Claude Code doesn't expose a PostPluginUpdate event — filed as a watch-item for when that API lands.
+For a clone install, run `./install.sh code --relink`. A clone's links, a regular-file `~/.claude/CLAUDE.md` and links outside the plugin cache are never touched.
+
+When the first session reports that it could not finish, run `/praxion-complete-install` and then, in your own terminal, the command it prints. `bash install.sh --check` names every stale or missing rule link.
 
 ### Uninstall ordering
 

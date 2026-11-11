@@ -11,10 +11,23 @@ Fast-skip conditions (exit 0, silent):
 
 Otherwise, from the plugin this hook runs from (its own version directory,
 `.../praxion/<version>/`, never the unversioned cache parent):
+  - Update path: the marker is present (an install ran before) and the plugin
+    root lies in a cache version directory, whatever `~/.claude/CLAUDE.md` holds.
+    The steps and the five states of the instructions are described in
+    `_install_update`: a cached render is carried forward with its personal
+    values, a missing or dangling cache link is set up as a first install sets
+    it up, and a regular file or a clone's link is left alone; the rule and
+    script links are refreshed, never taken over. Each step is fail-open and
+    the marker is written whatever happened, except after a refused
+    confirmation. A fully successful run prints nothing; a failure prints one
+    stderr line carrying the exception type and the command that completes the
+    refresh by hand.
   - Surfaces already present (CLAUDE.md symlink and the rules sentinel, both
-    resolving): refresh the rule links -- sweep each stale Praxion link and link
-    each manifest rule that has none -- then write the marker. An existing live
-    link is never re-pointed, so a clone install's links stay its own.
+    resolving) but no update path (a first session after a clone install, or a
+    `--plugin-dir` checkout root): refresh the rule links -- sweep each stale
+    Praxion link and link each manifest rule that has none -- then write the
+    marker. An existing live link is never re-pointed, so a clone install's links
+    stay its own.
   - Otherwise (cold path): derive personal-info defaults, optionally prompt the
     operator (30s timeout-accept), run install steps, write marker.
 
@@ -33,31 +46,48 @@ from __future__ import annotations
 
 import json
 import os
-import signal
-import subprocess
 import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Path bootstrap: inject scripts/ so render_claude_md is importable
-# without PYTHONPATH being set.
+# Path bootstrap: inject scripts/ so `_install_update` can import
+# render_claude_md without PYTHONPATH being set.
 # ---------------------------------------------------------------------------
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-import render_claude_md as _render_mod  # noqa: E402 (after sys.path injection)
+
+# The hook's own directory: the suite loads this file by path, so its sibling
+# modules are not importable without it.
+sys.path.insert(0, str(Path(__file__).parent))
+from _install_refresh import (  # noqa: E402 (after sys.path injection)
+    CachedRender,
+    ForeignLink,
+    cache_version_dir,
+    classify_instructions,
+)
+from _install_update import (  # noqa: E402 (after sys.path injection)
+    _BIN_SUBPATH,
+    _CLAUDE_MD_SUBPATH,
+    _MARKER_FILENAME,
+    _TRUTHY,
+    _confirm_install,
+    _default_values,
+    _render_claude_md,
+    _report_incomplete,
+    _report_install_complete,
+    _resolve_mode,
+    _run_rule_linkers,
+    _run_update_path,
+    _write_marker,
+    offered_scripts,
+    snapshot_instructions,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
 DISABLE_AUTO_COMPLETE = "PRAXION_DISABLE_AUTO_COMPLETE"
-_AUTO_COMPLETE_FLAG = "PRAXION_AUTO_COMPLETE"
-
-_TRUTHY = frozenset({"1", "true", "yes"})
-
-_MARKER_FILENAME = ".praxion-complete-installed"
-_DECLINE_MARKER_FILENAME = ".praxion-install-declined"
-
 # The unversioned cache parent: an update adds a version directory under it,
 # which moves its mtime past the marker's and re-arms the hook. Install sources
 # are read from the version directory `_plugin_root` returns, never from here.
@@ -65,18 +95,6 @@ _PLUGIN_CACHE_SUBPATH = Path(".claude") / "plugins" / "cache" / "bit-agora" / "p
 _INSTALLED_PLUGINS_SUBPATH = Path(".claude") / "plugins" / "installed_plugins.json"
 _PLUGIN_KEY_PREFIX = "praxion@"
 _RULES_SENTINEL_SUBPATH = Path(".claude") / "rules" / "swe" / "agent-behavioral-contract.md"
-_CLAUDE_MD_SUBPATH = Path(".claude") / "CLAUDE.md"
-
-# Relative to the plugin root
-_TEMPLATE_RELATIVE = Path("claude") / "config" / "CLAUDE.md.tmpl"
-_SHARED_LIB_RELATIVE = Path("lib") / "install_shared.sh"
-
-# One rule-linking run: a few hundred symlinks at most, well inside the hook's
-# registered 35-second budget alongside the 30-second prompt.
-_LINKER_TIMEOUT_SECS = 20
-
-# Interactive prompt timeout (seconds)
-_PROMPT_TIMEOUT_SECS = 30
 
 
 # ---------------------------------------------------------------------------
@@ -151,59 +169,25 @@ def _is_install_complete(home: Path) -> bool:
     return marker.stat().st_mtime >= plugin_cache.stat().st_mtime
 
 
-def _surfaces_present(home: Path) -> bool:
+def _surfaces_installed(home: Path) -> bool:
     """Return True when all expected global surfaces are in place.
 
     Surfaces checked:
-      - ~/.claude/CLAUDE.md is a symlink that resolves (a link left dangling
-        when an old plugin version's directory is removed is not installed)
+      - ~/.claude/CLAUDE.md is a link that resolves, into the cache or outside
+        it (a link left dangling when an old plugin version's directory is
+        removed, and a file the user wrote, are not installed)
       - ~/.claude/rules/swe/agent-behavioral-contract.md exists
     """
-    claude_md = home / _CLAUDE_MD_SUBPATH
-    rules_sentinel = home / _RULES_SENTINEL_SUBPATH
-    return claude_md.is_symlink() and claude_md.exists() and rules_sentinel.exists()
-
-
-# ---------------------------------------------------------------------------
-# Marker helpers
-# ---------------------------------------------------------------------------
-
-
-def _write_marker(home: Path) -> None:
-    """Write (or overwrite) the completion marker file."""
-    marker = home / ".claude" / _MARKER_FILENAME
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text("")
-
-
-def _write_decline_marker(home: Path) -> None:
-    """Write a soft-decline marker (operator chose not to install)."""
-    marker = home / ".claude" / _DECLINE_MARKER_FILENAME
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text("")
+    link = home / _CLAUDE_MD_SUBPATH
+    snapshot = snapshot_instructions(link)
+    state = classify_instructions(snapshot, str(link.parent))
+    working_link = isinstance(state, (CachedRender, ForeignLink)) and snapshot.resolves
+    return working_link and (home / _RULES_SENTINEL_SUBPATH).exists()
 
 
 # ---------------------------------------------------------------------------
 # Install steps
 # ---------------------------------------------------------------------------
-
-
-def _render_claude_md(home: Path, values: dict[str, str], root: Path) -> None:
-    """Render ~/.claude/CLAUDE.md from the plugin's template.
-
-    Renders the template into a real file in the plugin's config dir, then
-    symlinks ~/.claude/CLAUDE.md to that rendered file.  Raises on any I/O error.
-    """
-    template_path = root / _TEMPLATE_RELATIVE
-    rendered_path = root / "claude" / "config" / "CLAUDE.md"
-
-    _render_mod.render_claude_md(template_path, rendered_path, values)
-
-    claude_md_link = home / _CLAUDE_MD_SUBPATH
-    claude_md_link.parent.mkdir(parents=True, exist_ok=True)
-    if claude_md_link.exists() or claude_md_link.is_symlink():
-        claude_md_link.unlink()
-    claude_md_link.symlink_to(rendered_path)
 
 
 def _run_rule_linker(home: Path, root: Path, function: str) -> None:
@@ -216,18 +200,7 @@ def _run_rule_linker(home: Path, root: Path, function: str) -> None:
     never decides which rules get linked. A plugin without the library or a
     rules directory links nothing.
     """
-    rules_src = root / "rules"
-    library = root / _SHARED_LIB_RELATIVE
-    if not rules_src.is_dir() or not library.is_file():
-        return
-    subprocess.run(
-        ["bash", "-c", 'source "$1" && "$2" "$3" "$4"', "auto_complete_install"]
-        + [str(library), function, str(rules_src), str(home / ".claude" / "rules")],
-        env={**os.environ, "HOME": str(home)},
-        capture_output=True,
-        timeout=_LINKER_TIMEOUT_SECS,
-        check=True,
-    )
+    _run_rule_linkers(home, root, (function,))
 
 
 def _link_rules(home: Path, root: Path) -> None:
@@ -252,24 +225,31 @@ def _refresh_rules(home: Path, root: Path) -> None:
 
 def _link_scripts(home: Path, root: Path) -> None:
     """Symlink user-facing scripts from the plugin into ~/.local/bin/."""
-    scripts_src = root / "scripts"
-    bin_dest = home / ".local" / "bin"
-
-    if not scripts_src.is_dir():
+    if not (root / "scripts").is_dir():
         return
 
+    bin_dest = home / _BIN_SUBPATH
     bin_dest.mkdir(parents=True, exist_ok=True)
 
-    for script in scripts_src.iterdir():
-        if not script.is_file() or not os.access(script, os.X_OK):
-            continue
-        name = script.name
-        if name.startswith("merge_driver_") or name.endswith("-hook.sh"):
-            continue
-        dest = bin_dest / name
+    for script in offered_scripts(root):
+        dest = bin_dest / script.name
         if dest.is_symlink():
             dest.unlink()
-        dest.symlink_to(script)
+        dest.symlink_to(script.path)
+
+
+def _is_update_run(home: Path, root: Path) -> bool:
+    """True when a completed install meets a newer cache version directory.
+
+    The marker says an install ran before and the root lying in a cache version
+    directory rules out a checkout (`--plugin-dir`, a clone). Whatever the
+    instructions hold, the update path knows what to do with it. The root is
+    read lexically, so a root that is itself a link into the cache counts as
+    the cache.
+    """
+    marker = home / ".claude" / _MARKER_FILENAME
+    in_cache = cache_version_dir(str(root), str(home / ".claude")) is not None
+    return marker.exists() and in_cache
 
 
 def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
@@ -277,62 +257,6 @@ def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
     _render_claude_md(home, values, root)
     _link_rules(home, root)
     _link_scripts(home, root)
-
-
-# ---------------------------------------------------------------------------
-# Interactive prompt with timeout
-# ---------------------------------------------------------------------------
-
-
-def _prompt_with_timeout(values: dict[str, str]) -> bool:
-    """Prompt the operator to confirm personal-info values.
-
-    Returns True to proceed (accept defaults or user confirmed), False to
-    decline.  On timeout, returns True (default-accept).  On EOF (non-
-    interactive or piped stdin), returns True immediately.
-    """
-    username = values.get("USERNAME", "@anon")
-    email = values.get("EMAIL", "anon@unknown")
-    github = values.get("GITHUB_URL", "https://github.com/anon")
-
-    msg = (
-        "\n[Praxion] First-session auto-install\n"
-        f"  username: {username}\n"
-        f"  email:    {email}\n"
-        f"  github:   {github}\n"
-        "\nProceed with install? [Y/n, auto-accepts in 30s]: "
-    )
-
-    accepted = True
-
-    def _on_timeout(signum: int, frame: object) -> None:
-        # Timeout fires — proceed with defaults
-        pass
-
-    try:
-        old_handler = signal.signal(signal.SIGALRM, _on_timeout)
-        signal.alarm(_PROMPT_TIMEOUT_SECS)
-        try:
-            sys.stderr.write(msg)
-            sys.stderr.flush()
-            line = sys.stdin.readline()
-            signal.alarm(0)  # Cancel alarm on successful read
-            stripped = line.strip().lower()
-            if stripped in ("n", "no"):
-                accepted = False
-        except (EOFError, OSError):
-            # stdin is EOF or not readable — auto-accept
-            signal.alarm(0)
-            accepted = True
-        finally:
-            signal.signal(signal.SIGALRM, old_handler)
-            signal.alarm(0)
-    except Exception:
-        # signal.SIGALRM may not be available on all platforms (e.g., Windows)
-        # Fall back to non-interactive accept
-        accepted = True
-
-    return accepted
 
 
 # ---------------------------------------------------------------------------
@@ -349,15 +273,6 @@ def main() -> None:
         pass
 
 
-def _resolve_mode() -> bool:
-    """Return True when auto-complete mode is active (skip interactive prompt).
-
-    Auto-complete is active when PRAXION_AUTO_COMPLETE=1 is set, indicating
-    a non-interactive environment (CI, headless container) or operator opt-in.
-    """
-    return os.environ.get(_AUTO_COMPLETE_FLAG, "").strip().lower() in _TRUTHY
-
-
 def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, root: Path) -> None:
     """Run the interactive-prompt + install sequence for the cold path.
 
@@ -367,18 +282,8 @@ def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, ro
     completion marker. A failed install is reported as one, with the command
     that completes it, never as a success.
     """
-    if not auto_complete:
-        try:
-            accepted = _prompt_with_timeout(values)
-        except Exception:
-            accepted = True
-
-        if not accepted:
-            try:
-                _write_decline_marker(home)
-            except Exception:
-                pass
-            return
+    if not _confirm_install(home, values, auto_complete):
+        return
 
     # Run install steps (a failure is reported below; the marker is still written)
     failure: Exception | None = None
@@ -395,17 +300,13 @@ def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, ro
         pass
 
     if failure is None:
-        sys.stderr.write("[Praxion] Auto-install complete.\n")
+        _report_install_complete()
     else:
-        sys.stderr.write(
-            f"[Praxion] Auto-install could not finish ({type(failure).__name__}); "
-            "run /praxion-complete-install to complete it.\n"
-        )
-    sys.stderr.flush()
+        _report_incomplete("Auto-install", failure)
 
 
 def _run() -> None:
-    """Core logic: fast-skip guards then cold path."""
+    """Core logic: fast-skip guards, the update path, then the install paths."""
     # Drain stdin (required to avoid SIGPIPE; payload not needed for install logic)
     try:
         sys.stdin.read()
@@ -428,9 +329,13 @@ def _run() -> None:
         # session, once the plugin is resolvable, still completes the install.
         return
 
-    # Surfaces present (an install or an update ran before): refresh the rule
-    # links to this version, then record completion.
-    if _surfaces_present(home):
+    if _is_update_run(home, root):
+        _run_update_path(home, root)
+        return
+
+    # Surfaces present without an update path (a clone install, or a checkout
+    # root): refresh the rule links to this version, then record completion.
+    if _surfaces_installed(home):
         try:
             _refresh_rules(home, root)
         except Exception:
@@ -442,16 +347,7 @@ def _run() -> None:
         return
 
     # Cold path: derive defaults and perform install
-    try:
-        values = _render_mod.derive_defaults()
-    except Exception:
-        values = {
-            "USERNAME": "@anon",
-            "EMAIL": "anon@unknown",
-            "GITHUB_URL": "https://github.com/anon",
-        }
-
-    _perform_install(home, values, _resolve_mode(), root)
+    _perform_install(home, _default_values(), _resolve_mode(), root)
 
 
 if __name__ == "__main__":

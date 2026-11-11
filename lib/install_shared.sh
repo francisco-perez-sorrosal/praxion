@@ -318,3 +318,40 @@ refresh_rule_symlinks() {
         ln -sfn "${rules_source_dir}/${rel_path}" "$link"
     done <<< "$missing_rules"
 }
+
+# Re-point each rule link that lies in another version's cached rules to the
+# same place under <rules_source_dir>. Only a manifest `install: symlink` rule's
+# own place is considered, and only a link there (live or dangling) that
+# `_managed_rule_rel_path` reads as a cache link into a version other than
+# <rules_source_dir>. A link already into <rules_source_dir>, a live link
+# outside the cache (a clone install's), a regular file, and a place outside the
+# keep set (the sweep owns it) are never touched. The plugin's first-session
+# update path runs this before `refresh_rule_symlinks`; the installer and the
+# install check never call it, so a live link elsewhere is still never taken over
+# on any other path.
+# Fail-safe like the sweep: a manifest it cannot read changes nothing.
+#
+# Arguments:
+#   $1 — rules_source_dir: absolute path to the plugin's rules/ directory
+#   $2 — rules_target_dir: absolute path to the destination rules directory
+repoint_cached_rule_symlinks() {
+    local rules_source_dir="$1"
+    local rules_target_dir="$2"
+    [ -d "$rules_source_dir" ] || return 0
+    [ -d "$rules_target_dir" ] || return 0
+
+    local keep_paths="" rc=0 rel_path link target
+    keep_paths=$(_rule_symlink_keep_set "$rules_source_dir") || rc=$?
+    [ "$rc" -eq 0 ] || return 0
+    while IFS= read -r rel_path; do
+        [ -n "$rel_path" ] || continue
+        [ -f "${rules_source_dir}/${rel_path}" ] || continue
+        link="${rules_target_dir}/${rel_path}"
+        [ -L "$link" ] || continue
+        # Same file as the new version's rule, however the link is spelled.
+        [ "$link" -ef "${rules_source_dir}/${rel_path}" ] && continue
+        target=$(readlink "$link")
+        _managed_rule_rel_path "$rules_source_dir" "$target" >/dev/null || continue
+        ln -sfn "${rules_source_dir}/${rel_path}" "$link"
+    done <<< "$keep_paths"
+}

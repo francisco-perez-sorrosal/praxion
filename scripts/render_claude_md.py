@@ -8,9 +8,19 @@ Public API:
 
     render_claude_md(template_path, output_path, values) -> None
     derive_defaults() -> dict[str, str]
+    recover_values(template_text, render_text) -> dict[str, str] | None
 
 Placeholders handled: {{USERNAME}}, {{EMAIL}}, {{GITHUB_URL}}
 Residual placeholders (unknown keys) are logged to stderr but do not raise.
+
+recover_values is the inverse of render_claude_md: given a template and a render
+of it, it returns the value each placeholder carried, or None when the render is
+not exactly that template with single-line values substituted.  It is pure (two
+strings in, no I/O) and strict, so a caller can trust a returned dict: the texts
+must have equal line counts, a line without a placeholder must match its
+template line, a line with one placeholder must match around it, and a key seen
+twice must carry one value.  A line with several placeholders, or a value that
+spans lines, cannot be aligned unambiguously and yields None.
 """
 
 from __future__ import annotations
@@ -70,6 +80,56 @@ def render_claude_md(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content, encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Value recovery (inverse of render)
+# ---------------------------------------------------------------------------
+
+
+def recover_values(template_text: str, render_text: str) -> dict[str, str] | None:
+    """Recover the value each placeholder carried in render_text.
+
+    Returns a mapping of placeholder names (without braces) to the text that
+    replaced them, or None when render_text is not template_text with
+    single-line values substituted.  Never returns a partial mapping.
+    """
+    template_lines = template_text.split("\n")
+    render_lines = render_text.split("\n")
+    if len(template_lines) != len(render_lines):
+        return None
+
+    recovered: dict[str, str] = {}
+    # No strict=True: the first-session hook imports this module on Python 3.9.
+    for template_line, render_line in zip(template_lines, render_lines):  # noqa: B905
+        line_values = _recover_line_values(template_line, render_line)
+        if line_values is None:
+            return None
+        for key, value in line_values.items():
+            if recovered.setdefault(key, value) != value:
+                return None
+    return recovered
+
+
+def _recover_line_values(template_line: str, render_line: str) -> dict[str, str] | None:
+    """Align one template line with its render line (see recover_values)."""
+    placeholders = list(PLACEHOLDER_PATTERN.finditer(template_line))
+    if not placeholders:
+        return {} if template_line == render_line else None
+    if len(placeholders) > 1:
+        return None
+
+    placeholder = placeholders[0]
+    prefix = template_line[: placeholder.start()]
+    suffix = template_line[placeholder.end() :]
+    # The length check keeps prefix and suffix from claiming the same characters.
+    if len(render_line) < len(prefix) + len(suffix):
+        return None
+    if not (render_line.startswith(prefix) and render_line.endswith(suffix)):
+        return None
+
+    key = placeholder.group()[2:-2]
+    return {key: render_line[len(prefix) : len(render_line) - len(suffix)]}
 
 
 # ---------------------------------------------------------------------------

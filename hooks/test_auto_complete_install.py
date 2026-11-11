@@ -38,7 +38,14 @@ import pytest
 # ---------------------------------------------------------------------------
 
 HOOKS_DIR = Path(__file__).resolve().parent
-REPO_ROOT = HOOKS_DIR.parent
+# The mutation sensor runs a copy of this directory one level down, so the checkout
+# root is the nearest ancestor that holds the installer's shared library.
+REPO_ROOT = next(p for p in HOOKS_DIR.parents if (p / "lib" / "install_shared.sh").is_file())
+# The hook finds `render_claude_md` beside its own directory; a relocated copy does not.
+_SCRIPTS_DIR = REPO_ROOT / "scripts"
+sys.path.insert(0, str(_SCRIPTS_DIR))
+sys.path.insert(0, str(HOOKS_DIR))
+import _install_update as update  # noqa: E402 (after sys.path injection)
 
 # ---------------------------------------------------------------------------
 # Module-level import: deferred to inside each test body so pytest collection
@@ -67,6 +74,13 @@ def _load_module():
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _render_module_reachable_by_the_hook_subprocess(monkeypatch):
+    """The tests that run the hook as a process need `render_claude_md` too."""
+    ambient = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(filter(None, (str(_SCRIPTS_DIR), ambient))))
 
 
 @pytest.fixture(autouse=True)
@@ -1079,7 +1093,7 @@ class TestSurfacePresence:
     ):
         module = _fake_home_module(monkeypatch, fake_home)
 
-        assert module._surfaces_present(fake_home) is True
+        assert module._surfaces_installed(fake_home) is True
 
     def test_a_regular_claude_md_is_not_an_installed_surface(
         self, fake_home, rules_sentinel, monkeypatch
@@ -1090,14 +1104,14 @@ class TestSurfacePresence:
         # file permanently mistaken for a rendered one.
         (fake_home / ".claude" / "CLAUDE.md").write_text("# my own notes\n")
 
-        assert module._surfaces_present(fake_home) is False
+        assert module._surfaces_installed(fake_home) is False
 
     def test_missing_rules_sentinel_is_not_an_installed_surface(
         self, fake_home, claude_md_symlink, monkeypatch
     ):
         module = _fake_home_module(monkeypatch, fake_home)
 
-        assert module._surfaces_present(fake_home) is False
+        assert module._surfaces_installed(fake_home) is False
 
     def test_a_dangling_claude_md_link_is_not_an_installed_surface(
         self, fake_home, rules_sentinel, tmp_path, monkeypatch
@@ -1107,7 +1121,24 @@ class TestSurfacePresence:
         # Claude Code has since removed.
         (fake_home / ".claude" / "CLAUDE.md").symlink_to(tmp_path / "removed" / "CLAUDE.md")
 
-        assert module._surfaces_present(fake_home) is False
+        assert module._surfaces_installed(fake_home) is False
+
+    def test_a_live_link_into_the_cache_is_an_installed_surface(
+        self, fake_home, rules_sentinel, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        _link_instructions(fake_home, _previous_render(fake_home))
+
+        assert module._surfaces_installed(fake_home) is True
+
+    def test_a_dangling_link_into_the_cache_is_not_an_installed_surface(
+        self, fake_home, rules_sentinel, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        removed = _cached_version(fake_home, "9.9.8") / "claude" / "config" / "CLAUDE.md"
+        _link_instructions(fake_home, removed)
+
+        assert module._surfaces_installed(fake_home) is False
 
 
 class TestMarkerWriting:
@@ -1121,9 +1152,7 @@ class TestMarkerWriting:
 
     def test_decline_marker_is_a_distinct_file(self, tmp_path, monkeypatch):
         home = tmp_path / "home"
-        module = _fake_home_module(monkeypatch, home)
-
-        module._write_decline_marker(home)
+        update._write_decline_marker(home)
 
         assert (home / ".claude" / ".praxion-install-declined").exists()
         assert not (home / ".claude" / ".praxion-complete-installed").exists()
@@ -1425,6 +1454,13 @@ class TestScriptLinking:
         assert dest.resolve() == script.resolve()
 
 
+def _cached_version(home: Path, version: str) -> Path:
+    """A version directory of the plugin cache, other than the running one."""
+    root = home / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion" / version
+    (root / "scripts").mkdir(parents=True)
+    return root
+
+
 class TestFullInstallSequence:
     def test_runs_every_install_step(self, fake_home, plugin_root, monkeypatch):
         module = _fake_home_module(monkeypatch, fake_home)
@@ -1441,30 +1477,26 @@ class TestFullInstallSequence:
 class TestOperatorPrompt:
     @pytest.mark.parametrize("answer", ["n\n", "no\n", "N\n", "  No  \n"])
     def test_an_explicit_refusal_declines_the_install(self, answer, monkeypatch):
-        module = _load_module()
         monkeypatch.setattr(sys, "stdin", io.StringIO(answer))
 
-        assert module._prompt_with_timeout(_VALUES) is False
+        assert update._prompt_with_timeout(_VALUES) is False
 
     @pytest.mark.parametrize("answer", ["y\n", "\n", "yes\n", "anything else\n"])
     def test_anything_other_than_a_refusal_proceeds(self, answer, monkeypatch):
-        module = _load_module()
         monkeypatch.setattr(sys, "stdin", io.StringIO(answer))
 
-        assert module._prompt_with_timeout(_VALUES) is True
+        assert update._prompt_with_timeout(_VALUES) is True
 
     def test_the_prompt_shows_the_values_that_will_be_written(self, monkeypatch, capsys):
-        module = _load_module()
         monkeypatch.setattr(sys, "stdin", io.StringIO("\n"))
 
-        module._prompt_with_timeout(_VALUES)
+        update._prompt_with_timeout(_VALUES)
 
         prompt = capsys.readouterr().err
         assert "@someone" in prompt
         assert "someone@example.com" in prompt
 
     def test_unreadable_stdin_is_treated_as_consent(self, monkeypatch):
-        module = _load_module()
 
         class _Unreadable:
             def readline(self) -> str:
@@ -1474,17 +1506,16 @@ class TestOperatorPrompt:
 
         # A piped or headless session cannot answer; blocking it would wedge
         # session start, which this hook must never do.
-        assert module._prompt_with_timeout(_VALUES) is True
+        assert update._prompt_with_timeout(_VALUES) is True
 
     def test_a_platform_without_alarm_signals_still_proceeds(self, monkeypatch):
-        module = _load_module()
 
         def _no_alarm(*args: object, **kwargs: object):
             raise ValueError("signal only works in main thread")
 
-        monkeypatch.setattr(module.signal, "signal", _no_alarm)
+        monkeypatch.setattr(update.signal, "signal", _no_alarm)
 
-        assert module._prompt_with_timeout(_VALUES) is True
+        assert update._prompt_with_timeout(_VALUES) is True
 
 
 class TestAutoCompleteMode:
@@ -1554,7 +1585,7 @@ class TestPerformInstall:
         def _explodes(_values: dict) -> bool:
             raise RuntimeError("terminal is gone")
 
-        monkeypatch.setattr(module, "_prompt_with_timeout", _explodes)
+        monkeypatch.setattr(update, "_prompt_with_timeout", _explodes)
 
         module._perform_install(fake_home, _VALUES, auto_complete=False, root=plugin_root)
 
@@ -1658,13 +1689,364 @@ class TestRunFlow:
         def _no_identity() -> dict:
             raise OSError("git not on PATH")
 
-        monkeypatch.setattr(module._render_mod, "derive_defaults", _no_identity)
+        monkeypatch.setattr(update._render_mod, "derive_defaults", _no_identity)
 
         module._run()
 
         rendered = (fake_home / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
         assert "@anon" in rendered
         assert "anon@unknown" in rendered
+
+
+# Made-up identities: the one the previous version's render carried, and the one a
+# fresh derivation would give today. Neither is a real person's.
+_PREVIOUS_VERSION = "9.9.8"
+_PREVIOUS_TEMPLATE = (
+    "# Instructions\nuser: {{USERNAME}}\nmail: {{EMAIL}}\nweb: {{GITHUB_URL}}\nend\n"
+)
+_NEW_TEMPLATE = _PREVIOUS_TEMPLATE + "\n## Release notes\n\nHello {{USERNAME}}.\n"
+_CARRIED = {
+    "USERNAME": "@first-person",
+    "EMAIL": "first.person@example.invalid",
+    "GITHUB_URL": "https://example.invalid/first-person",
+}
+_TODAYS = {
+    "USERNAME": "@later-person",
+    "EMAIL": "later.person@example.invalid",
+    "GITHUB_URL": "https://example.invalid/later-person",
+}
+
+
+def _fill(template: str, values: dict[str, str]) -> str:
+    for key, value in values.items():
+        template = template.replace(f"{{{{{key}}}}}", value)
+    return template
+
+
+def _previous_render(home: Path, template: str = _PREVIOUS_TEMPLATE) -> Path:
+    """The previous cached version's template and its render with the carried values."""
+    config = _cached_version(home, _PREVIOUS_VERSION) / "claude" / "config"
+    config.mkdir(parents=True)
+    (config / "CLAUDE.md.tmpl").write_text(template, encoding="utf-8")
+    render = config / "CLAUDE.md"
+    render.write_text(_fill(template, _CARRIED), encoding="utf-8")
+    return render
+
+
+def _link_instructions(home: Path, target: Path | str) -> Path:
+    link = home / ".claude" / "CLAUDE.md"
+    link.symlink_to(target)
+    return link
+
+
+def _file_state(path: Path) -> tuple:
+    status = path.stat()
+    return path.read_bytes(), status.st_ino, status.st_mtime_ns
+
+
+def _record_derivations(monkeypatch, values: dict[str, str]) -> list:
+    calls: list = []
+
+    def derive() -> dict[str, str]:
+        calls.append("derived")
+        return dict(values)
+
+    monkeypatch.setattr(update._render_mod, "derive_defaults", derive)
+    return calls
+
+
+def _files_holding(root: Path, values, excluding: set[Path]) -> list[str]:
+    """The regular files under `root`, other than `excluding`, that contain any of `values`."""
+    regular = (p for p in root.rglob("*") if p.is_file() and not p.is_symlink())
+    return [
+        str(path.relative_to(root))
+        for path in regular
+        if path not in excluding and any(v in path.read_text(errors="replace") for v in values)
+    ]
+
+
+def _values_in(text: str, values) -> list[str]:
+    return [value for value in values if value in text]
+
+
+def _refuse_replacing(monkeypatch, destination: Path) -> None:
+    """Make the rename over `destination`, and only that one, fail."""
+    real_replace = os.replace
+
+    def replace(source, target) -> None:
+        if Path(target) == destination:
+            raise OSError("refused")
+        real_replace(source, target)
+
+    monkeypatch.setattr(os, "replace", replace)
+
+
+_not_as_root = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores the permissions these break"
+)
+
+
+class TestInstructionsCarryForward:
+    """A link into another cached version's render moves to this version's, values kept."""
+
+    @pytest.fixture
+    def todays_identity(self, tmp_path, monkeypatch):
+        """Git now answers with another identity than the one the previous render carried."""
+        gitconfig = tmp_path / "gitconfig"
+        gitconfig.write_text(
+            f"[user]\n\tname = Later Person\n\temail = {_TODAYS['EMAIL']}\n", encoding="utf-8"
+        )
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(gitconfig))
+        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+    @pytest.fixture
+    def updated(self, fake_home, plugin_root, monkeypatch):
+        """The previous version's render is linked, and this version ships a new template."""
+        module = _fake_home_module(monkeypatch, fake_home)
+        previous = _previous_render(fake_home)
+        link = _link_instructions(fake_home, previous)
+        _seed_template(plugin_root, _NEW_TEMPLATE)
+        return module, previous, link
+
+    @pytest.mark.usefixtures("todays_identity")
+    def test_the_new_template_is_filled_with_the_previous_renders_values(
+        self, updated, fake_home, plugin_root
+    ):
+        module, _, link = updated
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+
+    def test_the_link_points_at_this_versions_render(self, updated, fake_home, plugin_root):
+        module, _, link = updated
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(plugin_root / "claude" / "config" / "CLAUDE.md")
+
+    def test_the_previous_render_is_left_as_it_was(self, updated, fake_home, plugin_root):
+        module, previous, _ = updated
+        before = _file_state(previous)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert _file_state(previous) == before
+
+    def test_a_relative_link_into_the_previous_version_is_carried_forward(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        monkeypatch.setenv("HOME", str(fake_home))
+        previous = _previous_render(fake_home)
+        link = _link_instructions(fake_home, previous.relative_to(fake_home / ".claude"))
+        _seed_template(plugin_root, _NEW_TEMPLATE)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+
+    def test_a_default_fills_only_the_key_the_previous_render_never_carried(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        monkeypatch.setenv("HOME", str(fake_home))
+        without_web = _PREVIOUS_TEMPLATE.replace("web: {{GITHUB_URL}}\n", "")
+        link = _link_instructions(fake_home, _previous_render(fake_home, without_web))
+        _seed_template(plugin_root, _NEW_TEMPLATE)
+        _record_derivations(monkeypatch, _TODAYS)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        expected = {**_CARRIED, "GITHUB_URL": _TODAYS["GITHUB_URL"]}
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, expected)
+
+    def test_no_default_is_derived_when_every_key_was_carried(
+        self, updated, fake_home, plugin_root, monkeypatch
+    ):
+        module, _, _ = updated
+        calls = _record_derivations(monkeypatch, _TODAYS)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert calls == []
+
+    def test_a_key_neither_carried_nor_derivable_stays_a_named_placeholder(
+        self, updated, fake_home, plugin_root, monkeypatch, capsys
+    ):
+        module, _, link = updated
+        _seed_template(plugin_root, _NEW_TEMPLATE + "shell: {{SHELL_NAME}}\n")
+        _record_derivations(monkeypatch, _TODAYS)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert link.read_text(encoding="utf-8").endswith("shell: {{SHELL_NAME}}\n")
+        assert "{{SHELL_NAME}}" in capsys.readouterr().err
+
+    def test_an_unrecoverable_render_raises_its_own_error_type(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, _ = updated
+        previous.write_text(previous.read_text(encoding="utf-8") + "a line edited by hand\n")
+
+        with pytest.raises(update.UnrecoverableRenderError):
+            update._update_instructions(fake_home, plugin_root)
+
+    def test_an_unrecoverable_render_keeps_the_previous_link_and_writes_no_render(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, link = updated
+        previous.write_text(previous.read_text(encoding="utf-8") + "a line edited by hand\n")
+
+        with pytest.raises(update.UnrecoverableRenderError):
+            update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(previous)
+        assert sorted(p.name for p in (plugin_root / "claude" / "config").iterdir()) == [
+            "CLAUDE.md.tmpl"
+        ]
+
+    def test_an_unrecoverable_render_is_reported_in_one_line_naming_its_type(
+        self, updated, fake_home, plugin_root, monkeypatch, capsys
+    ):
+        module, previous, _ = updated
+        previous.write_text("# rewritten by hand\n", encoding="utf-8")
+        monkeypatch.setattr(update, "_UPDATE_STEPS", (update._update_instructions,))
+
+        update._run_update_path(fake_home, plugin_root)
+
+        assert capsys.readouterr().err == (
+            "[Praxion] Update refresh could not finish (UnrecoverableRenderError); "
+            "run /praxion-complete-install to complete it.\n"
+        )
+
+    @_not_as_root
+    def test_an_unreadable_new_template_keeps_the_previous_render(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, link = updated
+        template = plugin_root / "claude" / "config" / "CLAUDE.md.tmpl"
+        template.chmod(0o000)
+        try:
+            with pytest.raises(PermissionError):
+                update._update_instructions(fake_home, plugin_root)
+        finally:
+            template.chmod(0o644)
+
+        assert (os.readlink(link), link.read_text(encoding="utf-8")) == (
+            str(previous),
+            _fill(_PREVIOUS_TEMPLATE, _CARRIED),
+        )
+
+    @_not_as_root
+    def test_an_unwritable_render_directory_keeps_the_previous_render_and_no_temporary(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, link = updated
+        config = plugin_root / "claude" / "config"
+        config.chmod(0o555)
+        try:
+            with pytest.raises(PermissionError):
+                update._update_instructions(fake_home, plugin_root)
+        finally:
+            config.chmod(0o755)
+
+        assert os.readlink(link) == str(previous)
+        assert sorted(p.name for p in config.iterdir()) == ["CLAUDE.md.tmpl"]
+
+    def test_a_failed_rename_of_the_render_keeps_the_previous_render_and_no_temporary(
+        self, updated, fake_home, plugin_root, monkeypatch
+    ):
+        module, previous, link = updated
+        config = plugin_root / "claude" / "config"
+        _refuse_replacing(monkeypatch, config / "CLAUDE.md")
+
+        with pytest.raises(OSError, match="refused"):
+            update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(previous)
+        assert sorted(p.name for p in config.iterdir()) == ["CLAUDE.md.tmpl"]
+
+    def test_a_failed_swap_of_the_link_keeps_the_previous_render_and_no_temporary(
+        self, updated, fake_home, plugin_root, monkeypatch
+    ):
+        module, previous, link = updated
+        before = sorted(p.name for p in link.parent.iterdir())
+        _refuse_replacing(monkeypatch, link)
+
+        with pytest.raises(OSError, match="refused"):
+            update._update_instructions(fake_home, plugin_root)
+
+        assert (os.readlink(link), link.read_text(encoding="utf-8")) == (
+            str(previous),
+            _fill(_PREVIOUS_TEMPLATE, _CARRIED),
+        )
+        assert sorted(p.name for p in link.parent.iterdir()) == before
+
+    def test_a_link_already_into_this_version_is_left_as_it_is(
+        self, fake_home, plugin_root, monkeypatch
+    ):
+        monkeypatch.setenv("HOME", str(fake_home))
+        _seed_template(plugin_root, _NEW_TEMPLATE)
+        render = plugin_root / "claude" / "config" / "CLAUDE.md"
+        render.write_text(_fill(_NEW_TEMPLATE, _CARRIED), encoding="utf-8")
+        link = _link_instructions(fake_home, render)
+        before = (os.readlink(link), _file_state(render))
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert (os.readlink(link), _file_state(render)) == before
+
+    def test_a_clone_link_and_its_render_are_left_as_they_are(
+        self, fake_home, plugin_root, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("HOME", str(fake_home))
+        _seed_template(plugin_root, _NEW_TEMPLATE)
+        clone_render = tmp_path / "dev" / "praxion" / "claude" / "config" / "CLAUDE.md"
+        clone_render.parent.mkdir(parents=True)
+        clone_render.write_text("# a developer's own render\n", encoding="utf-8")
+        link = _link_instructions(fake_home, clone_render)
+        before = (os.readlink(link), _file_state(clone_render))
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert (os.readlink(link), _file_state(clone_render)) == before
+        assert not (plugin_root / "claude" / "config" / "CLAUDE.md").exists()
+
+    def test_nothing_is_read_from_stdin(self, updated, fake_home, plugin_root, monkeypatch):
+        module, _, link = updated
+
+        class _NoAnswers:
+            def read(self, *_args) -> str:
+                raise AssertionError("the update path read stdin")
+
+            readline = read
+
+        monkeypatch.setattr(sys, "stdin", _NoAnswers())
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+
+    def test_no_personal_value_is_printed(
+        self, updated, fake_home, plugin_root, monkeypatch, capsys
+    ):
+        module, _, _ = updated
+        _seed_template(plugin_root, _NEW_TEMPLATE + "shell: {{SHELL_NAME}}\n")
+        _record_derivations(monkeypatch, _TODAYS)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        output = "".join(capsys.readouterr())
+        assert _values_in(output, (*_CARRIED.values(), *_TODAYS.values())) == []
+
+    def test_no_personal_value_is_written_outside_the_two_renders(
+        self, updated, fake_home, plugin_root, tmp_path
+    ):
+        module, previous, _ = updated
+
+        update._update_instructions(fake_home, plugin_root)
+
+        renders = {previous, plugin_root / "claude" / "config" / "CLAUDE.md"}
+        assert _files_holding(tmp_path, _CARRIED.values(), excluding=renders) == []
 
 
 class TestRealInstallLayout:

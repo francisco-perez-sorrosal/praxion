@@ -31,8 +31,25 @@ from pathlib import Path
 import yaml
 
 from tests.acceptance.drivers.kernel_sandbox import isolated_env
+from tests.acceptance.drivers.plugin_update import shipped_tree
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+STAND_IN = "checkout"
+
+
+def stand_in_root(scratch: Path) -> Path:
+    """The stand-in copy of this checkout's shipped tree that installs into `scratch`'s HOME. The
+    installer renders into the checkout it runs from, so it never runs from this one."""
+    return scratch / STAND_IN
+
+
+def _stand_in(scratch: Path) -> Path:
+    root = stand_in_root(scratch)
+    if not (root / "install.sh").exists():
+        shipped_tree(root)
+    return root
+
+
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "adr_rule_move"
 MOVED_RULE = "rules/swe/adr-conventions.md"
 RESIDENT = "rules/swe/adr-conventions-resident.md"
@@ -43,7 +60,9 @@ PATH_SCOPE = ".ai-state/decisions/**"
 RESIDENT_TITLE = "## ADR Conventions"
 MEASURED_KEYS = ("id", "path", "load", "core", "install", "paths")
 CODEX_RULE_ID = "rules::swe::adr-conventions"
-GLOBAL_INSTRUCTIONS = "claude/config/CLAUDE.md"
+GLOBAL_INSTRUCTIONS = (
+    "claude/config/CLAUDE.md.tmpl"  # shipped; a render exists only after an install
+)
 
 
 def split_frontmatter(text: str) -> tuple[str, str]:
@@ -109,11 +128,11 @@ def _stand_in_claude(scratch: Path) -> Path:
 
 
 def install(scratch: Path) -> subprocess.CompletedProcess[str]:
-    """`bash install.sh code --relink` from this checkout into `scratch`'s HOME, never a session."""
+    """`bash install.sh code --relink` from a stand-in copy of this checkout into `scratch`'s HOME, never a session."""
     env = isolated_env(scratch)
     env["PATH"] = f"{_stand_in_claude(scratch)}:{env['PATH']}"
     return subprocess.run(
-        ["bash", str(REPO_ROOT / "install.sh"), "code", "--relink"],
+        ["bash", str(_stand_in(scratch) / "install.sh"), "code", "--relink"],
         input="Y\nY\nY\n",
         cwd=scratch,
         env=env,

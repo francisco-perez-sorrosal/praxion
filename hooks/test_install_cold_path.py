@@ -578,7 +578,7 @@ class TestHookNeverRaisesIntoTheHarness:
     def test_an_unhandled_failure_below_main_is_swallowed(self, monkeypatch):
         module = _load_module()
 
-        def _explodes() -> None:
+        def _explodes(report: list[str] | None = None) -> None:
             raise RuntimeError("catastrophic install failure")
 
         monkeypatch.setattr(module, "_run", _explodes)

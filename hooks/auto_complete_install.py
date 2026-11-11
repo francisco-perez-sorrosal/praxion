@@ -253,17 +253,14 @@ def _is_update_run(home: Path, root: Path) -> bool:
     return marker.exists() and in_cache
 
 
-def _tell_user_of_a_shortfall() -> None:
-    """Name a `python3` below the hooks' floor as a `systemMessage`.
+def _tell_user_of_a_shortfall() -> str | None:
+    """The line naming a `python3` below the hooks' floor, or None at the floor.
 
-    JSON on stdout, the one channel a SessionStart hook has to the user: its
-    stderr on exit 0 reaches neither Claude nor the user.
+    The caller gathers it with the run's other reports for `main()` to write: a
+    SessionStart hook's stderr on exit 0 reaches neither Claude nor the user.
     """
     line = interpreter_notice()
-    if line is None:
-        return
-    sys.stdout.write(json.dumps({"systemMessage": f"[Praxion] {line}"}) + "\n")
-    sys.stdout.flush()
+    return None if line is None else f"[Praxion] {line}"
 
 
 def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
@@ -279,12 +276,30 @@ def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
 
 
 def main() -> None:
-    """Hook entry point: read stdin, run fast-skip or cold path, exit 0."""
+    """Hook entry point: run, then write what the run gathered as one `systemMessage`.
+
+    The only function that writes standard output, and it writes once: the lines
+    gathered before an unexpected failure are still written. Exit 0 unconditionally.
+    """
+    lines: list[str] = []
     try:
-        _run()
+        _run(lines)
     except Exception:
         # Any unhandled error — exit 0 unconditionally to never block session start
         pass
+    try:
+        _write_system_message(lines)
+    except Exception:
+        # A closed pipe or an encoding error must not block session start either
+        pass
+
+
+def _write_system_message(lines: list[str]) -> None:
+    """Write the lines as the one JSON object a SessionStart hook reports through."""
+    if not lines:
+        return
+    sys.stdout.write(json.dumps({"systemMessage": "\n".join(lines)}) + "\n")
+    sys.stdout.flush()
 
 
 def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, root: Path) -> None:
@@ -319,8 +334,14 @@ def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, ro
         _report_incomplete("Auto-install", failure)
 
 
-def _run() -> None:
-    """Core logic: fast-skip guards, the update path, then the install paths."""
+def _run(report: list[str] | None = None) -> None:
+    """Core logic: fast-skip guards, the update path, then the install paths.
+
+    Appends the lines the user should see to `report`, in firing order; a caller
+    with no use for them passes nothing.
+    """
+    report = [] if report is None else report
+
     # Drain stdin (required to avoid SIGPIPE; payload not needed for install logic)
     try:
         sys.stdin.read()
@@ -344,7 +365,9 @@ def _run() -> None:
         return
 
     # Every path below writes a marker, so this names a shortfall once per version.
-    _tell_user_of_a_shortfall()
+    shortfall = _tell_user_of_a_shortfall()
+    if shortfall is not None:
+        report.append(shortfall)
 
     if _is_update_run(home, root):
         _run_update_path(home, root)

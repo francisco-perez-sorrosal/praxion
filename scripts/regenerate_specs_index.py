@@ -18,6 +18,7 @@ Usage: python scripts/regenerate_specs_index.py [--repo-root <path>]
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -235,18 +236,20 @@ def generate_index(specs: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _parse_repo_root_arg() -> str | None:
-    """Extract `--repo-root <path>` from argv, if present."""
-    if "--repo-root" in sys.argv:
-        idx = sys.argv.index("--repo-root")
-        if idx + 1 < len(sys.argv):
-            return sys.argv[idx + 1]
-    return None
+def _parse_args() -> argparse.Namespace:
+    """The command line. `--help` and an unknown option exit before anything is written."""
+    parser = argparse.ArgumentParser(
+        description="Regenerate .ai-state/specs/SPECS_INDEX.md from the archived SPEC_*.md files."
+    )
+    parser.add_argument(
+        "--repo-root", help="repository whose index to regenerate (default: the git toplevel)"
+    )
+    return parser.parse_args()
 
 
 def main() -> None:
     """Entry point: collect specs, generate index, write to file."""
-    root = resolve_repo_root(_parse_repo_root_arg())
+    root = resolve_repo_root(_parse_args().repo_root)
     if is_plugin_cache_path(root):
         print(
             f"refusing to regenerate index against a plugin-cache path: {root}",

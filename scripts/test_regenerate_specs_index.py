@@ -12,8 +12,9 @@ Tests are designed from the index generator's behavioral contract:
   8. ADRs field captures all dec-NNN identifiers from the bold-key line.
   9. Summary is truncated to MAX_SUMMARY_LEN characters.
 
-Each test is self-contained via tmp_path. Real specs are used only in the
-smoke test (test_smoke_against_real_specs).
+Each test is self-contained via tmp_path. The smoke tests run the generator over
+a scratch copy of the real specs, never over the checkout: the tracked index must
+not be rewritten by a test run.
 
 Strategy: monkeypatch the module-level SPECS_DIR and INDEX_PATH constants,
 then call collect_specs() / generate_index() directly, mirroring the approach
@@ -22,6 +23,7 @@ used in other scripts tests.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -482,27 +484,82 @@ class TestMain:
 # ---------------------------------------------------------------------------
 
 
+REAL_SPECS_DIR = SCRIPTS_DIR.parent / ".ai-state" / "specs"
+TRACKED_INDEX = REAL_SPECS_DIR / "SPECS_INDEX.md"
+
+
+def _run_over_a_copy_of_the_real_specs(tmp_path: Path) -> tuple[subprocess.CompletedProcess, Path]:
+    """The generator over a scratch copy of the real SPEC_*.md files; returns the run and the copy."""
+    copy_dir = tmp_path / ".ai-state" / "specs"
+    copy_dir.mkdir(parents=True)
+    for spec in REAL_SPECS_DIR.glob("SPEC_*.md"):
+        shutil.copy2(spec, copy_dir / spec.name)
+    result = subprocess.run(
+        [sys.executable, str(GENERATOR_SCRIPT), "--repo-root", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, copy_dir
+
+
+def _fingerprint(path: Path) -> tuple[bytes, int]:
+    """Bytes and modification time: a rewrite with identical bytes still moves the time."""
+    return path.read_bytes(), path.stat().st_mtime_ns
+
+
 class TestSmokeRealSpecs:
-    def test_real_specs_index_has_one_row_per_spec_file(self) -> None:
+    def test_real_specs_index_has_one_row_per_spec_file(self, tmp_path: Path) -> None:
         """Generator produces one row per real SPEC_*.md in .ai-state/specs/ (count-agnostic)."""
-        real_specs_dir = SCRIPTS_DIR.parent / ".ai-state" / "specs"
-        spec_count = len(list(real_specs_dir.glob("SPEC_*.md")))
-        result = subprocess.run(
-            [sys.executable, str(GENERATOR_SCRIPT)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        spec_count = len(list(REAL_SPECS_DIR.glob("SPEC_*.md")))
+        result, _ = _run_over_a_copy_of_the_real_specs(tmp_path)
         assert result.returncode == 0, f"Generator failed: {result.stderr}"
         assert str(spec_count) in result.stdout, (
             f"Expected {spec_count} entries (one per SPEC_*.md); got: {result.stdout.strip()}"
         )
 
-    def test_generated_index_readable(self) -> None:
-        """The written SPECS_INDEX.md is a well-formed markdown file."""
-        real_specs_dir = SCRIPTS_DIR.parent / ".ai-state" / "specs"
-        index_path = real_specs_dir / "SPECS_INDEX.md"
-        assert index_path.exists(), "SPECS_INDEX.md should exist after smoke run"
-        content = index_path.read_text(encoding="utf-8")
+    def test_generated_index_readable(self, tmp_path: Path) -> None:
+        """The index written over the real specs is a well-formed markdown file."""
+        result, copy_dir = _run_over_a_copy_of_the_real_specs(tmp_path)
+        assert result.returncode == 0, f"Generator failed: {result.stderr}"
+        content = (copy_dir / "SPECS_INDEX.md").read_text(encoding="utf-8")
         assert content.startswith("#"), "Index should start with a markdown heading"
         assert "|" in content, "Index should contain a table"
+
+    def test_the_smoke_run_leaves_the_tracked_index_untouched(self, tmp_path: Path) -> None:
+        """Running the generator over the real specs never writes the checkout's tracked index."""
+        before = _fingerprint(TRACKED_INDEX)
+        _run_over_a_copy_of_the_real_specs(tmp_path)
+        assert _fingerprint(TRACKED_INDEX) == before, "the smoke run rewrote the tracked index"
+
+
+class TestCommandLine:
+    def test_help_prints_usage_and_writes_no_index(self, tmp_path: Path) -> None:
+        """`--help` describes the command and regenerates nothing, even in a repository."""
+        specs_dir = tmp_path / ".ai-state" / "specs"
+        specs_dir.mkdir(parents=True)
+        result = subprocess.run(
+            [sys.executable, str(GENERATOR_SCRIPT), "--help", "--repo-root", str(tmp_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "--repo-root" in result.stdout
+        assert not (specs_dir / "SPECS_INDEX.md").exists(), "--help wrote an index"
+
+    def test_an_unknown_option_is_refused_and_writes_no_index(self, tmp_path: Path) -> None:
+        """An unknown option is an error, not a regeneration of the repository it runs in."""
+        specs_dir = tmp_path / ".ai-state" / "specs"
+        specs_dir.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
+        result = subprocess.run(
+            [sys.executable, str(GENERATOR_SCRIPT), "--frobnicate"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=tmp_path,
+        )
+        assert result.returncode == 2, result.stderr
+        assert "--frobnicate" in result.stderr, result.stderr
+        assert not (specs_dir / "SPECS_INDEX.md").exists(), "an unknown option wrote an index"

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-1921fe75
+id: dec-498
+draft_id: dec-draft-1921fe75
 title: "An update carries the personal values forward from the previous version's render, aligned with its template, and persists no new copy"
-status: proposed
+status: accepted
 category: implementation
 date: 2026-11-10
 summary: "On the update path the hook recovers username, email and GitHub URL by aligning the previous version's render with that version's template (render_claude_md.recover_values); a default fills only a placeholder the old render never carried, and an unrecoverable render is kept, never re-rendered with defaults."

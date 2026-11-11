@@ -1,7 +1,8 @@
 ---
-id: dec-draft-9954b327
+id: dec-499
+draft_id: dec-draft-9954b327
 title: "The first-session completion owns the update path: it refreshes the instructions and the script links, and re-points rule links into an older cached version"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-10
 summary: "After an update, a re-armed hooks/auto_complete_install.py run from a cache version directory re-renders ~/.claude/CLAUDE.md, refreshes ~/.local/bin and re-points rule links that target another cached Praxion version; links outside the cache and regular files are never touched, and a first install or a --plugin-dir run is unchanged."
@@ -34,7 +35,7 @@ The hook owns the update path.
 
 - **When it runs.** A run is the update path when the existing re-arm fires (the completion marker is older than the plugin cache directory), an earlier completion exists (the marker is present), and the plugin root is a version directory of the plugin cache. Every other run keeps today's behaviour exactly: a first install, or a `--plugin-dir` checkout.
 - **Instructions.** On the update path the hook classifies `~/.claude/CLAUDE.md` into one of five states: absent, user-owned file, foreign link, live cached render, dangling cached render.
-  - A live render of another version is re-rendered from the new template with the values that render carried (dec-draft-1921fe75). The new render is written atomically into the new version's directory, and the link is swapped atomically.
+  - A live render of another version is re-rendered from the new template with the values that render carried (dec-498). The new render is written atomically into the new version's directory, and the link is swapped atomically.
   - An absent or dangling cached render is set up as today's cold path sets it up.
   - A user-owned file or a foreign link is left alone.
 - **Rules.** The new library function `repoint_cached_rule_symlinks` re-points each manifest-place link that targets another cached Praxion version, live or dangling. `refresh_rule_symlinks` then sweeps stale links and links missing ones.

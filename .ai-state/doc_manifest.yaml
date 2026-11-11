@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-10T06:57:13Z'
+generated_at: '2026-11-11T00:06:22Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-11-05'
+  last_modified: '2026-11-10'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-11-04'
+  last_modified: '2026-11-10'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-09'
+  last_modified: '2026-11-10'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-09'
+  last_modified: '2026-11-10'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-09'
+  last_modified: '2026-11-10'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -682,7 +682,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-09'
+  last_modified: '2026-11-10'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3649,7 +3649,7 @@ surfaces:
   path: .ai-state/decisions/491-first-session-completion-installs-from-the-plugin-root.md
   type: markdown
   title: The first-session completion installs from the plugin root and links rules through the installer's library, never re-pointing a live link
-  last_modified: '2026-11-05'
+  last_modified: '2026-11-10'
   renderer: adr_card
 - id: ai-state-decisions-492-writer-kit-mode-role-checks
   path: .ai-state/decisions/492-writer-kit-mode-role-checks.md
@@ -3686,6 +3686,18 @@ surfaces:
   type: markdown
   title: The coordination protocol stays resident in the managed main session; its pipeline-only half is not deferred to a trigger
   last_modified: '2026-11-09'
+  renderer: adr_card
+- id: ai-state-decisions-498-personal-values-carried-from-the-previous-render
+  path: .ai-state/decisions/498-personal-values-carried-from-the-previous-render.md
+  type: markdown
+  title: An update carries the personal values forward from the previous version's render, aligned with its template, and persists no new copy
+  last_modified: '2026-11-10'
+  renderer: adr_card
+- id: ai-state-decisions-499-update-path-refreshes-instructions-and-script-links
+  path: .ai-state/decisions/499-update-path-refreshes-instructions-and-script-links.md
+  type: markdown
+  title: 'The first-session completion owns the update path: it refreshes the instructions and the script links, and re-points rule links into an older cached version'
+  last_modified: '2026-11-10'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -3946,6 +3958,12 @@ surfaces:
   type: markdown
   title: 'Spec: gate-repairs (the five rows Phase 3 leans on)'
   last_modified: '2026-10-27'
+  renderer: default_markdown
+- id: ai-state-specs-spec-install-refresh-2026-11-10
+  path: .ai-state/specs/SPEC_install-refresh_2026-11-10.md
+  type: markdown
+  title: 'Spec: install-refresh (a marketplace install''s first session after a plugin update brings its script links, rule links and instructions to the new version)'
+  last_modified: '2026-11-10'
   renderer: default_markdown
 - id: ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   path: .ai-state/specs/SPEC_lean-spawn-continuation_2026-10-20.md
@@ -4644,6 +4662,8 @@ groups:
   - ai-state-decisions-495-audience-split-spawn-rule-split
   - ai-state-decisions-496-intermediate-documents-rule-stays-reside
   - ai-state-decisions-497-coordination-protocol-stays-resident-for
+  - ai-state-decisions-498-personal-values-carried-from-the-previous-render
+  - ai-state-decisions-499-update-path-refreshes-instructions-and-script-links
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4688,6 +4708,7 @@ groups:
   - ai-state-specs-spec-diagrams-2026-04-30
   - ai-state-specs-spec-eval-kit-repairs-2026-11-01
   - ai-state-specs-spec-gate-repairs-2026-10-27
+  - ai-state-specs-spec-install-refresh-2026-11-10
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
   - ai-state-specs-spec-lean-writers-2026-11-07

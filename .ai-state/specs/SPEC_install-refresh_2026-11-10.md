@@ -157,7 +157,7 @@ Terms used below and in the requirements: **N** is the plugin version installed 
 ### REQ-14: A failure never blocks a session
 
 **When** any step of the first-session refresh fails, for example a tool is missing, a directory is not writable or a file cannot be read
-**the system** lets the session start, ends its session-start step with a success status, and reports the failure in at most one line that names `/praxion-complete-install` as the way to complete the refresh by hand
+**the system** lets the session start, ends its session-start step with a success status, and reports the failure in at most one line that names `/praxion-complete-install` as the way to complete the refresh by hand, carried by the `systemMessage` of the one JSON object that is the hook's whole standard output (SQ-06)
 **so that** an update can degrade a session's setup but never stop a session, and the user learns how to finish it.
 
 ### REQ-15: A failed render keeps the previous instructions
@@ -292,6 +292,13 @@ Assumptions taken while designing and planning (`LEARNINGS.md § Assumptions & C
 - The template keeps at most one placeholder per line with literal text around it, so a render changes nothing but the placeholders.
 - A declined first-install prompt in the recovery behaves as it does today: a decline marker, no completion marker, nothing else.
 - Loop agents (implementer and reviewer spawns the step-loop driver issues under a request id) are ledgered iterations, not charged spawns, per `scripts/spawn_count.py`. The charged estimate was 5 of 16; counted otherwise it would have been about 19.
+
+### SQ-06: On which channel does the failure line reach the user? (after archive)
+
+- **Kind:** specification (REQ-14 and SQ-03, raised by the orchestrator at the intake of td-619, 2026-11-10, pipeline `hook-report-channel`)
+- **Question:** SQ-03 settled which command the line names, but not where the line goes. The hook writes it to standard error and exits 0. Claude Code's hooks reference (`code.claude.com/docs/en/hooks.md`, re-read 2026-11-10) says Claude never sees a hook's stderr on exit 0, and gives debug logging as the only way to read it. A $0 run of the installed 0.61.0 hook in a throwaway home showed the line on stderr only, for each of the three failures the frozen test induces. So REQ-14's "so that ... the user learns how to finish it" was never met. The frozen `tests/acceptance/test_plugin_update_fails_open_and_quietly.py` could not show this: it reads `Session.lines`, which joins stdout and stderr, so it passes with the line on either stream. It was channel-blind, not a pin on stderr.
+- **Answer:** the line is carried by the `systemMessage` of exactly one JSON object, written as the hook's whole standard output, and is written nowhere else. `systemMessage` is the field the reference says is shown to the user, and the SessionStart section does not discard it. When the interpreter-floor notice (dec-500) fires in the same run, both lines share that one object, because two JSON lines on stdout are a parse failure. REQ-14 was amended in place, adding only its channel clause. Acceptance design (the test-engineer) amended the frozen test: two tests added, one that the line rides the message and one that standard error carries none of it, plus one sentence in its module docstring. No existing assertion changed, and its 17 existing tests still pass. The new behaviours (a first install's lines, the combined message, a quiet run) are specified in pipeline `hook-report-channel`. **Answered under the user's standing delegation:** the user named this output shape at intake ("one JSON object on stdout per run, combined with dec-500's `_tell_user_of_a_shortfall` line. Nothing else on stdout.").
+- **Resolved in:** 6adcfd60 (the acceptance-design commit of pipeline `hook-report-channel`)
 
 ## Footprint Readings
 

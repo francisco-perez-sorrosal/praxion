@@ -113,7 +113,7 @@ class TestFirstSessionNotice:
     def _run(module, monkeypatch, line: str | None) -> None:
         monkeypatch.setattr(module, "interpreter_notice", lambda: line)
         monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
-        module._run()
+        module.main()
 
     def test_a_shortfall_reaches_the_user_as_a_system_message(
         self, monkeypatch, capsys, fake_home, claude_md_symlink, rules_sentinel, marker_path

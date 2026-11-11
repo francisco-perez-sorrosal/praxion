@@ -233,9 +233,9 @@ def _confirm_install(home: Path, values: dict[str, str], auto_complete: bool) ->
     return accepted
 
 
-def _report_install_complete() -> None:
-    sys.stderr.write("[Praxion] Auto-install complete.\n")
-    sys.stderr.flush()
+def _install_complete_line() -> str:
+    """The line to report when a first install's setup completed."""
+    return "[Praxion] Auto-install complete."
 
 
 def _run_rule_linkers(home: Path, root: Path, functions: tuple[str, ...]) -> None:
@@ -403,26 +403,26 @@ def snapshot_instructions(path: Path) -> InstructionsSnapshot:
     return InstructionsSnapshot(SnapshotKind.OTHER, "", False)
 
 
-def _update_instructions(home: Path, root: Path) -> None:
+def _update_instructions(home: Path, root: Path) -> str | None:
     """Bring ~/.claude/CLAUDE.md to the plugin at `root`, by what it holds.
 
     A regular file and a link outside the cache are never touched. A live link
     into another cached version's render moves to `root`'s; one already into
     `root`'s version stays. Nothing there, or a link into the cache that no
-    longer resolves, is set up as a first install sets it up.
+    longer resolves, is set up as a first install sets it up, and only that
+    setup returns a line for the user: its completion.
     """
     link = home / _CLAUDE_MD_SUBPATH
     link_dir = str(link.parent)
     state = classify_instructions(snapshot_instructions(link), link_dir)
     if isinstance(state, (UserOwned, ForeignLink)):
-        return
+        return None
     if isinstance(state, CachedRender):
         if state.version_dir != cache_version_dir(str(root), link_dir):
             carry_forward_instructions(home, root, Path(state.version_dir))
-        return
+        return None
     if isinstance(state, (NoInstructions, MissingCachedRender)):
-        _fresh_instructions_setup(home, root)
-        return
+        return _fresh_instructions_setup(home, root)
     unreachable(state)
 
 
@@ -430,18 +430,19 @@ class InstallDeclinedError(Exception):
     """The operator refused the confirmation: nothing is set up, no completion is recorded."""
 
 
-def _fresh_instructions_setup(home: Path, root: Path) -> None:
+def _fresh_instructions_setup(home: Path, root: Path) -> str:
     """Set up ~/.claude/CLAUDE.md as the cold first install does, rules and scripts aside.
 
     Derives the personal values, asks the operator to confirm them (unless
-    auto-complete mode is on), renders into `root` and links the render. The
-    prompt goes to the terminal only. Raises InstallDeclinedError on a refusal.
+    auto-complete mode is on), renders into `root` and links the render, then
+    returns the completion line. The prompt goes to the terminal only. Raises
+    InstallDeclinedError on a refusal.
     """
     values = _default_values()
     if not _confirm_install(home, values, _resolve_mode()):
         raise InstallDeclinedError
     _render_claude_md(home, values, root)
-    _report_install_complete()
+    return _install_complete_line()
 
 
 def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> None:
@@ -496,43 +497,50 @@ def _with_defaults(
 
 
 # The update path's steps, in the one place that orders them. Each takes
-# (home, plugin root) and runs on its own, so a failing step never costs the next.
+# (home, plugin root) and runs on its own, so a failing step never costs the next;
+# a step may return a line for the user, and one that returns None has none.
 _UPDATE_STEPS = (_update_instructions, _update_rules, refresh_scripts)
 
 
-def _run_update_path(home: Path, root: Path) -> None:
+def _run_update_path(home: Path, root: Path) -> list[str]:
     """Refresh a completed install to the plugin at `root`, never raising.
 
-    Every step runs and the first failure is remembered; the marker is written
-    whatever happened, so a failing refresh is not retried at each session.
-    The exception is a refused first-install confirmation: it is no failure, and
-    it leaves the marker as it was, so the next session asks again.
+    Returns the lines for the user in firing order: those the steps return, then
+    the first failure's. Every step runs and the first failure is remembered;
+    the marker is written whatever happened, so a failing refresh is not retried
+    at each session. The exception is a refused first-install confirmation: it
+    is no failure, and it leaves the marker as it was, so the next session asks
+    again.
     """
+    lines: list[str] = []
     first_failure: Exception | None = None
     declined = False
     for step in _UPDATE_STEPS:
         try:
-            step(home, root)
+            line = step(home, root)
         except InstallDeclinedError:
             declined = True
         except Exception as exc:
             first_failure = first_failure or exc
+        else:
+            if line is not None:
+                lines.append(line)
     if not declined:
         try:
             _write_marker(home)
         except Exception:
             pass
     if first_failure is not None:
-        _report_incomplete("Update refresh", first_failure)
+        lines.append(_incomplete_line("Update refresh", first_failure))
+    return lines
 
 
-def _report_incomplete(what: str, failure: Exception) -> None:
-    """One stderr line naming `what` stopped, the exception type and the way to finish.
+def _incomplete_line(what: str, failure: Exception) -> str:
+    """The line to report that `what` stopped: the exception type and the way to finish.
 
     The type only: a message or value could carry a path or a personal detail.
     """
-    sys.stderr.write(
+    return (
         f"[Praxion] {what} could not finish ({type(failure).__name__}); "
-        "run /praxion-complete-install to complete it.\n"
+        "run /praxion-complete-install to complete it."
     )
-    sys.stderr.flush()

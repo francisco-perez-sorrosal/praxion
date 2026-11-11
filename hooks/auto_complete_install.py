@@ -19,9 +19,10 @@ Otherwise, from the plugin this hook runs from (its own version directory,
     it up, and a regular file or a clone's link is left alone; the rule and
     script links are refreshed, never taken over. Each step is fail-open and
     the marker is written whatever happened, except after a refused
-    confirmation. A fully successful run prints nothing; a failure prints one
-    stderr line carrying the exception type and the command that completes the
-    refresh by hand.
+    confirmation. A successful run reports nothing unless it set the
+    instructions up afresh, which reports that setup complete; a failure
+    reports one line carrying the exception type and the command that
+    completes the refresh by hand.
   - Surfaces already present (CLAUDE.md symlink and the rules sentinel, both
     resolving) but no update path (a first session after a clone install, or a
     `--plugin-dir` checkout root): refresh the rule links -- sweep each stale
@@ -29,7 +30,13 @@ Otherwise, from the plugin this hook runs from (its own version directory,
     marker. An existing live link is never re-pointed, so a clone install's links
     stay its own.
   - Otherwise (cold path): derive personal-info defaults, optionally prompt the
-    operator (30s timeout-accept), run install steps, write marker.
+    operator (30s timeout-accept), run install steps, write marker, and report
+    the install complete or the one line naming how to finish it.
+
+Every report is gathered in firing order and `main()` writes them as the one
+`systemMessage` the user sees: a SessionStart hook's stderr on exit 0 reaches
+neither Claude nor the user. Of the hook's own lines, only the confirmation
+prompt goes to stderr.
 
 Rule linking goes through the installer's own shell library
 (`lib/install_shared.sh`), so this hook, `install.sh` and `install.sh --check`
@@ -72,9 +79,9 @@ from _install_update import (  # noqa: E402 (after sys.path injection)
     _TRUTHY,
     _confirm_install,
     _default_values,
+    _incomplete_line,
+    _install_complete_line,
     _render_claude_md,
-    _report_incomplete,
-    _report_install_complete,
     _resolve_mode,
     _run_rule_linkers,
     _run_update_path,
@@ -253,17 +260,14 @@ def _is_update_run(home: Path, root: Path) -> bool:
     return marker.exists() and in_cache
 
 
-def _tell_user_of_a_shortfall() -> None:
-    """Name a `python3` below the hooks' floor as a `systemMessage`.
+def _shortfall_line() -> str | None:
+    """The line to report for a `python3` below the hooks' floor, or None at the floor.
 
-    JSON on stdout, the one channel a SessionStart hook has to the user: its
-    stderr on exit 0 reaches neither Claude nor the user.
+    The caller gathers it with the run's other reports for `main()` to write: a
+    SessionStart hook's stderr on exit 0 reaches neither Claude nor the user.
     """
     line = interpreter_notice()
-    if line is None:
-        return
-    sys.stdout.write(json.dumps({"systemMessage": f"[Praxion] {line}"}) + "\n")
-    sys.stdout.flush()
+    return None if line is None else f"[Praxion] {line}"
 
 
 def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
@@ -279,25 +283,59 @@ def _run_install(home: Path, values: dict[str, str], root: Path) -> None:
 
 
 def main() -> None:
-    """Hook entry point: read stdin, run fast-skip or cold path, exit 0."""
+    """Hook entry point: run, then write what the run gathered as one `systemMessage`.
+
+    The only function that writes standard output, and it writes once: the lines
+    gathered before an unexpected failure are still written. Exit 0 unconditionally.
+    """
+    lines: list[str] = []
     try:
-        _run()
+        _run(lines)
     except Exception:
         # Any unhandled error — exit 0 unconditionally to never block session start
         pass
+    try:
+        _write_system_message(lines)
+    except Exception:
+        # A closed pipe or an encoding error must not block session start either
+        _point_standard_output_at_devnull()
 
 
-def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, root: Path) -> None:
+def _point_standard_output_at_devnull() -> None:
+    """Make the interpreter's shutdown flush of what could not be written harmless.
+
+    A write that failed leaves its text buffered, and flushing it at exit would
+    fail again and turn the exit status into 120. Python's documented remedy for
+    a closed pipe is to point descriptor 1 at the null device.
+    """
+    try:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    except Exception:
+        # No descriptor to redirect (a replaced `sys.stdout`): nothing to flush at exit
+        pass
+
+
+def _write_system_message(lines: list[str]) -> None:
+    """Write the lines as the one JSON object a SessionStart hook reports through."""
+    if not lines:
+        return
+    sys.stdout.write(json.dumps({"systemMessage": "\n".join(lines)}) + "\n")
+    sys.stdout.flush()
+
+
+def _perform_install(
+    home: Path, values: dict[str, str], auto_complete: bool, root: Path
+) -> str | None:
     """Run the interactive-prompt + install sequence for the cold path.
 
     When auto_complete is False, prompts the operator (30s timeout-accept).
-    On decline writes a soft-decline marker and returns without installing.
-    On accept (or auto_complete=True), runs the full install and writes the
-    completion marker. A failed install is reported as one, with the command
-    that completes it, never as a success.
+    On decline writes a soft-decline marker and returns None without installing.
+    On accept (or auto_complete=True), runs the full install, writes the
+    completion marker and returns the line for the user. A failed install is
+    reported as one, with the command that completes it, never as a success.
     """
     if not _confirm_install(home, values, auto_complete):
-        return
+        return None
 
     # Run install steps (a failure is reported below; the marker is still written)
     failure: Exception | None = None
@@ -314,13 +352,18 @@ def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, ro
         pass
 
     if failure is None:
-        _report_install_complete()
-    else:
-        _report_incomplete("Auto-install", failure)
+        return _install_complete_line()
+    return _incomplete_line("Auto-install", failure)
 
 
-def _run() -> None:
-    """Core logic: fast-skip guards, the update path, then the install paths."""
+def _run(report: list[str] | None = None) -> None:
+    """Core logic: fast-skip guards, the update path, then the install paths.
+
+    Appends the lines the user should see to `report`, in firing order; a caller
+    with no use for them passes nothing.
+    """
+    report = [] if report is None else report
+
     # Drain stdin (required to avoid SIGPIPE; payload not needed for install logic)
     try:
         sys.stdin.read()
@@ -344,10 +387,12 @@ def _run() -> None:
         return
 
     # Every path below writes a marker, so this names a shortfall once per version.
-    _tell_user_of_a_shortfall()
+    shortfall = _shortfall_line()
+    if shortfall is not None:
+        report.append(shortfall)
 
     if _is_update_run(home, root):
-        _run_update_path(home, root)
+        report.extend(_run_update_path(home, root))
         return
 
     # Surfaces present without an update path (a clone install, or a checkout
@@ -364,7 +409,9 @@ def _run() -> None:
         return
 
     # Cold path: derive defaults and perform install
-    _perform_install(home, _default_values(), _resolve_mode(), root)
+    outcome = _perform_install(home, _default_values(), _resolve_mode(), root)
+    if outcome is not None:
+        report.append(outcome)
 
 
 if __name__ == "__main__":

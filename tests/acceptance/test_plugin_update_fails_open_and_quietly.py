@@ -2,7 +2,9 @@
 
 A refresh that fails (a directory not writable, a file that cannot be read) still ends the
 session-start step with a success status and reports itself in one line naming the command that
-finishes the job by hand; `~/.claude/CLAUDE.md` always resolves to a complete render. A later
+finishes the job by hand, carried by the message Claude Code shows the user (the `systemMessage` of
+the one JSON object that is the hook's whole standard output) and written nowhere else;
+`~/.claude/CLAUDE.md` always resolves to a complete render. A later
 session of the same version changes nothing and prints nothing, and no personal value ever
 reaches the session's output or a log.
 """
@@ -14,6 +16,7 @@ import time
 
 import pytest
 
+from tests.acceptance.drivers import hook_reports as hr
 from tests.acceptance.drivers import plugin_update as pu
 
 pytestmark = pytest.mark.skipif(
@@ -74,6 +77,19 @@ def test_a_failed_refresh_reports_itself_in_one_line_naming_the_command_to_finis
     lines = failed.session.lines
     assert len(lines) == 1, f"expected one report line, got {len(lines)}: {lines}"
     assert FINISH_BY_HAND in lines[0], lines[0]
+
+
+def test_a_failed_refresh_reports_itself_in_the_message_claude_code_shows_the_user(failed):
+    failed, _ = failed
+    lines = hr.message_lines(failed.session)
+    assert len(lines) == 1, f"expected one report line in the message, got {lines}"
+    assert lines[0].startswith(hr.PREFIX), lines[0]
+    assert FINISH_BY_HAND in lines[0], lines[0]
+
+
+def test_a_failed_refresh_writes_its_report_nowhere_but_that_message(failed):
+    failed, _ = failed
+    assert FINISH_BY_HAND not in failed.session.stderr, failed.session.stderr
 
 
 def test_a_failed_refresh_leaves_the_instructions_resolving_to_a_complete_render(failed):

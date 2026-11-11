@@ -422,7 +422,7 @@ def _update_instructions(home: Path, root: Path) -> str | None:
         return None
     if isinstance(state, CachedRender):
         if state.version_dir != cache_version_dir(str(root), link_dir):
-            carry_forward_instructions(home, root, Path(state.version_dir))
+            carry_forward_instructions(home, root, state)
         return None
     if isinstance(state, (NoInstructions, MissingCachedRender)):
         return _fresh_instructions_setup(home, root)
@@ -448,29 +448,41 @@ def _fresh_instructions_setup(home: Path, root: Path) -> str:
     return _install_complete_line()
 
 
-def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> None:
-    """Render `root`'s template with the values `version_dir`'s render carried, and link it.
+def carry_forward_instructions(home: Path, root: Path, state: CachedRender) -> None:
+    """Render `root`'s template with the values the render `state` names carried, and link it.
 
-    Raises UnrecoverableRenderError, before anything is written, when the
-    previous render cannot be read back as its own template's: falling back to
-    defaults would replace the user's identity with today's derived one. The
-    render is renamed into place before the link is swapped, so ~/.claude/CLAUDE.md
-    resolves to a complete render, the previous one or the new one, whatever fails.
+    The values are read back from `state.render`, the file the link names, not from
+    the version's primary render: a second render beside it can be the live one.
+    Raises UnrecoverableRenderError, before anything is written, when that render
+    cannot be read back as its version's template: falling back to defaults would
+    replace the user's identity with today's derived one.
     """
     carried = _render_mod.recover_values(
-        (version_dir / _TEMPLATE_RELATIVE).read_text(encoding="utf-8"),
-        (version_dir / _RENDER_RELATIVE).read_text(encoding="utf-8"),
+        (Path(state.version_dir) / _TEMPLATE_RELATIVE).read_text(encoding="utf-8"),
+        Path(state.render).read_text(encoding="utf-8"),
     )
     if carried is None:
         raise UnrecoverableRenderError
+    write_instructions(home, root, carried)
+
+
+def write_instructions(home: Path, root: Path, values: dict[str, str]) -> None:
+    """Render `root`'s template with `values` into its render, then link the render.
+
+    A key `values` lacks is filled from today's derived values; a derived value
+    never replaces one given. The render is renamed into place before the link is
+    swapped, so ~/.claude/CLAUDE.md resolves to a complete render, the previous
+    one or the new one, whatever fails. Prints nothing and saves no other copy of
+    the values: the terminal path shares this writer.
+    """
     template_path = root / _TEMPLATE_RELATIVE
-    missing = _missing_keys(template_path.read_text(encoding="utf-8"), carried)
+    missing = _missing_keys(template_path.read_text(encoding="utf-8"), values)
     # Derived only when a key is missing: it reads today's git identity.
-    values = _with_defaults(carried, missing, _render_mod.derive_defaults()) if missing else carried
+    filled = _with_defaults(values, missing, _render_mod.derive_defaults()) if missing else values
     rendered_path = root / _RENDER_RELATIVE
     _build_and_rename(
         rendered_path,
-        lambda temporary: _render_mod.render_claude_md(template_path, temporary, values),
+        lambda temporary: _render_mod.render_claude_md(template_path, temporary, filled),
     )
     _replace_link(home / _CLAUDE_MD_SUBPATH, str(rendered_path))
 

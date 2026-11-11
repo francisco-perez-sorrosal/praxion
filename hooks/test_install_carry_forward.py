@@ -196,6 +196,34 @@ class TestInstructionsCarryForward:
         assert link.read_text(encoding="utf-8").endswith("shell: {{SHELL_NAME}}\n")
         assert "{{SHELL_NAME}}" in capsys.readouterr().err
 
+    def test_a_link_naming_a_file_other_than_the_primary_render_is_the_one_read(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, link = updated
+        alternate = previous.with_name("CLAUDE.alternate.md")
+        alternate.write_text(_fill(_PREVIOUS_TEMPLATE, _TODAYS), encoding="utf-8")
+        link.unlink()
+        _link_instructions(fake_home, alternate)
+
+        update._update_instructions(fake_home, plugin_root)
+
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TODAYS)
+
+    def test_the_primary_render_is_not_read_when_the_link_names_another_file(
+        self, updated, fake_home, plugin_root
+    ):
+        module, previous, link = updated
+        alternate = previous.with_name("CLAUDE.alternate.md")
+        alternate.write_text("# rewritten by hand\n", encoding="utf-8")
+        link.unlink()
+        _link_instructions(fake_home, alternate)
+
+        with pytest.raises(update.UnrecoverableRenderError):
+            update._update_instructions(fake_home, plugin_root)
+
+        assert os.readlink(link) == str(alternate)
+        assert not (plugin_root / "claude" / "config" / "CLAUDE.md").exists()
+
     def test_an_unrecoverable_render_raises_its_own_error_type(
         self, updated, fake_home, plugin_root
     ):
@@ -362,3 +390,67 @@ class TestInstructionsCarryForward:
 
         renders = {previous, plugin_root / "claude" / "config" / "CLAUDE.md"}
         assert _files_holding(tmp_path, _CARRIED.values(), excluding=renders) == []
+
+
+class TestWriteInstructions:
+    """The one writer the update path and the terminal path share, given values."""
+
+    @pytest.fixture
+    def seeded(self, fake_home, plugin_root, monkeypatch):
+        monkeypatch.setenv("HOME", str(fake_home))
+        _seed_template(plugin_root, _NEW_TEMPLATE)
+        return fake_home / ".claude" / "CLAUDE.md"
+
+    def test_the_render_holds_the_given_values_and_the_link_points_at_it(
+        self, seeded, fake_home, plugin_root, monkeypatch
+    ):
+        calls = _record_derivations(monkeypatch, _TODAYS)
+
+        update.write_instructions(fake_home, plugin_root, _CARRIED)
+
+        render = plugin_root / "claude" / "config" / "CLAUDE.md"
+        assert (os.readlink(seeded), render.read_text(encoding="utf-8")) == (
+            str(render),
+            _fill(_NEW_TEMPLATE, _CARRIED),
+        )
+        assert calls == []
+
+    def test_only_the_keys_the_values_lack_are_filled_from_the_derived_ones(
+        self, seeded, fake_home, plugin_root, monkeypatch
+    ):
+        _record_derivations(monkeypatch, _TODAYS)
+        given = {"USERNAME": _CARRIED["USERNAME"], "EMAIL": _CARRIED["EMAIL"]}
+
+        update.write_instructions(fake_home, plugin_root, given)
+
+        expected = {**given, "GITHUB_URL": _TODAYS["GITHUB_URL"]}
+        assert seeded.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, expected)
+
+    def test_a_derived_value_never_replaces_a_given_one(
+        self, seeded, fake_home, plugin_root, monkeypatch
+    ):
+        _record_derivations(monkeypatch, _TODAYS)
+        given = {**_CARRIED, "GITHUB_URL": "{{GITHUB_URL}}"}
+
+        update.write_instructions(fake_home, plugin_root, given)
+
+        text = seeded.read_text(encoding="utf-8")
+        assert _CARRIED["USERNAME"] in text
+        assert _TODAYS["USERNAME"] not in text
+        assert _TODAYS["GITHUB_URL"] in text
+
+    def test_nothing_is_printed_and_no_other_copy_is_saved(
+        self, seeded, fake_home, plugin_root, monkeypatch, capsys, tmp_path
+    ):
+        _record_derivations(monkeypatch, _TODAYS)
+
+        update.write_instructions(fake_home, plugin_root, _CARRIED)
+
+        output = capsys.readouterr()
+        assert (output.out, output.err) == ("", "")
+        renders = {plugin_root / "claude" / "config" / "CLAUDE.md"}
+        assert _files_holding(tmp_path, _CARRIED.values(), excluding=renders) == []
+        assert sorted(p.name for p in (plugin_root / "claude" / "config").iterdir()) == [
+            "CLAUDE.md",
+            "CLAUDE.md.tmpl",
+        ]

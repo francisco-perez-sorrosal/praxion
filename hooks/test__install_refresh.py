@@ -44,6 +44,7 @@ CACHE_TARGETS_TABLE = (
 )
 LINK_DIR = "/home/example/.claude"
 VERSION_DIR = "/home/example/.claude/plugins/cache/example-market/praxion/0.60.0"
+RENDER = f"{VERSION_DIR}/claude/config/CLAUDE.md"
 
 
 def _cache_rows() -> list:
@@ -108,8 +109,8 @@ def test_link_outside_every_cache_version_directory_is_foreign_whether_live_or_d
 
 
 def test_live_link_into_a_cache_version_directory_is_a_cached_render():
-    snapshot = _link(f"{VERSION_DIR}/claude/config/CLAUDE.md")
-    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(VERSION_DIR)
+    snapshot = _link(RENDER)
+    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(VERSION_DIR, RENDER)
 
 
 def test_dangling_link_into_a_cache_version_directory_is_a_missing_cached_render():
@@ -119,7 +120,39 @@ def test_dangling_link_into_a_cache_version_directory_is_a_missing_cached_render
 
 def test_relative_link_text_into_the_cache_is_a_cached_render():
     snapshot = _link("plugins/cache/example-market/praxion/0.60.0/CLAUDE.md")
-    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(VERSION_DIR)
+    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(
+        VERSION_DIR, f"{VERSION_DIR}/CLAUDE.md"
+    )
+
+
+def test_a_render_that_is_not_the_primary_file_is_named_as_it_is():
+    alternate = f"{VERSION_DIR}/claude/config/CLAUDE.alternate.md"
+    state = classify_instructions(_link(alternate), LINK_DIR)
+    assert state == CachedRender(VERSION_DIR, alternate)
+
+
+def test_the_render_is_normalised_the_way_the_link_text_is():
+    text = f"{VERSION_DIR}/claude/rules/../config/./CLAUDE.alternate.md"
+    state = classify_instructions(_link(text), LINK_DIR)
+    assert state == CachedRender(VERSION_DIR, f"{VERSION_DIR}/claude/config/CLAUDE.alternate.md")
+
+
+@pytest.mark.parametrize(("link_dir", "target", "is_cache"), _cache_rows())
+def test_every_cache_row_names_a_render_inside_its_version_directory(link_dir, target, is_cache):
+    state = classify_instructions(InstructionsSnapshot(SnapshotKind.LINK, target, True), link_dir)
+    if not is_cache:
+        assert state == ForeignLink()
+        return
+    assert state.version_dir == cache_version_dir(target, link_dir)
+    assert state.render.startswith(state.version_dir + "/") or state.render == state.version_dir
+
+
+@pytest.mark.parametrize(
+    "render", ["/home/example/elsewhere/CLAUDE.md", f"{VERSION_DIR}-beta/claude/config/CLAUDE.md"]
+)
+def test_a_render_outside_its_version_directory_cannot_be_built(render):
+    with pytest.raises(ValueError, match="inside"):
+        CachedRender(VERSION_DIR, render)
 
 
 @pytest.mark.parametrize("kind", list(SnapshotKind))
@@ -132,7 +165,7 @@ def test_every_snapshot_kind_maps_to_exactly_one_state(kind):
 
 def test_states_are_immutable():
     with pytest.raises(dataclasses.FrozenInstanceError):
-        CachedRender(VERSION_DIR).version_dir = "elsewhere"  # type: ignore[misc]
+        CachedRender(VERSION_DIR, RENDER).version_dir = "elsewhere"  # type: ignore[misc]
 
 
 def test_unreachable_names_the_value_it_was_given():

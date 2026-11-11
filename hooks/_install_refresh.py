@@ -70,9 +70,19 @@ class ForeignLink:
 
 @dataclass(frozen=True)
 class CachedRender:
-    """A live link into the cache version directory `version_dir`."""
+    """A live link into the cache version directory `version_dir`.
+
+    `render` is the normalised path the link names, which is not always the version's
+    primary render: a hand-path install may link a second file beside it. It lies
+    inside `version_dir`; the check below is the invariant's enforcement point.
+    """
 
     version_dir: str
+    render: str
+
+    def __post_init__(self) -> None:
+        if not (self.render == self.version_dir or self.render.startswith(self.version_dir + "/")):
+            raise ValueError(f"render {self.render!r} must lie inside {self.version_dir!r}")
 
 
 @dataclass(frozen=True)
@@ -96,10 +106,11 @@ def classify_instructions(snapshot: InstructionsSnapshot, link_dir: str) -> Inst
 
 
 def _classify_link(snapshot: InstructionsSnapshot, link_dir: str) -> InstructionsState:
-    version_dir = cache_version_dir(snapshot.text, link_dir)
+    named = _normalised_link_text(snapshot.text, link_dir)
+    version_dir = _version_dir_of(named)
     if version_dir is None:
         return ForeignLink()
-    return CachedRender(version_dir) if snapshot.resolves else MissingCachedRender()
+    return CachedRender(version_dir, named) if snapshot.resolves else MissingCachedRender()
 
 
 # -- What to do to each script link ------------------------------------------------
@@ -208,8 +219,18 @@ def cache_version_dir(target: str, link_dir: str) -> str | None:
     Lexical: a relative text is joined to `link_dir` and normalised, so a dangling
     link answers the same as a live one.
     """
+    return _version_dir_of(_normalised_link_text(target, link_dir))
+
+
+def _normalised_link_text(target: str, link_dir: str) -> str:
+    """The path a link text names: joined to `link_dir` when relative, then normalised."""
     joined = target if posixpath.isabs(target) else posixpath.join(link_dir, target)
-    segments = posixpath.normpath(joined).split("/")
+    return posixpath.normpath(joined)
+
+
+def _version_dir_of(normalised: str) -> str | None:
+    """The cache version directory a normalised path lies in, or None."""
+    segments = normalised.split("/")
     for start in range(len(segments) - _ANCHOR_TO_VERSION_SPAN + 1):
         if _is_cache_structure(segments[start : start + _ANCHOR_TO_VERSION_SPAN]):
             return "/".join(segments[: start + _ANCHOR_TO_VERSION_SPAN])

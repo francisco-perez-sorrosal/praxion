@@ -1,7 +1,8 @@
 ---
-id: dec-draft-66aba0de
+id: dec-502
+draft_id: dec-draft-66aba0de
 title: No hook script reaches the PATH, by one installer predicate held equal to the first-session hook's
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-11
 summary: "install_claude.sh's script_is_user_facing now excludes every *-hook.sh script, not only git-*-hook.sh, matching the first-session hook's offered_scripts; every installer site (relink, the plugin hand path, --check) calls that one function, uninstall removes every link into scripts/ whatever today's filter says, and a parity test holds the bash and Python predicates equal over scripts/. scripts/diagram-regen-hook.sh, which only pre-commit runs and only by path, leaves ~/.local/bin on the next relink."

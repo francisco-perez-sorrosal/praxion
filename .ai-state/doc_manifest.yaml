@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-11T14:53:40Z'
+generated_at: '2026-11-11T16:06:34Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -676,7 +676,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-10'
+  last_modified: '2026-11-11'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -952,7 +952,7 @@ surfaces:
   path: .ai-state/decisions/042-scripts-filter-combined-predicate.md
   type: markdown
   title: Scripts install filter uses a combined predicate (executable + not-internal-helper) plus stale-symlink sweep
-  last_modified: '2026-04-12'
+  last_modified: '2026-11-11'
   renderer: adr_card
 - id: ai-state-decisions-043-behavioral-contract-layer
   path: .ai-state/decisions/043-behavioral-contract-layer.md
@@ -3711,11 +3711,17 @@ surfaces:
   title: The first-session hook sends every report to the user as one systemMessage per run
   last_modified: '2026-11-11'
   renderer: adr_card
+- id: ai-state-decisions-502-hook-scripts-stay-off-the-path
+  path: .ai-state/decisions/502-hook-scripts-stay-off-the-path.md
+  type: markdown
+  title: No hook script reaches the PATH, by one installer predicate held equal to the first-session hook's
+  last_modified: '2026-11-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-10'
+  last_modified: '2026-11-11'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4684,6 +4690,7 @@ groups:
   - ai-state-decisions-499-update-path-refreshes-instructions-and-script-links
   - ai-state-decisions-500-hook-interpreter-floor
   - ai-state-decisions-501-hook-report-channel-first-session-reports-as-one-system-message
+  - ai-state-decisions-502-hook-scripts-stay-off-the-path
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

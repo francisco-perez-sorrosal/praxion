@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-11T16:06:34Z'
+generated_at: '2026-11-11T19:01:02Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -3717,6 +3717,12 @@ surfaces:
   title: No hook script reaches the PATH, by one installer predicate held equal to the first-session hook's
   last_modified: '2026-11-11'
   renderer: adr_card
+- id: ai-state-decisions-503-likec4-server-only-where-it-has-a-model
+  path: .ai-state/decisions/503-likec4-server-only-where-it-has-a-model.md
+  type: markdown
+  title: The plugin's likec4 MCP server runs only where its workspace holds a model
+  last_modified: '2026-11-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4691,6 +4697,7 @@ groups:
   - ai-state-decisions-500-hook-interpreter-floor
   - ai-state-decisions-501-hook-report-channel-first-session-reports-as-one-system-message
   - ai-state-decisions-502-hook-scripts-stay-off-the-path
+  - ai-state-decisions-503-likec4-server-only-where-it-has-a-model
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

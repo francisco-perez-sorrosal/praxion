@@ -1,7 +1,8 @@
 ---
-id: dec-draft-cd95f438
+id: dec-503
+draft_id: dec-draft-cd95f438
 title: "The plugin's likec4 MCP server runs only where its workspace holds a model"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-11
 summary: "A launcher, scripts/likec4_mcp_gate.py, becomes the plugin's likec4 server entry: it runs npx -y @likec4/mcp, the command the plugin ran before, only when LIKEC4_WORKSPACE (docs/diagrams/) under the project directory holds a .c4 file, and otherwise answers MCP itself with no instructions and no tools, so a project with no model stops paying about 1,330 tokens of instructions and 460 of tool names per session."

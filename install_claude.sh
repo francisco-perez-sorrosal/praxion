@@ -580,8 +580,14 @@ complete_install_from_plugin() {
     complete_install_scripts_step
 
     # ---- LEGACY-CHUB-CLEANUP: offer to remove any leftover context-hub state ----
+    # Interactive, so it runs in an uncaptured subshell rather than through run_fail_soft:
+    # a failure (end of input at its prompt included) must not cost the instructions step.
     printf "\n"
-    legacy_chub_cleanup_claude offer
+    set +e
+    (set -e; legacy_chub_cleanup_claude offer)
+    local legacy_status=$?
+    set -e
+    [ "$legacy_status" -eq 0 ] || warn "Leftover-state cleanup could not finish; run this command again to retry it"
 
     complete_install_instructions_step
     complete_install_report

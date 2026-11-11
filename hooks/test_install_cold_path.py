@@ -327,7 +327,7 @@ class TestInteractiveAndTimeoutBranches:
 
 
 class TestErrorResilience:
-    """Internal errors → exit 0, stderr message, no crash, no block."""
+    """Internal errors → exit 0, the failure line on standard output, no crash, no block."""
 
     @pytest.mark.usefixtures("_clear_praxion_env")
     def test_empty_stdin_exits_zero(self, fake_home, minimal_session_payload):
@@ -349,7 +349,7 @@ class TestErrorResilience:
 
     @pytest.mark.usefixtures("_clear_praxion_env")
     def test_permission_error_on_home_exits_zero(self, tmp_path, minimal_session_payload):
-        """Filesystem permission error during install → exit 0, error on stderr."""
+        """Filesystem permission error during install → exit 0, the failure line on standard output."""
         # Create a home dir without write permissions on .claude/
         home = tmp_path / "noperm_home"
         claude_dir = home / ".claude"

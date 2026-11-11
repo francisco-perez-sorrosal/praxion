@@ -12,10 +12,12 @@ from __future__ import annotations
 import io
 import json
 import os
+import subprocess
 import sys
 
 import pytest
 from test_auto_complete_install import (
+    _MODULE_PATH,
     _cached_version,
     _fake_home_module,
     _no_ambient_plugin_root,
@@ -91,6 +93,30 @@ class TestOneSystemMessage:
         monkeypatch.setattr(sys, "stdout", _ClosedPipe())
 
         hook.main()  # must not raise
+
+
+class TestAClosedStandardOutput:
+    def test_the_hook_exits_zero_when_the_reader_of_standard_output_has_gone(
+        self, monkeypatch, fake_home, plugin_root
+    ):
+        """A first install with no template reports a failure line; nobody is left to read it."""
+        monkeypatch.setenv("HOME", str(fake_home))
+        monkeypatch.setenv("CLAUDE_PLUGIN_ROOT", str(plugin_root))
+        monkeypatch.setenv("PRAXION_AUTO_COMPLETE", "1")
+        read_end, write_end = os.pipe()
+        os.close(read_end)  # the reader is gone before the hook writes
+
+        with os.fdopen(write_end, "w") as closed_reader:
+            result = subprocess.run(
+                [sys.executable, str(_MODULE_PATH)],
+                input="{}",
+                text=True,
+                stdout=closed_reader,
+                stderr=subprocess.PIPE,
+                timeout=10,
+            )
+
+        assert result.returncode == 0, result.stderr
 
 
 def _message_and_error(capsys) -> tuple[list[str], str]:

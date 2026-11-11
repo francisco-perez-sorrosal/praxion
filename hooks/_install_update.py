@@ -233,8 +233,8 @@ def _confirm_install(home: Path, values: dict[str, str], auto_complete: bool) ->
     return accepted
 
 
-def _report_install_complete() -> str:
-    """The line telling the user a first install's setup completed."""
+def _install_complete_line() -> str:
+    """The line to report when a first install's setup completed."""
     return "[Praxion] Auto-install complete."
 
 
@@ -442,7 +442,7 @@ def _fresh_instructions_setup(home: Path, root: Path) -> str:
     if not _confirm_install(home, values, _resolve_mode()):
         raise InstallDeclinedError
     _render_claude_md(home, values, root)
-    return _report_install_complete()
+    return _install_complete_line()
 
 
 def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> None:
@@ -531,12 +531,12 @@ def _run_update_path(home: Path, root: Path) -> list[str]:
         except Exception:
             pass
     if first_failure is not None:
-        lines.append(_report_incomplete("Update refresh", first_failure))
+        lines.append(_incomplete_line("Update refresh", first_failure))
     return lines
 
 
-def _report_incomplete(what: str, failure: Exception) -> str:
-    """The line for the user naming `what` stopped, the exception type and the way to finish.
+def _incomplete_line(what: str, failure: Exception) -> str:
+    """The line to report that `what` stopped: the exception type and the way to finish.
 
     The type only: a message or value could carry a path or a personal detail.
     """

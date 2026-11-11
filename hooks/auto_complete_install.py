@@ -79,9 +79,9 @@ from _install_update import (  # noqa: E402 (after sys.path injection)
     _TRUTHY,
     _confirm_install,
     _default_values,
+    _incomplete_line,
+    _install_complete_line,
     _render_claude_md,
-    _report_incomplete,
-    _report_install_complete,
     _resolve_mode,
     _run_rule_linkers,
     _run_update_path,
@@ -260,8 +260,8 @@ def _is_update_run(home: Path, root: Path) -> bool:
     return marker.exists() and in_cache
 
 
-def _tell_user_of_a_shortfall() -> str | None:
-    """The line naming a `python3` below the hooks' floor, or None at the floor.
+def _shortfall_line() -> str | None:
+    """The line to report for a `python3` below the hooks' floor, or None at the floor.
 
     The caller gathers it with the run's other reports for `main()` to write: a
     SessionStart hook's stderr on exit 0 reaches neither Claude nor the user.
@@ -298,6 +298,20 @@ def main() -> None:
         _write_system_message(lines)
     except Exception:
         # A closed pipe or an encoding error must not block session start either
+        _point_standard_output_at_devnull()
+
+
+def _point_standard_output_at_devnull() -> None:
+    """Make the interpreter's shutdown flush of what could not be written harmless.
+
+    A write that failed leaves its text buffered, and flushing it at exit would
+    fail again and turn the exit status into 120. Python's documented remedy for
+    a closed pipe is to point descriptor 1 at the null device.
+    """
+    try:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    except Exception:
+        # No descriptor to redirect (a replaced `sys.stdout`): nothing to flush at exit
         pass
 
 
@@ -338,8 +352,8 @@ def _perform_install(
         pass
 
     if failure is None:
-        return _report_install_complete()
-    return _report_incomplete("Auto-install", failure)
+        return _install_complete_line()
+    return _incomplete_line("Auto-install", failure)
 
 
 def _run(report: list[str] | None = None) -> None:
@@ -373,7 +387,7 @@ def _run(report: list[str] | None = None) -> None:
         return
 
     # Every path below writes a marker, so this names a shortfall once per version.
-    shortfall = _tell_user_of_a_shortfall()
+    shortfall = _shortfall_line()
     if shortfall is not None:
         report.append(shortfall)
 

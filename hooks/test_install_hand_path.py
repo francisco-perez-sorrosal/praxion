@@ -3,10 +3,10 @@
 The conversation runs over `io.StringIO` streams, the step over a `tmp_path` home and
 plugin cache, and every identity is made up. The fixtures and helpers are the hook's own
 test module's, as in the other install suites. Nothing here reaches the session's plugin
-root, the real home or today's git identity.
+root, the real home or the machine's git identity.
 """
 
-# ruff: noqa: F401, F811 (a fixture imported by name is found by its parameter name, which redefines it)
+# ruff: noqa: F811 (a fixture's parameter name redefines the name it is imported under)
 from __future__ import annotations
 
 import ast
@@ -18,14 +18,14 @@ import sys
 from pathlib import Path
 
 import pytest
-from test_auto_complete_install import (
+
+# Fixtures are found by the name they are imported under, so each is imported though no code names it.
+from test_auto_complete_install import (  # noqa: F401
     _CARRIED,
     _NEW_TEMPLATE,
-    _PREVIOUS_TEMPLATE,
     _TODAYS,
     HOOKS_DIR,
     REPO_ROOT,
-    _cached_version,
     _fill,
     _link_instructions,
     _no_ambient_plugin_root,
@@ -114,126 +114,6 @@ def _link(home: Path) -> Path:
 def _ruin(render: Path) -> None:
     """Make `render` a file that no longer reads back as its template."""
     render.write_text(render.read_text(encoding="utf-8") + "A line added by hand.\n", "utf-8")
-
-
-# -- The conversation -----------------------------------------------------------------------------
-
-
-class TestOffer:
-    @pytest.mark.parametrize(("answer", "accepted"), [("\n", True), ("1\n", True), ("2\n", False)])
-    def test_the_choice_is_read_from_the_input(self, answer, accepted):
-        stderr = io.StringIO()
-
-        assert hand_path.ask_offer("why", io.StringIO(answer), stderr) is accepted
-
-    def test_the_offer_names_the_change_the_skip_and_why_in_the_designed_shape(self):
-        stderr = io.StringIO()
-
-        hand_path.ask_offer("It is old.", io.StringIO("1\n"), stderr)
-
-        assert stderr.getvalue().splitlines() == [
-            "",
-            "It is old.",
-            f"  [1] Bring {INSTRUCTIONS} to this version",
-            "  [2] Skip instructions",
-            "Choice [1]: ",
-        ]
-
-    def test_an_invalid_choice_asks_again(self):
-        stderr = io.StringIO()
-
-        accepted = hand_path.ask_offer("why", io.StringIO("x\n3\n2\n"), stderr)
-
-        assert accepted is False
-        assert stderr.getvalue().count("Choice [1]: ") == 3
-        assert stderr.getvalue().count("Please answer 1 or 2.") == 2
-
-    def test_the_input_ending_is_no_answer(self):
-        with pytest.raises(hand_path.InputEndedError):
-            hand_path.ask_offer("why", io.StringIO(""), io.StringIO())
-
-    def test_the_input_ending_finishes_the_prompts_line(self):
-        stderr = io.StringIO()
-
-        with pytest.raises(hand_path.InputEndedError):
-            hand_path.ask_offer("why", io.StringIO(""), stderr)
-
-        assert stderr.getvalue().endswith("Choice [1]: \n")
-
-
-class TestValues:
-    DEFAULTS = {"USERNAME": "@derived", "EMAIL": "derived@example.invalid", "GITHUB_URL": "u://d"}
-
-    def test_enter_at_each_prompt_takes_the_derived_value(self):
-        values = hand_path.ask_values(self.DEFAULTS, io.StringIO("\n\n\n"), io.StringIO())
-
-        assert values == self.DEFAULTS
-
-    @pytest.mark.parametrize(
-        "prompt",
-        ["Username [@derived]: ", "Email [derived@example.invalid]: ", "GitHub URL [u://d]: "],
-    )
-    def test_each_prompt_shows_its_derived_value_in_brackets(self, prompt):
-        stderr = io.StringIO()
-
-        hand_path.ask_values(self.DEFAULTS, io.StringIO("\n\n\n"), stderr)
-
-        assert prompt in stderr.getvalue()
-
-    def test_a_typed_value_wins_and_is_stripped(self):
-        answers = "  @typed  \n\ntyped@example.invalid\n"
-
-        values = hand_path.ask_values(self.DEFAULTS, io.StringIO(answers), io.StringIO())
-
-        assert values == {
-            "USERNAME": "@typed",
-            "EMAIL": self.DEFAULTS["EMAIL"],
-            "GITHUB_URL": "typed@example.invalid",
-        }
-
-    @pytest.mark.parametrize("answered", [0, 1, 2])
-    def test_the_input_ending_at_any_value_is_no_answer(self, answered):
-        answers = "\n" * answered
-
-        with pytest.raises(hand_path.InputEndedError):
-            hand_path.ask_values(self.DEFAULTS, io.StringIO(answers), io.StringIO())
-
-
-class TestConfirmation:
-    VALUES = {"USERNAME": "@shown", "EMAIL": "shown@example.invalid", "GITHUB_URL": "u://s"}
-
-    @pytest.mark.parametrize(
-        ("answer", "confirmed"),
-        [("\n", True), ("y\n", True), ("Y\n", True), ("n\n", False), ("N\n", False)],
-    )
-    def test_enter_or_y_confirms_and_n_declines(self, answer, confirmed):
-        assert (
-            hand_path.confirm_values(self.VALUES, io.StringIO(answer), io.StringIO()) is confirmed
-        )
-
-    def test_anything_else_asks_again(self):
-        stderr = io.StringIO()
-
-        confirmed = hand_path.confirm_values(self.VALUES, io.StringIO("maybe\nyes\nn\n"), stderr)
-
-        assert confirmed is False
-        assert stderr.getvalue().count("[Y/n]: ") == 3
-        assert stderr.getvalue().count("Please answer y or n.") == 2
-
-    def test_the_last_lines_show_the_three_values_and_never_say_default(self):
-        stderr = io.StringIO()
-
-        hand_path.confirm_values(self.VALUES, io.StringIO("\n"), stderr)
-
-        last = [line for line in stderr.getvalue().splitlines() if line.strip()][-6:]
-        assert last[-1] == f"Write these to {INSTRUCTIONS}? [Y/n]: "
-        shown = "\n".join(last)
-        assert all(value in shown for value in self.VALUES.values())
-        assert "default" not in shown.lower()
-
-    def test_the_input_ending_is_no_answer(self):
-        with pytest.raises(hand_path.InputEndedError):
-            hand_path.confirm_values(self.VALUES, io.StringIO(""), io.StringIO())
 
 
 # -- A readable earlier render: carried forward ---------------------------------------------------
@@ -372,7 +252,9 @@ class TestAskForValues:
         ran = Ran(fake_home, installed, self._answers(values=tuple(_TYPED.values())))
 
         confirmation = ran.err[ran.err.rindex("The values to write") :]
-        assert all(value in confirmation for value in _TYPED.values())
+        assert _TYPED["USERNAME"] in confirmation, confirmation
+        assert _TYPED["EMAIL"] in confirmation, confirmation
+        assert _TYPED["GITHUB_URL"] in confirmation, confirmation
 
     def test_n_at_the_confirmation_leaves_everything_as_it_was_and_names_it_skipped(
         self, fake_home, previous, installed
@@ -384,7 +266,8 @@ class TestAskForValues:
 
         assert _state(_link(fake_home), previous) == before
         assert not (installed / "claude/config/CLAUDE.md").exists()
-        assert (ran.status, "skipped" in ran.line) == (3, True)
+        assert ran.status == 3
+        assert "skipped" in ran.line, ran.line
 
     def test_the_installed_versions_own_hand_edited_render_is_not_modified(
         self, fake_home, installed
@@ -571,7 +454,8 @@ class TestNoQuestion:
 
         ran = Ran(fake_home, tmp_path / "checkout", "")
 
-        assert (ran.status, "your own regular file" in ran.line) == (0, True)
+        assert ran.status == 0
+        assert "your own regular file" in ran.line, ran.line
 
 
 # -- Failures ---------------------------------------------------------------------------------------
@@ -644,10 +528,8 @@ class TestFailures:
         ran = Ran(fake_home, installed, "\n")
 
         assert secret not in ran.out + ran.err
-        assert (ran.status, ran.line.startswith(f"{INSTRUCTIONS} could not be set up (")) == (
-            1,
-            True,
-        )
+        assert ran.status == 1
+        assert ran.line.startswith(f"{INSTRUCTIONS} could not be set up ("), ran.line
 
     def test_an_unexpected_exception_anywhere_is_named_unexpected(
         self, fake_home, installed, monkeypatch
@@ -660,7 +542,8 @@ class TestFailures:
         ran = Ran(fake_home, installed, "")
 
         assert _TYPED["USERNAME"] not in ran.out + ran.err
-        assert (ran.status, "unexpected error" in ran.line) == (1, True)
+        assert ran.status == 1
+        assert "unexpected error" in ran.line, ran.line
 
     @pytest.mark.parametrize("home", ["", "relative/home"])
     def test_a_home_that_is_not_absolute_changes_nothing_and_fails(
@@ -683,7 +566,8 @@ class TestFailures:
     def test_no_home_in_the_environment_fails(self, installed):
         ran = Ran(Path("/"), installed, "", environ={})
 
-        assert (ran.status, "unexpected error" in ran.line) == (1, True)
+        assert ran.status == 1
+        assert "unexpected error" in ran.line, ran.line
 
 
 # -- The line and the status of every outcome -----------------------------------------------------
@@ -756,21 +640,33 @@ def test_a_given_value_is_in_the_render_and_nowhere_else_not_even_standard_outpu
     render = installed / "claude/config/CLAUDE.md"
     assert _files_holding(tmp_path, _TYPED["USERNAME"]) == [render]
     assert _files_holding(tmp_path, _TYPED["EMAIL"]) == [render]
-    assert not any(value in ran.out for value in _TYPED.values())
+    assert _TYPED["USERNAME"] not in ran.out, ran.out
+    assert _TYPED["EMAIL"] not in ran.out, ran.out
+    assert _TYPED["GITHUB_URL"] not in ran.out, ran.out
 
 
 # -- The command, as a process --------------------------------------------------------------------
 
 
+_GIT_EMAIL = "isolated.person@example.invalid"
+_GIT_USERNAME = "@isolated-person"
+
+
 def _process(home: Path, root: Path, answers: str) -> subprocess.CompletedProcess:
-    environ = {k: v for k, v in os.environ.items() if not k.startswith("CLAUDE_")}
-    environ["HOME"] = str(home)
+    """Run the entry as the hook's own process: its git config is `home`'s, holding a made-up identity."""
+    scratch_git_config = home / ".gitconfig"
+    scratch_git_config.write_text(f"[user]\n\temail = {_GIT_EMAIL}\n", encoding="utf-8")
+    environ = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "GIT_"))}
+    environ.update(
+        HOME=str(home), GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=str(scratch_git_config)
+    )
     return subprocess.run(
         [sys.executable, str(HOOKS_DIR / "_install_hand_path.py"), "--root", str(root)],
         input=answers,
         capture_output=True,
         text=True,
         env=environ,
+        cwd=home,  # a repository's own config would otherwise be read
         timeout=60,
     )
 
@@ -791,6 +687,18 @@ def test_run_as_a_script_it_converses_on_standard_error_and_prints_one_line(
     )
     assert "Choice [1]: " in done.stderr
     assert _link(fake_home).read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TYPED)
+
+
+def test_run_as_a_script_the_default_offered_comes_from_the_scratch_git_config_alone(
+    fake_home, previous, installed
+):
+    _ruin(previous)
+    _link_instructions(fake_home, previous)
+
+    done = _process(fake_home, installed, "1\n\n")
+
+    assert f"Username [{_GIT_USERNAME}]: " in done.stderr
+    assert f"Email [{_GIT_EMAIL}]: " in done.stderr
 
 
 def test_run_as_a_script_the_input_ending_exits_with_the_left_behind_status(

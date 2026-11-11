@@ -571,7 +571,9 @@ class TestRealInstallLayout:
         ), result.stderr
         claude_md = fake_home / ".claude" / "CLAUDE.md"
         assert claude_md.resolve() == (plugin_root / "claude" / "config" / "CLAUDE.md").resolve()
-        assert "Auto-install complete" in result.stderr
+        assert "[Praxion] Auto-install complete." in (
+            json.loads(result.stdout)["systemMessage"].splitlines()
+        )
 
 
 class TestHookNeverRaisesIntoTheHarness:

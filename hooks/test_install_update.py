@@ -435,9 +435,11 @@ class TestUpdatePath:
 
         monkeypatch.setattr(update, "_UPDATE_STEPS", (_step("first"), _step("second")))
 
-    def _run_hook(self, module, monkeypatch) -> None:
+    def _run_hook(self, module, monkeypatch) -> list[str]:
         monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
-        module._run()
+        lines: list[str] = []
+        module._run(lines)
+        return lines
 
     def test_the_steps_are_the_instructions_then_the_rules_then_the_scripts(self, fake_home):
         assert update._UPDATE_STEPS == (
@@ -535,23 +537,22 @@ class TestUpdatePath:
         secret = "/home/someone/private-value"
         self._recording_steps(monkeypatch, [], fail={"first": PermissionError(secret)})
 
-        self._run_hook(module, monkeypatch)
+        lines = self._run_hook(module, monkeypatch)
 
-        captured = capsys.readouterr()
-        assert captured.out == ""
-        assert captured.err == (
+        assert capsys.readouterr() == ("", "")
+        assert lines == [
             "[Praxion] Update refresh could not finish (PermissionError); "
-            "run /praxion-complete-install to complete it.\n"
-        )
+            "run /praxion-complete-install to complete it."
+        ]
 
-    def test_the_first_of_several_failures_is_the_one_reported(self, armed, monkeypatch, capsys):
+    def test_the_first_of_several_failures_is_the_one_reported(self, armed, monkeypatch):
         module = _fake_home_module(monkeypatch, armed)
         fail = {"first": KeyError("a"), "second": OSError("b")}
         self._recording_steps(monkeypatch, [], fail=fail)
 
-        self._run_hook(module, monkeypatch)
+        lines = self._run_hook(module, monkeypatch)
 
-        assert capsys.readouterr().err.count("(KeyError)") == 1
+        assert [line.count("(KeyError)") for line in lines] == [1]
 
     def test_the_marker_is_rewritten_after_a_failure(self, armed, marker_path, monkeypatch):
         module = _fake_home_module(monkeypatch, armed)
@@ -565,21 +566,20 @@ class TestUpdatePath:
         module = _fake_home_module(monkeypatch, armed)
         self._recording_steps(monkeypatch, [])
 
-        self._run_hook(module, monkeypatch)
+        lines = self._run_hook(module, monkeypatch)
 
-        captured = capsys.readouterr()
-        assert (captured.out, captured.err) == ("", "")
+        assert (lines, capsys.readouterr()) == ([], ("", ""))
 
     def test_an_unwritable_marker_after_a_failure_still_reports_the_failure(
-        self, armed, marker_path, monkeypatch, capsys
+        self, armed, marker_path, monkeypatch
     ):
         marker_path.unlink()
         marker_path.mkdir()
         self._recording_steps(monkeypatch, [], fail={"second": OSError("disk")})
 
-        update._run_update_path(armed, armed)
+        lines = update._run_update_path(armed, armed)
 
-        assert "(OSError)" in capsys.readouterr().err
+        assert [line.count("(OSError)") for line in lines] == [1]
 
 
 class TestSnapshotInstructions:
@@ -740,16 +740,16 @@ class TestInstructionStates:
         )
 
     def test_a_failed_setup_is_reported_once_and_the_marker_is_still_written(
-        self, fake_home, plugin_root, marker_path, capsys
+        self, fake_home, plugin_root, marker_path
     ):
         _dangling_cache_link(fake_home)  # no template is seeded: the render fails
 
-        update._run_update_path(fake_home, plugin_root)
+        lines = update._run_update_path(fake_home, plugin_root)
 
-        assert capsys.readouterr().err == (
+        assert lines == [
             "[Praxion] Update refresh could not finish (FileNotFoundError); "
-            "run /praxion-complete-install to complete it.\n"
-        )
+            "run /praxion-complete-install to complete it."
+        ]
         assert marker_path.exists()
 
 
@@ -775,14 +775,14 @@ class TestInstructionSetupPrompt:
         assert marker_path.stat().st_mtime == 1_000_000
 
     def test_a_refusal_is_no_failure_and_the_rules_and_scripts_are_still_refreshed(
-        self, dangling, plugin_root, monkeypatch, capsys
+        self, dangling, plugin_root, monkeypatch
     ):
         _seed_script(plugin_root / "scripts", "praxion-dashboard")
         monkeypatch.setattr(sys, "stdin", io.StringIO("n\n"))
 
-        update._run_update_path(dangling, plugin_root)
+        lines = update._run_update_path(dangling, plugin_root)
 
-        assert "could not finish" not in capsys.readouterr().err
+        assert lines == []
         assert (dangling / ".local" / "bin" / "praxion-dashboard").is_symlink()
 
     def test_the_prompt_shows_on_the_terminal_and_nowhere_else(
@@ -791,10 +791,10 @@ class TestInstructionSetupPrompt:
         monkeypatch.setattr(sys, "stdin", io.StringIO("\n"))
         monkeypatch.setattr(update._render_mod, "derive_defaults", lambda: dict(_TODAYS))
 
-        update._run_update_path(dangling, plugin_root)
+        lines = update._run_update_path(dangling, plugin_root)
 
         captured = capsys.readouterr()
         assert _TODAYS["EMAIL"] in captured.err
-        assert captured.err.endswith("[Praxion] Auto-install complete.\n")
+        assert lines == ["[Praxion] Auto-install complete."]
         assert captured.out == ""
         assert marker_path.stat().st_mtime > 1_000_000

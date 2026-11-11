@@ -19,9 +19,10 @@ Otherwise, from the plugin this hook runs from (its own version directory,
     it up, and a regular file or a clone's link is left alone; the rule and
     script links are refreshed, never taken over. Each step is fail-open and
     the marker is written whatever happened, except after a refused
-    confirmation. A fully successful run prints nothing; a failure prints one
-    stderr line carrying the exception type and the command that completes the
-    refresh by hand.
+    confirmation. A successful run reports nothing unless it set the
+    instructions up afresh, which reports that setup complete; a failure
+    reports one line carrying the exception type and the command that
+    completes the refresh by hand.
   - Surfaces already present (CLAUDE.md symlink and the rules sentinel, both
     resolving) but no update path (a first session after a clone install, or a
     `--plugin-dir` checkout root): refresh the rule links -- sweep each stale
@@ -29,7 +30,13 @@ Otherwise, from the plugin this hook runs from (its own version directory,
     marker. An existing live link is never re-pointed, so a clone install's links
     stay its own.
   - Otherwise (cold path): derive personal-info defaults, optionally prompt the
-    operator (30s timeout-accept), run install steps, write marker.
+    operator (30s timeout-accept), run install steps, write marker, and report
+    the install complete or the one line naming how to finish it.
+
+Every report is gathered in firing order and `main()` writes them as the one
+`systemMessage` the user sees: a SessionStart hook's stderr on exit 0 reaches
+neither Claude nor the user. Of the hook's own lines, only the confirmation
+prompt goes to stderr.
 
 Rule linking goes through the installer's own shell library
 (`lib/install_shared.sh`), so this hook, `install.sh` and `install.sh --check`
@@ -302,17 +309,19 @@ def _write_system_message(lines: list[str]) -> None:
     sys.stdout.flush()
 
 
-def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, root: Path) -> None:
+def _perform_install(
+    home: Path, values: dict[str, str], auto_complete: bool, root: Path
+) -> str | None:
     """Run the interactive-prompt + install sequence for the cold path.
 
     When auto_complete is False, prompts the operator (30s timeout-accept).
-    On decline writes a soft-decline marker and returns without installing.
-    On accept (or auto_complete=True), runs the full install and writes the
-    completion marker. A failed install is reported as one, with the command
-    that completes it, never as a success.
+    On decline writes a soft-decline marker and returns None without installing.
+    On accept (or auto_complete=True), runs the full install, writes the
+    completion marker and returns the line for the user. A failed install is
+    reported as one, with the command that completes it, never as a success.
     """
     if not _confirm_install(home, values, auto_complete):
-        return
+        return None
 
     # Run install steps (a failure is reported below; the marker is still written)
     failure: Exception | None = None
@@ -329,9 +338,8 @@ def _perform_install(home: Path, values: dict[str, str], auto_complete: bool, ro
         pass
 
     if failure is None:
-        _report_install_complete()
-    else:
-        _report_incomplete("Auto-install", failure)
+        return _report_install_complete()
+    return _report_incomplete("Auto-install", failure)
 
 
 def _run(report: list[str] | None = None) -> None:
@@ -370,7 +378,7 @@ def _run(report: list[str] | None = None) -> None:
         report.append(shortfall)
 
     if _is_update_run(home, root):
-        _run_update_path(home, root)
+        report.extend(_run_update_path(home, root))
         return
 
     # Surfaces present without an update path (a clone install, or a checkout
@@ -387,7 +395,9 @@ def _run(report: list[str] | None = None) -> None:
         return
 
     # Cold path: derive defaults and perform install
-    _perform_install(home, _default_values(), _resolve_mode(), root)
+    outcome = _perform_install(home, _default_values(), _resolve_mode(), root)
+    if outcome is not None:
+        report.append(outcome)
 
 
 if __name__ == "__main__":

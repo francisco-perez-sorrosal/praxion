@@ -199,18 +199,18 @@ class TestInstructionsCarryForward:
         ]
 
     def test_an_unrecoverable_render_is_reported_in_one_line_naming_its_type(
-        self, updated, fake_home, plugin_root, monkeypatch, capsys
+        self, updated, fake_home, plugin_root, monkeypatch
     ):
         module, previous, _ = updated
         previous.write_text("# rewritten by hand\n", encoding="utf-8")
         monkeypatch.setattr(update, "_UPDATE_STEPS", (update._update_instructions,))
 
-        update._run_update_path(fake_home, plugin_root)
+        lines = update._run_update_path(fake_home, plugin_root)
 
-        assert capsys.readouterr().err == (
+        assert lines == [
             "[Praxion] Update refresh could not finish (UnrecoverableRenderError); "
-            "run /praxion-complete-install to complete it.\n"
-        )
+            "run /praxion-complete-install to complete it."
+        ]
 
     @_not_as_root
     def test_an_unreadable_new_template_keeps_the_previous_render(

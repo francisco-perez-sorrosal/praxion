@@ -385,20 +385,17 @@ class TestPerformInstall:
         assert not (fake_home / ".claude" / ".praxion-complete-installed").exists()
         assert not (fake_home / ".claude" / "CLAUDE.md").exists()
 
-    def test_a_failed_install_still_records_completion(
-        self, fake_home, plugin_root, monkeypatch, capsys
-    ):
+    def test_a_failed_install_still_records_completion(self, fake_home, plugin_root, monkeypatch):
         module = _fake_home_module(monkeypatch, fake_home)
         # No template seeded: `_render_claude_md` raises FileNotFoundError.
 
-        module._perform_install(fake_home, _VALUES, auto_complete=True, root=plugin_root)
+        reported = module._perform_install(fake_home, _VALUES, auto_complete=True, root=plugin_root)
 
         # Deliberate: without the marker the hook would retry the same failing
         # install on every single session start.
         assert (fake_home / ".claude" / ".praxion-complete-installed").exists()
         # ...but the failure is reported as one, with the command that completes
         # it: a success line here once hid an install that did nothing at all.
-        reported = capsys.readouterr().err
         assert "Auto-install complete" not in reported
         assert "/praxion-complete-install" in reported
 

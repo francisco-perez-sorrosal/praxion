@@ -6,6 +6,10 @@ states the global instructions entry is in, and what to do to each script link i
 the bin directory. The hook gathers a snapshot at its edge, calls these, and acts
 on the answer; nothing in this module touches a file, the environment or the clock.
 
+The hand path (the command a person runs in their own terminal) asks the same
+states one more question, what to do about the instructions, and reports its result
+as an exit status; both answers are decided here too, below the script-link planner.
+
 The cache rule mirrors the shell library's `_managed_rule_rel_path` glob
 (`*/plugins/cache/*/praxion/*/...`), and `tests/fixtures/plugin_cache_targets.tsv`
 holds the two equal. The rule asks for the whole structure, never a bare
@@ -18,7 +22,7 @@ Stdlib only, and importable on Python 3.9, like the hook modules around it.
 from __future__ import annotations
 
 import posixpath
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import NoReturn, Union
@@ -208,6 +212,170 @@ def _place(script: OfferedScript, entry: BinEntry | None, link_dir: str):
 def _is_cache_link(entry: BinEntry, link_dir: str) -> bool:
     """A link whose target lies in a cache version directory, live or dangling."""
     return entry.kind is EntryKind.LINK and cache_version_dir(entry.text, link_dir) is not None
+
+
+# -- What the hand path does about the instructions --------------------------------
+
+# Where a version directory keeps its renders. A render is never written over the file
+# the link resolves to, so a version directory has a second slot to alternate into.
+PRIMARY = "claude/config/CLAUDE.md"
+ALTERNATE = "claude/config/CLAUDE.alternate.md"
+
+# The exit statuses of the hand path's instructions step; the installer maps them to words.
+STATUS_DONE = 0
+STATUS_FAILED = 1
+STATUS_LEFT_BEHIND = 3
+
+
+@dataclass(frozen=True)
+class Carried:
+    """The earlier render was read: the values it held, and the template's placeholders it did not fill."""
+
+    values: Mapping[str, str]
+    missing: frozenset[str]
+
+
+@dataclass(frozen=True)
+class Unreadable:
+    """The earlier render, or the template to read it against, could not be read."""
+
+
+Readback = Union[Carried, Unreadable]  # noqa: UP007
+
+
+class LeaveAloneReason(Enum):
+    OWN_FILE = "own-file"
+    OUTSIDE_CACHE = "outside-cache"
+    CHECKOUT = "checkout"
+
+
+class AskReason(Enum):
+    UNREADABLE = "unreadable"
+    MISSING = "missing"
+
+
+@dataclass(frozen=True)
+class LeaveAlone:
+    why: LeaveAloneReason
+
+
+@dataclass(frozen=True)
+class Current:
+    """The link already reads from the installed version, with every placeholder filled."""
+
+
+@dataclass(frozen=True)
+class CarryForward:
+    values: Mapping[str, str]
+    missing: frozenset[str]
+
+
+@dataclass(frozen=True)
+class AskForValues:
+    why: AskReason
+
+
+HandPathPlan = Union[LeaveAlone, Current, CarryForward, AskForValues]  # noqa: UP007
+
+
+def plan_hand_path_instructions(
+    state: InstructionsState,
+    readback: Readback,
+    root_is_cache_version: bool,
+    installed_version_dir: str,
+) -> HandPathPlan:
+    """What the hand path does about the instructions, by the first rule that applies.
+
+    Order matters. The person's own file and a link outside the cache are named as
+    such even from a checkout; only then does a checkout leave everything alone.
+    `readback` is consulted only for a `CachedRender`; elsewhere pass `Unreadable()`.
+    """
+    if isinstance(state, UserOwned):
+        return LeaveAlone(LeaveAloneReason.OWN_FILE)
+    if isinstance(state, ForeignLink):
+        return LeaveAlone(LeaveAloneReason.OUTSIDE_CACHE)
+    if not root_is_cache_version:
+        return LeaveAlone(LeaveAloneReason.CHECKOUT)
+    if isinstance(state, CachedRender):
+        return _plan_cached_render(state, readback, installed_version_dir)
+    if isinstance(state, (NoInstructions, MissingCachedRender)):
+        return AskForValues(AskReason.MISSING)
+    return unreachable(state)
+
+
+def _plan_cached_render(
+    state: CachedRender, readback: Readback, installed_version_dir: str
+) -> HandPathPlan:
+    if isinstance(readback, Unreadable):
+        return AskForValues(AskReason.UNREADABLE)
+    if isinstance(readback, Carried):
+        if state.version_dir == installed_version_dir and not readback.missing:
+            return Current()
+        return CarryForward(readback.values, readback.missing)
+    return unreachable(readback)
+
+
+def render_slot(state: InstructionsState, root: str) -> str:
+    """The slot, relative to `root`, a new render is written to.
+
+    `PRIMARY`, unless the link currently resolves to `root`'s own `PRIMARY`: that file
+    is what the person reads now, and a failed write must leave it as it is.
+    """
+    occupied = isinstance(state, CachedRender) and state.render == posixpath.join(root, PRIMARY)
+    return ALTERNATE if occupied else PRIMARY
+
+
+class SkipPoint(Enum):
+    OFFER = "offer"
+    CONFIRM = "confirm"
+
+
+class FailureKind(Enum):
+    READING = "reading"
+    WRITING = "writing"
+    PERMISSION = "permission"
+    UNEXPECTED = "unexpected"
+
+
+@dataclass(frozen=True)
+class SetUp:
+    """The instructions were rendered and linked."""
+
+
+@dataclass(frozen=True)
+class LeftAlone:
+    why: LeaveAloneReason
+
+
+@dataclass(frozen=True)
+class Skipped:
+    at: SkipPoint
+
+
+@dataclass(frozen=True)
+class NoAnswer:
+    """The input ended before the person answered."""
+
+
+@dataclass(frozen=True)
+class Failed:
+    kind: FailureKind
+
+
+HandPathOutcome = Union[SetUp, Current, LeftAlone, Skipped, NoAnswer, Failed]  # noqa: UP007
+
+
+def exit_status(outcome: HandPathOutcome) -> int:
+    """The exit status for an outcome: 3 whenever the instructions are left behind unfinished."""
+    if isinstance(outcome, (SetUp, Current)):
+        return STATUS_DONE
+    if isinstance(outcome, LeftAlone):
+        return STATUS_LEFT_BEHIND if outcome.why is LeaveAloneReason.CHECKOUT else STATUS_DONE
+    if isinstance(outcome, (Skipped, NoAnswer)):
+        return STATUS_LEFT_BEHIND
+    if isinstance(outcome, Failed):
+        return STATUS_FAILED
+    return unreachable(outcome)
 
 
 # -- What counts as the plugin cache ----------------------------------------------

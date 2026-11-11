@@ -512,15 +512,16 @@ The plugin manifest lives in `.claude-plugin/plugin.json`. Key constraints:
 
 When `claude plugin install praxion@bit-agora` runs, Claude Code clones the entire Praxion repo at the marketplace-pinned tag into `~/.claude/plugins/cache/bit-agora/praxion/<version>/`. The plugin mechanism only **loads** what `plugin.json` declares (skills, agents, hooks, MCP servers) — but the rest of the repo (rules, CLI scripts, `install.sh`, `lib/`, `task-chronograph-mcp/`, `eval/`, etc.) sits on disk unused by the loader.
 
-`/praxion-complete-install` relies on this. It resolves `${CLAUDE_PLUGIN_ROOT}` (set by Claude Code) and prints the resolved `install.sh --complete-install` command for the user to run in their own terminal, which symlinks `${CLAUDE_PLUGIN_ROOT}/rules/` → `~/.claude/rules/` and `${CLAUDE_PLUGIN_ROOT}/scripts/` → `~/.local/bin/`. Source and destination are both local; no network, no extra clone.
+`/praxion-complete-install` relies on this. Claude Code substitutes the literal token `${CLAUDE_PLUGIN_ROOT}` into the skill body when it loads (the variable is not in the Bash tool's environment); the skill takes that root, else the install path the plugin registry records for Praxion, never a listing of the cache. It prints the resolved `install.sh --complete-install` command for the user to run in their own terminal, which symlinks `${CLAUDE_PLUGIN_ROOT}/rules/` → `~/.claude/rules/` and `${CLAUDE_PLUGIN_ROOT}/scripts/` → `~/.local/bin/` and then brings `~/.claude/CLAUDE.md` to the installed version. Source and destination are both local; no network, no extra clone.
 
 ### Marketplace-only install flow (internal architecture)
 
-The two system-level surfaces (rules, scripts) that the plugin mechanism doesn't cover are handled transparently via a first-session auto-completion hook. <!-- LEGACY-CHUB-CLEANUP: when the shim is deleted, also drop this sentence. --> It also offers consent-gated removal of leftover state from earlier Praxion versions (transitional cleanup, tagged in code for later removal).
+The three system-level surfaces (rules, scripts, the global instructions file) that the plugin mechanism doesn't cover are handled transparently via a first-session auto-completion hook. <!-- LEGACY-CHUB-CLEANUP: when the shim is deleted, also drop this sentence. --> It also offers consent-gated removal of leftover state from earlier Praxion versions (transitional cleanup, tagged in code for later removal).
 
 - `hooks/auto_complete_install.py` — SessionStart hook that detects missing surfaces and completes setup automatically on first session. Uses sensible defaults from `git config` (name, email) with optional operator override via single prompt.
-- `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts.
-- `skills/praxion-complete-install/SKILL.md` — optional user-invoked skill for explicit re-invocation. Resolves `CLAUDE_PLUGIN_ROOT`, runs the cache's `install.sh code --check`, and prints `install.sh code --complete-install` for the user to run in their own terminal — the Bash tool has no TTY to answer the installer's consent prompts.
+- `install_claude.sh::complete_install_from_plugin()` — the underlying logic (shared with explicit re-invocation). Prompts per-surface for consent, reuses `link_rules()` from `lib/install_shared.sh` and the same filter predicate as `relink_all()` for scripts, then runs the instructions step last and ends with a report naming each step's outcome (it says done only when nothing failed and the instructions are not left behind, and exits non-zero when a step failed).
+- `hooks/_install_hand_path.py` — the instructions step of that command, run in the person's own terminal. It composes the update path's classifier, read-back and atomic writer (`hooks/_install_refresh.py`, `hooks/_install_update.py`) and adds only the conversation: values the previous render holds are carried forward with no question; when it cannot be read back (or is missing) it asks for each personal value with a git-derived default and a confirmation. A regular-file `~/.claude/CLAUDE.md`, a link outside the plugin cache and a clone run are left alone. When the link names the installed version's own `claude/config/CLAUDE.md`, the render is written to `claude/config/CLAUDE.alternate.md` instead, so a failed write never replaces what the person reads; every reader follows the link.
+- `skills/praxion-complete-install/SKILL.md` — optional user-invoked skill for explicit re-invocation. Resolves the plugin root (the substituted `${CLAUDE_PLUGIN_ROOT}`, else the plugin registry), runs the cache's `install.sh code --check`, and prints `install.sh code --complete-install` for the user to run in their own terminal — the Bash tool has no TTY to answer the installer's consent prompts.
 
 The inverse pair (`complete_uninstall_from_plugin()`, run through the command `/praxion-complete-uninstall` prints) removes only symlinks whose target begins with the plugin cache path. Hand-installed rules/scripts from other sources are left alone.
 
@@ -530,7 +531,7 @@ The inverse pair (`complete_uninstall_from_plugin()`, run through the command `/
 |---|---|---|---|---|
 | **Clone-based (full)** | `./install.sh code` | Local checkout | Local checkout | One-step installer; no follow-up needed |
 | **Marketplace (plugin only)** | `claude plugin install praxion@bit-agora` | Plugin cache | Plugin cache via auto-completion hook | Auto-completes on first session (no manual step required) |
-| **Marketplace (explicit reconfigure)** | `/praxion-complete-install` | Plugin cache | Plugin cache | Optional: prints the terminal command for reconfiguration/recovery/re-link |
+| **Marketplace (explicit reconfigure)** | `/praxion-complete-install` | Plugin cache | Plugin cache | Optional: prints the terminal command for reconfiguration/recovery/re-link; it also finishes `~/.claude/CLAUDE.md` |
 
 For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wrapper around `claude --plugin-dir`) to launch a session that loads the plugin directly from the working tree — see [Session-scoped local testing](#session-scoped-local-testing).
 
@@ -540,7 +541,7 @@ For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wr
 
 For a clone install, run `./install.sh code --relink`. A clone's links, a regular-file `~/.claude/CLAUDE.md` and links outside the plugin cache are never touched.
 
-When the first session reports that it could not finish, run `/praxion-complete-install` and then, in your own terminal, the command it prints. `bash install.sh --check` names every stale or missing rule link.
+When the first session reports that it could not finish, run `/praxion-complete-install` and then, in your own terminal, the command it prints; it finishes the rules, the scripts and `~/.claude/CLAUDE.md`, and asks for your personal values only when it cannot read them back from the current file. `bash install.sh --check` names every stale or missing rule link.
 
 ### Uninstall ordering
 

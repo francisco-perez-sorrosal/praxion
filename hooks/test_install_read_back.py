@@ -18,6 +18,7 @@ from test_auto_complete_install import (
     _CARRIED,
     _NEW_TEMPLATE,
     _PREVIOUS_TEMPLATE,
+    _TODAYS,
     _cached_version,
     _fill,
     _link_instructions,
@@ -31,11 +32,6 @@ from test_auto_complete_install import (
 )
 
 _EDITED_BY_HAND = "# edited by hand, not a render of any template\n"
-_TODAYS_MADE_UP = {
-    "USERNAME": "@second-person",
-    "EMAIL": "second.person@example.invalid",
-    "GITHUB_URL": "https://example.invalid/second-person",
-}
 _NOT_AS_ROOT = pytest.mark.skipif(
     hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores the permissions this breaks"
 )
@@ -105,11 +101,11 @@ class TestReadBack:
         self, previous, installed
     ):
         alternate = previous.with_name("CLAUDE.alternate.md")
-        alternate.write_text(_fill(_PREVIOUS_TEMPLATE, _TODAYS_MADE_UP), encoding="utf-8")
+        alternate.write_text(_fill(_PREVIOUS_TEMPLATE, _TODAYS), encoding="utf-8")
 
         readback = update.read_back(_state_naming(alternate), installed)
 
-        assert readback == update.Carried(_TODAYS_MADE_UP, frozenset())
+        assert readback == update.Carried(_TODAYS, frozenset())
 
     @pytest.mark.parametrize(
         "damage",
@@ -175,6 +171,12 @@ def _file_state(path: Path) -> tuple[bytes, int]:
     return path.read_bytes(), path.stat().st_ino
 
 
+def _files_holding_any(root: Path, values) -> list[Path]:
+    """The regular files under `root` whose text holds any of `values`."""
+    texts = {p: p.read_text(errors="replace") for p in root.rglob("*") if p.is_file()}
+    return [p for p, text in texts.items() if not p.is_symlink() and any(v in text for v in values)]
+
+
 class TestWriteInstructionsSlot:
     @pytest.fixture
     def primary(self, fake_home, installed):
@@ -197,17 +199,41 @@ class TestWriteInstructionsSlot:
         assert os.readlink(link) == str(alternate)
         assert alternate.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
 
+    def test_a_root_spelled_with_a_parent_segment_is_still_the_root_the_link_resolves_into(
+        self, primary, fake_home, installed
+    ):
+        before = _file_state(primary)
+
+        update.write_instructions(fake_home, installed / "claude" / "..", _CARRIED)
+
+        assert _file_state(primary) == before
+        link = fake_home / ".claude" / "CLAUDE.md"
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+
+    def test_a_relative_link_into_the_roots_primary_gets_the_alternate(
+        self, primary, fake_home, installed
+    ):
+        link = fake_home / ".claude" / "CLAUDE.md"
+        link.unlink()
+        link.symlink_to(os.path.relpath(primary, link.parent))
+        before = _file_state(primary)
+
+        update.write_instructions(fake_home, installed, _CARRIED)
+
+        assert _file_state(primary) == before
+        assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+
     def test_a_link_into_the_roots_alternate_gets_the_primary(self, primary, fake_home, installed):
         update.write_instructions(fake_home, installed, _CARRIED)
         alternate = installed / "claude" / "config" / "CLAUDE.alternate.md"
         before = _file_state(alternate)
 
-        update.write_instructions(fake_home, installed, _TODAYS_MADE_UP)
+        update.write_instructions(fake_home, installed, _TODAYS)
 
         link = fake_home / ".claude" / "CLAUDE.md"
         assert _file_state(alternate) == before
         assert os.readlink(link) == str(primary)
-        assert primary.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TODAYS_MADE_UP)
+        assert primary.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TODAYS)
 
     def test_a_link_into_another_version_gets_the_primary(self, previous, fake_home, installed):
         link = _link_instructions(fake_home, previous)
@@ -262,24 +288,22 @@ class TestWriteInstructionsSlot:
 
         output = capsys.readouterr()
         assert (output.out, output.err) == ("", "")
-        holders = [
-            p
-            for p in tmp_path.rglob("*")
-            if p.is_file()
-            and not p.is_symlink()
-            and any(value in p.read_text(errors="replace") for value in _CARRIED.values())
-        ]
+        holders = _files_holding_any(tmp_path, _CARRIED.values())
         assert holders == [installed / "claude" / "config" / "CLAUDE.alternate.md"]
 
 
 class TestConsecutiveUpdatesAfterAnAlternateWrite:
     @pytest.fixture
     def alternate_linked(self, fake_home, installed):
-        """The link after a hand write into the installed version's alternate render."""
+        """The link after a hand write into the installed version's alternate render.
+
+        The stale primary carries one identity and the alternate another, so a reader
+        that still assumed the primary recovers the wrong one.
+        """
         primary = installed / "claude" / "config" / "CLAUDE.md"
-        primary.write_text(_fill(_NEW_TEMPLATE, _CARRIED), encoding="utf-8")
+        primary.write_text(_fill(_NEW_TEMPLATE, _TODAYS), encoding="utf-8")
         link = _link_instructions(fake_home, primary)
-        update.write_instructions(fake_home, installed, _CARRIED)
+        update.write_instructions(fake_home, installed, _TODAYS)
         return link
 
     def _updated_to(self, home: Path, version: str) -> Path:
@@ -294,7 +318,7 @@ class TestConsecutiveUpdatesAfterAnAlternateWrite:
         primary = self._updated_to(fake_home, "10.0.0")
 
         assert os.readlink(alternate_linked) == str(primary)
-        assert primary.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+        assert primary.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TODAYS)
 
     def test_the_update_after_that_reads_the_new_primary(self, alternate_linked, fake_home):
         self._updated_to(fake_home, "10.0.0")
@@ -302,4 +326,4 @@ class TestConsecutiveUpdatesAfterAnAlternateWrite:
         primary = self._updated_to(fake_home, "10.0.1")
 
         assert os.readlink(alternate_linked) == str(primary)
-        assert primary.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+        assert primary.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _TODAYS)

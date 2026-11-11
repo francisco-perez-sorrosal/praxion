@@ -99,7 +99,7 @@ Utility and operational scripts for the Praxion ecosystem.
 
 ## Installer Filter
 
-`install_claude.sh` links scripts under `~/.local/bin/` only when they are `-f && -x` AND do not match `merge_driver_*` or `git-*-hook.sh`. User-facing tools must be executable (`chmod +x`); merge drivers and git hooks are invoked by git, not by PATH, so they are intentionally skipped. Orphaned symlinks (from renamed/removed scripts) are cleaned on upgrade by `clean_stale_symlinks`. See dec-042.
+`install_claude.sh` links scripts under `~/.local/bin/` only when they are `-f && -x` AND do not match `merge_driver_*` or `*-hook.sh`. User-facing tools must be executable (`chmod +x`); merge drivers and hook scripts (`git-finalize-hook.sh`, the pre-commit `diagram-regen-hook.sh`) are run by git or pre-commit by path, not from PATH, so they are intentionally skipped. One predicate, `script_is_user_facing`, serves every installer site; the first-session hook's `offered_scripts` (`hooks/_install_update.py`) is its twin, held equal by `hooks/test_install_script_predicate.py`. Orphaned symlinks (from renamed/removed scripts) are cleaned on upgrade by `clean_stale_symlinks`. See dec-042.
 
 Asset directories (`scripts/praxion_parallel_ui_assets/`) are not executable files and are not linked into `~/.local/bin/`. The `praxion-parallel-ui` script resolves its assets via `realpath(__file__)` so the symlinked launcher finds the original asset directory through the symlink chain — same pattern as `praxion-claude-dev` and `praxion-hackathon`.
 

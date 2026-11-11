@@ -263,8 +263,11 @@ def offered_scripts(root: Path) -> tuple[OfferedScript, ...]:
     """The user-facing scripts the plugin at `root` offers, in name order.
 
     A regular, executable file under `scripts/` that is neither a git merge
-    driver nor a git hook script. The first install and the update path read
-    this one predicate, so they never disagree on which scripts reach the PATH.
+    driver nor a hook script (`*-hook.sh`, which git or pre-commit runs by path).
+    The first install and the update path read this one predicate, and the
+    installer's `script_is_user_facing` is its twin, held equal by
+    `hooks/test_install_script_predicate.py`, so no install path links a script
+    another removes.
     """
     scripts_src = root / "scripts"
     if not scripts_src.is_dir():

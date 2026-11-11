@@ -3,7 +3,7 @@
 #
 # Validates the predicate contract:
 #   - Only executable regular files in scripts/ get linked.
-#   - Internal helpers (merge_driver_*, git-*-hook.sh) are excluded even
+#   - Internal helpers (merge_driver_*, *-hook.sh) are excluded even
 #     when executable.
 #   - scripts/regenerate_adr_index.py has the executable bit set in source.
 #   - clean_stale_symlinks() sweeps ~/.local/bin/ for links that no longer
@@ -101,9 +101,11 @@ fi
 start_test "test_predicate_excludes_internal_helpers"
 MERGE_DRIVER="${TMPDIR}/merge_driver_foo.py"
 GIT_HOOK="${TMPDIR}/git-post-merge-hook.sh"
+PRECOMMIT_HOOK="${TMPDIR}/diagram-regen-hook.sh"
 printf '#!/usr/bin/env python3\n' > "$MERGE_DRIVER"
 printf '#!/bin/sh\n' > "$GIT_HOOK"
-chmod 755 "$MERGE_DRIVER" "$GIT_HOOK"
+printf '#!/bin/sh\n' > "$PRECOMMIT_HOOK"
+chmod 755 "$MERGE_DRIVER" "$GIT_HOOK" "$PRECOMMIT_HOOK"
 
 if script_is_user_facing "$MERGE_DRIVER"; then
     fail "merge_driver_foo.py passed predicate (should be excluded)"
@@ -115,6 +117,12 @@ if script_is_user_facing "$GIT_HOOK"; then
     fail "git-post-merge-hook.sh passed predicate (should be excluded)"
 else
     pass "git-*-hook.sh excluded"
+fi
+
+if script_is_user_facing "$PRECOMMIT_HOOK"; then
+    fail "diagram-regen-hook.sh passed predicate (a pre-commit hook script, should be excluded)"
+else
+    pass "*-hook.sh excluded, not only git-*-hook.sh"
 fi
 
 # Internal helpers that are NOT executable must also be rejected.
@@ -155,7 +163,7 @@ fi
 # scripts/ had 15), this test pins the *contract* of script_is_user_facing:
 #   - It MUST include known user-facing tools (positive cases).
 #   - It MUST NOT include internal helpers (negative cases: merge_driver_*,
-#     git-*-hook.sh) regardless of their executable bits.
+#     *-hook.sh) regardless of their executable bits.
 # That way, adding a new user-facing script doesn't break the test, but a
 # regression that lets internal helpers slip into ~/.local/bin/ does.
 start_test "test_repo_scripts_yield_expected_inventory"
@@ -181,7 +189,7 @@ done
 
 # Negative contract: these MUST NOT be present even if executable
 # (internal helpers — merge drivers, git hooks).
-EXPECTED_ABSENT_PATTERNS="merge_driver_ git-finalize-hook.sh git-pre-commit-hook.sh git-post-merge-hook.sh"
+EXPECTED_ABSENT_PATTERNS="merge_driver_ -hook.sh"
 present_negatives=""
 for tool in $ACTUAL_LINKED; do
     for bad in $EXPECTED_ABSENT_PATTERNS; do

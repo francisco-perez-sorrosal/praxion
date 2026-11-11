@@ -17,6 +17,7 @@ affected_reqs:
   - REQ-SL-02
   - REQ-SL-04
   - REQ-SL-05
+superseded_in_part_by: dec-draft-66aba0de
 ---
 
 ## Context

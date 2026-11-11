@@ -99,15 +99,18 @@ link_item() {
 
 # Predicate: should scripts/<file> be linked into ~/.local/bin/?
 # Returns 0 (true) only for user-facing CLI tools — regular executable files
-# whose basename is NOT an internal git helper (merge driver, git-* hook).
-# See dec-042 for rationale.
+# whose basename is NOT an internal helper that git or pre-commit runs by path
+# (a merge driver, or any *-hook.sh script). See dec-042 for rationale.
+# Checklist: the first-session hook's twin is offered_scripts() in
+# hooks/_install_update.py; hooks/test_install_script_predicate.py holds the two
+# equal over scripts/. Every installer site below calls this one function.
 script_is_user_facing() {
     local path="$1"
     [ -f "$path" ] && [ -x "$path" ] || return 1
     local name
     name="$(basename "$path")"
     case "$name" in
-        merge_driver_*|git-*-hook.sh) return 1 ;;
+        merge_driver_*|*-hook.sh) return 1 ;;
     esac
     return 0
 }
@@ -297,12 +300,9 @@ relink_all() {
             # files with the executable bit set. Internal helpers invoked by
             # git (merge drivers, git-* hooks) must stay out of $PATH even
             # though they are executable.
-            [ -f "$script" ] && [ -x "$script" ] || continue
+            script_is_user_facing "$script" || continue
             local name
             name="$(basename "$script")"
-            case "$name" in
-                merge_driver_*|git-*-hook.sh) continue ;;
-            esac
             ln -sf "$script" "${bin_dir}/${name}"
             scripts_count=$((scripts_count + 1))
         done
@@ -608,12 +608,9 @@ complete_install_from_plugin() {
         mkdir -p "$bin_dir"
         local scripts_count=0
         for script in "$scripts_src"/*; do
-            [ -f "$script" ] && [ -x "$script" ] || continue
+            script_is_user_facing "$script" || continue
             local name
             name="$(basename "$script")"
-            case "$name" in
-                merge_driver_*|git-*-hook.sh) continue ;;
-            esac
             ln -sf "$script" "${bin_dir}/${name}"
             scripts_count=$((scripts_count + 1))
         done
@@ -1181,12 +1178,9 @@ check_claude_code() {
     for script in "${SCRIPT_DIR}/scripts"/*; do
         # Same combined predicate as relink_all() (dec-042) so check only
         # reports on scripts that would actually be linked.
-        [ -f "$script" ] && [ -x "$script" ] || continue
+        script_is_user_facing "$script" || continue
         local name
         name="$(basename "$script")"
-        case "$name" in
-            merge_driver_*|git-*-hook.sh) continue ;;
-        esac
         if [ -L "${bin_dir}/${name}" ] && [ "$(readlink "${bin_dir}/${name}")" = "$script" ]; then
             info "${name} linked"
         else
@@ -1347,15 +1341,12 @@ uninstall_claude_code() {
             || warn "Plugin removal failed"
     fi
 
-    # Remove scripts (same combined filter as relink_all — dec-042).
+    # Remove every link into scripts/, whatever the filter says today: a link an
+    # earlier installer made under an older filter (dec-042) is still ours.
     local bin_dir="${HOME}/.local/bin"
     for script in "${SCRIPT_DIR}/scripts"/*; do
-        [ -f "$script" ] && [ -x "$script" ] || continue
         local name
         name="$(basename "$script")"
-        case "$name" in
-            merge_driver_*|git-*-hook.sh) continue ;;
-        esac
         if [ -L "${bin_dir}/${name}" ] && [ "$(readlink "${bin_dir}/${name}")" = "$script" ]; then
             rm "${bin_dir}/${name}"
             info "Removed ${name} from ~/.local/bin/"

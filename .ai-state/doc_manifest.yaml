@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-11T00:06:22Z'
+generated_at: '2026-11-11T01:21:02Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-10'
+  last_modified: '2026-11-11'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -676,7 +676,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-09'
+  last_modified: '2026-11-10'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
@@ -3699,11 +3699,17 @@ surfaces:
   title: 'The first-session completion owns the update path: it refreshes the instructions and the script links, and re-points rule links into an older cached version'
   last_modified: '2026-11-10'
   renderer: adr_card
+- id: ai-state-decisions-500-hook-interpreter-floor
+  path: .ai-state/decisions/500-hook-interpreter-floor.md
+  type: markdown
+  title: The hooks declare a Python 3.11 with PyYAML floor and name a shortfall at install check and first session
+  last_modified: '2026-11-10'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-09'
+  last_modified: '2026-11-10'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4664,6 +4670,7 @@ groups:
   - ai-state-decisions-497-coordination-protocol-stays-resident-for
   - ai-state-decisions-498-personal-values-carried-from-the-previous-render
   - ai-state-decisions-499-update-path-refreshes-instructions-and-script-links
+  - ai-state-decisions-500-hook-interpreter-floor
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

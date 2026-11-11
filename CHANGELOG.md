@@ -1,3 +1,9 @@
+## v0.62.0 (2026-11-11)
+
+### Feat
+
+- Name a hook interpreter below the floor
+
 ## v0.61.0 (2026-11-11)
 
 ### Feat

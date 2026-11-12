@@ -753,10 +753,13 @@ def test_a_timeout_kills_the_commands_whole_process_group(tmp_path: Path) -> Non
 
 
 INTERRUPTED_DRIVER = """\
-import sys
+import signal, sys
 from pathlib import Path
 sys.path.insert(0, {scripts!r})
 from _step_loop_io import run_command
+
+# A POSIX background job starts with SIGINT ignored; make the interrupt land however the suite was launched.
+signal.signal(signal.SIGINT, signal.default_int_handler)
 
 runner = "import os, time; open({pid_file!r}, 'w').write(str(os.getpid())); time.sleep(60)"
 run_command((sys.executable, "-c", runner), Path({cwd!r}), 120)

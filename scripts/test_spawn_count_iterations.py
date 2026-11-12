@@ -212,6 +212,34 @@ def test_a_ledger_record_for_an_agent_the_log_does_not_name_lists_nothing(tmp_pa
     assert (report["spawns"], report["charged"]) == (2, 2)
 
 
+def _linked_worktree(main: Path) -> Path:
+    """A linked worktree of `main` (git needs one commit to branch from)."""
+    identity = ("-c", "user.name=spawn-count", "-c", "user.email=spawn-count@example.invalid")
+    worktree = main.parent / "linked"
+    for args in (
+        (*identity, "commit", "-q", "--no-verify", "--allow-empty", "-m", "initial"),
+        ("worktree", "add", "-q", "-b", "linked", str(worktree)),
+    ):
+        subprocess.run(["git", *args], cwd=main, check=True, capture_output=True, timeout=30)
+    return worktree
+
+
+def test_a_ledger_kept_in_a_linked_worktree_is_read_from_the_main_checkout(
+    tmp_path: Path,
+) -> None:
+    main = _task(tmp_path / "repo", _PLANNED, [])
+    task_dir = _linked_worktree(main) / ".ai-work" / _SLUG
+    task_dir.mkdir(parents=True)
+    (task_dir / "ITERATION_LEDGER.jsonl").write_text(
+        render_record_line(_loop_record("agent-driven", "rq-1")) + "\n", encoding="utf-8"
+    )
+
+    report = _report(main, budget=1)
+
+    assert _iteration_ids(report) == ["agent-driven"]
+    assert (report["spawns"], report["charged"], report["verdict"]) == (2, 1, "within")
+
+
 def test_a_heavy_resume_of_a_loop_agent_is_still_charged() -> None:
     import spawn_count
 
@@ -245,5 +273,5 @@ def test_the_ledger_requests_map_each_recorded_agent_to_its_request(tmp_path: Pa
         ],
     )
 
-    assert spawn_count._ledger_requests(root, _SLUG) == {"agent-driven": "rq-1"}
-    assert spawn_count._ledger_requests(root, "no-such-task") == {}
+    assert spawn_count._ledger_requests([root], _SLUG) == {"agent-driven": "rq-1"}
+    assert spawn_count._ledger_requests([root], "no-such-task") == {}

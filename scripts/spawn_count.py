@@ -46,7 +46,7 @@ after the dated ones. A merged and removed worktree is reached through the main 
 was merged into.
 
 Loop iterations: an attributed agent that the task's iteration ledger
-(`.ai-work/<slug>/ITERATION_LEDGER.jsonl`) records under a request id is an iteration of the
+(`.ai-work/<slug>/ITERATION_LEDGER.jsonl`, in any checkout) records under a request id is an iteration of the
 step loop, not a spawn: it is listed under the conditional `iterations` key and left out of
 `charged`; `spawns` still counts it. An agent the ledger has not recorded yet, a record with no
 request id and a line the ledger reader rejects leave the agent charged.
@@ -70,6 +70,7 @@ import argparse
 import json
 import sys
 from collections import namedtuple
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, Union
@@ -548,14 +549,19 @@ def resolve_owner(agent_tally: AgentTally, projects_dir: Path) -> AgentTally:
     return replace(agent_tally, owner=_owned_by(stated_task_slug(prompt) or agent_tally.project))
 
 
-def _ledger_requests(repo_root: Path, slug: str) -> dict[str, str]:
+def _ledger_requests(roots: Iterable[Path], slug: str) -> dict[str, str]:
     """`agent_id -> request` for each record of the task's ledger that carries a request.
 
-    A line the ledger reader rejects is a finding there and is ignored here, so its agent
-    stays charged: the conservative direction.
+    The ledger lives in the checkout the pipeline runs in, which need not be the one the
+    count runs from, so every checkout's ledger for the slug is read. A line the ledger
+    reader rejects is a finding there and is ignored here, so its agent stays charged: the
+    conservative direction.
     """
-    records = read_ledger(repo_root / ".ai-work" / slug).records
-    return {r.agent_id: r.request for r in records if r.request is not None}
+    requests: dict[str, str] = {}
+    for root in roots:
+        records = read_ledger(root / ".ai-work" / slug).records
+        requests.update({r.agent_id: r.request for r in records if r.request is not None})
+    return requests
 
 
 def _source_label(path: Path, repo_root: Path) -> str:
@@ -733,7 +739,8 @@ def _run(args: argparse.Namespace) -> int:
         tallies = tuple(resolve_resume_context(t, projects_dir) for t in tallies)
     # Each unattributed spawn, and each resume of one, could still be charged to this slug.
     pending = sum(1 + len(t.resumes) for t in unattributed)
-    requests = _ledger_requests(repo_root, args.slug)
+    checkout_roots = [c.root for c in checkouts.repository_checkouts(repo_root).checkouts]
+    requests = _ledger_requests(checkout_roots, args.slug)
     in_loop = {t.agent_id: requests[t.agent_id] for t in tallies if t.agent_id in requests}
     result = verdict(tallies, args.budget, args.heavy_context, pending, frozenset(in_loop))
     envelope = _build_envelope(

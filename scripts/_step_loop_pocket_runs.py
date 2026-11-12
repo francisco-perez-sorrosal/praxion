@@ -40,7 +40,8 @@ its deadline once from it (the bound and five seconds of grace), so nothing late
 environment or the pocket's file. A watchdog it starts watches that deadline; with no exit file at
 the deadline it writes the cut file first, then sends SIGTERM to the group (the watchdog ignores the
 signal itself), and after two seconds SIGKILL to what survives: the whole stop lands inside 30
-seconds of the bound, with no call of ours to make it. A cut file that cannot be written means no
+seconds of the bound, with no call of ours to make it. A watchdog that finds its launcher gone with no
+exit file kills what is left of the group and ends. A cut file that cannot be written means no
 signal at all: the attach-time check below then stands alone, and nothing is stopped unrecorded. It
 needs only what macOS and Linux ship (`date`, `sleep`, `mv`, `printf`) and the POSIX spelling of
 `kill`, which dash accepts too. The command itself runs in the launcher's foreground, with the
@@ -275,7 +276,10 @@ _MAX_LAUNCHER_BOUND_SECONDS = 10 * 365 * 24 * 3600
 # started in a session of its own) signals nothing. `kill -s NAME --` is the spelling every
 # POSIX shell takes: dash reads `kill -TERM --` as a pid. A cut file that cannot be written ends
 # the watchdog before any signal: no marker, no kill (printf is a regular built-in, so the failed
-# redirection is a status here and not an exit, in any shell).
+# redirection is a status here and not an exit, in any shell). A watchdog that finds the launcher
+# gone with no exit file (killed alone, leaving the command orphaned in the group) kills what is
+# left of the group and ends, so a later look reads the run as ended without a record at once and
+# never as running or cut off by the clock.
 _LAUNCHER = rf"""
 log=$1; done=$2; pidfile=$3; cutfile=$4; bound=$5; shift 5
 leader=$$
@@ -284,6 +288,10 @@ deadline=$(( $(date +%s) + bound + {_GRACE_SECONDS} ))
 (
     trap '' TERM
     while [ ! -e "$done" ]; do
+        if ! kill -0 "$leader" 2>/dev/null; then
+            [ -e "$done" ] || kill -s KILL -- "-$leader"
+            exit 0
+        fi
         if [ "$(date +%s)" -ge "$deadline" ]; then
             printf '' > "$cutfile" || exit 0
             kill -s TERM -- "-$leader"

@@ -651,6 +651,37 @@ def test_a_run_and_its_child_that_both_ignore_sigterm_are_still_gone_after_the_s
     assert isinstance(read_run(spec), CutOff)
 
 
+def run_whose_launcher_alone_was_killed(make_spec, tmp_path) -> tuple[RunSpec, int, FakeClock]:
+    """A run inside its bound whose launcher died by itself, leaving its command and watchdog."""
+    clock = FakeClock(1000.0)
+    command_pid = tmp_path / "command.pid"
+    spec = make_spec(command_that_records_its_pid(command_pid, "exec sleep 600"))
+    run_detached(spec, give_up_at=clock(), now=clock, sleep=clock.sleep)
+    wait_until(lambda: has_text(command_pid), "the run to record its pid")
+    os.kill(pid_in(spec.pid_path), signal.SIGKILL)
+    clock.now += 1.0
+    return spec, pid_in(command_pid), clock
+
+
+def test_a_launcher_killed_alone_leaves_a_run_that_reads_as_ended_whatever_the_moment(
+    make_spec, tmp_path
+):
+    spec, command, clock = run_whose_launcher_alone_was_killed(make_spec, tmp_path)
+    os.kill(command, signal.SIGKILL)
+
+    wait_until(lambda: isinstance(read_run(spec, now=clock), NotStarted), "the watchdog to be gone")
+
+    assert not pocket_runs._group_is_alive(spec)
+
+
+def test_a_launcher_killed_alone_does_not_leave_its_command_running_unbounded(make_spec, tmp_path):
+    spec, command, clock = run_whose_launcher_alone_was_killed(make_spec, tmp_path)
+
+    wait_until(lambda: isinstance(read_run(spec, now=clock), NotStarted), "the group to be gone")
+
+    assert has_exited(command)
+
+
 def test_a_launcher_that_does_not_lead_its_group_signals_no_sibling(make_spec, launched, tmp_path):
     command_pid = tmp_path / "command.pid"
     spec = make_spec(

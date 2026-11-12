@@ -76,8 +76,8 @@ GLOB_MARKS = "*?["
 UNCOMMITTED_SHOWN = 5  # file names a marked stop spells out; the rest are counted
 HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
-    review-revised-twice review-unfinished revision-failed not-driven dependency-defect
-    commit-disturbed-tree loop-state-defect files-glob""".split()
+    review-revised-twice review-unfinished revision-failed review-without-work not-driven
+    dependency-defect commit-disturbed-tree loop-state-defect files-glob""".split()
 )
 NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", BUDGET_CAUSE)
 REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound
@@ -153,15 +153,19 @@ def next_action(inputs: LoopInputs) -> Action:
 
 
 def issuable_action(inputs: LoopInputs) -> Action:
-    """The action a call can issue: `next_action`, except that a review request whose series
-    holds no commit is a stop, because the reviewer's prompt names the diff to read."""
+    """The action a call can issue: `next_action`, except that a review request with no commit
+    to read, in its series or made outside the loop since the step began, is a stop, because
+    the reviewer's prompt names the diff to read."""
     action = next_action(inputs)
     if not (isinstance(action, Spawn) and action.key.kind == "review"):
         return action
     if review_range(inputs, action.step) is not None:
         return action
-    why = f"{STEP_LABEL}{action.step.id} is due a light review and no commit holds its work"
-    return Stop("loop-state-defect", None, why)
+    why = (
+        f"{STEP_LABEL}{action.step.id} is due a light review and no commit holds its work, "
+        "in its series or since the step began"
+    )
+    return Stop("review-without-work", action.step.id, why)
 
 
 def _human_stop(inputs: LoopInputs, selection: Next | Defects) -> Stop | None:

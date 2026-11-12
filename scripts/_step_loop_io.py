@@ -234,6 +234,19 @@ def paths_differing_from_head(repo: Path, paths: Iterable[str]) -> tuple[str, ..
     return tuple(sorted({entry[_STATUS_PATH_OFFSET:] for entry in _lines(status)}))
 
 
+def commits_touching(repo: Path, since: str, paths: Iterable[str]) -> tuple[str, ...]:
+    """The commits after `since` up to HEAD that change any of the paths, oldest first. A start
+    git cannot resolve finds none, so the review it was asked for stops and names its step."""
+    wanted = tuple(normalise_path(p, repo) for p in paths)
+    if not wanted:
+        return ()
+    try:
+        log = _git(repo, "log", "--reverse", "--format=%H", f"{since}..HEAD", "--", *_specs(wanted))
+    except GitCommandError:
+        return ()
+    return tuple(line for line in log.splitlines() if line)
+
+
 def normalise_path(raw: str, root: Path | None = None) -> str:
     """The repo-relative, `normpath`-clean form of a path; one leaving the repo is an error."""
     relative = raw

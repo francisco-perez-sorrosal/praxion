@@ -30,6 +30,7 @@ from _loop_state_testkit import (  # noqa: E402
     PLAN,
     REVISE,
     RISKY,
+    SECOND,
     STEP,
     act,
     block,
@@ -64,8 +65,11 @@ from _step_loop_state import (  # noqa: E402
     is_done,
     review_range,
     select_step,
+    series_states,
     series_work,
     step_series,
+    wants_outside_work,
+    work_start,
 )
 
 # --- the trigger and the review file -----------------------------------------------------------
@@ -374,8 +378,76 @@ def test_a_review_that_is_due_over_work_with_no_commit_is_a_stop_not_a_spawn():
 
     stop = issuable_action(inputs)
 
-    assert (stop.cause, stop.step) == ("loop-state-defect", None)
+    assert (stop.cause, stop.step) == ("review-without-work", FORCED_STEP.id)
     assert "no commit holds its work" in stop.evidence
+
+
+def outside(*shas, records=(), step=FORCED_STEP):
+    """Inputs whose step's work was committed outside the loop, in these commits."""
+    return replace(read([step, SECOND], records=records), outside_work={step.id: shas})
+
+
+def test_work_committed_outside_the_loop_is_the_range_when_the_series_committed_nothing():
+    inputs = outside(FIRST_SHA, SECOND_SHA, records=[verified(FORCED_STEP)])
+
+    assert review_range(inputs, FORCED_STEP) == (f"{FIRST_SHA}^", SECOND_SHA)
+
+
+def test_a_review_due_over_work_committed_outside_the_loop_is_issued():
+    inputs = outside(FIRST_SHA, records=[verified(FORCED_STEP)])
+
+    assert issuable_action(inputs) == Spawn(FORCED_STEP, RequestKey("1", 1, "review", 1, 1))
+
+
+def test_the_series_own_commits_outrank_work_committed_outside_the_loop():
+    records = [committed(verified(FORCED_STEP), THIRD_SHA)]
+
+    assert review_range(outside(FIRST_SHA, records=records), FORCED_STEP) == (
+        f"{THIRD_SHA}^",
+        THIRD_SHA,
+    )
+
+
+def test_the_work_begins_after_the_last_commit_recorded_before_the_steps_first_record():
+    records = [
+        committed(verified(SECOND), FIRST_SHA),
+        committed(verified(SECOND), SECOND_SHA),
+        verified(FORCED_STEP),
+        committed(verified(SECOND), THIRD_SHA),
+    ]
+
+    assert work_start(read([FORCED_STEP, SECOND], records=records), FORCED_STEP) == SECOND_SHA
+
+
+def test_a_step_whose_records_come_first_begins_at_no_recorded_commit():
+    records = [verified(FORCED_STEP), committed(verified(SECOND), FIRST_SHA)]
+
+    assert work_start(read([FORCED_STEP, SECOND], records=records), FORCED_STEP) is None
+
+
+@pytest.mark.parametrize(
+    ("records", "reviews", "wanted"),
+    [
+        pytest.param([verified(FORCED_STEP)], None, True, id="due-and-uncommitted"),
+        pytest.param([committed(verified(FORCED_STEP), FIRST_SHA)], None, False, id="committed"),
+        pytest.param([rec(FORCED_STEP, 1)], None, False, id="not-verified"),
+        pytest.param(
+            [verified(FORCED_STEP), reviewed(FORCED_STEP)], {"1": ACCEPT}, False, id="accepted"
+        ),
+    ],
+)
+def test_only_a_step_due_a_review_over_uncommitted_work_asks_for_outside_commits(
+    records, reviews, wanted
+):
+    inputs = read([FORCED_STEP, SECOND], records=records, reviews=reviews)
+
+    assert wants_outside_work(inputs, FORCED_STEP, series_states(inputs)[FORCED_STEP.id]) is wanted
+
+
+def test_a_step_with_no_review_never_asks_for_outside_commits():
+    inputs = read([PLAIN_STEP], records=[verified(PLAIN_STEP)])
+
+    assert wants_outside_work(inputs, PLAIN_STEP, series_states(inputs)[PLAIN_STEP.id]) is False
 
 
 def test_an_action_that_is_not_a_review_is_the_next_action_whatever_the_commits():

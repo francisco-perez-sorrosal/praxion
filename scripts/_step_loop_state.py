@@ -103,6 +103,9 @@ class LoopInputs:
     snapshots: tuple[str, ...] = ()  # request ids with a tree snapshot file beside the task
     uncommitted: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     # ^ a marked step's declared files that differ from HEAD, by step id; no other step has an entry
+    outside_work: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    # ^ the commits, oldest first, that touched a step's files since its work began, by step id;
+    # only a step `wants_outside_work` names has an entry (its work was committed by hand)
 
     @classmethod
     def read(
@@ -397,10 +400,30 @@ def series_work(inputs: LoopInputs, step: PlanStep) -> tuple[IterationRecord, ..
 
 
 def review_range(inputs: LoopInputs, step: PlanStep) -> ReviewRange | None:
-    """What a light review reads: from the first commit of the series' work to its last (None
-    when none of that work holds a commit). Derived on demand, never stored."""
+    """What a light review reads: from the first commit of the series' work to its last. A
+    series that committed nothing is read over the commits made outside the loop that hold the
+    step's work (how a blocked or twice-revised step is cleared), and None when there are none
+    either. Derived on demand, never stored."""
     commits = [r.commit for r in series_work(inputs, step) if r.commit]
+    commits = commits or list(inputs.outside_work.get(step.id, ()))
     return (f"{commits[0]}^", commits[-1]) if commits else None
+
+
+def wants_outside_work(inputs: LoopInputs, step: PlanStep, state: Series) -> bool:
+    """Whether the step is due a light review over a series whose work holds no commit: the one
+    case the commits made outside the loop are looked up for."""
+    due = isinstance(state, Verified) and isinstance(state.review, (Due, Requested))
+    return due and not any(r.commit for r in series_work(inputs, step))
+
+
+def work_start(inputs: LoopInputs, step: PlanStep) -> str | None:
+    """Where the step's work began: the last commit the ledger records before the step's first
+    record, or None when no earlier record holds one (the pipeline's base is the start then)."""
+    first = next(
+        (i for i, r in enumerate(inputs.records) if bare_id(r.step) == step.id), len(inputs.records)
+    )
+    earlier = [r.commit for r in inputs.records[:first] if r.commit]
+    return earlier[-1] if earlier else None
 
 
 def _review_of(

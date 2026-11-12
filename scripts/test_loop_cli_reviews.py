@@ -189,8 +189,9 @@ def test_a_review_due_over_work_that_holds_no_commit_stops_for_a_human_and_write
     assert (reply.exit, reply.doc["outcome"], reply.doc["stop"]["cause"]) == (
         2,
         "needs-human",
-        "loop-state-defect",
+        "review-without-work",
     )
+    assert reply.doc["stop"]["step"] == "1"
     assert (attempts_lines(root), list((root / ".ai-work" / SLUG).glob("PROMPT_*"))) == ([], [])
 
 
@@ -200,7 +201,41 @@ def test_status_reports_the_same_stop_for_a_review_with_nothing_to_read(tmp_path
 
     reply = call(root, "status", "--json")
 
-    assert (reply.exit, reply.doc["stop"]["cause"]) == (2, "loop-state-defect")
+    assert (reply.exit, reply.doc["stop"]["cause"]) == (2, "review-without-work")
+
+
+def from_base(root, base, verb):
+    """The command against a base older than HEAD: the step's work began before HEAD."""
+    return step_loop.execute([verb, SLUG, "--repo-root", str(root), "--base-ref", base])
+
+
+def test_work_committed_by_hand_outside_the_loop_is_what_the_review_reads(tmp_path):
+    """A blocked or twice-revised step is cleared by committing its work outside the loop; the
+    re-issued attempt then verifies with nothing left to commit, and the review reads the hand
+    commits instead of stopping."""
+    root = build(tmp_path)
+    base = git(root, "rev-parse", "HEAD")
+    first, last = commit_work(root, "by hand"), commit_work(root, "by hand, fixed")
+    verified_work(root, returned("implement", None))
+
+    reply = from_base(root, base, "next")
+
+    prompt = (root / ".ai-work" / SLUG / f"PROMPT_{REVIEW_REQUEST}.md").read_text(encoding="utf-8")
+    assert (reply.exit, reply.doc["request"]["id"]) == (0, REVIEW_REQUEST)
+    assert f"git diff {first}^..{last} -- {SOURCE}" in prompt
+
+
+def test_a_hand_commit_of_another_file_leaves_the_review_with_nothing_to_read(tmp_path):
+    root = build(tmp_path)
+    base = git(root, "rev-parse", "HEAD")
+    (root / "notes.md").write_text("unrelated\n", encoding="utf-8")
+    git(root, "add", "notes.md")
+    git(root, "commit", "-q", "-m", "unrelated")
+    verified_work(root, returned("implement", None))
+
+    reply = from_base(root, base, "next")
+
+    assert (reply.exit, reply.doc["stop"]["cause"]) == (2, "review-without-work")
 
 
 def test_an_outstanding_review_request_is_reissued_and_never_a_defect(tmp_path):

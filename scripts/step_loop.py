@@ -82,7 +82,7 @@ from _step_loop_files import (
     write_prompt,
     write_stop_handoff,
 )
-from _step_loop_io import paths_differing_from_head
+from _step_loop_io import commits_touching, paths_differing_from_head
 from _step_loop_record_gate import RESULTS_FILE
 from _step_loop_render import (
     GoalState,
@@ -101,6 +101,8 @@ from _step_loop_state import (
     review_range,
     series_states,
     step_cap,
+    wants_outside_work,
+    work_start,
 )
 from iteration_ledger import read_ledger
 from reconcile_pipeline_state import reconcile
@@ -170,6 +172,7 @@ def read_task(args: argparse.Namespace) -> Task:
         steps, attempts.counts, ledger.records, verdicts, reviews, attempts.unnamed, snapshots
     )
     inputs = replace(inputs, uncommitted=uncommitted_files(repo, inputs))
+    inputs = replace(inputs, outside_work=outside_work(repo, inputs, base_ref))
     brief = directory / BRIEF_FILE
     brief_text = brief.read_text("utf-8") if brief.is_file() else ""
     return Task(args.slug, repo, work, directory, base_ref, wip_text, brief_text, inputs)
@@ -194,6 +197,20 @@ def uncommitted_files(repo: Path, inputs: LoopInputs) -> dict[str, tuple[str, ..
         if not path.startswith(PIPELINE_STATE)
     )
     return dict.fromkeys(marked, left) if left else {}
+
+
+def outside_work(repo: Path, inputs: LoopInputs, base_ref: str) -> dict[str, tuple[str, ...]]:
+    """The commits made outside the loop that hold a reviewed step's work, for each step due a
+    light review whose series committed nothing: every commit that touched the step's files
+    since its work began (the last commit recorded before the step, else the pipeline base)."""
+    states = series_states(inputs)
+    found = {}
+    for step in inputs.steps:
+        if wants_outside_work(inputs, step, states[step.id]):
+            since = work_start(inputs, step) or base_ref
+            if commits := commits_touching(repo, since, step.files):
+                found[step.id] = commits
+    return found
 
 
 def _required(path: Path) -> str:

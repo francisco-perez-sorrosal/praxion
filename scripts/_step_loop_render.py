@@ -404,6 +404,9 @@ _ACTIONS = {  # `{step}` is the stop's step id
     "review-revised-twice": "set verdict: accept in LIGHT_REVIEW_step-{step}.md or revise the step",
     "review-unfinished": "finish LIGHT_REVIEW_step-{step}.md with verdict: accept or revise",
     "revision-failed": "revise the step block, or finish the revision by hand and accept it",
+    "review-without-work": (
+        "commit the step's work, or set review: off on the step block with the reason"
+    ),
     "not-driven": "run the step outside the loop as the plan says and tick its WIP.md line",
     "dependency-defect": "correct the [depends-on: ...] annotations in IMPLEMENTATION_PLAN.md",
     "files-glob": "name each path, or a directory by its bare path, in the step's Files:",

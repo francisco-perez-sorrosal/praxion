@@ -23,7 +23,7 @@ Run tests via the derived-selection resolver, `resolve_test_scope.py`. Load the 
 
    **Detach a run that may pass two minutes.** Long runs launched with `run_in_background` were reaped mid-run, reported killed at 16% and 55% and later under memory pressure (observed 2026-09 and 2026-10, not re-probed). A job started with `&` from the tool shell also ignores SIGINT, so a test that interrupts a child process fails in it and passes alone. Start the run from a small launcher script that calls `subprocess.Popen(argv, start_new_session=True, stdin=DEVNULL, stdout=<log>, stderr=STDOUT, preexec_fn=<reset SIGINT to SIG_DFL>)` and writes a done-file when the run ends. Prove it is alive (`pgrep -fl <runner>`), then wait with `Monitor` on `until [ -f <done-file> ]; do sleep 5; done`.
 
-   **Leave the files the run reads alone while it runs.** A widened scope can take minutes (a change to the install script selected about 8,300 tests, roughly ten minutes, on 2026-11-12), and an edit to a file the run reads mid-run turns its verdict into noise.
+   **Leave the files the run reads alone while it runs.** A widened scope can take minutes, and an edit to a file the run reads mid-run turns its verdict into noise.
 
    When `decision` is `"widened"`, report every `widen[].reason`/`detail` before running — a widened run means every affected pocket runs its full suite, not a narrower one. A change the resolver cannot account for widens; it never narrows.
 

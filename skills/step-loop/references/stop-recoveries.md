@@ -12,7 +12,7 @@ A step whose Check reads the committed tree (a plugin copy built from `git archi
 
 ## A commit that is refused
 
-The driver's commit goes through the repository's hooks. When the commit gate (`hooks/commit_gate.sh`) rejects a Bash call whose text holds `git` and `commit`, nothing in that call runs, and the block message may show no findings (observed 2026-09-17).
+The driver's commit goes through the repository's hooks. When the commit gate (`hooks/commit_gate.sh`) rejects a Bash call whose text holds `git` and `commit`, nothing in that call runs, and the refusal carries the checker's findings and the way out.
 
 - Before committing a step, run the checker on its files yourself: `check_id_citation_discipline.py --files <the staged paths>`. Mark a fixture literal that mirrors a real step header with the checker's ignore marker.
 - Put the fix and the `git add` in one Bash call that holds no `git ... commit` text, and the commit in the next.

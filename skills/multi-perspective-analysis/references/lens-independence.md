@@ -12,7 +12,7 @@ This is the **correlation-collapse failure mode**. The isolate/reconcile pattern
 
 Three-phase discipline for any fan-out that claims to produce independent perspectives:
 
-1. **Isolate (collection)** — each lens agent runs independently with no access to sibling outputs. Provide each agent with identical task framing and identical source materials; withhold all sibling partial results. Fragment files enforce this mechanically: each agent writes to `<artifact>_<lens>.md`, reads only its own prior context.
+1. **Isolate (collection)** — each lens agent runs independently with no access to sibling outputs. Provide each agent with identical task framing and identical source materials; withhold all sibling partial results. Fragment files scope each agent's writes: each writes to `<artifact>_<lens>.md` and is instructed to read only its own prior context.
 
 2. **Reconcile (synthesis)** — a designated aggregator (never a peer lens agent) reads all fragment outputs and produces the consolidated artifact. The aggregator's role is to identify agreements, contradictions, and blind spots — not to average or homogenize. Contradictions that survive reconciliation are the most valuable signal: they indicate genuine ambiguity in the evidence.
 
@@ -20,7 +20,7 @@ Three-phase discipline for any fan-out that claims to produce independent perspe
 
 ## Enforcement Mechanism: Fragment Files
 
-The coordination protocol's fragment-file pattern is the mechanical enforcement surface for lens independence. Each parallel agent writes to a scoped fragment (`<artifact>_<lens>.md`) rather than the canonical document. The aggregator merges fragments. This prevents mid-run reads of sibling output because no sibling has written to the canonical path yet.
+The coordination protocol's fragment-file pattern is the convention that supports lens independence, not a mechanical guarantee: isolation in this pattern is a prompting discipline. Each parallel agent writes to a scoped fragment (`<artifact>_<lens>.md`) rather than the canonical document, and the aggregator merges fragments. Because no sibling has written to the canonical path, a mid-run read finds nothing there, but nothing stops an agent from reading a sibling's fragment path.
 
 Claude Code only: `lens-fanout`'s `parallel()` closures share no mutable state and cannot read a sibling's in-flight result — construction-level, stronger than the read-omission guarantee above.
 

@@ -27,10 +27,12 @@
 
 set -e
 
-# Led with, not appended: a refusal's stderr may be clipped, and the way out is
-# the part the session cannot do without. A refused call is refused whole, and
-# the check read the tree before the call began, so a fix made inside the
-# refused call is not seen.
+# The gate leads its own replay of a checker's stdout findings with this hint:
+# a refusal's stderr may be clipped, and the way out is the part the session
+# cannot do without. A checker that exits 2 by itself has already streamed its
+# own stderr before the gate prints anything, so the hint follows it there. A
+# refused call is refused whole, and the check read the tree before the call
+# began, so a fix made inside the refused call is not seen.
 REFUSAL_HINT="commit gate: refused; no command of that call ran. The check judged the files as they stood before the call began, so a fix made in the same call is not seen. Fix the findings, then stage in one call and commit in a separate call."
 
 # How many lines of a checker's findings a refusal replays. Enough for a dozen
@@ -48,7 +50,7 @@ refuse() {
             printf '%s' "$out" | sed -n "1,${FINDINGS_LINE_CAP}p"
             total=$(printf '%s' "$out" | sed -n '$=')
             if [ "$total" -gt "$FINDINGS_LINE_CAP" ]; then
-                printf 'commit gate: %s more line(s) not shown; to see them all, run the check by hand: python3 %s\n' \
+                printf 'commit gate: %s more line(s) not shown; to see them all, run the check by hand, scoped to the staged files where it takes --files (a bare run can scan more than the commit): python3 %s\n' \
                     "$((total - FINDINGS_LINE_CAP))" "$1"
             fi
         fi

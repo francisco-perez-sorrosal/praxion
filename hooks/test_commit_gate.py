@@ -480,7 +480,8 @@ def test_a_bounded_refusal_says_how_many_lines_were_left_out_and_how_to_see_them
         shell=shell,
     )
     assert f"{total - FINDINGS_LINE_CAP} more line" in result.stderr
-    assert f"by hand: python3 {hook}" in result.stderr
+    assert "by hand, scoped to the staged files where it takes --files" in result.stderr
+    assert f"python3 {hook}" in result.stderr
 
 
 @pytest.mark.parametrize("phrase", HINT_PHRASES)

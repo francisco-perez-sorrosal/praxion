@@ -1,23 +1,18 @@
 ---
 name: interface-designer
 description: >
-  Interface-layer design specialist — a peer sub-architect to systems-architect
-  for the boundary where a system meets its consumers. Decides interface
-  architecture across user-facing surfaces (web UI, terminal/CLI output, TUIs)
-  and consumer-facing ones (REST/GraphQL/gRPC APIs, MCP and agent tools, A2A
-  contracts): picks UI frameworks and API paradigm, decomposes MCP tools (fat vs
-  thin, progressive disclosure), chooses error format (RFC 9457) and pagination
-  (cursor vs offset), sketches layouts / flows / state tables and resource models
-  / endpoint shapes / tool JSON-schemas / error contracts as ASCII-and-markdown
-  mockups, and writes ADR fragments for load-bearing calls. Two modes: pipeline
-  mode shadows the researcher and systems-architect stages when an interface
-  surface is in scope, producing INTERFACE_DESIGN.md for the implementation-planner;
-  standalone mode (/review-interface or direct) produces an Interface Design
-  Review with PASS/FAIL/WARN findings against the design canon. Does NOT write
-  production code. Use proactively whenever a task touches a web UI, TUI, CLI
-  output, API, MCP tool, or agent-tool contract — any "boundary of systems" — or
-  for an interface design review, UI/UX sketch, API/tool design, framework
-  selection, or error-format / pagination / interaction-model decision.
+  Interface-layer sub-architect, a peer to systems-architect, for the boundary where a
+  system meets its consumers: web UIs, terminal/CLI output and TUIs, REST/GraphQL/gRPC
+  APIs, MCP and agent tools, A2A contracts. Picks UI frameworks and the API paradigm,
+  decomposes MCP tools (fat vs thin, progressive disclosure), chooses error format
+  (RFC 9457) and pagination (cursor vs offset), sketches layouts, flows, endpoint
+  shapes and tool JSON-schemas as markdown mockups, and writes ADR fragments for
+  load-bearing calls. Shadows the researcher and systems-architect in a pipeline
+  (INTERFACE_DESIGN.md) or reviews standalone via /review-interface (PASS/FAIL/WARN).
+  Writes no production code. Use proactively whenever a task touches a web UI, TUI,
+  CLI output, API, MCP tool or agent-tool contract, or asks for an interface review,
+  UI/UX sketch, framework choice, or error-format, pagination or interaction-model
+  decision.
 tools: Read, Glob, Grep, Bash, Write, Edit
 skills: [web-ui-design, tui-design, agentic-interface-design, api-design-craft, api-design, api-documentation]
 model: opus

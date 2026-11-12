@@ -127,6 +127,30 @@
     "expect": "agent:praxion:discipline-consultant"
   },
   {
+    "id": "roadmap-cartographer-state-of-project",
+    "request": "What is the state of the project? Audit it against its own goals and tell us what we should build next, written up as a ROADMAP.md.",
+    "expect": "agent:praxion:roadmap-cartographer",
+    "near_miss": ["agent:praxion:promethean", "skill:praxion:roadmap-planning", "agent:praxion:sentinel"]
+  },
+  {
+    "id": "sentinel-stale-since-last-report",
+    "request": "Forty commits have landed since the last sentinel report. Check every skill, agent, rule and hook for broken cross-references and stale content.",
+    "expect": "agent:praxion:sentinel",
+    "near_miss": ["agent:praxion:context-engineer", "agent:praxion:doc-engineer"]
+  },
+  {
+    "id": "interface-designer-cli-output",
+    "request": "Design what our new CLI command prints: the success line, partial failures, the --json shape and how errors read.",
+    "expect": "agent:praxion:interface-designer",
+    "near_miss": ["skill:praxion:tui-design", "agent:praxion:systems-architect"]
+  },
+  {
+    "id": "agentic-transactions-x402-mandate",
+    "request": "Our agent must pay per API call with x402 stablecoin payments under a monthly mandate. Decide how settlement finality and the human approval gate work.",
+    "expect": "agent:praxion:agentic-transactions-architect",
+    "near_miss": ["agent:praxion:systems-architect", "agent:praxion:interface-designer"]
+  },
+  {
     "id": "direct-typo",
     "request": "Fix the typo on line 3 of README.md.",
     "expect": "none"

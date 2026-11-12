@@ -1,41 +1,14 @@
 ---
 name: roadmap-cartographer
 description: >-
-  Project-level roadmap cartographer. Runs an ultra-in-depth audit of any project
-  (deterministic, agentic, or hybrid) through a project-derived evaluation lens
-  set and emits a grounded ROADMAP.md at the project root. Derives the lens set
-  from the project's own values, domain constraints, and exemplar sets (SPIRIT,
-  DORA, SPACE, FAIR, CNCF Platform Maturity, or Custom) — no hardcoded universal
-  list. Activated by `/roadmap`, by phrases like "spring cleaning", "state of the
-  project", "what should we build next", or "produce a ROADMAP.md", and by direct
-  @roadmap-cartographer delegation. For audit-to-roadmap synthesis — distinct from
-  the `roadmap-planning` skill, which prioritizes and sequences an existing
-  backlog. Use proactively when the user requests a project review, spring
-  cleaning, or roadmap synthesis.
-
-  <example>
-  Context: Project-wide review.
-  user: "Let's do spring cleaning on the whole project and produce a ROADMAP.md."
-  assistant: "Delegating to roadmap-cartographer — it derives a project-specific
-  lens set, runs parallel researchers per lens, and emits a grounded ROADMAP.md."
-  <commentary>Spring-cleaning + ROADMAP.md is the canonical cartographer trigger.</commentary>
-  </example>
-
-  <example>
-  Context: User has a backlog and asks for prioritization.
-  user: "Here's our backlog — help us decide what to build first."
-  assistant: "That's backlog prioritization, not a full audit — the
-  `roadmap-planning` skill fits here, not the cartographer."
-  <commentary>Cartographer is for audit-to-roadmap; roadmap-planning is for backlog sequencing. Keep them disjoint.</commentary>
-  </example>
-
-  <example>
-  Context: `/roadmap diff` on a project that already has a ROADMAP.md.
-  user: "/roadmap diff"
-  assistant: "Invoking roadmap-cartographer in diff mode — re-audits, surfaces
-  deltas against the existing ROADMAP.md, and preserves the Decision Log."
-  <commentary>`diff` mode is incremental and Decision-Log-preserving.</commentary>
-  </example>
+  Project-level roadmap cartographer: writes a grounded ROADMAP.md at the project root
+  from a deep audit of any project (deterministic, agentic or hybrid) through a lens
+  set derived from the project's own values, constraints and exemplar sets (SPIRIT,
+  DORA, SPACE, FAIR, CNCF Platform Maturity or Custom). `/roadmap diff` re-audits an
+  existing ROADMAP.md and keeps its Decision Log. Use proactively on `/roadmap`, for a
+  project review, "spring cleaning", "state of the project", "what should we build
+  next" or "produce a ROADMAP.md". Not for prioritising or sequencing an existing
+  backlog: that is the `roadmap-planning` skill.
 tools: Read, Glob, Grep, Bash(git:*), Bash(wc:*), Bash(grep:*), Bash(find:*), Bash(jq:*), Write, Edit, AskUserQuestion, Task
 model: opus
 effort: xhigh

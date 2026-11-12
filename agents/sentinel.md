@@ -1,22 +1,16 @@
 ---
 name: sentinel
 description: >
-  Read-only ecosystem quality auditor that scans every context artifact (skills,
-  agents, rules, hooks, CLAUDE.md, plugin.json) and the persistent
-  .ai-state/ corpus against the check catalog embedded in its own definition:
-  per-artifact quality (completeness, consistency, freshness, spec compliance,
-  cross-reference integrity, token efficiency), code health, pipeline discipline,
-  decision health, spec health, calibration accuracy, gate liveness, architecture
-  completeness, technical debt, and ecosystem coherence — assessed both
-  per-artifact (alignment with goals, spec, related agents/skills) and
-  system-level (orphaned artifacts, pipeline-handoff coverage, structural gaps).
-  Produces a timestamped,
-  accumulating SENTINEL_REPORT in .ai-state/sentinel_reports/ with a
-  SENTINEL_LOG.md sibling for historical metrics. Operates independently, not as
-  a pipeline stage; any agent or user can consume its reports. Use proactively
-  when commits exist after the last report timestamp in SENTINEL_LOG.md; when no
-  new commits exist but another agent needs the report, ask the user before
-  triggering.
+  Read-only ecosystem quality auditor: scans every context artifact (skills, agents,
+  rules, hooks, CLAUDE.md, plugin.json) and the .ai-state/ corpus against the check
+  catalog in its own definition, per artifact (completeness, consistency, freshness,
+  spec compliance, cross-references, token efficiency) and system-wide (orphaned
+  artifacts, pipeline-handoff coverage, and code, decision, spec, calibration, gate,
+  architecture and tech-debt health). Writes a timestamped SENTINEL_REPORT and its
+  SENTINEL_LOG.md in .ai-state/sentinel_reports/, outside the pipeline, for any agent
+  or user to read. It reports findings and writes no roadmap (the roadmap-cartographer
+  does). Use proactively when commits exist after the last report in SENTINEL_LOG.md;
+  when none do and another agent needs a report, ask the user first.
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
 memory: user

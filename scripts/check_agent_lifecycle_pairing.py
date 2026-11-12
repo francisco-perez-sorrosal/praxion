@@ -51,6 +51,17 @@ enough that no ordinary multi-agent pipeline batch would false-positive as
 an incident, long enough to catch the retry storms this check was written
 for. Recorded as a load-bearing assumption in this pipeline's `LEARNINGS.md`.
 
+A large unmatched-start cluster of `agent_type: workflow-subagent` is local,
+not CI. That label comes from the harness's own `/deep-research` fan-out (no
+code in this repository emits it): when the API rate-limits the verification
+votes, each abstaining vote logs an `agent_start` with no `tool_use` and no
+`agent_stop`, so one run leaves roughly claims x 3 votes of them (observed
+2026-06 and 2026-08, harness version not recorded). An earlier audit read the
+name as a GitHub Actions class and designed a workflow-side stop for it. The
+falsifier before attributing any unmatched start to CI is
+`grep -c '/home/runner' .ai-state/observations.jsonl`: only local hook
+sessions write this log, so a count of zero means no row came from CI.
+
 Unmatched stops are read the opposite way: the classifier's own pairing
 already knows *that* a stop is unmatched, and reads the stop row's own
 `start_correlation` field only to say *which* INFO class it is.

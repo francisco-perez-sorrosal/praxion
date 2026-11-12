@@ -34,7 +34,11 @@ such as `<project>--claude-worktrees-<name>/`, invisible to a single
 cross worktree-mangled siblings; `--transcripts-dir DIR` names the directory to
 read instead (the one holding `<session>.jsonl` files and `<session>/subagents/`),
 so a worktree's sessions are measured with one invocation each, and
-`source_root` echoes the directory read.
+`source_root` echoes the directory read. A session that has left its worktree
+(after the merge) has its main transcript back under the primary checkout's
+project directory and leaves the worktree-keyed one empty, so look in the
+primary's directory first, or a handoff that names the worktree-keyed
+directory reads "no sessions found" (observed 2026-09).
 
 Cap-outs: the report's `cap_outs` object counts, per agent type, the spawns
 that stopped at their turn cap. The harness leaves no stop marker in a

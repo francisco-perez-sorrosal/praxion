@@ -230,6 +230,12 @@ def test_judge_client_module_importable_without_agent_sdk(monkeypatch):
     # The import must not raise; the missing SDK is only relevant at construction time.
     import importlib
 
+    # A reload re-runs the module in place, so every class in it becomes a new
+    # object: a test file that imported a name at collection (for example
+    # `JudgeReplyTruncatedError`) then fails in a whole-suite run with "raised
+    # but not caught by pytest.raises" while it passes alone. Judge-client tests
+    # import the module and read names off it at call time, and run together
+    # with `tests/test_harness_*.py`, never alone.
     # Force a fresh import (the module may already be cached from prior tests)
     if "praxion_evals.harness.judge_client" in sys.modules:
         importlib.reload(sys.modules["praxion_evals.harness.judge_client"])

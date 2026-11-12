@@ -719,6 +719,10 @@ jobs:
           # every future PR, so an unbounded `git log` would accumulate the
           # counter ACROSS PRs and silently self-disable this surface repo-wide.
           # origin/<default> is present locally because checkout uses fetch-depth: 0.
+          # To re-arm a declined PR (a re-test, a human override) clear the label with
+          # `gh api --method DELETE repos/<owner>/<repo>/issues/<n>/labels/autofix:declined`:
+          # `gh pr edit --remove-label` was seen to exit 0 and leave the label in place
+          # (2026-07, gh version not recorded), so the gate below stays closed.
           attempts=$(git log "origin/${DEFAULT_BRANCH}..HEAD" --grep='Autofix-Attempt:' --format='%H' | wc -l | tr -d ' ')
           # Fail CLOSED on a gh error (skip this run): on a privileged write
           # surface, erring toward not-writing beats fixing a PR whose declined

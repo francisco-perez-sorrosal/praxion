@@ -164,6 +164,43 @@ def _normalize_reference_ids(raw: Any) -> list[str]:
     return [value] if value else []
 
 
+def _index_frontmatter_by_id(adr_entries: list[tuple[str, str]]) -> dict[str, dict[str, Any]]:
+    """Map each ADR's id to its parsed frontmatter, skipping ADRs without an id."""
+    id_to_fm: dict[str, dict[str, Any]] = {}
+    for _path, content in adr_entries:
+        fm = _parse_frontmatter(content)
+        adr_id = str(fm.get("id", ""))
+        if adr_id:
+            id_to_fm[adr_id] = fm
+    return id_to_fm
+
+
+def _supersession_violations(id_to_fm: dict[str, dict[str, Any]]) -> tuple[list[str], bool]:
+    """Return the asymmetric or dangling supersedes links, and whether any link exists."""
+    violations: list[str] = []
+    has_supersession = False
+
+    for adr_id, fm in id_to_fm.items():
+        for target_id in _normalize_reference_ids(fm.get("supersedes")):
+            has_supersession = True
+
+            target_fm = id_to_fm.get(target_id)
+            if target_fm is None:
+                violations.append(
+                    f"{adr_id} supersedes {target_id!r} but target ADR not found in corpus."
+                )
+                continue
+
+            back_link = str(target_fm.get("superseded_by", "")).strip()
+            if back_link != adr_id:
+                violations.append(
+                    f"{adr_id} supersedes {target_id!r} but "
+                    f"{target_id!r}.superseded_by={back_link!r} (expected {adr_id!r})."
+                )
+
+    return violations, has_supersession
+
+
 def _count_index_rows(index_content: str) -> int:
     """Count the number of data rows in a DECISIONS_INDEX.md table."""
     # Table rows start with '|' and are not the header or separator rows
@@ -435,79 +472,35 @@ class Family1PipelineOutcomeFidelity(Family):
         self, adr_entries: list[tuple[str, str]]
     ) -> list[CheckResult]:
         """Verify that supersedes/superseded_by links are symmetric."""
-        results: list[CheckResult] = []
+        id_to_fm = _index_frontmatter_by_id(adr_entries)
+        violations, has_supersession = _supersession_violations(id_to_fm)
 
-        # Build id → frontmatter map
-        id_to_fm: dict[str, dict[str, Any]] = {}
-        for _path, content in adr_entries:
-            fm = _parse_frontmatter(content)
-            adr_id = str(fm.get("id", ""))
-            if adr_id:
-                id_to_fm[adr_id] = fm
-
-        violations: list[str] = []
-        has_supersession = False
-
-        for adr_id, fm in id_to_fm.items():
-            for target_id in _normalize_reference_ids(fm.get("supersedes")):
-                has_supersession = True
-
-                target_fm = id_to_fm.get(target_id)
-                if target_fm is None:
-                    # Target not in corpus — cannot verify; skip with WARN
-                    violations.append(
-                        f"{adr_id} supersedes {target_id!r} but target ADR not found in corpus."
-                    )
-                    continue
-
-                back_link = str(target_fm.get("superseded_by", "")).strip()
-                if back_link != adr_id:
-                    violations.append(
-                        f"{adr_id} supersedes {target_id!r} but "
-                        f"{target_id!r}.superseded_by={back_link!r} (expected {adr_id!r})."
-                    )
-
-        if not violations and id_to_fm:
-            verdict_note = (
+        if violations:
+            verdict, artifact_path, findings = "FAIL", "(corpus-wide)", tuple(violations)
+        elif id_to_fm:
+            note = (
                 "All supersedes/superseded_by links are symmetric."
                 if has_supersession
                 else "No supersession links found in corpus (trivially consistent)."
             )
-            results.append(
-                CheckResult(
-                    check_name="supersession_reciprocity",
-                    check_kind="mechanical",
-                    verdict="PASS",
-                    artifact_path="(corpus-wide)",
-                    findings=(verdict_note,),
-                    score=-1,
-                )
-            )
-        elif violations:
-            results.append(
-                CheckResult(
-                    check_name="supersession_reciprocity",
-                    check_kind="mechanical",
-                    verdict="FAIL",
-                    artifact_path="(corpus-wide)",
-                    findings=tuple(violations),
-                    score=-1,
-                )
-            )
+            verdict, artifact_path, findings = "PASS", "(corpus-wide)", (note,)
         else:
-            # Empty corpus
-            results.append(
-                CheckResult(
-                    check_name="supersession_reciprocity",
-                    check_kind="mechanical",
-                    verdict="SKIP",
-                    artifact_path="(no ADRs in corpus)",
-                    findings=("No ADR files found in corpus.",),
-                    score=-1,
-                )
+            verdict, artifact_path, findings = (
+                "SKIP",
+                "(no ADRs in corpus)",
+                ("No ADR files found in corpus.",),
             )
 
-        return results
+        return [
+            CheckResult(
+                check_name="supersession_reciprocity",
+                check_kind="mechanical",
+                verdict=verdict,
+                artifact_path=artifact_path,
+                findings=findings,
+                score=-1,
+            )
+        ]
 
     # ------------------------------------------------------------------
     # Mechanical: re-affirmation reciprocity

@@ -731,6 +731,47 @@ def test_supersession_list_form_missing_one_target_fails_naming_it():
     ), "A list-valued supersedes with one missing target must FAIL naming that element"
 
 
+def _supersession_check(frontmatters: list[str]):
+    from praxion_evals.harness.families.family1_pipeline_fidelity import (
+        Family1PipelineOutcomeFidelity,
+    )
+
+    entries = [(f"decisions/{n}.md", f"---\n{fm}\n---\n") for n, fm in enumerate(frontmatters)]
+    return Family1PipelineOutcomeFidelity()._check_supersession_reciprocity(entries)
+
+
+def test_supersession_dangling_target_fails_naming_it():
+    (result,) = _supersession_check(["id: dec-010\nsupersedes: dec-404"])
+
+    assert result.verdict == "FAIL"
+    assert result.findings == ("dec-010 supersedes 'dec-404' but target ADR not found in corpus.",)
+
+
+def test_supersession_wrong_back_link_fails_with_expected_id():
+    (result,) = _supersession_check(
+        ["id: dec-010\nsupersedes: dec-011", "id: dec-011\nsuperseded_by: dec-012"]
+    )
+
+    assert result.verdict == "FAIL"
+    assert result.findings == (
+        "dec-010 supersedes 'dec-011' but 'dec-011'.superseded_by='dec-012' (expected 'dec-010').",
+    )
+
+
+def test_supersession_corpus_without_links_passes_as_trivially_consistent():
+    (result,) = _supersession_check(["id: dec-010", "id: dec-011"])
+
+    assert result.verdict == "PASS"
+    assert result.findings == ("No supersession links found in corpus (trivially consistent).",)
+
+
+def test_supersession_empty_corpus_is_skipped():
+    (result,) = _supersession_check([])
+
+    assert result.verdict == "SKIP"
+    assert result.artifact_path == "(no ADRs in corpus)"
+
+
 # ---------------------------------------------------------------------------
 # Re-affirmation reciprocity checks
 # ---------------------------------------------------------------------------

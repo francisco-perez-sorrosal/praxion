@@ -96,6 +96,66 @@ def test_allows_a_new_index_of_short_pointers(tmp_path: Path) -> None:
     assert _decision(result) is None
 
 
+def _index_of(lines: int, total_bytes: int) -> str:
+    """An index of `lines` short pointer lines whose UTF-8 size is exactly `total_bytes`."""
+    pad = total_bytes - lines * len("- [t](t.md) — \n".encode())
+    per_line, extra = divmod(pad, lines)
+    assert 0 <= per_line < 130, "keep every line under the 150-character line limit"
+    body = ["- [t](t.md) — " + "x" * (per_line + (1 if i < extra else 0)) for i in range(lines)]
+    text = "\n".join(body) + "\n"
+    assert len(text.encode("utf-8")) == total_bytes
+    return text
+
+
+def _write_growing(tmp_path: Path, before: str, after: str) -> dict | None:
+    index = _index(tmp_path, PROJECT, before)
+    return _decision(_run(tmp_path, "Write", {"file_path": str(index), "content": after}))
+
+
+def test_canary_a_write_past_the_byte_ceiling_lands_and_warns(tmp_path: Path) -> None:
+    decision = _write_growing(tmp_path, _index_of(39, 4_990), _index_of(39, 5_010))
+    assert decision is not None
+    assert "permissionDecision" not in decision
+    assert decision["hookEventName"] == "PreToolUse"
+    warning = decision["additionalContext"]
+    assert "5,010 bytes" in warning
+    assert "39 lines" in warning
+    assert "5,000 bytes" in warning
+    assert "topic file" in warning
+
+
+def test_canary_an_edit_adding_the_forty_first_line_warns(tmp_path: Path) -> None:
+    before = _index_of(40, 2_300)
+    last = before.splitlines()[-1]
+    index = _index(tmp_path, PROJECT, before)
+    edit = {"file_path": str(index), "old_string": last, "new_string": f"{last}\n{POINTER}"}
+    decision = _decision(_run(tmp_path, "Edit", edit))
+    assert decision is not None
+    assert "41 lines" in decision["additionalContext"]
+
+
+def test_a_write_ending_exactly_at_the_ceiling_draws_no_warning(tmp_path: Path) -> None:
+    assert _write_growing(tmp_path, _index_of(39, 4_990), _index_of(39, 5_000)) is None
+
+
+def test_a_write_that_shrinks_an_index_still_above_the_ceiling_draws_no_warning(
+    tmp_path: Path,
+) -> None:
+    assert _write_growing(tmp_path, _index_of(45, 6_000), _index_of(45, 5_900)) is None
+
+
+def test_a_growing_write_well_under_the_ceiling_draws_no_warning(tmp_path: Path) -> None:
+    assert _write_growing(tmp_path, _index_of(10, 1_000), _index_of(11, 1_100)) is None
+
+
+def test_a_refusal_wins_over_the_warning(tmp_path: Path) -> None:
+    before = _index_of(39, 4_990)
+    decision = _write_growing(tmp_path, before, before + LONG_LINE + "\n")
+    assert decision is not None
+    assert decision["permissionDecision"] == "deny"
+    assert "additionalContext" not in decision
+
+
 @pytest.mark.parametrize(
     "rel",
     [

@@ -66,27 +66,25 @@ def main() -> None:
         return
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-    from check_memory_index import CONVENTION, gate_messages
+    from check_memory_index import CONVENTION, budget_warning, gate_messages
 
     before = path.read_text(encoding="utf-8") if path.is_file() else ""
     after = _after(payload.get("tool_name", ""), tool_input, before)
     if after is None:
         return
     messages = gate_messages(before, after)
-    if not messages:
+    if messages:
+        reason = f"{CONVENTION} This write would add:\n" + "\n".join(f"- {m}" for m in messages)
+        _emit({"permissionDecision": "deny", "permissionDecisionReason": reason})
         return
-    reason = f"{CONVENTION} This write would add:\n" + "\n".join(f"- {m}" for m in messages)
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
-                }
-            }
-        )
-    )
+    warning = budget_warning(before, after)
+    if warning:
+        # No permissionDecision: the write lands, and additionalContext is what the writing session reads.
+        _emit({"additionalContext": warning})
+
+
+def _emit(fields: dict) -> None:
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", **fields}}))
 
 
 if __name__ == "__main__":

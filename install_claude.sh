@@ -26,12 +26,10 @@ MARKETPLACE_SOURCE="francisco-perez-sorrosal/bit-agora"
 PLUGIN_CACHE_DIR="${HOME}/.claude/plugins/cache/${MARKETPLACE_NAME}/${PLUGIN_NAME}"
 
 # Personal identifiers rendered into claude/config/CLAUDE.md (the Personal Info
-# section). Defaults are the original author's — users can accept them as-is
-# or customize during the install prompt; saved values persist across re-runs
-# in .personal_info.env (gitignored).
-DEFAULT_USERNAME="@fperezsorrosal"
-DEFAULT_EMAIL="fperezsorrosal@gmail.com"
-DEFAULT_GITHUB_URL="https://github.com/francisco-perez-sorrosal"
+# section). The defaults are derived from the machine running the installer
+# (derive_personal_defaults); users accept or customize them at the install
+# prompt, and saved values persist across re-runs in .personal_info.env
+# (gitignored).
 PERSONAL_INFO_ENV="${CLAUDE_CONFIG_DIR}/.personal_info.env"
 CLAUDE_MD_TEMPLATE="${CLAUDE_CONFIG_DIR}/CLAUDE.md.tmpl"
 CLAUDE_MD_RENDERED="${CLAUDE_CONFIG_DIR}/CLAUDE.md"
@@ -195,6 +193,23 @@ clean_stale_symlinks() {
 # symlink points at, so the user's global Claude prompt always reflects
 # their own identifiers, not the original author's.
 
+# Sets DEFAULT_USERNAME, DEFAULT_EMAIL and DEFAULT_GITHUB_URL by the rule the
+# first-session hook uses (render_claude_md.derive_defaults): this machine's
+# git user.email, else an anonymous stand-in. No identity ships here.
+derive_personal_defaults() {
+    {
+        IFS= read -r DEFAULT_USERNAME
+        IFS= read -r DEFAULT_EMAIL
+        IFS= read -r DEFAULT_GITHUB_URL
+    } < <(python3 -c '
+import sys
+sys.path.insert(0, sys.argv[1])
+from render_claude_md import derive_defaults
+values = derive_defaults()
+print("\n".join(values[key] for key in ("USERNAME", "EMAIL", "GITHUB_URL")))
+' "${SCRIPT_DIR}/scripts") || fail "Could not derive the personal-info defaults (scripts/render_claude_md.py)"
+}
+
 prompt_personal_info() {
     # If saved values exist and --reconfigure was not requested, reuse silently.
     if [ -f "$PERSONAL_INFO_ENV" ] && ! $RECONFIGURE; then
@@ -204,6 +219,7 @@ prompt_personal_info() {
         return
     fi
 
+    derive_personal_defaults
     header "Step 0 — Personal identifiers"
     cat <<EOF
 
@@ -1560,6 +1576,7 @@ dry_run_claude_code() {
     if [ -f "$PERSONAL_INFO_ENV" ]; then
         printf "    (reuse saved values from %s)\n" "$(basename "$PERSONAL_INFO_ENV")"
     else
+        derive_personal_defaults
         printf "    Defaults: %s / %s / %s\n" "$DEFAULT_USERNAME" "$DEFAULT_EMAIL" "$DEFAULT_GITHUB_URL"
         printf "    (installer will prompt to accept or customize)\n"
     fi

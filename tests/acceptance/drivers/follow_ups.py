@@ -14,9 +14,10 @@ Bound here, because the specification or the base commit fixes them:
 - a follow-up item carries a state word (`open`, `fixed`, `ledgered`, `dropped`), the state's
   argument (a commit, a row id, a reason; none for `open`) and a description of the debt.
 
-Unbound: how an item is written as a line of the record. The specification fixes one item per
-line and the four states, and leaves the line's shape to the design. `record_text` raises until
-a binding step writes it.
+Bound by the design: an item is one line, `- [<state>] <description>`, where `<state>` is the
+state word followed by a space and the argument only when the argument is not empty. So
+`open` is `- [open] ...`, `fixed 4f3c2a1` is `- [fixed 4f3c2a1] ...`, and an item the check
+cannot read is written as given (`- [done] ...`, `- [fixed] ...`).
 
 Isolation: every process runs with `kernel_sandbox.isolated_env`.
 """
@@ -31,7 +32,6 @@ from pathlib import Path
 from tests.acceptance.drivers.kernel_sandbox import (
     REPO_ROOT,
     RunResult,
-    UnboundDriverError,
     _run,
     isolated_env,
 )
@@ -72,10 +72,11 @@ def record_text(items: list[FollowUp]) -> str:
     word goes, and an empty argument is left out where an argument goes, so a scenario can
     hand the check an item it cannot read.
     """
-    raise UnboundDriverError(
-        "how one follow-up item (a state, its commit, row id or reason, and a description) "
-        "is written as a line of the follow-up record is not designed yet"
-    )
+    return "".join(f"- [{_state_text(item)}] {item.description}\n" for item in items)
+
+
+def _state_text(item: FollowUp) -> str:
+    return f"{item.state} {item.argument}" if item.argument else item.state
 
 
 # -- Task directories ---------------------------------------------------------------------------

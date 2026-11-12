@@ -1243,6 +1243,15 @@ check_claude_code() {
         warn "CLAUDE.md not rendered (run: ./install.sh code)"
         healthy=false
     fi
+    # The link can be live and still read from another version's render: after a failed
+    # refresh, "linked" above says nothing about which version it follows.
+    local instructions_status=0
+    python3 "${SCRIPT_DIR}/hooks/_install_hand_path.py" --root "$SCRIPT_DIR" --check \
+        || instructions_status=$?
+    if [ "$instructions_status" -eq 3 ]; then
+        warn "~/.claude/CLAUDE.md is behind this version (run: /praxion-complete-install)"
+        healthy=false
+    fi
     if [ -f "$PERSONAL_INFO_ENV" ]; then
         info "Personal info saved ($(basename "$PERSONAL_INFO_ENV"))"
     else

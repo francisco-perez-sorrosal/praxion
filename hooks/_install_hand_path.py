@@ -32,6 +32,8 @@ from typing import TextIO
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 sys.path.insert(0, str(Path(__file__).parent))
 from _install_refresh import (  # noqa: E402 (after sys.path injection)
+    STATUS_DONE,
+    STATUS_LEFT_BEHIND,
     AskForValues,
     AskReason,
     CachedRender,
@@ -45,6 +47,7 @@ from _install_refresh import (  # noqa: E402 (after sys.path injection)
     LeaveAlone,
     LeaveAloneReason,
     LeftAlone,
+    MissingCachedRender,
     NoAnswer,
     Readback,
     SetUp,
@@ -101,6 +104,8 @@ def main(
     """Run the step, print its one outcome line, and return the outcome's exit status."""
     arguments = _parse_arguments(argv)
     root = os.path.abspath(arguments.root)  # lexical: a dev-linked hooks/ must not move the root
+    if arguments.check:
+        return _check_status(_home_of(environ), root)
     try:
         outcome, carried_from = run_instructions_step(_home_of(environ), root, stdin, stderr)
     except Exception:  # the line has a kind and no message, so nothing here can leak a value
@@ -110,11 +115,33 @@ def main(
     return exit_status(outcome)
 
 
+def _check_status(home: Path, root: str) -> int:
+    """`STATUS_LEFT_BEHIND` when the instructions read from another version's render, else `STATUS_DONE`.
+
+    Judged from the state alone, with no read-back: a version removed from the cache
+    cannot be read back, and that is behind too. A failure to look says nothing.
+    """
+    try:
+        state, is_cache_version = _gather(home, root)
+    except OSError:
+        return STATUS_DONE
+    behind = is_cache_version and (
+        isinstance(state, MissingCachedRender)
+        or (isinstance(state, CachedRender) and state.version_dir != root)
+    )
+    return STATUS_LEFT_BEHIND if behind else STATUS_DONE
+
+
 def _parse_arguments(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Bring ~/.claude/CLAUDE.md to this plugin version."
     )
     parser.add_argument("--root", required=True, help="the plugin root this command runs from")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="change and print nothing; exit 3 when the instructions are behind this version",
+    )
     return parser.parse_args(argv)
 
 
@@ -149,12 +176,17 @@ def run_instructions_step(
 
 def _decide(home: Path, root: str) -> tuple[InstructionsState, HandPathPlan]:
     """What the instructions hold and what to do about them: reads, and changes nothing."""
-    link_dir = str(home / _CLAUDE_MD_SUBPATH.parent)
     with _phase(FailureKind.READING):
-        state = classify_instructions(snapshot_instructions(home / _CLAUDE_MD_SUBPATH), link_dir)
-        is_cache_version = cache_version_dir(root, link_dir) == root
+        state, is_cache_version = _gather(home, root)
         readback = _read_back_when_needed(state, root, is_cache_version)
         return state, plan_hand_path_instructions(state, readback, is_cache_version, root)
+
+
+def _gather(home: Path, root: str) -> tuple[InstructionsState, bool]:
+    """What the instructions entry is, and whether `root` is a cache version directory."""
+    link_dir = str(home / _CLAUDE_MD_SUBPATH.parent)
+    state = classify_instructions(snapshot_instructions(home / _CLAUDE_MD_SUBPATH), link_dir)
+    return state, cache_version_dir(root, link_dir) == root
 
 
 def _read_back_when_needed(state: InstructionsState, root: str, is_cache_version: bool) -> Readback:

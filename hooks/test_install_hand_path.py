@@ -75,10 +75,10 @@ def previous(fake_home):
 class Ran:
     """One run of `main` over string streams: its status and what each stream held."""
 
-    def __init__(self, home: Path, root: Path, answers: str, environ=None):
+    def __init__(self, home: Path, root: Path, answers: str, environ=None, flags=()):
         out, err = io.StringIO(), io.StringIO()
         self.status = hand_path.main(
-            ["--root", str(root)],
+            ["--root", str(root), *flags],
             environ if environ is not None else {"HOME": str(home)},
             io.StringIO(answers),
             out,
@@ -455,6 +455,52 @@ class TestNoQuestion:
 
         assert ran.status == 0
         assert "your own regular file" in ran.line, ran.line
+
+
+# -- The read-only check ---------------------------------------------------------------------------
+
+
+class TestCheck:
+    """`--check` answers whether the instructions are behind the installed version: status only."""
+
+    def _check(self, home, root):
+        return Ran(home, root, "", flags=["--check"])
+
+    def test_a_link_into_an_earlier_versions_render_is_behind_and_nothing_changes(
+        self, fake_home, previous, installed
+    ):
+        _link_instructions(fake_home, previous)
+        before = _state(_link(fake_home), previous)
+
+        ran = self._check(fake_home, installed)
+
+        assert _state(_link(fake_home), previous) == before
+        assert (ran.status, ran.out, ran.err) == (3, "", "")
+
+    def test_a_dangling_link_into_the_cache_is_behind(self, fake_home, previous, installed):
+        _link_instructions(fake_home, previous)
+        previous.unlink()
+
+        assert self._check(fake_home, installed).status == 3
+
+    def test_a_link_to_the_installed_versions_own_render_is_not_behind(self, fake_home, installed):
+        own = installed / "claude/config/CLAUDE.md"
+        own.write_text(_fill(_NEW_TEMPLATE, _CARRIED), encoding="utf-8")
+        _link_instructions(fake_home, own)
+
+        assert self._check(fake_home, installed).status == 0
+
+    def test_a_regular_file_is_not_behind(self, fake_home, installed):
+        _link(fake_home).write_text("mine\n", encoding="utf-8")
+
+        assert self._check(fake_home, installed).status == 0
+
+    def test_a_checkout_never_judges_a_cache_render_behind(self, fake_home, previous, tmp_path):
+        _link_instructions(fake_home, previous)
+        checkout = tmp_path / "checkout"
+        _seed_template(checkout, _NEW_TEMPLATE)
+
+        assert self._check(fake_home, checkout).status == 0
 
 
 # -- Failures ---------------------------------------------------------------------------------------

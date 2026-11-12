@@ -745,25 +745,28 @@ link_rules_and_count() {
 }
 
 # Links the user-facing scripts into ~/.local/bin and prints how many: standard output
-# carries the count alone, for run_fail_soft.
+# carries the count alone, for run_fail_soft. A name that holds a regular file, or a link to
+# anything but the offered script, is the person's own: it is left as it is and named. Only a
+# free name is linked and a link already to the script is kept, so the count is what is linked.
 link_user_scripts() {
     local scripts_src="${SCRIPT_DIR}/scripts"
     local bin_dir="${HOME}/.local/bin"
-    local scripts_count=0 script name
+    local scripts_count=0 script name entry
     mkdir -p "$bin_dir"
     for script in "$scripts_src"/*; do
         script_is_user_facing "$script" || continue
         name="$(basename "$script")"
-        ln -sf "$script" "${bin_dir}/${name}"
+        entry="${bin_dir}/${name}"
+        if [ -L "$entry" ] && [ "$(readlink "$entry")" = "$script" ]; then
+            :
+        elif [ -e "$entry" ] || [ -L "$entry" ]; then
+            warn "${name} left alone: ${entry} is not a link to this script" >&2
+            continue
+        else
+            ln -s "$script" "$entry"
+        fi
         scripts_count=$((scripts_count + 1))
     done
-
-    # onboard-project (also linked by the generic scripts/ loop above;
-    # kept explicit for clarity since it is the single onboarding entry point)
-    if [ -f "${SCRIPT_DIR}/scripts/onboard-project" ] && [ -x "${SCRIPT_DIR}/scripts/onboard-project" ]; then
-        ln -sf "${SCRIPT_DIR}/scripts/onboard-project" "${bin_dir}/onboard-project"
-        info "onboard-project: linked" >&2
-    fi
     printf '%s' "$scripts_count"
 }
 

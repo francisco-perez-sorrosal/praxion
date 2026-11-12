@@ -14,7 +14,9 @@ from tests.acceptance.drivers.kernel_sandbox import REPO_ROOT, frontmatter
 # The ADR-rule move reworded the reading order; the model-routing move rewords it again (it stops
 # listing model routing as always-on) and restates the routing rule's spawn directive. The
 # routing-facts change restates the resolution order and the alias paragraph to the harness's
-# current behaviour, and the tier table and its pointer line for the L tier's alias. Each index is
+# current behaviour, and the tier table and its pointer line for the L tier's alias. The lessons
+# batch adds a bullet or a table row to a list or table of three path-scoped rules; the block is
+# one paragraph, so it reads as reworded though every line it had is still there. Each index is
 # the paragraph's position in the frozen fixture.
 DECLARED_REWORDINGS = {
     ("CLAUDE.md", "## Agent reading order [1]", 0),
@@ -23,6 +25,13 @@ DECLARED_REWORDINGS = {
     ("rules/swe/agent-model-routing.md", "## Agent Model Routing [1]", 3),
     ("rules/swe/agent-model-routing.md", "### Tier Table [1]", 0),
     ("rules/swe/agent-model-routing.md", "### Tier Table [1]", 1),
+    ("rules/swe/gate-liveness.md", "### Anti-patterns [1]", 0),
+    ("rules/swe/id-citation-discipline.md", "### Narrow Exceptions (and their reasons) [1]", 0),
+    ("rules/swe/testing-conventions.md", "### Cleanup [1]", 1),
+    ("rules/swe/testing-conventions.md", "### Determinism [1]", 5),
+    ("rules/swe/testing-conventions.md", "### Fixtures Under Gitignored Paths [1]", 1),
+    ("rules/swe/testing-conventions.md", "### Mocking Boundaries [1]", 1),
+    ("rules/swe/testing-conventions.md", "### Test Data [1]", 1),
 }
 
 

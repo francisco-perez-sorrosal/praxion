@@ -770,8 +770,8 @@ def _stand_in_spec(tmp_path, timeout_s=30):
 
 
 def test_run_session_launches_claude_from_the_given_env_in_the_spec_cwd(tmp_path):
-    """The stand-in proves argv, cwd and env reach the child, an ambient
-    `CLAUDECODE` does not, and stdin is closed (never the runner's terminal)."""
+    """The stand-in proves argv, cwd and env reach the child, and an ambient
+    `CLAUDECODE` does not."""
     from praxion_evals.live.session import build_argv, run_session
 
     spec = _stand_in_spec(tmp_path)
@@ -784,10 +784,26 @@ def test_run_session_launches_claude_from_the_given_env_in_the_spec_cwd(tmp_path
     assert Path(seen["cwd"]).resolve() == spec.cwd.resolve()
     assert seen["home"] == str(tmp_path / "home")
     assert seen["claudecode"] is None
-    assert seen["stdin"] == ""
     assert run.stderr.strip() == "stand-in stderr"
     assert run.exit_code == 3
     assert run.timed_out is False
+
+
+def test_run_session_gives_the_child_no_input_even_when_the_runners_stdin_has_some(tmp_path):
+    from praxion_evals.live.session import run_session
+
+    runner_input = tmp_path / "runner-stdin"
+    runner_input.write_text("typed at the runner's terminal\n", encoding="utf-8")
+    saved_fd = os.dup(0)
+    with runner_input.open("rb") as handle:
+        os.dup2(handle.fileno(), 0)
+        try:
+            run = run_session(_stand_in_spec(tmp_path), _stand_in_env(tmp_path))
+        finally:
+            os.dup2(saved_fd, 0)
+            os.close(saved_fd)
+
+    assert json.loads(run.stdout.splitlines()[0])["stdin"] == ""
 
 
 def test_run_argv_timeout_returns_the_decoded_partial_stdout_and_no_exit_code(tmp_path):

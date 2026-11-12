@@ -84,6 +84,31 @@ def test_restore_returns_a_modified_tracked_file_to_head(repo: Path) -> None:
     assert status(repo) == ""
 
 
+def test_restore_brings_back_a_tracked_file_whose_name_holds_a_newline(repo: Path) -> None:
+    name = "src/two\nlines.py"
+    write(repo, name, "kept = 1\n")
+    git(repo, "add", "src")
+    git(repo, "commit", "-q", "-m", "newline name")
+    write(repo, name, "kept = 2\n")
+    write(repo, "src/zzz.py", "new = 1\n")
+
+    restore_paths(repo, SCOPE)
+
+    assert (repo / name).read_text() == "kept = 1\n"
+
+
+def test_restore_refuses_a_nested_repository_before_touching_anything(repo: Path) -> None:
+    write(repo, "src/one.py", "one = 2\n")
+    write(repo, "src/nested/work.py", "nested = 1\n")
+    git(repo / "src/nested", "init", "-q")
+
+    with pytest.raises(OutsideRepoError, match="nested repository"):
+        restore_paths(repo, SCOPE)
+
+    assert (repo / "src/one.py").read_text() == "one = 2\n"
+    assert (repo / "src/nested/work.py").exists()
+
+
 def test_restore_removes_an_untracked_file_in_the_scope(repo: Path) -> None:
     write(repo, "src/fresh.py", "fresh = 1\n")
 
@@ -314,6 +339,21 @@ def test_the_patch_is_the_same_whatever_the_users_diff_config_says(
     assert "+++ b/src/fresh.py" in configured
     carry_back(repo, tmp_path)
     assert (repo / "src/fresh.py").read_text() == "fresh = 1\n"
+
+
+def test_a_zero_context_diff_setting_does_not_make_the_patch_unappliable(
+    repo: Path, tmp_path: Path
+) -> None:
+    body = "".join(f"line {n}\n" for n in range(9))
+    write(repo, "src/long.txt", body)
+    git(repo, "add", "src")
+    git(repo, "commit", "-q", "-m", "long file")
+    git(repo, "config", "diff.context", "0")
+    write(repo, "src/long.txt", body.replace("line 4", "changed"))
+
+    carry_back(repo, tmp_path)
+
+    assert (repo / "src/long.txt").read_text() == body.replace("line 4", "changed")
 
 
 def test_the_patch_ignores_a_textconv_filter_the_users_attributes_name(repo: Path) -> None:

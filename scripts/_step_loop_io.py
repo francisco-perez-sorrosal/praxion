@@ -89,9 +89,8 @@ _SCRATCH_DIRECTORY = ".ai-work"  # pipeline documents: never part of a tree patc
 _EXCLUDE_AI_WORK = f":(exclude,literal){_SCRATCH_DIRECTORY}"
 # Fixed whatever the user's git config says: `git apply -p1` reads no colour, helper or prefix.
 _PATCH_FORMAT = (
-    "--binary --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/"
+    "--binary --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/ --unified=3"
 ).split()
-_MISSING = " missing"  # the end of `git cat-file --batch-check`'s line for an absent object
 _DELETED = "deleted"
 _NOT_A_FILE = "not-a-file"
 
@@ -296,10 +295,12 @@ def restore_paths(repo: Path, paths: Iterable[str]) -> tuple[str, ...]:
     namespace package). Nothing outside `paths` is touched. This is the driver's one
     destructive operation: it runs over a step's declared `Files:` only, and only after
     `tree_patch` has been written. A path that is absolute, climbs out of the repository, is
-    the repository itself or lies under `.git/` is refused before anything is touched.
+    the repository itself, lies under `.git/` or holds a nested repository is refused before
+    anything is touched.
     """
     scope = tuple(_restorable(p) for p in paths)
     changed = paths_differing_from_head(repo, scope)
+    _refuse_nested_repositories(changed)
     tracked = _present_in_head(repo, changed)
     gone = tuple(p for p in changed if p not in tracked)
     if tracked:
@@ -320,6 +321,15 @@ def tree_patch(repo: Path) -> str:
     return tracked + "".join(_patch(repo, "--no-index", "--", os.devnull, p) for p in new_files)
 
 
+def _refuse_nested_repositories(changed: tuple[str, ...]) -> None:
+    """git lists a nested repository as a bare directory; removing one is not ours to do."""
+    for path in changed:
+        if path.endswith(_UNTRACKED_DIRECTORY_MARK):
+            raise OutsideRepoError(
+                f"{path!r} is a nested repository, which a restore may not remove"
+            )
+
+
 def _restorable(raw: str) -> str:
     clean = normalise_path(raw)
     if clean == "." or (clean + "/").lower().startswith(_GIT_DIRECTORY):
@@ -330,9 +340,10 @@ def _restorable(raw: str) -> str:
 def _present_in_head(repo: Path, paths: tuple[str, ...]) -> tuple[str, ...]:
     if not paths:
         return ()
-    asked = "".join(f"HEAD:{path}\n" for path in paths)
-    answers = _git(repo, "cat-file", "--batch-check", stdin=asked).splitlines()
-    return tuple(paths[i] for i, answer in enumerate(answers) if not answer.endswith(_MISSING))
+    named = frozenset(
+        _lines(_git(repo, "ls-tree", "-z", "--name-only", "HEAD", "--", *_specs(paths)))
+    )
+    return tuple(path for path in paths if path in named)
 
 
 def _is_scratch(path: str) -> bool:

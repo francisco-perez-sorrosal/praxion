@@ -519,7 +519,8 @@ def write_instructions(home: Path, root: Path, values: dict[str, str]) -> None:
     missing = _missing_keys(template_path.read_text(encoding="utf-8"), values)
     # Derived only when a key is missing: it reads today's git identity.
     filled = _with_defaults(values, missing, _render_mod.derive_defaults()) if missing else values
-    rendered_path = root / render_slot(state, os.path.normpath(root))
+    live_render = os.path.realpath(link) if isinstance(state, CachedRender) else None
+    rendered_path = root / render_slot(live_render, os.path.realpath(root))
     _build_and_rename(
         rendered_path,
         lambda temporary: _render_mod.render_claude_md(template_path, temporary, filled),

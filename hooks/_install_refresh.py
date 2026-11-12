@@ -315,14 +315,16 @@ def _plan_cached_render(
     return unreachable(readback)
 
 
-def render_slot(state: InstructionsState, root: str) -> str:
+def render_slot(live_render: str | None, root: str) -> str:
     """The slot, relative to `root`, a new render is written to.
 
-    `PRIMARY`, unless the link currently resolves to `root`'s own `PRIMARY`: that file
-    is what the person reads now, and a failed write must leave it as it is.
+    `live_render` is the file the link resolves to, or None when no live link names
+    one; both paths are given with every link resolved, so two spellings of one file
+    compare equal. `PRIMARY`, unless the link currently resolves to `root`'s own
+    `PRIMARY`: that file is what the person reads now, and a failed write must leave
+    it as it is.
     """
-    occupied = isinstance(state, CachedRender) and state.render == posixpath.join(root, PRIMARY)
-    return ALTERNATE if occupied else PRIMARY
+    return ALTERNATE if live_render == posixpath.join(root, PRIMARY) else PRIMARY
 
 
 class SkipPoint(Enum):

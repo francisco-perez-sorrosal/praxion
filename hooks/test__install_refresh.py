@@ -454,23 +454,16 @@ def test_the_two_render_slots_are_two_files_in_the_same_directory():
 
 
 @pytest.mark.parametrize(
-    ("state", "slot"),
+    ("live_render", "slot"),
     [
-        pytest.param(IN_INSTALLED, ALTERNATE, id="link-names-the-primary"),
-        pytest.param(
-            CachedRender(INSTALLED_DIR, f"{INSTALLED_DIR}/{ALTERNATE}"),
-            PRIMARY,
-            id="link-names-the-alternate",
-        ),
-        pytest.param(IN_EARLIER, PRIMARY, id="link-names-an-earlier-version"),
-        pytest.param(NoInstructions(), PRIMARY, id="no-link"),
-        pytest.param(MissingCachedRender(), PRIMARY, id="dangling-link"),
-        pytest.param(UserOwned(), PRIMARY, id="own-file"),
-        pytest.param(ForeignLink(), PRIMARY, id="foreign-link"),
+        pytest.param(f"{INSTALLED_DIR}/{PRIMARY}", ALTERNATE, id="link-resolves-to-the-primary"),
+        pytest.param(f"{INSTALLED_DIR}/{ALTERNATE}", PRIMARY, id="link-resolves-to-the-alternate"),
+        pytest.param(IN_EARLIER.render, PRIMARY, id="link-resolves-to-an-earlier-version"),
+        pytest.param(None, PRIMARY, id="no-live-link"),
     ],
 )
-def test_a_render_goes_to_the_primary_slot_unless_the_link_resolves_to_it(state, slot):
-    assert render_slot(state, INSTALLED_DIR) == slot
+def test_a_render_goes_to_the_primary_slot_unless_the_link_resolves_to_it(live_render, slot):
+    assert render_slot(live_render, INSTALLED_DIR) == slot
 
 
 @pytest.mark.parametrize(

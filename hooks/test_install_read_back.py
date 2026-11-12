@@ -223,6 +223,22 @@ class TestWriteInstructionsSlot:
         assert _file_state(primary) == before
         assert link.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
 
+    def test_a_link_spelled_through_a_symlinked_home_still_resolves_to_the_roots_primary(
+        self, primary, fake_home, installed, tmp_path
+    ):
+        alias = tmp_path / "alias"
+        alias.symlink_to(fake_home)
+        link = fake_home / ".claude" / "CLAUDE.md"
+        link.unlink()
+        link.symlink_to(alias / primary.relative_to(fake_home))
+        before = _file_state(primary)
+
+        update.write_instructions(fake_home, installed, _CARRIED)
+
+        alternate = installed / "claude" / "config" / "CLAUDE.alternate.md"
+        assert _file_state(primary) == before
+        assert alternate.read_text(encoding="utf-8") == _fill(_NEW_TEMPLATE, _CARRIED)
+
     def test_a_link_into_the_roots_alternate_gets_the_primary(self, primary, fake_home, installed):
         update.write_instructions(fake_home, installed, _CARRIED)
         alternate = installed / "claude" / "config" / "CLAUDE.alternate.md"

@@ -35,6 +35,9 @@ REVIEW_OFF = "off"
 ACCEPT = "accept"
 REVISE = "revise"
 UNFINISHED = "partial"
+# The most review-side requests one series issues before a human stop: the first review, the
+# revision it asks for and the second review (a second `revise` is `RevisedTwice`, a stop).
+REVIEW_CYCLE = 3
 
 _VERDICT_RE = re.compile(r"^verdict:[ \t]*(\S+)", re.MULTILINE)
 

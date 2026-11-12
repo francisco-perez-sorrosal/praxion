@@ -18,6 +18,7 @@ affected_files:
 affected_reqs: [REQ-26, REQ-36]
 supersedes_in_part: [dec-394]
 re_affirmed_by: [dec-434]
+superseded_in_part_by: [dec-509]
 dissent: []
 ---
 

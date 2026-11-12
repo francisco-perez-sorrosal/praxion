@@ -254,6 +254,7 @@ The Standard/Full envelope has two halves: the [artifact floor](artifact-invento
 A resume into a small context is free under the count, but it is not free: it is reported separately with its context size, because resumes are where a capped count hides its real cost.
 
 Inside the loop the step-loop driver's spawns count as iterations, bounded by the plan-derived iteration budget that the driver reports; the counter lists them under `iterations`, apart from `charged`.
+That budget is each driven step's attempt cap, plus the review cycle (the review, the revision it asks for and the second review: three iterations) of each step the light-review trigger marks. So only a plan revision, which opens a fresh series, can spend it.
 Quality bounds the loop: after the attempt cap, surface the step to a person and never grind.
 Cost is observed and recorded per pipeline, never capped in dollars.
 

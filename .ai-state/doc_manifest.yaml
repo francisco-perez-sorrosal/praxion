@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-12T01:42:37Z'
+generated_at: '2026-11-12T02:02:55Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -3275,7 +3275,7 @@ surfaces:
   path: .ai-state/decisions/429-loop-iteration-budget.md
   type: markdown
   title: Driver-emitted spawns are budgeted as iterations against a plan-derived budget; spawn_count reports them apart from charged spawns
-  last_modified: '2026-10-07'
+  last_modified: '2026-11-11'
   renderer: adr_card
 - id: ai-state-decisions-430-plan-local-light-review-trigger
   path: .ai-state/decisions/430-plan-local-light-review-trigger.md
@@ -3751,6 +3751,12 @@ surfaces:
   path: .ai-state/decisions/508-held-roles-close-as-final.md
   type: markdown
   title: 'The four held lean-spawn roles close as final: the verifier, context-engineer, discipline-consultant and skill-genesis keep the full arm'
+  last_modified: '2026-11-11'
+  renderer: adr_card
+- id: ai-state-decisions-509-loop-budget-counts-the-review-cycle
+  path: .ai-state/decisions/509-loop-budget-counts-the-review-cycle.md
+  type: markdown
+  title: The step loop's iteration budget counts a marked step's whole review cycle
   last_modified: '2026-11-11'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
@@ -4739,6 +4745,7 @@ groups:
   - ai-state-decisions-506-hand-path-skills-resolve-the-substituted-root
   - ai-state-decisions-507-two-render-slots-and-readers-follow-the-link
   - ai-state-decisions-508-held-roles-close-as-final
+  - ai-state-decisions-509-loop-budget-counts-the-review-cycle
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

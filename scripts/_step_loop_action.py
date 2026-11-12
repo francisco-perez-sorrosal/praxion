@@ -33,6 +33,7 @@ from _loop_fields import STALL_RUN, GoalBudget, OutstandingAttempt, request_cap
 from _plan_steps import PlanStep
 from _step_loop_render import Kind, RequestKey, parse_request_id
 from _step_loop_review import (
+    REVIEW_CYCLE,
     Due,
     Requested,
     RevisedTwice,
@@ -130,8 +131,12 @@ Action = Union[Spawn, Complete, Stop]  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 def iteration_budget(steps: Iterable[PlanStep]) -> int:
-    """The request cap of each driven step's bound, plus one review for each the trigger marks."""
-    return sum(step_cap(step) + needs_review(step) for step in steps if is_driven(step))
+    """The request cap of each driven step's bound, plus the review cycle of each the trigger
+    marks: every request the steps' own bounds allow, so a plan that is never revised meets a
+    step's own stop before the budget's, and only revised series can spend the budget."""
+    return sum(
+        step_cap(step) + REVIEW_CYCLE * needs_review(step) for step in steps if is_driven(step)
+    )
 
 
 def iterations_used(inputs: LoopInputs) -> int:

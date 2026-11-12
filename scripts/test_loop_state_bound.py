@@ -57,6 +57,7 @@ from _step_loop_action import (  # noqa: E402
     next_action,
 )
 from _step_loop_render import _ACTIONS, RequestKey  # noqa: E402
+from _step_loop_review import REVIEW_CYCLE  # noqa: E402
 from iteration_ledger import IterationRecord  # noqa: E402
 
 # --- the iteration budget ----------------------------------------------------------------------
@@ -67,14 +68,36 @@ from iteration_ledger import IterationRecord  # noqa: E402
     [
         pytest.param([], 0, id="no-steps"),
         pytest.param([PLAIN_STEP, SECOND], 2 * ATTEMPT_CAP, id="the-cap-for-each-driven-step"),
-        pytest.param([FORCED_STEP], ATTEMPT_CAP + 1, id="plus-one-for-a-forced-review"),
-        pytest.param([one(IMPL, RISKY)], ATTEMPT_CAP + 1, id="plus-one-for-tier-h"),
+        pytest.param([FORCED_STEP], ATTEMPT_CAP + REVIEW_CYCLE, id="plus-a-forced-review-cycle"),
+        pytest.param([one(IMPL, RISKY)], ATTEMPT_CAP + REVIEW_CYCLE, id="plus-a-cycle-for-tier-h"),
         pytest.param([one(IMPL, RISKY, OFF)], ATTEMPT_CAP, id="off-takes-the-review-back"),
         pytest.param([one(OTHER, FORCED)], 0, id="a-step-outside-the-loop-adds-nothing"),
     ],
 )
-def test_the_budget_is_the_cap_per_driven_step_plus_a_review_for_each_marked_one(steps, budget):
+def test_the_budget_is_the_cap_per_driven_step_plus_a_review_cycle_for_each_marked_one(
+    steps, budget
+):
     assert iteration_budget(steps) == budget
+
+
+def test_a_review_cycle_is_a_review_the_revision_it_asks_for_and_the_second_review():
+    assert REVIEW_CYCLE == 3
+
+
+def test_a_lone_forced_step_spends_its_whole_bound_and_review_cycle_before_the_budget_stops():
+    """Every request the step's own bounds allow is inside the budget: a second attempt, the
+    first review, the revision it asks for and the second review, with no plan revision."""
+    records = [
+        rec(FORCED_STEP, 1),
+        replace(verified(FORCED_STEP, 2), commit="a" * 40),
+        rec(FORCED_STEP, 2, "review", verdict="verified-complete"),
+        replace(rec(FORCED_STEP, 2, "revise", verdict="verified-complete"), commit="b" * 40),
+    ]
+
+    action = act([FORCED_STEP], records=records, reviews={"1": REVISE})
+
+    assert action == Spawn(FORCED_STEP, RequestKey("1", 2, "review", 1, 2))
+    assert iterations_used(read([FORCED_STEP], records=records)) < iteration_budget([FORCED_STEP])
 
 
 def test_the_iterations_used_are_the_ledger_records_that_carry_a_request():

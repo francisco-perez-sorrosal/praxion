@@ -431,6 +431,8 @@ jobs:
         run: uv run mypy src/
 ```
 
+`astral-sh/setup-uv` with `enable-cache: true` fails its post-step ("Cache path does not exist") in a job that sets up uv but never runs a `uv` command, for example one that installs its tools through npm or curl. Set `enable-cache: false` on those jobs. The same failure also appeared intermittently as a race when no parallel sibling had yet saved the shared cache (observed 2026-06-23; the `setup-uv` version was not recorded).
+
 ## Advanced Features
 
 **Custom indexes**:

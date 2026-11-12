@@ -37,7 +37,7 @@ A placeholder written in explanatory prose is substituted exactly like a functio
 
 A bang-prefixed backtick-quoted command runs once, before the body renders, and its output replaces it, so the model sees live repository state rather than a description of it (a fenced block opened with three backticks and a bang does the same for several lines). Every command run this way needs matching `allowed-tools` coverage, or the user is prompted before the body renders, and a failing command aborts the render. The `@path` file-inclusion form is legacy; prefer the bang form for new work.
 
-`${CLAUDE_SKILL_DIR}` substitutes the skill's own directory at load, for bundled scripts and assets; `${CLAUDE_PLUGIN_ROOT}` substitutes the plugin root, for repository-level scripts a plugin ships.
+`${CLAUDE_SKILL_DIR}` substitutes the skill's own directory at load, for bundled scripts and assets; `${CLAUDE_PLUGIN_ROOT}` substitutes the plugin root, for repository-level scripts a plugin ships. Only the brace form is substituted in a skill body, at load; the shell form `$CLAUDE_PLUGIN_ROOT` is not, and the Bash environment variable of the same name is not a safe substitute, since a session setting can pin it to a different checkout than the plugin actually loaded (observed 2026-09-21, Claude Code version not recorded). When a path will not resolve, stop and report it: listing the plugin cache and taking an entry picks whichever version happens to be there.
 
 `$ARGUMENTS` may be empty because the person can always type the bare `/name`. Test three paths before shipping: no arguments (infer a sensible default or decline naming the missing input, never proceed on nothing), more arguments than the hint declares, and arguments with spaces, quotes or shell metacharacters.
 

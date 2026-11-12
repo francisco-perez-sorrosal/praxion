@@ -590,3 +590,17 @@ jobs:
       ${{ runner.os }}-custom-${{ hashFiles('config.lock') }}-
       ${{ runner.os }}-custom-
 ```
+
+## claude-code-action
+
+### claude-code-action pins
+
+The action installs a fixed Claude Code version (the `CLAUDE_CODE_VERSION` line in its `base-action/action.yml`), and a model alias such as `sonnet` or `opus` resolves inside that CLI, so a stale action pin means a stale alias table. Observed 2026-11-02: a SHA pin that bundled Claude Code 2.1.142 resolved `opus` to an older model than the release tagged `v1.0.266`, which bundled 2.1.316. Pass aliases rather than full model IDs, and keep the pin fresh: write `uses: anthropics/claude-code-action@<full-sha>  # v1.0.N`, because Dependabot follows only an exact-version comment, never `# v1`. To see what a pin bundles, read `base-action/action.yml` at that commit (`gh api repos/anthropics/claude-code-action/contents/base-action/action.yml?ref=<sha>`). Invariant tests that need the pin derive it from the workflow files; a hardcoded SHA in a test breaks on every Dependabot bump.
+
+### claude-code-action failure triage
+
+A cryptic action failure is usually a secondary symptom, and the action hides its real output. Observed 2026-06-23: `--json-schema was provided but Claude did not return structured_output` with `is_error: true`, one turn, zero cost and under 500 ms meant the model run errored before generating a token; the real cause, found in the uploaded execution log, was `error: rate_limit` (the subscription quota is shared by every action workflow in the repository). Upload the execution log as an artifact, download it (`gh run download <run-id> -n <artifact> -D <dir>`) and read its `error` and `result` fields before changing any configuration; without an artifact, set `show_full_output: true` or rerun in debug. Design the authentication to degrade: the subscription token first, an API key as fallback, gated on the first producing an empty `structured_output` (a rate limit can exit 0, so step failure is not the signal) and on the secret existing, then an advisory floor (`continue-on-error`) so a quota loss never hard-blocks a pull request. A pull request that edits the action's own workflow file is skipped by the action's workflow validation, which looks like an auth failure; such a change is verifiable only on the next pull request after merge.
+
+### workflow tests
+
+Tests that read a workflow's YAML cannot see how the action behaves at runtime, so they pass on a workflow that never works. Observed 2026-07-26 against action v1 (SHA `51ea8ea`): the action refuses a run whose triggering workflow was started by a bot (`Workflow initiated by non-human actor: dependabot`), and the Dependabot autofix surface was dead although every structure test passed; only a live run against a real Dependabot event showed it. Set `allowed_bots` to the specific login (`"dependabot[bot]"`), never `"*"` on a public repository. The guard fails closed: the agent step errors and the push step is skipped. Treat a live run as the gate for any permission or runtime semantic of a CLI-driven step.

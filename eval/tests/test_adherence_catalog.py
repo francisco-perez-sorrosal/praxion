@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import replace
 
 import pytest
 
 from praxion_evals.adherence import grade
 from praxion_evals.adherence.catalog import (
-    ARCHITECT_FEATURE_SECTIONS,
-    ARCHITECT_PARTIAL,
-    ARCHITECT_SPEC_SECTIONS,
     RESEARCHER_DOCS_FIRST,
     RESEARCHER_SECTIONS,
     RESEARCHER_SOURCES,
@@ -34,7 +30,7 @@ from praxion_evals.adherence.catalog_rows import (
     VALIDATOR_PRE_MERGE,
     VALIDATOR_SECTIONS,
 )
-from praxion_evals.adherence.checks_adr import FILE_NAME, ID_FROM_NAME, adr_row
+from praxion_evals.adherence.checks_adr import adr_row
 from praxion_evals.adherence.checks_common import COMMON_CHECKS, synthetic_evidence
 from praxion_evals.adherence.checks_roles import CHECKOUT_ROOT, section_body
 from praxion_evals.adherence.model import (
@@ -51,23 +47,14 @@ from praxion_evals.adherence.model import (
     TaskFacts,
     convention_check_name,
 )
-from praxion_evals.live.session import InitInfo, ResultInfo, ToolUse
+from praxion_evals.live.session import ToolUse
+from tests.adherence_grading_support import TASK_DIR, gradable, graded_outcome, read_of
 
 ALL_CHECKS = [(role, check) for role in ROLES for check in check_catalog(role)]
 
 
 def _ids(pairs):
     return [f"{role}:{check.name[:48]}" for role, check in pairs]
-
-
-def _gradable(role: str, **kwargs):
-    """Synthetic evidence whose stream reads as a finished session, so the grader scores it."""
-    evidence = synthetic_evidence(role, **kwargs)
-    plugin = {"name": "praxion", "path": str(evidence.plugin_copy), "source": "praxion@inline"}
-    init = InitInfo(None, (plugin,), (), None, None, None)
-    result = ResultInfo("done", None, False, "success", None, None)
-    envelope = replace(evidence.envelope, init=init, final_result=result, result_count=1)
-    return replace(evidence, envelope=envelope)
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +255,7 @@ def test_a_name_from_another_role_is_refused_and_the_known_names_are_listed():
 
 
 def test_the_grader_resolves_a_role_clause_through_the_catalog():
-    evidence = _gradable("researcher", slug="grade-task")
+    evidence = gradable("researcher", slug="grade-task")
 
     status = grade.grade(evidence, [RESEARCHER_SOURCES, "C2"], judge=None, setup=None)
 
@@ -279,7 +266,7 @@ def test_the_grader_resolves_a_role_clause_through_the_catalog():
 
 def test_a_measured_session_records_the_roles_return_as_it_was_graded():
     returned = "Findings: .ai-work/grade-task/RESEARCH_FINDINGS.md\n[COMPLETE]"
-    evidence = _gradable("researcher", slug="grade-task", role_return=returned)
+    evidence = gradable("researcher", slug="grade-task", role_return=returned)
 
     status = grade.grade(evidence, ["C2"], judge=None, setup=None)
 
@@ -289,7 +276,7 @@ def test_a_measured_session_records_the_roles_return_as_it_was_graded():
 
 def test_a_runaway_return_is_recorded_clipped_and_says_so():
     runaway = "x" * (grade.RECORDED_RETURN_CHARS + 50) + "\n[COMPLETE]"
-    evidence = _gradable("researcher", slug="grade-task", role_return=runaway)
+    evidence = gradable("researcher", slug="grade-task", role_return=runaway)
 
     status = grade.grade(evidence, ["C2"], judge=None, setup=None)
 
@@ -300,16 +287,14 @@ def test_a_runaway_return_is_recorded_clipped_and_says_so():
 
 
 def test_the_grader_refuses_a_clause_that_is_not_the_roles():
-    evidence = _gradable("researcher")
+    evidence = gradable("researcher")
 
     with pytest.raises(ValueError, match="no check named"):
         grade.grade(evidence, [VERIFIER_PARTIAL], judge=None, setup=None)
 
 
 def test_a_clause_that_cannot_run_is_an_errored_outcome_never_a_failed_one():
-    evidence = _gradable(
-        "verifier", slug="grade-task", files={".ai-state/TECH_DEBT_LEDGER.md": "x"}
-    )
+    evidence = gradable("verifier", slug="grade-task", files={".ai-state/TECH_DEBT_LEDGER.md": "x"})
 
     status = grade.grade(evidence, [VERIFIER_LEDGER], judge=None, setup=None)
 
@@ -318,7 +303,7 @@ def test_a_clause_that_cannot_run_is_an_errored_outcome_never_a_failed_one():
 
 
 def test_a_clause_that_does_not_bind_is_not_applicable():
-    evidence = _gradable("researcher")
+    evidence = gradable("researcher")
 
     status = grade.grade(evidence, [RESEARCHER_DOCS_FIRST], judge=None, setup=None)
 
@@ -354,7 +339,7 @@ def test_the_lens_canary_lays_out_the_session_home_under_the_directory_the_harne
 
 @pytest.mark.parametrize("role", ["interface-designer", "agentic-transactions-architect"])
 def test_the_self_test_clause_is_reported_not_applicable_with_its_reason(role):
-    evidence = _gradable(role, slug="grade-task")
+    evidence = gradable(role, slug="grade-task")
     name = DESIGN_SELF_TEST.format(role=role)
 
     status = grade.grade(evidence, [name], judge=None, setup=None)
@@ -376,7 +361,7 @@ def test_the_self_test_clause_is_reported_not_applicable_with_its_reason(role):
     ],
 )
 def test_a_clause_stated_for_one_mode_does_not_apply_to_a_task_in_another(role, name, prompt):
-    evidence = _gradable(role, slug="grade-task", spawn_prompt=prompt)
+    evidence = gradable(role, slug="grade-task", spawn_prompt=prompt)
 
     status = grade.grade(evidence, [name], judge=None, setup=None)
 
@@ -388,7 +373,6 @@ def test_a_clause_stated_for_one_mode_does_not_apply_to_a_task_in_another(role, 
 # The test-engineer's own process, gated by the task's kit mode
 # ---------------------------------------------------------------------------
 
-TASK_DIR = ".ai-work/grade-task"
 FIVE_SECTIONS = (
     "## Sources Read\n\n- the spec delta\n\n## Scenarios\n\n- a limit over the cap is refused\n\n"
     "## Boundary Assumptions\n\n- the CLI is the boundary\n\n## Spec Questions\n\n- none\n\n"
@@ -400,28 +384,14 @@ RESULTS_SECTION = (
 )
 
 
-def _read_of(path: str) -> ToolUse:
-    return ToolUse(f"toolu_read_{path}", "Read", {"file_path": path}, "canary-spawn")
-
-
-def _graded_outcome(role: str, name: str, mode: str | None, *, forced_stop: bool = False, **kwargs):
-    facts = TaskFacts(forced_stop, False, False, None, None, None, mode=mode)
-    evidence = _gradable(role, slug="grade-task", facts=facts, **kwargs)
-
-    status = grade.grade(evidence, [name], judge=None, setup=None)
-
-    assert isinstance(status, Measured)
-    return status.outcomes[name]
-
-
 HABIT_RECORDS = [
     pytest.param(
         TEST_ENGINEER_INPUTS,
         "acceptance-design",
         {
             "tool_uses": [
-                _read_of(f"{TASK_DIR}/SYSTEMS_PLAN.md"),
-                _read_of(f"{TASK_DIR}/TASK_BRIEF.md"),
+                read_of(f"{TASK_DIR}/SYSTEMS_PLAN.md"),
+                read_of(f"{TASK_DIR}/TASK_BRIEF.md"),
             ]
         },
         id="acceptance-design reads the design",
@@ -449,7 +419,7 @@ GOOD_RECORDS = [
     pytest.param(
         TEST_ENGINEER_INPUTS,
         "acceptance-design",
-        {"tool_uses": [_read_of("README.md"), _read_of("tests/acceptance/conftest.py")]},
+        {"tool_uses": [read_of("README.md"), read_of("tests/acceptance/conftest.py")]},
         id="acceptance-design reads only the allowed",
     ),
     pytest.param(
@@ -471,12 +441,12 @@ GOOD_RECORDS = [
 def test_a_habit_record_of_the_test_engineers_mode_fails_its_check_for_that_mode(
     name, mode, record
 ):
-    assert isinstance(_graded_outcome("test-engineer", name, mode, **record), Failed)
+    assert isinstance(graded_outcome("test-engineer", name, mode, **record), Failed)
 
 
 @pytest.mark.parametrize(("name", "mode", "record"), GOOD_RECORDS)
 def test_a_record_in_the_form_its_rule_states_passes_the_check_for_that_mode(name, mode, record):
-    assert _graded_outcome("test-engineer", name, mode, **record) == Passed()
+    assert graded_outcome("test-engineer", name, mode, **record) == Passed()
 
 
 @pytest.mark.parametrize(
@@ -489,7 +459,7 @@ def test_a_record_in_the_form_its_rule_states_passes_the_check_for_that_mode(nam
 )
 def test_a_test_engineer_check_is_not_applicable_to_a_task_of_its_other_mode(name, other, record):
     # The prompt names acceptance design on every task: the task's mode alone gates the check.
-    outcome = _graded_outcome(
+    outcome = graded_outcome(
         "test-engineer", name, other, spawn_prompt="Mode: acceptance-design", **record
     )
 
@@ -503,260 +473,7 @@ def test_a_test_engineer_check_is_not_applicable_to_a_task_of_its_other_mode(nam
 def test_a_test_engineer_document_check_is_not_applicable_when_the_task_stopped_it_early(
     name, mode
 ):
-    assert isinstance(_graded_outcome("test-engineer", name, mode, forced_stop=True), NotApplicable)
-
-
-# ---------------------------------------------------------------------------
-# The systems-architect's own process, by the task's kit mode
-# ---------------------------------------------------------------------------
-
-ARCHITECT = "systems-architect"
-PLAN = f"{TASK_DIR}/SYSTEMS_PLAN.md"
-ARCHITECT_MODES = ("spec", "feature")
-FIRST_READS = [_read_of(p) for p in ("TASK_BRIEF.md", "README.md", "pyproject.toml", "DESIGN.md")]
-SPEC_HABIT = (
-    "# Plan for the change\n\n## Overview\nWhat the change does.\n\n"
-    "## Requirements\n- the behaviour asked for.\n\n## Approach\nA new module.\n"
-)
-FEATURE_HABIT = (
-    "# Design for the change\n\n## Overview\nWhat the change does.\n\n"
-    "## Design\nA new module beside the existing ones.\n\n## Risks\nFew.\n"
-)
-SPEC_PLAN = (
-    "# Plan: tag filter\n\n## Goal\n\nList notes by tag.\n\n"
-    "## Acceptance Criteria\n\n- listing by an unknown tag lists nothing\n\n"
-    "## Behavioral Specification\n\n### Observable Surface\n\n- `notes list --tag`\n\n"
-    "### Requirements\n\n- listing by a tag shows only the notes that carry it\n\n"
-    "## Architecture\n\n[pending: design phase]\n"
-)
-FEATURE_PLAN = (
-    "# Plan: audit trail\n\n## Goal\n\nKeep a history of changes.\n\n"
-    "## Tech Stack\n\nPython 3.13\n\n## Acceptance Criteria\n\n- every change is listed\n\n"
-    "## Architecture\n\n### Components\n\n- a history store\n\n"
-    "## Codebase Readiness\n\n### Structural Issues\n\n- none\n\n"
-    "## Risk Assessment\n\n- the history grows without bound\n"
-)
-RESCOPE_PLAN = (
-    "# Plan: audit trail\n\n## Goal\n\nKeep a history of changes.\n\n"
-    "## Codebase Readiness\n\n### Pre-Refactor Assessment\n\n"
-    "Outcome: `rescope-and-restart`. The notes store has no notion of a change to record.\n"
-)
-RESCOPE_SIBLING_PLAN = RESCOPE_PLAN.replace(
-    "### Pre-Refactor Assessment", "## Pre-Refactor Assessment"
-)
-RESCOPE_SUFFIXED_PLAN = RESCOPE_PLAN.replace(
-    "### Pre-Refactor Assessment", "#### Pre-Refactor Assessment (Phase 2.5)"
-)
-RESCOPE_HEADED_PLAN = RESCOPE_PLAN.replace(
-    "### Pre-Refactor Assessment\n\nOutcome: `rescope-and-restart`. The",
-    "### Pre-Refactor Assessment: `rescope-and-restart`\n\nThe",
-)
-RESCOPE_DASHED_PLAN = RESCOPE_HEADED_PLAN.replace(
-    ": `rescope-and-restart`", " — rescope-and-restart"
-)
-RESCOPE_PHASE_TITLED_PLAN = RESCOPE_PLAN.replace(
-    "### Pre-Refactor Assessment", "### Phase 2.5 — Pre-Refactor Assessment"
-)
-RESCOPE_SENTENCE_CASE_PLAN = RESCOPE_PLAN.replace(
-    "### Pre-Refactor Assessment", "### Pre-refactor assessment"
-)
-RESCOPE_SKELETON_PLAN = (
-    RESCOPE_PLAN + "\n## Architecture\n\n[pending]\n\n## Risk Assessment\n\n[pending]\n"
-)
-FEATURE_RISKS = "## Risk Assessment\n\n- the history grows without bound\n"
-MENTIONED_RESCOPE = (
-    "### Pre-Refactor Assessment\n\n`rescope-and-restart` was weighed and set aside.\n"
-)
-HAND_NAMED_DRAFT = {
-    ".ai-state/decisions/drafts/new-module.md": (
-        "---\nid: dec-draft-newmodul\nstatus: proposed\n---\n\nUse a new module.\n"
-    )
-}
-
-
-def _plan_written(opening: str, final: str, *, reads_before: int) -> dict:
-    """A record whose plan is first written after ``reads_before`` reads and left as ``final``."""
-    write = ToolUse("toolu_write_plan", "Write", {"file_path": PLAN, "content": opening}, None)
-    return {"tool_uses": [*FIRST_READS[:reads_before], write], "files": {PLAN: final}}
-
-
-@pytest.mark.parametrize("mode", ARCHITECT_MODES)
-@pytest.mark.parametrize(
-    ("record", "expected"),
-    [
-        pytest.param(
-            _plan_written("# Plan: x [PARTIAL]\n", "# Plan: x\n", reads_before=0),
-            Passed,
-            id="written first with the marker and finished unmarked",
-        ),
-        pytest.param(
-            _plan_written(SPEC_HABIT, SPEC_HABIT, reads_before=4),
-            Failed,
-            id="habit: written at call 5 and never marked",
-        ),
-        pytest.param(
-            _plan_written("# Plan: x [PARTIAL]\n", "# Plan: x\n", reads_before=4),
-            Failed,
-            id="marked but written at call 5",
-        ),
-        pytest.param(
-            _plan_written("# Plan: x [PARTIAL]\n", "# Plan: x [PARTIAL]\n", reads_before=0),
-            Failed,
-            id="marked first and never finished",
-        ),
-    ],
-)
-def test_the_architects_plan_is_scored_on_being_written_early_and_finished_last(
-    mode, record, expected
-):
-    outcome = _graded_outcome(ARCHITECT, ARCHITECT_PARTIAL, mode, **record)
-
-    assert isinstance(outcome, expected), outcome
-
-
-@pytest.mark.parametrize(
-    ("name", "mode", "plan"),
-    [
-        pytest.param(ARCHITECT_SPEC_SECTIONS, "spec", SPEC_HABIT, id="spec habit"),
-        pytest.param(
-            ARCHITECT_SPEC_SECTIONS,
-            "spec",
-            SPEC_PLAN.replace("### Observable Surface", "### Interfaces"),
-            id="spec without an observable surface",
-        ),
-        pytest.param(ARCHITECT_FEATURE_SECTIONS, "feature", FEATURE_HABIT, id="feature habit"),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            FEATURE_PLAN.replace("## Codebase Readiness", "## Readiness"),
-            id="feature without codebase readiness",
-        ),
-        pytest.param(ARCHITECT_FEATURE_SECTIONS, "feature", "", id="feature writes no plan"),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            RESCOPE_PLAN.replace("`rescope-and-restart`", "a rescope"),
-            id="feature rescope without the outcome token",
-        ),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            RESCOPE_PLAN.replace("### Pre-Refactor Assessment", "### Assessment"),
-            id="feature rescope token without the pre-refactor assessment",
-        ),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            RESCOPE_PLAN.replace("Keep a history of changes.", "[pending]"),
-            id="feature rescope with an empty goal",
-        ),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            FEATURE_PLAN.replace(FEATURE_RISKS, MENTIONED_RESCOPE),
-            id="feature five sections short of the risks, its assessment mentioning the outcome",
-        ),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            RESCOPE_PLAN + "\n## Architecture\n\n### Components\n\n- a history store\n",
-            id="feature rescope that also writes the architecture",
-        ),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            RESCOPE_PLAN + "\n## Risk Assessment\n\n- the history grows without bound\n",
-            id="feature rescope that also writes the risks",
-        ),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            RESCOPE_PLAN.replace(
-                "Outcome: `rescope-and-restart`.",
-                "Outcome: `proceed`.\n\n### Alternatives\n\n`rescope-and-restart` was weighed.",
-            ),
-            id="feature rescope whose token sits after the assessment's own body",
-        ),
-        pytest.param(
-            ARCHITECT_FEATURE_SECTIONS,
-            "feature",
-            RESCOPE_HEADED_PLAN.replace("`rescope-and-restart`", "`proceed`"),
-            id="feature rescope whose heading line names another outcome",
-        ),
-    ],
-)
-def test_a_plan_of_its_own_shape_fails_the_architects_check_for_that_mode(name, mode, plan):
-    files = {PLAN: plan} if plan else {}
-
-    assert isinstance(_graded_outcome(ARCHITECT, name, mode, files=files), Failed)
-
-
-@pytest.mark.parametrize(
-    ("name", "mode", "plan"),
-    [
-        (ARCHITECT_SPEC_SECTIONS, "spec", SPEC_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", FEATURE_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SIBLING_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SUFFIXED_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SKELETON_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_HEADED_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_DASHED_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_PHASE_TITLED_PLAN),
-        (ARCHITECT_FEATURE_SECTIONS, "feature", RESCOPE_SENTENCE_CASE_PLAN),
-    ],
-    ids=[
-        "spec",
-        "feature",
-        "feature rescope-and-restart",
-        "feature rescope with the assessment as a sibling section",
-        "feature rescope with a level-four suffixed assessment",
-        "feature rescope keeping the skeleton's pending design sections",
-        "feature rescope naming the outcome on the assessment's heading line",
-        "feature rescope naming the outcome after a dash on the heading line",
-        "feature rescope under the definition's phase title",
-        "feature rescope with a sentence-case assessment heading",
-    ],
-)
-def test_a_plan_with_the_sections_its_mode_requires_passes(name, mode, plan):
-    assert _graded_outcome(ARCHITECT, name, mode, files={PLAN: plan}) == Passed()
-
-
-@pytest.mark.parametrize(
-    ("name", "other", "plan"),
-    [
-        (ARCHITECT_SPEC_SECTIONS, "feature", SPEC_HABIT),
-        (ARCHITECT_FEATURE_SECTIONS, "spec", FEATURE_HABIT),
-        (ARCHITECT_FEATURE_SECTIONS, "spec", RESCOPE_PLAN),
-    ],
-    ids=[
-        "spec check on a feature task",
-        "feature check on a spec task",
-        "feature check on a spec task's rescope plan",
-    ],
-)
-def test_an_architect_section_check_is_not_applicable_to_a_task_of_its_other_mode(
-    name, other, plan
-):
-    # The prompt names spec mode on every task: the task's mode alone gates the check.
-    outcome = _graded_outcome(ARCHITECT, name, other, spawn_prompt="Mode: spec", files={PLAN: plan})
-
-    assert isinstance(outcome, NotApplicable)
-
-
-@pytest.mark.parametrize(
-    ("name", "mode"), [(ARCHITECT_SPEC_SECTIONS, "spec"), (ARCHITECT_FEATURE_SECTIONS, "feature")]
-)
-def test_an_architect_section_check_is_not_applicable_when_the_task_stopped_it_early(name, mode):
-    assert isinstance(_graded_outcome(ARCHITECT, name, mode, forced_stop=True), NotApplicable)
-
-
-@pytest.mark.parametrize("mode", ARCHITECT_MODES)
-@pytest.mark.parametrize("clause", [FILE_NAME, ID_FROM_NAME], ids=["file name", "derived id"])
-def test_a_hand_named_draft_with_a_made_up_id_still_fails_the_shared_adr_clauses(mode, clause):
-    name = clause.format(role=ARCHITECT)
-
-    assert isinstance(_graded_outcome(ARCHITECT, name, mode, files=HAND_NAMED_DRAFT), Failed)
+    assert isinstance(graded_outcome("test-engineer", name, mode, forced_stop=True), NotApplicable)
 
 
 # ---------------------------------------------------------------------------

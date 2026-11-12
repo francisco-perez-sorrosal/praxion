@@ -1912,6 +1912,25 @@ def test_a_row_copied_into_a_second_log_is_read_once(tmp_path: Path) -> None:
     assert len(tallied.resumes) == 1
 
 
+def test_rows_are_read_as_stored_never_upcast(tmp_path: Path) -> None:
+    import spawn_count
+
+    helper_call = {
+        "timestamp": _T0,
+        "session_id": "sess-1",
+        "agent_id": "a-helper",
+        "project": _CHECKOUT,
+        "event_type": "agent_stop",
+        "start_correlation": "unobserved-agent",
+    }
+    repo = tmp_path / "repo"
+    _write_wal(repo, [], _jsonl(helper_call))
+
+    _, rows, _ = spawn_count._read_wal_rows(repo)
+
+    assert rows == [helper_call]
+
+
 def test_a_spawn_in_one_checkout_and_its_resume_in_another_is_one_spawn_and_a_resume(
     tmp_path: Path,
 ) -> None:

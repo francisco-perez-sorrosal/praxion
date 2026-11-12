@@ -176,6 +176,54 @@ def test_draft_stage_pointers_are_checked_for_reciprocity_too(tmp_path: Path) ->
     assert report["findings"][0]["entity"] == "dec-draft-aaaaaaaa"  # id-citation-discipline:ignore
 
 
+def _draft(root: Path, hash8: str, *, extra_lines: str = "") -> Path:
+    drafts = root / ".ai-state" / "decisions" / "drafts"
+    drafts.mkdir(parents=True, exist_ok=True)
+    path = drafts / f"20260101-0000-user-branch-slug-{hash8}.md"
+    path.write_text(
+        f"---\nid: dec-draft-{hash8}\ntitle: t\nstatus: proposed\ncategory: architectural\n"  # id-citation-discipline:ignore
+        f"date: 2026-01-01\nsummary: s\ntags: [t]\nmade_by: agent\n{extra_lines}---\n\n# Body\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_draft_re_affirming_a_finalized_record_is_pending_finalize_not_a_finding(
+    tmp_path: Path,
+) -> None:
+    """Finalize writes the target's `re_affirmed_by` at promotion, so an unpromoted
+    draft's `re_affirms` onto a finalized record owes no back-link yet.
+    """
+    _adr(tmp_path, 1)
+    _draft(tmp_path, "aaaaaaaa", extra_lines="re_affirms: dec-001\n")
+
+    assert car.classify(tmp_path)["findings"] == []
+
+
+def test_finalized_missing_back_link_still_fails_while_an_unrelated_draft_is_pending(
+    tmp_path: Path,
+) -> None:
+    _adr(tmp_path, 1)
+    _adr(tmp_path, 2, extra_fields={"re_affirms": "dec-001"})
+    _draft(tmp_path, "aaaaaaaa", extra_lines="re_affirms: dec-001\n")
+
+    findings = car.classify(tmp_path)["findings"]
+
+    assert [f["entity"] for f in findings] == ["dec-002"]
+
+
+def test_draft_superseding_a_finalized_record_without_back_link_is_still_a_finding(
+    tmp_path: Path,
+) -> None:
+    """Finalize heals only `re_affirmed_by`; a supersession back-link is the author's to write."""
+    _adr(tmp_path, 1)
+    _draft(tmp_path, "aaaaaaaa", extra_lines="supersedes: dec-001\n")
+
+    entities = [f["entity"] for f in car.classify(tmp_path)["findings"]]
+
+    assert entities == ["dec-draft-aaaaaaaa"]  # id-citation-discipline:ignore
+
+
 # -- Substrate and unreadable frontmatter ---------------------------------------
 
 

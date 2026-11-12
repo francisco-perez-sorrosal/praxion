@@ -35,7 +35,13 @@ is iterated, never just the first -- the golden bad-case is an ADR carrying
 which must WARN on `dec-B` and `dec-C` by name. Reading the list as one
 opaque value is the exact defect this fixture exists to catch.
 
-Draft-stage `dec-draft-<hash>` pointers are checked the same way as finalized
+A `re_affirms` held by an unpromoted draft whose target is a finalized record is
+pending finalize, not a missing back-link: `finalize_adrs_backlinks` writes the
+target's `re_affirmed_by` at promotion, so gating a commit on it would refuse
+work that merge completes. No other pair is healed at finalize, so supersession
+and partial-supersession links stay checked even when a draft holds them.
+
+Draft-stage `dec-draft-<hash>` pointers are otherwise checked the same way as finalized
 ones, within the combined finalized+draft id space `query_adrs.discover_adr_files`
 already builds -- a dangling cross-stage pointer (the target file itself
 absent) is DL04's mixed-pointer WARN, not this check's; a target that exists,
@@ -71,6 +77,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from _decision_records import DRAFT_ID
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 from _script_cli import configure_logging
 from query_adrs import (
@@ -179,11 +186,26 @@ def _unreadable_finding(withheld_entry: str) -> dict:
     }
 
 
+def _is_draft(record: _AdrEdges) -> bool:
+    return DRAFT_ID.fullmatch(record.id) is not None
+
+
+def _awaits_finalize(source: _AdrEdges, target: _AdrEdges, forward: str) -> bool:
+    """True when finalize will write this back-link at promotion.
+
+    Finalize backfills `re_affirmed_by` on a finalized target when the
+    re-affirming draft is promoted; nothing heals the other pairs, and a
+    draft-to-draft edge has no finalized target to backfill yet.
+    """
+    return forward == "re_affirms" and _is_draft(source) and not _is_draft(target)
+
+
 def find_missing_reciprocals(records: list[_AdrEdges]) -> list[dict]:
     """One WARN per relation field whose reciprocal back-link is missing.
 
     A target this check cannot resolve (unknown id) is skipped, not flagged --
-    a dangling pointer is DL04's finding, not a missing back-link.
+    a dangling pointer is DL04's finding, not a missing back-link. A
+    `re_affirms` held by an unpromoted draft is pending finalize, not missing.
     """
     by_id = {r.id: r for r in records}
     findings: list[dict] = []
@@ -191,7 +213,7 @@ def find_missing_reciprocals(records: list[_AdrEdges]) -> list[dict]:
         for forward, backward in _CHECKED_PAIRS:
             for target_id in source.fields[forward]:
                 target = by_id.get(target_id)
-                if target is None:
+                if target is None or _awaits_finalize(source, target, forward):
                     continue
                 if source.id not in target.fields[backward]:
                     findings.append(_finding(source, target_id, forward, backward))

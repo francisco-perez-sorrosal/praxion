@@ -4,7 +4,8 @@ scope receive exactly what they received at the pipeline base.
 "What they received at the base" is observed, not remembered: the same checkout is delivered
 once by its own hooks and once by the base commit's hooks (or, for the strings a lean role
 receives, by everything the base commit's delivery read), in the very same project, and the two
-readings must be byte for byte equal.
+readings must be byte for byte equal, less the edits a later change declares in
+`project_gating/declared_edits.json`.
 """
 
 from __future__ import annotations
@@ -163,7 +164,8 @@ def test_a_spawn_without_instruction_files_receives_byte_for_byte_what_the_base_
     delivery = spawned_by(template)
 
     assert delivery.rule_strings == ()
-    assert delivery.strings == spawned_by(base_tree).strings
+    changes = split.changes_beyond_declared_edits(spawned_by(base_tree).strings, delivery.strings)
+    assert changes.none, f"missing: {changes.missing[:5]}\nadded: {changes.added[:5]}"
 
 
 # -- Unmanaged scope ---------------------------------------------------------------------------

@@ -31,6 +31,7 @@ import re
 import shutil
 import subprocess
 import tarfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,6 +40,7 @@ import yaml
 from tests.acceptance.drivers.audience_split_oracle import Unit, split_text
 from tests.acceptance.drivers.kernel_sandbox import isolated_env, normalize_plugin_location
 from tests.acceptance.drivers.kernel_spawn import project_checkout
+from tests.acceptance.drivers.process_text_oracles import Changes, unexplained_changes
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BASE_COMMIT = "f1f8adf18d18967c368c1a70f35132650802cde0"
@@ -92,6 +94,20 @@ def _replace_with_base(tree: Path, dest: Path, paths: tuple[str, ...]) -> Path:
             target.unlink()
     _extract_base(paths, dest)
     return dest
+
+
+def changes_beyond_declared_edits(base: Sequence[str], delivered: Sequence[str]) -> Changes:
+    """What `delivered` adds or loses against `base` that no declared edit accounts for; empty
+    when the two are byte for byte equal.
+
+    The base arm is a live read of the base commit's kernels, so a later change that edits a
+    kernel and declares the edit in `project_gating/declared_edits.json` moves the delivery away
+    from that commit by design. Such an edit is not a breach of the guard; any other difference
+    is. The declared edits are read only when the two readings differ.
+    """
+    if tuple(delivered) == tuple(base):
+        return Changes([], [])
+    return unexplained_changes("\n\n".join(base), "\n\n".join(delivered))
 
 
 def base_hooks_arm(tree: Path, dest: Path) -> Path:

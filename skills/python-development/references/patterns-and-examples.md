@@ -96,6 +96,8 @@ def save(obj: Serializable) -> None:
     # ... save data
 ```
 
+**Literal types lost in comprehensions** (pyright, observed 2026-10-20): a comprehension or generator over `Literal`-typed values is inferred as `str`, and `x in that_set` narrows `x` to `str`, so the result no longer fits a field typed with the `Literal`. Annotating the container (`reasons: set[Reason] = {...}`) and picking with an explicit `for` loop that returns the literal fixes it; `next(gen, default)` does not, because the generator element and the default both widen. When one fix does not stick, run `reveal_type` on a scratch copy to see where the type widens before a second guess.
+
 **Context managers** for resource management:
 ```python
 from contextlib import contextmanager

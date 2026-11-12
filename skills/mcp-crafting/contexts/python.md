@@ -399,6 +399,8 @@ Add to `pyproject.toml`:
 asyncio_mode = "auto"
 ```
 
+**Probing a stdio server as a subprocess:** read its replies on a dedicated thread (or with an async stream reader). Polling the pipe with `select()` hangs: the pipe is wrapped in a buffered reader, which can already hold the second reply line in memory while the underlying file descriptor reports nothing readable. Observed 2026-11-12 in a hand-rolled probe of a stdio server.
+
 ### MCP Inspector
 
 ```bash

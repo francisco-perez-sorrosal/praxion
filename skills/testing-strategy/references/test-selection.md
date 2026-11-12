@@ -89,7 +89,7 @@ A missing tool or a missing adapter widens only that pocket (`tool-unavailable` 
 
 ## Input Modes and Output Contract
 
-Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--changed-from REF` (`REF...HEAD`, plus uncommitted changes to tracked files, plus untracked files), `--full` (every pocket), or no arguments (working-tree diff against `HEAD` plus untracked files). `--json` emits schema-2 JSON; without it, the resolver prints shell-runnable, runner-prefixed commands on stdout with context on stderr — the same entry point serves agents and humans (`resolve_test_scope.py | sh -e`). A rename counts as both its old and its new path, and a deleted file is never emitted as a test target (a deleted source still selects its surviving tests, except in a vitest or jest pocket, where a deleted module widens that pocket).
+Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--changed-from REF` (`REF...HEAD`, plus uncommitted changes to tracked files, plus untracked files), `--full` (every pocket), or no arguments (working-tree diff against `HEAD` plus untracked files). `--json` emits schema-2 JSON; without it, the resolver prints shell-runnable, runner-prefixed commands on stdout with context on stderr — the same entry point serves agents and humans (`resolve_test_scope.py | sh -e`). `sh -e` stops at the first red suite, so the suites after it have not run: after a fix, re-run the whole scope, not only the suite that failed. A change that widens the scope runs long; run it in the background. A rename counts as both its old and its new path, and a deleted file is never emitted as a test target (a deleted source still selects its surviving tests, except in a vitest or jest pocket, where a deleted module widens that pocket).
 
 ```json
 {
@@ -166,5 +166,7 @@ The doctrine copy of this table lives in [SKILL.md § The Five Loops](../SKILL.m
 | Integration checkpoint | The pipeline's final step | Full suite; on failure, the audit against the pipeline diff, misses closed in-pipeline | Full-suite command; `audit_tests.py --junit … --changed-from <base>` |
 | Pre-merge CI | Push / PR | Full parallel suite, coverage ratchet, junit artifact | The project's CI test workflow |
 | Scheduled | Weekly cron + dispatch | Full suite, one rerun of failures (classify), `large` tests per pocket, audit of real failures against the diff since the last green run, slow top-20 | The project's scheduled test workflow → `audit_tests.py --junit run1.xml --rerun run2.xml --changed-from <last-green-sha> --slow 20` |
+
+**Claim rule for the full-suite checkpoint.** Scoped greens are not the suite: each scoped run answers only for its own scope, and a consumer outside every scope (a test directory the scoped runs never name) stays invisible to all of them. Before saying "suite green", run the project's bare CI invocation once (the command the CI workflow runs, honouring the configured `testpaths`). When deleting files, grep every test directory, not only the usual one, for consumers.
 
 Resolver flow: changed set → non-source predicate and declared `inert` → global widen triggers → partition by pocket (longest-prefix root) → per-pocket adapter → per-pocket selection → payload.

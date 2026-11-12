@@ -197,7 +197,7 @@ Be explicit about error conditions. Create domain-specific exception classes, ch
 2. **Set up tools**: ruff, mypy/pyright, pytest
 3. **Write tests first** for critical functionality
 4. **Implement** with type hints
-5. **Run checks**: `<tool> run ruff format . && <tool> run ruff check --fix . && <tool> run mypy src/ && <tool> run pytest`
+5. **Run checks**: `<tool> run ruff format . && <tool> run ruff check --fix . && <tool> run mypy src/ && <tool> run pytest`. A `ruff check --fix` can delete an import your own edit just made unused; re-read the file before the next edit
 6. **Iterate** in small increments
 
 ## Quick Commands

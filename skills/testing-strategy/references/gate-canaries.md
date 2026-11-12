@@ -43,7 +43,9 @@ A canary can be vacuous: green for a reason other than the defect it names. Befo
 1. **Save the gate's bytes and their hash** (`shasum -a 256 <file>`), never relying on git to restore them — a bare `git stash` takes every writer's uncommitted work, and `git checkout -- <file>` discards it.
 2. **Break the gate by script, not by hand**: swap in the unfixed function body, or the one-line regression the canary targets, with `sed` or a short Python replace that asserts it matched once. Hand edits leave syntactically broken states that fail for the wrong reason.
 3. **Run the canary and confirm it fails for the right reason** — its own assertion naming the finding, not a collection error or an import failure.
-4. **Restore the saved bytes, check the hash matches, and run the canary green again.** If it still fails against a byte-identical file, delete the package's `__pycache__`: two edits within one wall-clock second can leave a stale `.pyc`.
+4. **Restore the saved bytes, check the hash matches, and run the canary green again.** If it still fails against a byte-identical file, delete the package's `__pycache__`: two edits within one wall-clock second can leave a stale `.pyc`. A same-size edit (a constant swapped for another of equal length) is the sharpest case, because the cached bytecode records the source's size and modification second. Besides deleting the cache, run the check with `python -B` and `PYTHONDONTWRITEBYTECODE=1` so no `.pyc` is written or trusted in the first place.
+
+**Measure the thing, not a proxy.** A canary and its break must act on the quantity the gate actually judges. A gate that bounds UTF-8 bytes is not exercised by an input sized in characters; `head` output read as a count is not a count. After breaking the gate, assert that the probe mutated something (the replace matched once, the hash changed) before trusting a red or green: a probe that silently did nothing proves nothing.
 
 ## How coverage is enforced
 

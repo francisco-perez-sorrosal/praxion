@@ -277,3 +277,26 @@ def test_check_flags_leftover_praxion_settings_hooks(home, tmp_path):
 
     assert "Stale" in output
     assert "remove the 'hooks' key" not in output
+
+
+def test_check_reads_the_first_existing_install_path_user_scope_first(home, tmp_path):
+    _seed_plugin(home, installed="0.40.0", orphaned_versions=("0.40.0",))
+    cache = home / ".claude" / "plugins" / "cache" / "bit-agora" / "praxion"
+    registry = home / ".claude" / "plugins" / "installed_plugins.json"
+    registry.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "plugins": {
+                    "praxion@bit-agora": [
+                        {"scope": "user", "installPath": str(cache / "0.1.0-gone")},
+                        {"scope": "project", "installPath": str(cache / "0.40.0")},
+                    ]
+                },
+            }
+        )
+    )
+
+    output = _check(home, tmp_path)
+
+    assert "orphaned_at" in output

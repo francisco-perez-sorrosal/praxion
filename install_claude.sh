@@ -481,19 +481,22 @@ install_praxion_pre_commit() {
 # =============================================================================
 
 # Prints the version directory the plugin registry says is installed (a
-# user-scope entry first, else the first entry), or nothing.
+# user-scope entry first, and the first whose directory exists), or nothing.
 plugin_installed_path() {
     local reg="${HOME}/.claude/plugins/installed_plugins.json"
     [ -f "$reg" ] || return 0
     python3 - "$reg" "${PLUGIN_NAME}@${MARKETPLACE_NAME}" <<'PYEOF' 2>/dev/null || true
-import json, sys
+import json, os, sys
 try:
     entries = json.load(open(sys.argv[1])).get("plugins", {}).get(sys.argv[2], [])
 except (OSError, ValueError, AttributeError):
     sys.exit(0)
 entries = sorted((e for e in entries if isinstance(e, dict)), key=lambda e: e.get("scope") != "user")
-if entries and entries[0].get("installPath"):
-    print(entries[0]["installPath"])
+for entry in entries:
+    path = entry.get("installPath")
+    if isinstance(path, str) and os.path.isdir(path):
+        print(path)
+        break
 PYEOF
 }
 

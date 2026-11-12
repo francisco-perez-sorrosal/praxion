@@ -102,6 +102,7 @@ DISABLE_AUTO_COMPLETE = "PRAXION_DISABLE_AUTO_COMPLETE"
 _PLUGIN_CACHE_SUBPATH = Path(".claude") / "plugins" / "cache" / "bit-agora" / "praxion"
 _INSTALLED_PLUGINS_SUBPATH = Path(".claude") / "plugins" / "installed_plugins.json"
 _PLUGIN_KEY_PREFIX = "praxion@"
+_USER_SCOPE = "user"
 _RULES_SENTINEL_SUBPATH = Path(".claude") / "rules" / "swe" / "agent-behavioral-contract.md"
 
 
@@ -129,7 +130,8 @@ def _plugin_root(home: Path) -> Path | None:
     The hook's own `CLAUDE_PLUGIN_ROOT` comes first: Claude Code sets it to the
     plugin the hook runs from, a cache version directory for a marketplace
     install or a checkout under `--plugin-dir`. Without it, the plugin registry
-    (`installed_plugins.json`) names the install path of the praxion plugin.
+    (`installed_plugins.json`) names the install path of the praxion plugin: a
+    user-scope install first, and the first whose directory exists.
     Claude Code installs into `.../praxion/<version>/`, so the unversioned
     cache parent never holds the plugin's files.
     """
@@ -138,13 +140,17 @@ def _plugin_root(home: Path) -> Path | None:
         return Path(env_root)
     try:
         registry = json.loads((home / _INSTALLED_PLUGINS_SUBPATH).read_text(encoding="utf-8"))
-        for key, installs in registry.get("plugins", {}).items():
-            if not key.startswith(_PLUGIN_KEY_PREFIX):
-                continue
-            for install in installs:
-                root = Path(install.get("installPath", ""))
-                if install.get("installPath") and root.is_dir():
-                    return root
+        installs = [
+            install
+            for key, listed in registry.get("plugins", {}).items()
+            if key.startswith(_PLUGIN_KEY_PREFIX)
+            for install in listed
+        ]
+        installs.sort(key=lambda install: install.get("scope") != _USER_SCOPE)
+        for install in installs:
+            root = Path(install.get("installPath", ""))
+            if install.get("installPath") and root.is_dir():
+                return root
     except (OSError, ValueError, AttributeError, TypeError):
         pass
     return None

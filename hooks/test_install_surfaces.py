@@ -11,6 +11,7 @@ lays out one plugin and one HOME the same way.
 from __future__ import annotations
 
 import io
+import json
 import os
 import shutil
 import sys
@@ -141,6 +142,15 @@ class TestClaudeMdRendering:
             module._render_claude_md(fake_home, _VALUES, plugin_root)
 
 
+def _register(home, *installs):
+    """Replace the plugin registry with `installs`, listed in the order given."""
+    registry = home / ".claude" / "plugins" / "installed_plugins.json"
+    registry.write_text(
+        json.dumps({"version": 2, "plugins": {"praxion@bit-agora": list(installs)}}),
+        encoding="utf-8",
+    )
+
+
 class TestPluginRoot:
     """The hook installs from the plugin's own version directory."""
 
@@ -168,6 +178,34 @@ class TestPluginRoot:
 
         # Claude Code never installs a plugin's files into the cache parent.
         assert module._plugin_root(home) is None
+
+    def test_a_user_scope_install_wins_over_an_earlier_listed_other_scope(
+        self, fake_home, plugin_root, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        project_install = tmp_path / "project-install"
+        project_install.mkdir()
+        _register(
+            fake_home,
+            {"scope": "project", "installPath": str(project_install)},
+            {"scope": "user", "installPath": str(plugin_root)},
+        )
+
+        assert module._plugin_root(fake_home) == plugin_root
+
+    def test_a_user_scope_install_that_is_gone_yields_to_an_existing_other_scope(
+        self, fake_home, plugin_root, tmp_path, monkeypatch
+    ):
+        module = _fake_home_module(monkeypatch, fake_home)
+        project_install = tmp_path / "project-install"
+        project_install.mkdir()
+        _register(
+            fake_home,
+            {"scope": "user", "installPath": str(tmp_path / "gone")},
+            {"scope": "project", "installPath": str(project_install)},
+        )
+
+        assert module._plugin_root(fake_home) == project_install
 
     def test_a_registry_naming_a_missing_directory_is_no_plugin(
         self, fake_home, plugin_root, monkeypatch

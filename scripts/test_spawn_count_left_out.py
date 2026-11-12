@@ -235,11 +235,21 @@ def test_the_envelope_has_no_left_out_key_when_nothing_was_left_out() -> None:
 def test_the_envelope_lists_each_left_out_agent_with_its_reason() -> None:
     envelope = _envelope(_left_out_tally())
 
-    assert envelope["left_out"] == [
-        {
-            "agent_id": "a1",
-            "agent_type": "praxion:implementer",
-            "reason": spawn_count.HEADLESS_LEFT_OUT,
-        }
+    assert [(e["agent_id"], e["agent_type"], e["reason"]) for e in envelope["left_out"]] == [
+        ("a1", "praxion:implementer", spawn_count.HEADLESS_LEFT_OUT)
     ]
     assert "left_out=1" in spawn_count._format_human(envelope)
+
+
+def test_the_envelope_names_the_checkout_and_project_each_left_out_agent_ran_in() -> None:
+    rows = [_start_row(), _result_row(session_kind="headless", checkout=str(SIBLING))]
+
+    (entry,) = _envelope(spawn_count.tally(rows, ROOT))["left_out"]
+
+    assert (entry["checkout"], entry["project"]) == (str(SIBLING), PROJECT)
+
+
+def test_a_left_out_agent_whose_row_names_no_checkout_reports_an_empty_one() -> None:
+    (entry,) = _envelope(_left_out_tally())["left_out"]
+
+    assert entry["checkout"] == ""

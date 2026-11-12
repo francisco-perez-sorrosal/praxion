@@ -29,7 +29,7 @@ A transcript is evidence only for as long as it exists; nothing is written back.
 follows its spawn's owner. A slug is seen when some row's `project` names it or
 some agent's owner is it; a resume's message, an unattributed spawn or a left-out one makes
 none seen through its owner. An agent left out is listed under the conditional `left_out` key with its
-reason, is never pending and is never charged.
+reason, checkout and project, is never pending and is never charged.
 
 Each resume is classified against the resuming agent's own subagent transcript (globbed
 on the session UUID, since this CLI is never handed the hashed project-dir name Claude
@@ -155,7 +155,8 @@ class SpawnOrigin:
 class AgentTally:
     """One agent_id's spawn plus every later resume, in WAL order.
 
-    `session_id` and `project` come from the spawn's first record.
+    `session_id` and `project` come from the spawn's first record; `checkout` is the one
+    its result row names ("" when the row predates that key or no result row arrived).
     """
 
     agent_id: str
@@ -165,6 +166,7 @@ class AgentTally:
     owner: Owner = UNATTRIBUTED
     session_id: str = ""
     project: str = ""
+    checkout: str = ""
 
 
 @dataclass(frozen=True)
@@ -249,7 +251,14 @@ def _agent_tally(
         owner=_row_owner(starts[0] if starts else None, result, root),
         session_id=str(spawn_row.get("session_id") or ""),
         project=str(spawn_row.get("project") or ""),
+        checkout=_logged_checkout(result),
     )
+
+
+def _logged_checkout(result: dict | None) -> str:
+    """The checkout a spawn-result row names, "" when there is no such row or key."""
+    checkout = (result or {}).get("checkout")
+    return checkout if isinstance(checkout, str) else ""
 
 
 def _row_owner(first_start: dict | None, result: dict | None, root: Path | None) -> Owner:
@@ -633,7 +642,13 @@ def _build_envelope(
         ]
     if left_out:  # likewise, so a log with no left-out agent reports what it always did
         envelope["left_out"] = [
-            {"agent_id": t.agent_id, "agent_type": t.agent_type, "reason": t.owner.reason}
+            {
+                "agent_id": t.agent_id,
+                "agent_type": t.agent_type,
+                "reason": t.owner.reason,
+                "checkout": t.checkout,
+                "project": t.project,
+            }
             for t in left_out
             if isinstance(t.owner, LeftOut)
         ]

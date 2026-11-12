@@ -52,8 +52,15 @@ import signal
 import sys
 import time
 
+READ_CHUNK_BYTES = 4096
+POLL_SECONDS = 0.1
+DRAIN_POLL_SECONDS = 0.05
+TIMEOUT_EXIT = 124
+NO_COMMAND_EXIT = 2
+EXEC_FAILED_EXIT = 127
 
-def main() -> int:
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--timeout", type=float, default=20.0)
     parser.add_argument("--answers", type=int, default=8)
@@ -66,83 +73,118 @@ def main() -> int:
     )
     parser.add_argument("--answer-delay", type=float, default=0.2)
     parser.add_argument("cmd", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
+    return parser.parse_args(argv)
 
-    # Scripted answers to send, in order — either the explicit --answer
-    # list, or --answers blank lines (the original accept-every-default
-    # form) when no --answer was given.
-    answers = args.answer if args.answer is not None else [""] * args.answers
 
-    cmd = args.cmd
-    if cmd and cmd[0] == "--":
-        cmd = cmd[1:]
-    if not cmd:
-        print("pty_scripted_run: no command given", file=sys.stderr)
-        return 2
+def scripted_answers(args: argparse.Namespace) -> list[str]:
+    """The explicit --answer list, else --answers blank lines (accept every default)."""
+    return args.answer if args.answer is not None else [""] * args.answers
 
+
+def command_from(args: argparse.Namespace) -> list[str]:
+    return args.cmd[1:] if args.cmd and args.cmd[0] == "--" else args.cmd
+
+
+def spawn(cmd: list[str]) -> tuple[int, int]:
+    """Fork `cmd` onto a pty slave; returns (child pid, pty master fd)."""
     pid, master_fd = pty.fork()
     if pid == 0:
-        # Child: replace ourselves with the target command on the pty slave.
         os.execvp(cmd[0], cmd)
-        os._exit(127)  # pragma: no cover — only reached if execvp fails
+        os._exit(EXEC_FAILED_EXIT)  # pragma: no cover — only reached if execvp fails
+    return pid, master_fd
 
-    deadline = time.time() + args.timeout
+
+def emit(output: bytearray) -> None:
+    sys.stdout.buffer.write(bytes(output))
+    sys.stdout.flush()
+
+
+def send_answer(master_fd: int, answer: str) -> None:
+    try:
+        os.write(master_fd, (answer + "\n").encode())
+    except OSError:
+        pass
+
+
+def poll_exit(pid: int) -> int | None:
+    """The child's wait status once it has exited, else None."""
+    try:
+        done_pid, status = os.waitpid(pid, os.WNOHANG)
+    except ChildProcessError:
+        return 0
+    return status if done_pid == pid else None
+
+
+def exit_code_of(status: int) -> int:
+    return os.WEXITSTATUS(status) if os.WIFEXITED(status) else 1
+
+
+def is_readable(master_fd: int, wait: float) -> bool:
+    rlist, _, _ = select.select([master_fd], [], [], wait)
+    return master_fd in rlist
+
+
+def read_chunk(master_fd: int) -> bytes:
+    try:
+        return os.read(master_fd, READ_CHUNK_BYTES)
+    except OSError:
+        return b""
+
+
+def drain(master_fd: int, output: bytearray) -> None:
+    """Collect whatever is left in the pty buffer after the child exited."""
+    while is_readable(master_fd, DRAIN_POLL_SECONDS):
+        chunk = read_chunk(master_fd)
+        if not chunk:
+            break
+        output.extend(chunk)
+
+
+def kill_and_report_timeout(pid: int, output: bytearray) -> int:
+    try:
+        os.kill(pid, signal.SIGKILL)
+        os.waitpid(pid, 0)
+    except OSError:
+        pass
+    emit(output)
+    print("\n[pty_scripted_run] TIMEOUT waiting for child", file=sys.stderr)
+    return TIMEOUT_EXIT
+
+
+def run(cmd: list[str], answers: list[str], timeout: float, answer_delay: float) -> int:
+    pid, master_fd = spawn(cmd)
+    deadline = time.time() + timeout
     sent = 0
-    next_send = time.time() + args.answer_delay
+    next_send = time.time() + answer_delay
     output = bytearray()
 
     while True:
         now = time.time()
         if now > deadline:
-            try:
-                os.kill(pid, signal.SIGKILL)
-                os.waitpid(pid, 0)
-            except OSError:
-                pass
-            sys.stdout.buffer.write(bytes(output))
-            sys.stdout.flush()
-            print("\n[pty_scripted_run] TIMEOUT waiting for child", file=sys.stderr)
-            return 124
+            return kill_and_report_timeout(pid, output)
 
         if sent < len(answers) and now >= next_send:
-            try:
-                os.write(master_fd, (answers[sent] + "\n").encode())
-            except OSError:
-                pass
+            send_answer(master_fd, answers[sent])
             sent += 1
-            next_send = now + args.answer_delay
+            next_send = now + answer_delay
 
-        try:
-            done_pid, status = os.waitpid(pid, os.WNOHANG)
-        except ChildProcessError:
-            done_pid, status = pid, 0
-        if done_pid == pid:
-            # Drain whatever is left in the pty buffer before reporting.
-            while True:
-                rlist, _, _ = select.select([master_fd], [], [], 0.05)
-                if master_fd not in rlist:
-                    break
-                try:
-                    chunk = os.read(master_fd, 4096)
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                output.extend(chunk)
-            sys.stdout.buffer.write(bytes(output))
-            sys.stdout.flush()
-            if os.WIFEXITED(status):
-                return os.WEXITSTATUS(status)
-            return 1
+        status = poll_exit(pid)
+        if status is not None:
+            drain(master_fd, output)
+            emit(output)
+            return exit_code_of(status)
 
-        rlist, _, _ = select.select([master_fd], [], [], 0.1)
-        if master_fd in rlist:
-            try:
-                chunk = os.read(master_fd, 4096)
-            except OSError:
-                chunk = b""
-            if chunk:
-                output.extend(chunk)
+        if is_readable(master_fd, POLL_SECONDS):
+            output.extend(read_chunk(master_fd))
+
+
+def main() -> int:
+    args = parse_args()
+    cmd = command_from(args)
+    if not cmd:
+        print("pty_scripted_run: no command given", file=sys.stderr)
+        return NO_COMMAND_EXIT
+    return run(cmd, scripted_answers(args), args.timeout, args.answer_delay)
 
 
 if __name__ == "__main__":

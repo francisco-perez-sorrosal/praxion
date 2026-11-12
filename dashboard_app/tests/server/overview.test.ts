@@ -259,11 +259,13 @@ describe("digestDecisions", () => {
   });
 });
 
+const NEWEST_REPORT_FILE = "SENTINEL_REPORT_2026-10-01_09-30-00.md";
+
 function reportWith(overrides: Partial<SentinelReport>): SentinelReport {
   return {
     body: "",
     data: {},
-    fileName: "SENTINEL_REPORT_2026-10-01_09-30-00.md",
+    fileName: NEWEST_REPORT_FILE,
     highlight: null,
     isPartial: false,
     notReachedCount: 0,
@@ -329,8 +331,8 @@ describe("digestSentinel", () => {
   it("reads a grade the log wrote as free text as not graded", () => {
     const data: SentinelData = {
       log: null,
-      logSeries: [],
-      reports: [reportWith({ highlight: { ...LOG_POINT, grade: "pending" } })]
+      logSeries: [{ ...LOG_POINT, grade: "pending", reportFile: NEWEST_REPORT_FILE }],
+      reports: [reportWith({})]
     };
 
     expect(digestSentinel(data)?.grade).toBeNull();
@@ -421,8 +423,8 @@ describe("composeOverview", () => {
   it("omits the not-reached count from the partial line when the report names none", () => {
     const data: SentinelData = {
       log: null,
-      logSeries: [],
-      reports: [reportWith({ highlight: { ...LOG_POINT, grade: "B", important: 0 }, isPartial: true })]
+      logSeries: [{ ...LOG_POINT, grade: "B", important: 0, reportFile: NEWEST_REPORT_FILE }],
+      reports: [reportWith({ isPartial: true })]
     };
 
     const overview = composeOverview(

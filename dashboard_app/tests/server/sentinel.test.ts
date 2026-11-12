@@ -7,12 +7,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { parseMetricsLog } from "@/server/view-models/metrics";
 import {
   countNotReached,
+  gradingRow,
   getSentinelData,
   getSentinelSignal,
   isPartialReport,
   reportTimestampFromFileName,
   runStampFromFileName
 } from "@/server/view-models/sentinel";
+import type { SentinelLogPoint } from "@/server/sentinel/extract-sections";
 import { extractSections, parseSentinelLog } from "@/server/sentinel/extract-sections";
 
 // ---------------------------------------------------------------------------
@@ -495,5 +497,38 @@ describe("getSentinelData digest fields", () => {
 
     expect(logSeries[0]?.grade).toBe("C");
     expect(reports[0]?.highlight).toMatchObject({ coherence: "A", critical: 1, grade: "C" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// gradingRow
+// ---------------------------------------------------------------------------
+
+describe("gradingRow", () => {
+  const point = (grade: string, reportFile: string | null): SentinelLogPoint => ({
+    coherence: null,
+    critical: null,
+    grade,
+    important: null,
+    reportFile,
+    suggested: null,
+    timestamp: null
+  });
+  const series = [point("A", "old.md"), point("B", "new.md"), point("C", "new.md"), point("D", null)];
+
+  it("takes the last log row that names the newest report", () => {
+    expect(gradingRow(series, "new.md")?.grade).toBe("C");
+  });
+
+  it("has no row for a newest report no log row names, never the previous run's row", () => {
+    expect(gradingRow(series, "unlogged.md")).toBeNull();
+  });
+
+  it("takes the log's last row only when no report exists", () => {
+    expect(gradingRow(series, null)?.grade).toBe("D");
+  });
+
+  it("has no row when the log is empty and no report exists", () => {
+    expect(gradingRow([], null)).toBeNull();
   });
 });

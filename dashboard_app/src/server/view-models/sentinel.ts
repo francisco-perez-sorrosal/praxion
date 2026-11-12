@@ -157,6 +157,17 @@ function withGradeLetters(point: SentinelLogPoint): SentinelLogPoint {
   return { ...point, coherence: letter(point.coherence), grade: letter(point.grade) };
 }
 
+/**
+ * The log row that grades a report: the last row naming that file. A report no
+ * row names (a run cut short before the log append) is not graded, never the
+ * previous run's grade; with no report at all, the log's last row stands in.
+ * One rule for the sidebar chip, the Overview digest and each report's highlight.
+ */
+export function gradingRow(series: readonly SentinelLogPoint[], reportFile: string | null): SentinelLogPoint | null {
+  const row = reportFile === null ? series.at(-1) : series.findLast((point) => point.reportFile === reportFile);
+  return row ?? null;
+}
+
 const SENTINEL_LOG_FILE = "SENTINEL_LOG.md";
 
 function reportsRootOf(validatedRoot: string): string {
@@ -183,12 +194,6 @@ async function readSentinelData(projectRoot: string): Promise<SentinelData> {
   const reportFileNames = await listReportFileNames(reportsRoot);
   const log = await readLog(validatedRoot, reportsRoot);
   const logSeries = parseSentinelLog(log?.body ?? "").map(withGradeLetters);
-  const highlightByFile = new Map<string, SentinelLogPoint>();
-  for (const point of logSeries) {
-    if (point.reportFile !== null) {
-      highlightByFile.set(point.reportFile, point);
-    }
-  }
 
   const reports = (
     await Promise.all(
@@ -204,7 +209,7 @@ async function readSentinelData(projectRoot: string): Promise<SentinelData> {
           data: file.data,
           fileName,
           fileTimestamp: (await fileMtime(file.path)) ?? reportTimestampFromFileName(fileName),
-          highlight: highlightByFile.get(fileName) ?? null,
+          highlight: gradingRow(logSeries, fileName),
           isPartial: isPartialReport(file.body),
           notReachedCount: countNotReached(file.body),
           path: file.path,
@@ -228,11 +233,9 @@ export const getSentinelData = cache(readSentinelData);
 export type SentinelSignal = { grade: string | null };
 
 /**
- * The latest grade without opening any report: the log row that names the
- * newest report file. A newest report no row names (a run cut short before the
- * log append) is not graded, never the previous run's grade; the log's last row
- * stands in only when no report exists. Same rule as the Overview's digest, at
- * the cost of one directory listing and one log read however many reports exist.
+ * The latest grade without opening any report: the row grading the newest
+ * report file, at the cost of one directory listing and one log read however
+ * many reports exist.
  */
 async function readSentinelSignal(projectRoot: string): Promise<SentinelSignal> {
   const validatedRoot = await validateProjectRoot(projectRoot);
@@ -241,9 +244,7 @@ async function readSentinelSignal(projectRoot: string): Promise<SentinelSignal> 
   const newest = (await listReportFileNames(reportsRoot))[0] ?? null;
   const log = await readLog(validatedRoot, reportsRoot);
   const series = parseSentinelLog(log?.body ?? "").map(withGradeLetters);
-  const row =
-    newest === null ? series.at(-1) : series.filter((point) => point.reportFile === newest).at(-1);
-  return { grade: normalizeGrade(row?.grade) ?? null };
+  return { grade: normalizeGrade(gradingRow(series, newest)?.grade) ?? null };
 }
 
 export const getSentinelSignal = cache(readSentinelSignal);

@@ -32,7 +32,7 @@ import { getMetricsData } from "@/server/view-models/metrics";
 import type { PraxionEvalsData } from "@/server/view-models/praxion-evals";
 import { getPraxionEvalsData } from "@/server/view-models/praxion-evals";
 import type { SentinelData } from "@/server/view-models/sentinel";
-import { getSentinelData } from "@/server/view-models/sentinel";
+import { getSentinelData, gradingRow } from "@/server/view-models/sentinel";
 import type { TechDebtSummary } from "@/server/view-models/tech-debt";
 import { getTechDebtSummary } from "@/server/view-models/tech-debt";
 import { getWorkshopsData } from "@/server/view-models/workshops";
@@ -245,14 +245,10 @@ export function composeOverview(inputs: OverviewInputs, now: Date): OverviewData
 
 const SENTINEL_TREND_RUNS = 8;
 
-/**
- * The newest report's own log row. A report no row names (a run cut short
- * before the log append) is reported as not graded, never as the previous
- * run's grade; the log's last row stands in only when no report exists.
- */
+/** The digest reads the newest report's grading row; see `gradingRow` for the rule. */
 export function digestSentinel(data: SentinelData): SentinelDigest | null {
   const newest = data.reports[0] ?? null;
-  const latest = newest === null ? (data.logSeries.at(-1) ?? null) : newest.highlight;
+  const latest = gradingRow(data.logSeries, newest?.fileName ?? null);
   if (newest === null && latest === null) {
     return null;
   }

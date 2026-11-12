@@ -426,6 +426,16 @@ filter, so the gate fires on a pull request touching only `finalize_adrs.py`. Se
 
 Two producers write rows, five consumers read and filter by `owner-role`. `/project-metrics` and `/project-coverage` are signal sources for the sentinel TD dimension — their `METRICS_REPORT_*.md` outputs feed sentinel's `TD01–TD04` checks but neither skill writes to the ledger directly. Promethean (project-level ideation) and roadmap-cartographer (lens-set audit synthesis) are explicitly excluded — strategic horizons, not in-flight debt. Append-only writes plus the post-merge dedupe sequence (`scripts/finalize_tech_debt_ledger.py` — see `rules/swe/agent-intermediate-documents.md § TECH_DEBT_LEDGER.md`) keep concurrent worktree pipelines safe.
 
+**Design target, small debt (`process-principles`, `dec-draft-66ca6b02`, not yet built).** Small debt found during a pipeline does not reach the ledger. "Small" means seven conditions, all required, set out in `skills/software-planning/references/tech-debt-ledger.md`.
+
+- **Recording.** The verifier and the orchestrator append an `open` line to `.ai-work/<task-slug>/FOLLOW_UPS.md`; the implementer reports such debt on a `Follow-ups:` line of its return.
+- **Grammar.** `scripts/_follow_ups.py` owns the line grammar and its parser. Every line is one of `open`, `fixed <sha>`, `ledgered td-NNN` or `dropped <reason>`; an unreadable or misshapen line counts as open.
+- **Closing.** After the feature's last commit, the orchestrator's follow-up pass fixes each item test-first in its own commit or files a row with its reason.
+- **Cleanup.** `scripts/clean_work_safety.py` reads the record through the parser and BLOCKs while any item is open. The registry carries the record under `block-if-active`.
+- **Unchanged.** The sentinel and the architect-validator keep filing every finding; the verifier-only rule lives in the `local-verifier` kernel overlay.
+
+**Design target, principle delivery (`dec-draft-d170480e`, not yet built).** The kernels' principles pointer takes its count and names from the `### ` headings of the philosophy template; `scripts/generate_kernels.py` fills two markers, and its `--check` and manifest I8 fail while committed kernels lag. The `principles-prior-art` module delivers the principle "Standing on the Shoulders of Giants" to the promethean, the systems architect and the researcher. Constraint: the researcher's single kernel string sits about 990 characters under the 10,000-character cap.
+
 ### Verifier Rework Loop (Built)
 
 The rework loop is a closed feedback path that automates today's manual self-healing-loop contract documented in `agents/verifier.md`. Status: `Built` — all Groups A–H landed (verifier Phase 12.5, `/resume-rework` skill, the banner rework-affordance extension and the subagent-isolation harness (both retired by dec-379), architect/planner Phase 1 adapter sentences, disposition-vocabulary skill reference, always-loaded rule additions, and architecture documentation in `docs/architecture.md` §10), matching the §3 row for this component.

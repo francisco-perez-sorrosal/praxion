@@ -27,9 +27,33 @@
 
 set -e
 
-# Appended to every refusal: a refused call is refused whole, and the check read
-# the tree before the call began, so a fix made inside the refused call is not seen.
-REFUSAL_HINT="commit gate: refused; no command of that call ran. The check judged the files as they stood before the call began, so a fix made in the same call is not seen. Fix the findings above, then stage in one call and commit in a separate call."
+# Led with, not appended: a refusal's stderr may be clipped, and the way out is
+# the part the session cannot do without. A refused call is refused whole, and
+# the check read the tree before the call began, so a fix made inside the
+# refused call is not seen.
+REFUSAL_HINT="commit gate: refused; no command of that call ran. The check judged the files as they stood before the call began, so a fix made in the same call is not seen. Fix the findings, then stage in one call and commit in a separate call."
+
+# How many lines of a checker's findings a refusal replays. Enough for a dozen
+# multi-line findings, small enough that the hint, the findings and the pointer
+# to the rest stay in one readable block however much the checker printed.
+FINDINGS_LINE_CAP=40
+
+# Write the refusal on stderr, the stream a refused session reads: the way out
+# first, then at most FINDINGS_LINE_CAP lines of the findings in $out, then how
+# to see the rest. $1 is the checker, named so it can be run by hand.
+refuse() {
+    {
+        printf '%s\n' "$REFUSAL_HINT"
+        if [ -n "$out" ]; then
+            printf '%s' "$out" | sed -n "1,${FINDINGS_LINE_CAP}p"
+            total=$(printf '%s' "$out" | sed -n '$=')
+            if [ "$total" -gt "$FINDINGS_LINE_CAP" ]; then
+                printf 'commit gate: %s more line(s) not shown; to see them all, run the check by hand: python3 %s\n' \
+                    "$((total - FINDINGS_LINE_CAP))" "$1"
+            fi
+        fi
+    } >&2 || :
+}
 
 blocking=0
 if [ "$1" = "--blocking" ]; then
@@ -46,7 +70,6 @@ input=$(cat)
 # contains `\|`, `\s` or `\n` (any grep pattern) arrives as invalid JSON and
 # every Python hook's json.loads fails silently -- td-188.
 if printf '%s\n' "$input" | grep -q 'git.*commit'; then
-    rc=0
     # PRAXION_COMMIT_PAYLOAD tells a payload-aware checker that stdin carries a
     # hook payload deterministically, rather than sniffing stdin readiness with
     # a timed probe that can lose the race under load (a false "no payload" then
@@ -56,18 +79,27 @@ if printf '%s\n' "$input" | grep -q 'git.*commit'; then
     #
     # The checker's stdout is captured, not streamed: checkers print findings
     # there (so a hand, pre-commit or CI run is unchanged), but on exit 2 the
-    # harness shows the session only stderr, so a refusal re-routes them.
-    out=$(printf '%s\n' "$input" | PRAXION_COMMIT_PAYLOAD=1 python3 "$1") || rc=$?
+    # harness shows the session only stderr, so a refusal re-routes them. The
+    # capture ends in a sentinel and the checker's status, because a bare $(...)
+    # strips trailing newlines and a pass must replay stdout byte for byte. The
+    # substitution turns `set -e` off so the checker's non-zero status reaches
+    # the sentinel instead of ending the substitution early.
+    captured=$(set +e; printf '%s\n' "$input" | PRAXION_COMMIT_PAYLOAD=1 python3 "$1"; printf 'x%s' "$?")
+    rc=${captured##*x}
+    out=${captured%x*}
+    # From here on, a write to a closed or broken stream must not change the
+    # verdict: SIGPIPE would end the shell with another status, and a failed
+    # write under `set -e` would turn a block into a non-blocking error. So the
+    # signal is ignored and every write ends `|| :`. Set only after the checker
+    # ran, so it is not inherited by it.
+    trap '' PIPE
     if [ "$blocking" -eq 1 ] && [ "$rc" -eq 1 ]; then
         rc=2
     fi
     if [ "$rc" -eq 2 ]; then
-        if [ -n "$out" ]; then
-            printf '%s\n' "$out" >&2
-        fi
-        printf '%s\n' "$REFUSAL_HINT" >&2
-    elif [ -n "$out" ]; then
-        printf '%s\n' "$out"
+        refuse "$1"
+    else
+        printf '%s' "$out" || :
     fi
     exit "$rc"
 else

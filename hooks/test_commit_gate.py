@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -46,20 +47,44 @@ def _run_gate(
     hook: Path | None = None,
     env: dict[str, str] | None = None,
     blocking: bool = False,
+    shell: str | None = None,
+    stderr: int | None = subprocess.PIPE,
+    close_stderr: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    """Invoke commit_gate.sh with a JSON payload on stdin."""
+    """Invoke commit_gate.sh with a JSON payload on stdin.
+
+    `shell` runs the script under that interpreter instead of its shebang; `stderr`
+    is what the gate's fd 2 is connected to, and `close_stderr` leaves fd 2 closed
+    (both let a test prove a failed stderr write cannot change the verdict).
+    """
     real_hook = str(hook) if hook else str(HOOKS_DIR / "check_id_citation_discipline.py")
     merged_env = dict(os.environ)
     merged_env.update(env or {})
-    argv = [str(GATE_SCRIPT)] + (["--blocking"] if blocking else []) + [real_hook]
+    argv = [shell] if shell else []
+    argv += [str(GATE_SCRIPT)] + (["--blocking"] if blocking else []) + [real_hook]
+    if close_stderr:
+        argv = ["sh", "-c", 'exec "$@" 2>&-', "sh", *argv]
     return subprocess.run(
         argv,
         input=json.dumps(payload),
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=stderr,
         text=True,
         env=merged_env,
         check=False,
     )
+
+
+SHELLS = [
+    pytest.param(name, marks=pytest.mark.skipif(shutil.which(name) is None, reason=f"no {name}"))
+    for name in ("sh", "dash", "bash")
+]
+
+
+@pytest.fixture(params=SHELLS)
+def shell(request: pytest.FixtureRequest) -> str:
+    """Each POSIX shell the gate must behave identically under."""
+    return request.param
 
 
 def _make_bash_payload(command: str) -> dict:
@@ -251,6 +276,8 @@ HINT_PHRASES = (
     "before the call began",
     "stage in one call and commit in a separate call",
 )
+# Mirrors the gate's cap on the findings a refusal replays; pins the bound.
+FINDINGS_LINE_CAP = 40
 
 
 def _write_reporting_spy(tmp_path: Path, code: int, *, stream: str) -> Path:
@@ -263,6 +290,32 @@ def _write_reporting_spy(tmp_path: Path, code: int, *, stream: str) -> Path:
     return spy
 
 
+def _write_raw_stdout_spy(tmp_path: Path, code: int, text: str) -> Path:
+    """A stub check that writes `text` to stdout exactly (no added newline)."""
+    spy = tmp_path / "raw_stdout_hook.py"
+    spy.write_text(
+        f"import sys\nsys.stdin.read()\nsys.stdout.write({text!r})\nsys.exit({code})\n",
+        encoding="utf-8",
+    )
+    return spy
+
+
+def _write_many_findings_spy(tmp_path: Path, count: int) -> Path:
+    """A stub check that prints `count` numbered finding lines on stdout and exits 1."""
+    spy = tmp_path / "many_findings_hook.py"
+    spy.write_text(
+        "import sys\nsys.stdin.read()\n"
+        f"for n in range(1, {count} + 1):\n    print(f'finding line {{n}}')\n"
+        "sys.exit(1)\n",
+        encoding="utf-8",
+    )
+    return spy
+
+
+def _stderr_lines(result: subprocess.CompletedProcess[str]) -> list[str]:
+    return result.stderr.splitlines()
+
+
 def test_a_blocked_refusal_carries_stdout_findings_and_the_hint_on_stderr(tmp_path: Path) -> None:
     """Canary: the finding printed on stdout reaches the session through stderr."""
     result = _run_gate(
@@ -272,8 +325,16 @@ def test_a_blocked_refusal_carries_stdout_findings_and_the_hint_on_stderr(tmp_pa
     )
     assert result.returncode == 2
     assert FINDING in result.stderr
-    for phrase in HINT_PHRASES:
-        assert phrase in result.stderr, phrase
+
+
+@pytest.mark.parametrize("phrase", HINT_PHRASES)
+def test_a_blocked_refusal_says_the_hint_phrase(tmp_path: Path, phrase: str) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_reporting_spy(tmp_path, 1, stream="stdout"),
+        blocking=True,
+    )
+    assert phrase in result.stderr
 
 
 def test_a_native_exit_two_keeps_its_stderr_and_gains_the_hint(tmp_path: Path) -> None:
@@ -284,8 +345,16 @@ def test_a_native_exit_two_keeps_its_stderr_and_gains_the_hint(tmp_path: Path) -
     )
     assert result.returncode == 2
     assert FINDING in result.stderr
-    for phrase in HINT_PHRASES:
-        assert phrase in result.stderr, phrase
+
+
+@pytest.mark.parametrize("phrase", HINT_PHRASES)
+def test_a_native_exit_two_says_the_hint_phrase(tmp_path: Path, phrase: str) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_reporting_spy(tmp_path, 2, stream="stderr"),
+        blocking=True,
+    )
+    assert phrase in result.stderr
 
 
 def test_a_refusal_without_findings_still_carries_the_hint(tmp_path: Path) -> None:
@@ -299,7 +368,7 @@ def test_a_refusal_without_findings_still_carries_the_hint(tmp_path: Path) -> No
 
 
 def test_a_pass_prints_its_stdout_unchanged_and_no_hint(tmp_path: Path) -> None:
-    """Canary: only a refusal gains the hint; a pass is byte-identical to before."""
+    """Canary: only a refusal gains the hint; a pass writes no stderr of its own."""
     result = _run_gate(
         _make_bash_payload("git commit -m 'x'"),
         hook=_write_reporting_spy(tmp_path, 0, stream="stdout"),
@@ -307,6 +376,47 @@ def test_a_pass_prints_its_stdout_unchanged_and_no_hint(tmp_path: Path) -> None:
     )
     assert result.returncode == 0
     assert result.stdout == FINDING + "\n"
+    assert result.stderr == ""
+
+
+# Output shapes a command substitution would normalise: trailing blank lines,
+# blank-only output, a missing final newline, no output at all.
+STDOUT_SHAPES = [
+    pytest.param("a\n\n\n", id="trailing-blank-lines"),
+    pytest.param("\n", id="blank-only"),
+    pytest.param("\n\n", id="blank-lines-only"),
+    pytest.param("abc", id="no-final-newline"),
+    pytest.param("a\nb\n", id="ordinary"),
+    pytest.param("", id="empty"),
+]
+
+
+@pytest.mark.parametrize("text", STDOUT_SHAPES)
+def test_a_pass_replays_the_checkers_stdout_byte_for_byte(
+    tmp_path: Path, shell: str, text: str
+) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_raw_stdout_spy(tmp_path, 0, text),
+        blocking=True,
+        shell=shell,
+    )
+    assert result.returncode == 0
+    assert result.stdout == text
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize("text", STDOUT_SHAPES)
+def test_a_non_blocking_findings_exit_replays_stdout_byte_for_byte(
+    tmp_path: Path, shell: str, text: str
+) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_raw_stdout_spy(tmp_path, 1, text),
+        shell=shell,
+    )
+    assert result.returncode == 1
+    assert result.stdout == text
     assert result.stderr == ""
 
 
@@ -318,3 +428,113 @@ def test_a_non_blocking_findings_exit_keeps_its_stdout_and_gains_no_hint(tmp_pat
     assert result.returncode == 1
     assert result.stdout == FINDING + "\n"
     assert result.stderr == ""
+
+
+def test_a_refusal_leads_with_the_way_out_before_its_findings(tmp_path: Path, shell: str) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_reporting_spy(tmp_path, 1, stream="stdout"),
+        blocking=True,
+        shell=shell,
+    )
+    assert result.returncode == 2
+    assert result.stderr.index(HINT_PHRASES[0]) < result.stderr.index(FINDING)
+
+
+def test_a_refusal_with_few_findings_replays_every_one(tmp_path: Path, shell: str) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_many_findings_spy(tmp_path, FINDINGS_LINE_CAP),
+        blocking=True,
+        shell=shell,
+    )
+    assert result.returncode == 2
+    assert f"finding line {FINDINGS_LINE_CAP}" in result.stderr
+    assert "not shown" not in result.stderr
+
+
+def test_a_refusal_bounds_the_findings_it_replays(tmp_path: Path, shell: str) -> None:
+    total = FINDINGS_LINE_CAP * 25
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_many_findings_spy(tmp_path, total),
+        blocking=True,
+        shell=shell,
+    )
+    assert result.returncode == 2
+    assert "finding line 1\n" in result.stderr
+    assert f"finding line {FINDINGS_LINE_CAP}\n" in result.stderr
+    assert f"finding line {FINDINGS_LINE_CAP + 1}\n" not in result.stderr
+    assert len(_stderr_lines(result)) < FINDINGS_LINE_CAP + 10
+
+
+def test_a_bounded_refusal_says_how_many_lines_were_left_out_and_how_to_see_them(
+    tmp_path: Path, shell: str
+) -> None:
+    total = FINDINGS_LINE_CAP * 25
+    hook = _write_many_findings_spy(tmp_path, total)
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=hook,
+        blocking=True,
+        shell=shell,
+    )
+    assert f"{total - FINDINGS_LINE_CAP} more line" in result.stderr
+    assert f"by hand: python3 {hook}" in result.stderr
+
+
+@pytest.mark.parametrize("phrase", HINT_PHRASES)
+def test_a_bounded_refusal_still_says_the_hint_phrase(tmp_path: Path, phrase: str) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_many_findings_spy(tmp_path, FINDINGS_LINE_CAP * 25),
+        blocking=True,
+    )
+    assert phrase in result.stderr
+
+
+# A refusal's verdict must not depend on its stderr writes succeeding: under
+# `set -e` a failed write would otherwise turn exit 2 (block) into exit 1 (a
+# non-blocking error the model never sees).
+UNWRITABLE_STDERR = [
+    pytest.param({"close_stderr": True}, id="stderr-closed"),
+    pytest.param("broken-pipe", id="stderr-broken-pipe"),
+]
+
+
+def _run_blocking_with_unwritable_stderr(
+    hook: Path, shell: str, mode: object
+) -> subprocess.CompletedProcess[str]:
+    payload = _make_bash_payload("git commit -m 'x'")
+    if mode == "broken-pipe":
+        read_end, write_end = os.pipe()
+        os.close(read_end)
+        try:
+            return _run_gate(payload, hook=hook, blocking=True, shell=shell, stderr=write_end)
+        finally:
+            os.close(write_end)
+    return _run_gate(payload, hook=hook, blocking=True, shell=shell, **mode)
+
+
+@pytest.mark.parametrize("mode", UNWRITABLE_STDERR)
+def test_a_findings_exit_still_blocks_when_stderr_cannot_be_written(
+    tmp_path: Path, shell: str, mode: object
+) -> None:
+    hook = _write_reporting_spy(tmp_path, 1, stream="stdout")
+    assert _run_blocking_with_unwritable_stderr(hook, shell, mode).returncode == 2
+
+
+@pytest.mark.parametrize("mode", UNWRITABLE_STDERR)
+def test_a_native_exit_two_still_blocks_when_stderr_cannot_be_written(
+    tmp_path: Path, shell: str, mode: object
+) -> None:
+    hook = _write_exiting_spy(tmp_path, 2)
+    assert _run_blocking_with_unwritable_stderr(hook, shell, mode).returncode == 2
+
+
+@pytest.mark.parametrize("mode", UNWRITABLE_STDERR)
+def test_a_bounded_refusal_still_blocks_when_stderr_cannot_be_written(
+    tmp_path: Path, shell: str, mode: object
+) -> None:
+    hook = _write_many_findings_spy(tmp_path, FINDINGS_LINE_CAP * 25)
+    assert _run_blocking_with_unwritable_stderr(hook, shell, mode).returncode == 2

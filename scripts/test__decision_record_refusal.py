@@ -328,19 +328,6 @@ def test_the_home_rule_is_the_last_resort(isolated):
     assert find_rule_text() == "from home"
 
 
-def test_a_relative_link_in_the_rule_points_at_the_rule_files_directory(isolated):
-    plant_rule(
-        isolated / "plugin",
-        "see [protocol](../../skills/a/b.md#frag) and [here](#local) and [web](https://x.io/y)",
-    )
-
-    rule_dir = (isolated / "plugin" / refusal.RULE_RELPATH).parent.resolve()
-    assert find_rule_text() == (
-        f"see [protocol]({rule_dir.parents[1] / 'skills/a/b.md'}#frag) and [here](#local) "
-        "and [web](https://x.io/y)"
-    )
-
-
 def test_no_readable_rule_gives_none(isolated):
     assert find_rule_text() is None
 

@@ -13,7 +13,6 @@ Stdlib-only and 3.9-safe, like ``_decision_records.py``.
 from __future__ import annotations
 
 import os
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -178,23 +177,6 @@ def _section_lines(rule_text: str, heading: str) -> list[str] | None:
     return section
 
 
-_RELATIVE_LINK = re.compile(r"\]\((\.{1,2}/[^)#\s]*)(#[^)\s]*)?\)")
-
-
-def anchor_relative_links(rule_text: str, rule_dir: Path) -> str:
-    """The rule with each relative Markdown link target made absolute against ``rule_dir``.
-
-    A refusal quotes the rule where the rule's own directory is no base, so a relative link
-    would point nowhere; the anchor after ``#`` is kept.
-    """
-
-    def absolute(match: re.Match[str]) -> str:
-        target = os.path.normpath(rule_dir / match.group(1))
-        return f"]({target}{match.group(2) or ''})"
-
-    return _RELATIVE_LINK.sub(absolute, rule_text)
-
-
 # -- The one effect -----------------------------------------------------------------------
 
 
@@ -211,8 +193,7 @@ def find_rule_text() -> str | None:
     """The rule's text from the first readable location, or ``None`` when none reads."""
     for path in rule_candidates(os.environ.get(PLUGIN_ROOT_ENV), __file__, Path.home()):
         try:
-            text = path.read_text(encoding="utf-8")
+            return path.read_text(encoding="utf-8")
         except (OSError, ValueError):
             continue
-        return anchor_relative_links(text, path.resolve().parent)
     return None

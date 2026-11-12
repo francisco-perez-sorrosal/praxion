@@ -18,6 +18,12 @@
 # discipline-consultant, skill-genesis) are closed as final: no kit is owed and no trial is
 # planned. Each re-opens as a trial only on that decision's reversal trigger. This note
 # moves no role either.
+# 2026-11-12, the verifier's trigger checked at no cost: the forced-stop check does tell a
+# finished report from one with an open section or no verdict (dec-486), but at the
+# discordance the last run showed (0.571) a 24-pair run would read covered with no
+# regression with probability 0.0035, and it needs 0.027 or less to reach 0.8. The second
+# trigger does not hold, so the verifier stays held; the check's remaining gaps are td-637.
+# This note moves no role.
 version: 1
 roles:
   researcher:

@@ -151,7 +151,7 @@ def main(argv=None):
     return 0
 
 
-def run(slot, payload, environ):
+def run(slot: int, payload, environ):
     """The edge: gather what the spawn needs, compute its delivery, emit and record."""
     role = role_of(payload.get("agent_type"))
     plugin_root = environ.get("CLAUDE_PLUGIN_ROOT")

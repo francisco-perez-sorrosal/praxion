@@ -162,9 +162,13 @@ class NothingToCommit:
 
 @dataclass(frozen=True)
 class CommitRefused:
-    """The hooks, git or a lock refused (after the one re-stage retry); the files stay staged."""
+    """The hooks, git or a lock refused (after the one re-stage retry); the files stay staged.
+
+    `before_commit` is True when git failed in staging or reading the index, so no hook ran.
+    """
 
     detail: str
+    before_commit: bool = False
 
 
 @dataclass(frozen=True)
@@ -380,7 +384,7 @@ def _commit_and_judge(repo: Path, job: _Job) -> CommitOutcome:
         expected = frozenset(_lines(staged))
         refused = _commit_with_retry(repo, job) if expected else None
     except GitCommandError as exc:
-        return CommitRefused(str(exc))
+        return CommitRefused(str(exc), before_commit=True)
     except GitUnavailableError as exc:
         after = snapshot_outside(repo, frozenset(job.paths))
         return CommitInterrupted(str(exc), after, _index_locked(repo))

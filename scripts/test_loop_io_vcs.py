@@ -481,8 +481,10 @@ def test_a_lock_that_stops_the_staging_is_a_refusal_not_an_exception(surrounded:
     assert (
         isinstance(outcome, CommitRefused),
         "index.lock" in outcome.detail,
+        outcome.before_commit,
         head(surrounded),
     ) == (
+        True,
         True,
         True,
         before,
@@ -595,10 +597,12 @@ def test_hooks_that_keep_refusing_leave_a_refusal_with_their_words_and_no_commit
     assert (
         isinstance(outcome, CommitRefused),
         "lint says no" in outcome.detail,
+        outcome.before_commit,
         head(surrounded),
     ) == (
         True,
         True,
+        False,
         before,
     )
 

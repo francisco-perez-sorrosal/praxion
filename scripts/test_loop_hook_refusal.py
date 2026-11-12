@@ -58,10 +58,15 @@ ORDINARY_PLAN = (
     f"**Check**: `{CHECK_COMMAND}` expects pass=3 fail=0\n"
 )
 LINT_WORDS = "lint says no"
-GATE_PASSED = "the gate passed, but the repository's hooks refused the step-loop driver's commit"
-THE_FIX = (
-    "To fix: make the declared files pass that hook; they stay staged as the attempt left them"
+GATE_PASSED = (
+    "the gate passed, but the step-loop driver's commit was refused "
+    "by the repository's hooks or by git itself"
 )
+THE_FIX = (
+    "To fix: make the declared files pass the hook or clear what git names; "
+    "they stay staged as the attempt left them"
+)
+GIT_FAILED_FIRST = "the gate passed, but git failed before the step-loop driver's commit"
 
 
 def status(name: str, verdict: str, note: str = "") -> str:
@@ -237,3 +242,12 @@ def test_a_multi_line_over_long_git_failure_is_recorded_as_one_bounded_line(tmp_
     start = failure.index(": ") + 2
     words = failure[start : failure.index(f". {THE_FIX}")]
     assert ("\n" in failure, len(words) <= LIMIT, words.endswith(MARKER)) == (False, True, True)
+
+
+def test_a_git_failure_before_the_commit_is_not_blamed_on_the_hooks(tmp_path: Path):
+    task = SimpleNamespace(dir=tmp_path, repo=tmp_path)
+
+    refusal = CommitRefused("git add failed: index.lock exists", before_commit=True)
+    failure = rec.judge_commit(task, "s1-a1-implement", refusal).failure
+
+    assert (failure.startswith(GIT_FAILED_FIRST), "hook" in failure.lower()) == (True, False)

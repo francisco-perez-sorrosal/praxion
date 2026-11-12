@@ -115,10 +115,16 @@ POLL_SECONDS = 0.5
 AGENTS_DIR = Path(__file__).resolve().parent.parent / "agents"
 WIP_FILE = "WIP.md"
 TRAILER = "Step-Loop-Request: "
-_HOOKS_REFUSED = "the gate passed, but the repository's hooks refused the step-loop driver's commit"
-_HOOK_FIX = (
-    "To fix: make the declared files pass that hook; they stay staged as the attempt left them"
+_COMMIT_REFUSED = (
+    "the gate passed, but the step-loop driver's commit was refused "
+    "by the repository's hooks or by git itself"
 )
+_COMMIT_FIX = (
+    "To fix: make the declared files pass the hook or clear what git names; "
+    "they stay staged as the attempt left them"
+)
+_GIT_FAILED_FIRST = "the gate passed, but git failed before the step-loop driver's commit"
+_GIT_FAILED_FIX = "To fix: clear what git names; the declared files stay as the attempt left them"
 _MAX_TURNS_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.MULTILINE)
 _MARKER_OF_STOP = {"completed": "complete", **{m: m for m in ("blocked", "conflict", "partial")}}
 
@@ -534,7 +540,12 @@ def judge_commit(task: TaskView, request: str, outcome: CommitOutcome) -> Commit
     if isinstance(outcome, NothingToCommit):
         return Committing(None, None)
     if isinstance(outcome, CommitRefused):
-        return Committing(None, f"{_HOOKS_REFUSED}: {_one_line(outcome.detail)}. {_HOOK_FIX}")
+        what, fix = (
+            (_GIT_FAILED_FIRST, _GIT_FAILED_FIX)
+            if outcome.before_commit
+            else (_COMMIT_REFUSED, _COMMIT_FIX)
+        )
+        return Committing(None, f"{what}: {_one_line(outcome.detail)}. {fix}")
     if isinstance(outcome, CommitInterrupted):
         why = f"the step-loop driver's commit did not finish: {_first_line(outcome.detail)}"
         _save_snapshot(task, request, outcome.after.patch_text(), why)

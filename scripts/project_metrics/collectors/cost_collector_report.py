@@ -5,21 +5,58 @@ own data (`PipelineBucket`, `Coverage`) into the plain dict/list shapes the
 runner serializes. Pure functions over in-memory values; re-exported
 unchanged from `cost_collector`.
 
-`PipelineBucket`/`Coverage` are imported only under `TYPE_CHECKING` (never at
-runtime) to avoid a real circular import, since `cost_collector.py` imports
-this module's functions back for its own `build_pipeline_buckets` and
-`CostCollector.collect`.
+`PipelineBucket` and `Coverage` are defined here, below the entry module, so
+`cost_collector.py` depends on this module and never the reverse; it
+re-exports both names.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import Any
 
-from scripts.project_metrics.collectors.cost_collector_read import AttributedRow
+from scripts.project_metrics.collectors.cost_collector_read import AttributedRow, SourceRef
 
-if TYPE_CHECKING:
-    from scripts.project_metrics.collectors.cost_collector import Coverage, PipelineBucket
+# ---------------------------------------------------------------------------
+# The aggregate pass's own data -- what every projection below folds.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PipelineBucket:
+    """The per-pipeline row every rendered table is a projection of."""
+
+    pipeline_slug: str
+    tier: str
+    tier_reason: str | None
+    attributed_rows: int
+    sessions: int
+    models: frozenset[str]
+    tokens: dict[str, int]
+    by_agent_type: dict[str, dict[str, int]]
+
+
+@dataclass(frozen=True)
+class Coverage:
+    """The honesty surface -- how few rows a report stands on, and why.
+
+    `duplicates_dropped` defaults to `0` (keyword-safe) so a `Coverage`
+    built without it -- as every pre-existing test fixture in this suite
+    does -- describes a run where dedup dropped nothing, matching those
+    fixtures' own implicit assumption.
+    """
+
+    attributed_rows: int
+    total_agent_stop_rows: int
+    quarantine: dict[str, int]
+    duplicate_agent_ids: list[str]
+    sessions_durable: int
+    sessions_with_slug: int
+    sessions_slug_unknown: int
+    sources: list[SourceRef]
+    duplicates_dropped: int = 0
+
 
 # ---------------------------------------------------------------------------
 # JSON/dict projections -- the token-totals accumulator and every table fold.

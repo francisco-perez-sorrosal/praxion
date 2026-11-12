@@ -689,3 +689,30 @@ class TestComputeStandardVsLightweightCell:
         assert cell["ratio"] == pytest.approx(
             cell["standard"]["median"] / cell["lightweight"]["median"]
         )
+
+
+class TestCostModuleDependencyDirection:
+    """The report projections sit below the entry module: they depend on the
+    shared dataclasses, never the reverse, so a future runtime import of either
+    type cannot turn the typing-only link into a real import loop."""
+
+    def test_report_module_does_not_import_the_entry_module(self) -> None:
+        import ast
+        import inspect
+
+        from scripts.project_metrics.collectors import cost_collector_report
+
+        tree = ast.parse(inspect.getsource(cost_collector_report))
+        imported = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        }
+
+        assert "scripts.project_metrics.collectors.cost_collector" not in imported
+
+    def test_entry_module_still_exposes_the_shared_dataclasses(self) -> None:
+        from scripts.project_metrics.collectors import cost_collector, cost_collector_report
+
+        assert cost_collector.Coverage is cost_collector_report.Coverage
+        assert cost_collector.PipelineBucket is cost_collector_report.PipelineBucket

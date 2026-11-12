@@ -68,7 +68,6 @@ from __future__ import annotations
 import dataclasses
 import statistics
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -96,6 +95,8 @@ from scripts.project_metrics.collectors.cost_collector_read import (
     read_agent_stop_rows,
 )
 from scripts.project_metrics.collectors.cost_collector_report import (
+    Coverage,
+    PipelineBucket,
     _accumulate_tokens,
     _agent_type_projection,
     _bucket_to_json,
@@ -318,20 +319,6 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class PipelineBucket:
-    """The per-pipeline row every rendered table is a projection of."""
-
-    pipeline_slug: str
-    tier: str
-    tier_reason: str | None
-    attributed_rows: int
-    sessions: int
-    models: frozenset[str]
-    tokens: dict[str, int]
-    by_agent_type: dict[str, dict[str, int]]
-
-
 def build_pipeline_buckets(
     rows: Sequence[AttributedRow], tier_index: dict[str, list[str]]
 ) -> list[PipelineBucket]:
@@ -407,27 +394,6 @@ _WAL_QUARANTINE_KEYS: tuple[str, ...] = (
     Provenance.UNPARSED.value,
 )
 _SUMMARY_ROLLUP_QUARANTINE_KEY = "summary-rollup-unattributed"
-
-
-@dataclass(frozen=True)
-class Coverage:
-    """The honesty surface -- how few rows a report stands on, and why.
-
-    `duplicates_dropped` defaults to `0` (keyword-safe) so a `Coverage`
-    built without it -- as every pre-existing test fixture in this suite
-    does -- describes a run where dedup dropped nothing, matching those
-    fixtures' own implicit assumption.
-    """
-
-    attributed_rows: int
-    total_agent_stop_rows: int
-    quarantine: dict[str, int]
-    duplicate_agent_ids: list[str]
-    sessions_durable: int
-    sessions_with_slug: int
-    sessions_slug_unknown: int
-    sources: list[SourceRef]
-    duplicates_dropped: int = 0
 
 
 def summary_row_slug(row: dict) -> str:

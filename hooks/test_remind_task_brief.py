@@ -390,6 +390,33 @@ def test_repo_root_resolves_the_real_toplevel(repo: Path) -> None:
     )
 
 
+def test_missing_brief_advisory_names_the_root_it_looked_under(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reader can tell which checkout was searched, so a brief elsewhere is spotted."""
+    context = _drive_process(_load_module(), _payload(cwd=str(repo)), monkeypatch)
+
+    assert str(repo.resolve()) in context or str(repo) in context
+
+
+def test_missing_brief_advisory_says_another_worktrees_brief_is_not_seen(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A brief kept in a pipeline worktree is invisible from another checkout: the advisory is then false."""
+    context = _drive_process(_load_module(), _payload(cwd=str(repo)), monkeypatch)
+
+    assert "worktree" in context
+    assert "not seen" in context
+
+
+def test_a_found_brief_still_draws_no_advisory_for_the_root_it_looked_under(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (repo / ".ai-work" / "auth-flow" / "TASK_BRIEF.md").write_text("# Task Brief\n")
+
+    assert _drive_process(_load_module(), _payload(cwd=str(repo)), monkeypatch) == ""
+
+
 # ---------------------------------------------------------------------------
 # End-to-end contract proof (subprocess) -- real argv/stdin/exit code.
 #

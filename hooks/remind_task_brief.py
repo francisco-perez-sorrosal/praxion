@@ -134,11 +134,14 @@ def _process(payload: dict) -> None:
         return
 
     _emit(
-        f"{PREFIX} .ai-work/{slug}/TASK_BRIEF.md is missing while spawning `{stage}`. "
-        "The Intake Clarity Gate requires it at Standard/Full before the first "
-        "agent spawn -- it seeds every downstream stage and the verifier's "
-        "rubric. Write it now (Intent / Key Signals / Health Guards / "
-        "Uncertainty Flag), or re-tier if this is not Standard/Full."
+        f"{PREFIX} .ai-work/{slug}/TASK_BRIEF.md is missing under {root} while spawning `{stage}`. "
+        "Only this checkout was searched: a brief kept in another worktree of the "
+        "repository (a pipeline worktree) is not seen from here, so this advisory is "
+        "false when the brief lives in that worktree. Otherwise the Intake Clarity "
+        "Gate requires it at Standard/Full before the first agent spawn -- it seeds "
+        "every downstream stage and the verifier's rubric. Write it now (Intent / Key "
+        "Signals / Health Guards / Uncertainty Flag), or re-tier if this is not "
+        "Standard/Full."
     )
 
 

@@ -27,6 +27,10 @@
 
 set -e
 
+# Appended to every refusal: a refused call is refused whole, and the check read
+# the tree before the call began, so a fix made inside the refused call is not seen.
+REFUSAL_HINT="commit gate: refused; no command of that call ran. The check judged the files as they stood before the call began, so a fix made in the same call is not seen. Fix the findings above, then stage in one call and commit in a separate call."
+
 blocking=0
 if [ "$1" = "--blocking" ]; then
     blocking=1
@@ -47,11 +51,23 @@ if printf '%s\n' "$input" | grep -q 'git.*commit'; then
     # hook payload deterministically, rather than sniffing stdin readiness with
     # a timed probe that can lose the race under load (a false "no payload" then
     # runs a whole-repo scan and blocks the commit). Harmless to checkers that
-    # ignore it. The `echo | python3` pipe always reaches EOF, so a blocking
+    # ignore it. The `printf | python3` pipe always reaches EOF, so a blocking
     # read is safe here.
-    printf '%s\n' "$input" | PRAXION_COMMIT_PAYLOAD=1 python3 "$1" || rc=$?
+    #
+    # The checker's stdout is captured, not streamed: checkers print findings
+    # there (so a hand, pre-commit or CI run is unchanged), but on exit 2 the
+    # harness shows the session only stderr, so a refusal re-routes them.
+    out=$(printf '%s\n' "$input" | PRAXION_COMMIT_PAYLOAD=1 python3 "$1") || rc=$?
     if [ "$blocking" -eq 1 ] && [ "$rc" -eq 1 ]; then
-        exit 2
+        rc=2
+    fi
+    if [ "$rc" -eq 2 ]; then
+        if [ -n "$out" ]; then
+            printf '%s\n' "$out" >&2
+        fi
+        printf '%s\n' "$REFUSAL_HINT" >&2
+    elif [ -n "$out" ]; then
+        printf '%s\n' "$out"
     fi
     exit "$rc"
 else

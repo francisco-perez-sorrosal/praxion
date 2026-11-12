@@ -235,3 +235,86 @@ def test_forwards_backslash_bearing_payload_intact(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert out.exists(), "the Python hook never received parseable JSON"
     assert json.loads(out.read_text())["tool_input"]["command"] == command
+
+
+# ---------------------------------------------------------------------------
+# A refusal shows the session its findings and the way out
+#
+# On exit 2 the harness shows the model only stderr, and a checker prints its
+# findings on stdout (so a hand, pre-commit or CI run is unchanged). The gate
+# re-routes them and adds the hint; exit statuses stay as they were.
+# ---------------------------------------------------------------------------
+
+FINDING = "src/widget.py:2: a finding the session must read"
+HINT_PHRASES = (
+    "no command of that call ran",
+    "before the call began",
+    "stage in one call and commit in a separate call",
+)
+
+
+def _write_reporting_spy(tmp_path: Path, code: int, *, stream: str) -> Path:
+    """A stub check that prints FINDING on `stream` and exits with `code`."""
+    spy = tmp_path / f"report_{stream}_{code}.py"
+    spy.write_text(
+        f"import sys\nsys.stdin.read()\nprint({FINDING!r}, file=sys.{stream})\nsys.exit({code})\n",
+        encoding="utf-8",
+    )
+    return spy
+
+
+def test_a_blocked_refusal_carries_stdout_findings_and_the_hint_on_stderr(tmp_path: Path) -> None:
+    """Canary: the finding printed on stdout reaches the session through stderr."""
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_reporting_spy(tmp_path, 1, stream="stdout"),
+        blocking=True,
+    )
+    assert result.returncode == 2
+    assert FINDING in result.stderr
+    for phrase in HINT_PHRASES:
+        assert phrase in result.stderr, phrase
+
+
+def test_a_native_exit_two_keeps_its_stderr_and_gains_the_hint(tmp_path: Path) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_reporting_spy(tmp_path, 2, stream="stderr"),
+        blocking=True,
+    )
+    assert result.returncode == 2
+    assert FINDING in result.stderr
+    for phrase in HINT_PHRASES:
+        assert phrase in result.stderr, phrase
+
+
+def test_a_refusal_without_findings_still_carries_the_hint(tmp_path: Path) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_exiting_spy(tmp_path, 1),
+        blocking=True,
+    )
+    assert result.returncode == 2
+    assert HINT_PHRASES[0] in result.stderr
+
+
+def test_a_pass_prints_its_stdout_unchanged_and_no_hint(tmp_path: Path) -> None:
+    """Canary: only a refusal gains the hint; a pass is byte-identical to before."""
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_reporting_spy(tmp_path, 0, stream="stdout"),
+        blocking=True,
+    )
+    assert result.returncode == 0
+    assert result.stdout == FINDING + "\n"
+    assert result.stderr == ""
+
+
+def test_a_non_blocking_findings_exit_keeps_its_stdout_and_gains_no_hint(tmp_path: Path) -> None:
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'x'"),
+        hook=_write_reporting_spy(tmp_path, 1, stream="stdout"),
+    )
+    assert result.returncode == 1
+    assert result.stdout == FINDING + "\n"
+    assert result.stderr == ""

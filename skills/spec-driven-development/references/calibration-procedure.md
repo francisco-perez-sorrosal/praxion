@@ -36,6 +36,8 @@ Before computing the numeric score, check for spike indicators in the request:
 
 When spike indicators are present, recommend **Spike** regardless of the numeric score. A spike can have any scope — the uncertainty is about outcome, not size.
 
+Classify the uncertainty, not the request's phrasing. If the open question is whether the thing should exist at all (value), that is the Spike signal, however confidently the user asked: "build X" settles intent, not whether X is worth building, and a contested premise with a cheap build is still a Spike. If the open question is how to build it (approach), pick Standard or Full. Read your own uncertainty prose before committing a tier, and grep the project's existing skills for the topic first: the conflicting evidence is often already on file.
+
 ### Goal-Clarity Read (feeds the Intake Clarity Gate, NOT the size score)
 
 Intent clarity is **orthogonal** to task size — a one-file change can be deeply ambiguous, a large refactor crystal-clear. Read it separately; do **not** add it to the numeric score (that would conflate two independent axes). This read feeds the orchestrator's **Intake Clarity Gate** (see `swe-agent-coordination-protocol.md` § Conversation Checkpoints); the full procedure is the `goal-disambiguation` skill.

@@ -64,7 +64,9 @@ Extends the base [`IMPLEMENTATION_PLAN.md Structure`](../SKILL.md#implementation
 - `full — <reason>` — force the full suite for this step.
 - `<path> [<path> ...] — <reason>` — force these explicit paths, bypassing derivation.
 
-**`Read-only:` field — canonical schema.** Optional; present on an implementer step whose work turns outer-loop tests green. It lists the outer-loop test nodes (under `tests/acceptance/` or `tests/e2e/`) the step must make pass. The implementer runs them and edits no outer-loop file, listed or not. Each scenario node in `ACCEPTANCE_TESTS.md` appears in exactly one step's `Read-only:` field (planner invariant; the verifier cross-checks it). Keep it off `**Files**:`: `reconcile_pipeline_state.py` parses `Files:` to attribute git changes to steps, and a read-only node is not a change. The stage that produces the nodes: [`coordination-details.md § Acceptance-Design Stage`](coordination-details.md#acceptance-design-stage).
+**`Files:` field — tracked paths only.** A `Files:` entry that names a gitignored `.ai-work/` path reads as a permanent reconciler mismatch, because the path can never show a git change; declare the tracked paths a step edits.
+
+**`Read-only:` field — canonical schema.** Optional; present on an implementer step whose work turns outer-loop tests green. It lists the outer-loop test nodes (under `tests/acceptance/` or `tests/e2e/`) the step must make pass. The implementer runs them and edits no outer-loop file, listed or not. Each scenario node in `ACCEPTANCE_TESTS.md` appears in exactly one step's `Read-only:` field (planner invariant; the verifier cross-checks it). Write the whole field on its one line, as comma-separated paths, each in backticks, after the field name: the step-loop driver reads the value from that line alone, so indented sub-bullets under a count line parse as zero owners and every red outer-loop node then counts as a failure. Keep it off `**Files**:`: `reconcile_pipeline_state.py` parses `Files:` to attribute git changes to steps, and a read-only node is not a change. The stage that produces the nodes: [`coordination-details.md § Acceptance-Design Stage`](coordination-details.md#acceptance-design-stage).
 
 There is no `groups=`/`tier=`/`selector=` schema — that topology-era field retired with the hand-maintained topology. This is the single canonical statement of the `Tests:` field; other references (`SKILL.md`, `agent-pipeline-details.md`) point here rather than restate it.
 
@@ -74,7 +76,7 @@ There is no `groups=`/`tier=`/`selector=` schema — that topology-era field ret
 Check: `<command>` expects <key><op><count> [<key><op><count> ...]
 ```
 
-`<key>` is one of `pass fail skip pending`, `<op>` is `=` (exactly) or `>=` (at least), `<count>` is a decimal integer. The command is the step's own test command, never a narrower re-run, so a green subset cannot hide a red scoped run. A step always declares `fail=0` and `pass>=1` (a run of zero tests proves nothing); it declares `pending=<n>` where its `Read-only:` nodes leave acceptance tests still red because a later step owns them. A wrong expectation is a plan amendment, never an edit by the step's implementer. Example:
+`<key>` is one of `pass fail skip pending`, `<op>` is `=` (exactly) or `>=` (at least), `<count>` is a decimal integer. The command is the step's own test command, never a narrower re-run, so a green subset cannot hide a red scoped run. The driver splits it like a shell would but runs it **without one**, so `&&`, `;` and `|` are not operators but arguments to the first program; build any setup into the test command or a `python -c` marker, and when a Check passes on macOS but fails on a Linux CI runner, suspect BSD versus GNU coreutils before the code (observed 2026-10). A step always declares `fail=0` and `pass>=1` (a run of zero tests proves nothing); it declares `pending=<n>` where its `Read-only:` nodes leave acceptance tests still red because a later step owns them. A wrong expectation is a plan amendment, never an edit by the step's implementer. Example:
 
 ```
 **Check**: `uv run pytest tests/test_widget.py -q` expects pass>=4 fail=0 pending=2
@@ -204,6 +206,8 @@ Update WIP.md:
 - At end of each session
 
 **If WIP.md doesn't reflect reality, update it immediately.**
+
+Keep any table with a Step column and a Status column out of `WIP.md`: the step-loop driver and the reconciler read it as per-step completion claims, so a planner's checkpoint table made a finished step read as pending. Review tables and checkpoints go in their own file under `.ai-work/<task-slug>/`, with a one-paragraph pointer in `WIP.md`.
 
 ## LEARNINGS.md Structure
 

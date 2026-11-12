@@ -35,6 +35,8 @@ The review request names exactly three inputs; the orchestrator hands them to th
 
 The reviewer does NOT receive: `SYSTEMS_PLAN.md`, prior step diffs, traceability matrices, or `VERIFICATION_REPORT.md` history. Those are the full verifier's domain.
 
+**Reviewer stance.** Fixes carry a worse defect rate than features (three of six defects in one pipeline came from fixes, two guards shipping weaker than their predecessors), so for a fix re-probe the property ("does any shape still slip through?") instead of re-testing the finding, and run the shipped artifact over the real tree before the verifier does (dogfooding found a consumer that code-only greps and three reviews had missed). The author's own check shares the author's blind spot (a generator run twice from the same contaminated location agrees with itself): for a generated artifact, run the generator from a second, structurally different location, or compare against the pre-change generator.
+
 ---
 
 ## Reviewer Output Contract (Bounded Verdict)

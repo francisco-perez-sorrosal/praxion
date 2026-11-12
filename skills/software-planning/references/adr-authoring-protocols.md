@@ -45,6 +45,15 @@ id          = f"dec-draft-{sha1(filename)[:8]}"
 
 **Collision avoidance**: minute-precision timestamp + user + branch makes collisions effectively impossible in normal use. If two drafts with the same minute, user, branch, and slug do land, append `-2`, `-3`, ... to the slug at write time.
 
+### Recovering a dangling draft id
+
+When a `dec-draft-<hash>` citation survives in `.ai-state/` because its finalize never rewrote it, the mapping to `dec-NNN` is recoverable two independent ways, and both must agree before anything is written back:
+
+1. **Rename records.** `git log --all --diff-filter=R --name-status --format= -- .ai-state/decisions` lists each `drafts/<fragment>.md -> <NNN>-<slug>.md`; the draft id is `dec-draft-` plus `sha1(<fragment filename>)[:8]`, so every promoted fragment's id derives from its old name.
+2. **Per-file diff block.** In the commit that `git log -S"id: dec-draft-<hash>"` finds, split `git show` on `diff --git` and take the `+id: dec-NNN` line of the same block that carries `-id: dec-draft-<hash>`. Never take the first `+id:` line of the commit: one finalize commit can promote several drafts, and that shortcut mis-mapped five of eleven ids once.
+
+Print both columns side by side, rewrite only where they agree, and run the rewrite through the finalize cross-reference rewriter rather than a bare `sed`. A hash found in no rename record and no `id:` line never entered git: the draft was never promoted, so annotate the citation as such instead of inventing a target.
+
 ## Frontmatter Schema
 
 The frontmatter schema is shared between draft and finalized ADRs (summary and the field-name list live in the [adr-conventions rule § Frontmatter](../../../rules/swe/adr-conventions.md#frontmatter)). Only the `id` value format differs between the two stages (`dec-draft-<8-char-hash>` during draft; `dec-NNN` after finalize). Cross-reference fields (`supersedes`, `superseded_by`, `re_affirms`, `re_affirmed_by`) likewise carry `dec-draft-<hash>` values during the draft stage and `dec-NNN` values after finalize.
@@ -52,8 +61,8 @@ The frontmatter schema is shared between draft and finalized ADRs (summary and t
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | Yes | `dec-draft-<8-char-hash>` in drafts; `dec-NNN` after finalize |
-| `title` | string | Yes | Short decision title |
-| `status` | string | Yes | `proposed` / `accepted` / `superseded` / `rejected` / `re-affirmation` / `retired` |
+| `title` | string | Yes | Short decision title — double-quote it when it contains `: `, as for `summary` |
+| `status` | string | Yes | `proposed` / `accepted` / `superseded` / `rejected` / `re-affirmation` / `retired`. A finalized record may not be `proposed` (the frontmatter gate refuses it): a decision taken but not yet built is `accepted` plus a dated `## Status note` saying it is not yet in force |
 | `category` | string | Yes | `architectural` / `behavioral` / `implementation` / `configuration` |
 | `date` | string | Yes | ISO 8601 date (`YYYY-MM-DD`) |
 | `summary` | string | Yes | One-line description for index and scanning — double-quote it when it contains `: ` (an unquoted colon-space fails YAML parsing and the reciprocity gate reports the record unreadable) |
@@ -282,6 +291,11 @@ The full step sequence:
    | `.ai-work/*/LEARNINGS.md`, `.ai-work/*/SYSTEMS_PLAN.md`, `.ai-work/*/IMPLEMENTATION_PLAN.md` | All occurrences — the in-flight pipeline documents of whichever checkout finalize runs in (a worktree pipeline's copies are local to that worktree, which is why nothing persistent is scoped through them) |
    | project-root `ROADMAP.md` | All occurrences |
 5. **Index regeneration.** After all drafts in the batch promote, `DECISIONS_INDEX.md` regenerates to reflect the new finalized records. Drafts are excluded from the index by construction; the index lists only finalized `<NNN>-<slug>.md` files.
+
+**Races with finalize.** Finalize runs on whatever drafts exist at that instant, and on main it is triggered by the state, not by the commit that carries the draft:
+
+- A citation of a draft id appended in a parallel call can land after the rewrite and keep the `dec-draft-<hash>` literal. Write citations before the commit that triggers finalize, or grep `.ai-state/` for `dec-draft-` afterwards and rewrite by hand before the state commit.
+- An untracked draft on main is promoted, and its rename staged, by the post-commit finalize of an unrelated commit, so it rides into the next commit. Write the draft last, just before the state commit, or assert an empty index before each commit of a multi-commit script.
 
 **Concurrency safety.** Finalize acquires an advisory file lock before any writes so concurrent post-merge hook invocations serialize cleanly. Exit codes: `0` for success or no-op; non-zero only when manual intervention is needed (e.g., an unresolvable filename collision). The protocol deliberately avoids rewriting arbitrary repository text; the bounded walk scope is the contract.
 

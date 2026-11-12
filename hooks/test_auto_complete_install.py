@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import resource
 import shutil
 import subprocess
 import sys
@@ -246,6 +247,16 @@ def _run_hook_subprocess(
     )
 
 
+# Python startup plus the guards is tens of milliseconds of CPU; install work would be seconds.
+_FAST_SKIP_CPU_BUDGET_SECONDS = 0.5
+
+
+def _children_cpu_seconds() -> float:
+    """CPU time (user + system) this process's finished children have used so far."""
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return usage.ru_utime + usage.ru_stime
+
+
 # ===========================================================================
 # Group 1: Fast-skip path (steady state)
 # ===========================================================================
@@ -310,7 +321,7 @@ class TestFastSkipPath:
         assert result.stdout == "", f"Fast-skip should produce no stdout, got: {result.stdout!r}"
 
     @pytest.mark.usefixtures("_clear_praxion_env")
-    def test_fast_skip_completes_under_50ms(
+    def test_fast_skip_spends_under_half_a_second_of_cpu(
         self,
         fake_home,
         marker_path,
@@ -319,23 +330,29 @@ class TestFastSkipPath:
         claude_md_symlink,
         minimal_session_payload,
     ):
-        """Fast-skip path wall-clock must be under 50ms overhead after Python startup."""
+        """The fast-skip path does no install work: the hook process burns little CPU.
+
+        CPU time, not wall-clock: a loaded machine stretches the wall-clock of a
+        process that did nothing, but not the CPU it used.
+        """
         plugin_cache_dir.touch()
         marker_path.write_text("")
         marker_time = os.stat(plugin_cache_dir).st_mtime + 1
         os.utime(marker_path, (marker_time, marker_time))
 
-        start = time.perf_counter()
+        before = _children_cpu_seconds()
         result = _run_hook_subprocess(
             minimal_session_payload,
             home_dir=fake_home,
             env_extra={"PRAXION_AUTO_COMPLETE": "1"},
         )
-        elapsed_ms = (time.perf_counter() - start) * 1000
+        cpu_seconds = _children_cpu_seconds() - before
 
         assert result.returncode == 0, f"Precondition: hook must exit 0\nstderr: {result.stderr}"
-        # Python startup is ~30-50ms; total hook including startup < 500ms for CI
-        assert elapsed_ms < 500, f"Fast-skip path took {elapsed_ms:.1f}ms — expected < 500ms total"
+        assert cpu_seconds < _FAST_SKIP_CPU_BUDGET_SECONDS, (
+            f"Fast-skip path used {cpu_seconds:.3f}s of CPU, expected < "
+            f"{_FAST_SKIP_CPU_BUDGET_SECONDS}s including Python startup"
+        )
 
     @pytest.mark.usefixtures("_clear_praxion_env")
     def test_disable_flag_exits_zero_regardless_of_state(self, fake_home, minimal_session_payload):

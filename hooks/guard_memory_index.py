@@ -10,6 +10,11 @@ the index past the harness load limit. Lines already there never block a write,
 so an index carrying old debt still takes a conforming new entry. The refusal
 reason carries the convention, so the agent learns it at the moment it applies.
 
+A write it does not refuse can still draw a warning: one that leaves the index
+past its size budget and larger than before lands, and the writing session is
+told so through ``additionalContext``. The audit script owns the budget and the
+wording; this hook only relays them.
+
 Which files count: ``<config>/projects/<project>/memory/MEMORY.md`` (a
 project's auto-memory) and any ``agent-memory/<agent>/MEMORY.md`` (an agent's
 own memory, user or project scope). ``<config>`` is ``$CLAUDE_CONFIG_DIR`` or
@@ -79,7 +84,8 @@ def main() -> None:
         return
     warning = budget_warning(before, after)
     if warning:
-        # No permissionDecision: the write lands, and additionalContext is what the writing session reads.
+        # No permissionDecision: the write lands, and additionalContext is what the
+        # writing session reads.
         _emit({"additionalContext": warning})
 
 

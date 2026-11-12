@@ -17,19 +17,15 @@ Declared limit: an import built from a computed string (`importlib`,
 
 from __future__ import annotations
 
-import ast
-import re
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from hooks._observation_log import reader, registry
 from hooks._observation_log.modes import Mode
+from hooks._observation_scan_testkit import candidate_modules, importers_of
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-OWNER_PACKAGE_PREFIX = "hooks/_observation_log/"
 
 # Modules that name the log file without reading its rows, so they
 # legitimately stay outside the owner reader. Filename check only: a module
@@ -64,77 +60,16 @@ _COMPANION_MODULES = {
     "scripts/kernel_liveness.py": "scripts/check_kernel_manifest.py",
 }
 
-# Test modules and pytest conftest files are test support, not consumers.
-_TEST_FILE_RE = re.compile(r"(^|/)(test_[^/]+|conftest)\.py$")
-# `.ai-work/` and `tmp/` are gitignored scratch space (pipeline notes, probe copies
-# of hooks/): a local checkout carries them and CI does not. td-273 tracks
-# replacing this walk with a `git ls-files` lister shared by both scans.
-_EXCLUDED_DIR_MARKERS = (
-    ".venv/",
-    "/plugins/cache/",
-    "/.claude/worktrees/",
-    "/node_modules/",
-    "/.ai-work/",
-    "/tmp/",
-)
-
-
-def _candidate_modules(root: Path) -> Iterator[tuple[str, Path]]:
-    """(repo-relative path, path) of every non-test .py file outside the
-    owner package and excluded dirs -- the walk both checks share."""
-    for path in sorted(root.rglob("*.py")):
-        rel = path.relative_to(root).as_posix()
-        if rel.startswith(OWNER_PACKAGE_PREFIX) or _TEST_FILE_RE.search(rel):
-            continue
-        if any(marker in f"/{rel}" for marker in _EXCLUDED_DIR_MARKERS):
-            continue
-        yield rel, path
-
 
 def _referencing_modules(root: Path) -> list[str]:
     """Candidate modules outside the allowlist whose source references the
     log filename literal."""
     return [
         rel
-        for rel, path in _candidate_modules(root)
+        for rel, path in candidate_modules(root)
         if rel not in ALLOWLIST
         and reader.LOG_FILENAME in path.read_text(encoding="utf-8", errors="replace")
     ]
-
-
-def _imports_reader(tree: ast.AST) -> bool:
-    """Whether any import in `tree`, at any depth, binds the owner reader --
-    bare, `hooks.`-prefixed, relative, or aliased."""
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module:
-            parts = node.module.split(".")
-            if parts[-2:] == ["_observation_log", "reader"]:
-                return True
-            if parts[-1] == "_observation_log" and any(a.name == "reader" for a in node.names):
-                return True
-        elif isinstance(node, ast.Import):
-            if any(a.name.split(".")[-2:] == ["_observation_log", "reader"] for a in node.names):
-                return True
-    return False
-
-
-def _reader_importers(root: Path) -> tuple[frozenset[str], tuple[str, ...]]:
-    """(candidate modules importing the reader, candidates that failed to
-    parse). Only sources naming `_observation_log` are parsed -- every static
-    import form spells it."""
-    importers, unparseable = set(), []
-    for rel, path in _candidate_modules(root):
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if "_observation_log" not in text:
-            continue
-        try:
-            tree = ast.parse(text, filename=rel)
-        except SyntaxError:
-            unparseable.append(rel)
-            continue
-        if _imports_reader(tree):
-            importers.add(rel)
-    return frozenset(importers), tuple(unparseable)
 
 
 def _declared_code_modules(consumers) -> frozenset[str]:
@@ -174,7 +109,7 @@ def test_canary_a_synthetic_undeclared_reader_is_caught(tmp_path: Path) -> None:
 
 
 def test_reader_importers_equal_declared_code_consumers() -> None:
-    importers, unparseable = _reader_importers(REPO_ROOT)
+    importers, unparseable = importers_of(REPO_ROOT, "reader")
 
     assert unparseable == (), f"candidate modules failed to parse: {unparseable}"
     assert set(_COMPANION_MODULES) <= importers, "a companion no longer imports the reader"
@@ -211,7 +146,7 @@ def test_canary_a_synthetic_undeclared_importer_is_caught(tmp_path: Path, import
         (scripts / name).write_text(f"{import_line}\n", encoding="utf-8")
     declared = [registry.ConsumerSpec("scripts/declared_reader.py", "code", {}, Mode.STANDARD)]
 
-    importers, unparseable = _reader_importers(tmp_path)
+    importers, unparseable = importers_of(tmp_path, "reader")
 
     assert unparseable == ()
     assert _consumer_equality_delta(importers, declared, {}) == (["scripts/rogue_reader.py"], [])

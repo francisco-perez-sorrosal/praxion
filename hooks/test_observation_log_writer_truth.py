@@ -34,13 +34,14 @@ import importlib.util
 import io
 import json
 import os
-import re
 import sys
 from collections import namedtuple
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+from hooks._observation_scan_testkit import importers_of
 
 HOOKS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = HOOKS_DIR.parent
@@ -551,39 +552,16 @@ def test_hooks_share_one_observation_log_writer_copy(tmp_path, monkeypatch):
 
 # ---------------------------------------------------------------------------
 # T2: the writer-importer inventory. Mirrors the scan in
-# test_observation_log_private_reader.py:34-76.
+# test_observation_log_private_reader.py; both share one candidate lister.
 # ---------------------------------------------------------------------------
-
-_OWNER_PACKAGE_PREFIX = "hooks/_observation_log/"
-_TEST_FILE_RE = re.compile(r"(^|/)(test_[^/]+|conftest)\.py$")
-# `.ai-work/` and `tmp/` are gitignored scratch space (pipeline notes, probe copies
-# of hooks/): a local checkout carries them and CI does not. td-273 tracks
-# replacing this walk with a `git ls-files` lister shared by both scans.
-_EXCLUDED_DIR_MARKERS = (
-    ".venv/",
-    "/plugins/cache/",
-    "/.claude/worktrees/",
-    "/node_modules/",
-    "/.ai-work/",
-    "/tmp/",
-)
-_WRITER_IMPORT_RE = re.compile(r"_observation_log(\.writer\b|\s+import\s+[^\n#]*\bwriter\b)")
 
 
 def _writer_importing_modules(root: Path) -> set[str]:
     """Repo-relative paths of non-test `.py` files (outside the owner
-    package) whose source references the writer submodule."""
-    findings = set()
-    for path in sorted(root.rglob("*.py")):
-        rel = path.relative_to(root).as_posix()
-        if rel.startswith(_OWNER_PACKAGE_PREFIX) or _TEST_FILE_RE.search(rel):
-            continue
-        if any(marker in f"/{rel}" for marker in _EXCLUDED_DIR_MARKERS):
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if _WRITER_IMPORT_RE.search(text):
-            findings.add(rel)
-    return findings
+    package) that import the writer submodule."""
+    importers, unparseable = importers_of(root, "writer")
+    assert unparseable == (), f"candidate modules failed to parse: {unparseable}"
+    return set(importers)
 
 
 def test_every_writer_importing_module_is_in_the_driven_set():
@@ -596,6 +574,25 @@ def test_canary_an_undriven_writer_importer_is_caught(tmp_path):
     rogue = tmp_path / "scripts" / "rogue_writer.py"
     rogue.parent.mkdir(parents=True)
     rogue.write_text("from _observation_log import writer\n", encoding="utf-8")
+
+    assert _writer_importing_modules(tmp_path) == {"scripts/rogue_writer.py"}
+
+
+@pytest.mark.parametrize(
+    "import_source",
+    [
+        "from _observation_log import (\n    reader,\n    writer,\n)\n",
+        "from hooks._observation_log import (\n    modes,\n    writer as w,\n)\n",
+        "from _observation_log import reader, \\\n    writer\n",
+        "import _observation_log.writer\n",
+    ],
+)
+def test_canary_a_multi_line_writer_import_is_caught(tmp_path, import_source):
+    """Gate-liveness canary: the import forms a formatter emits for a long
+    import line must still be found."""
+    rogue = tmp_path / "scripts" / "rogue_writer.py"
+    rogue.parent.mkdir(parents=True)
+    rogue.write_text(import_source, encoding="utf-8")
 
     assert _writer_importing_modules(tmp_path) == {"scripts/rogue_writer.py"}
 

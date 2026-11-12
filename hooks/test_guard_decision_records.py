@@ -14,6 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import _hook_utils
 import guard_decision_records as guard
 import pytest
 
@@ -97,6 +98,16 @@ def repo(tmp_path: Path) -> Path:
 
 def _write(repo: Path, rel: str, content: str) -> dict:
     return {"file_path": str(repo / rel), "content": content}
+
+
+@pytest.fixture(autouse=True)
+def fires(monkeypatch: pytest.MonkeyPatch) -> list[tuple[tuple, dict]]:
+    """Every gate-fire row the hook records in this process, so no test writes a real one."""
+    recorded: list[tuple[tuple, dict]] = []
+    monkeypatch.setattr(
+        _hook_utils, "record_gate_fire", lambda *args, **kwargs: recorded.append((args, kwargs))
+    )
+    return recorded
 
 
 # -- Refused writes ---------------------------------------------------------------------------
@@ -467,3 +478,52 @@ def test_the_gate_core_is_found_beside_the_hook() -> None:
 def test_a_path_without_the_decisions_directory_has_no_anchor(repo: Path) -> None:
     assert guard.repo_relative(str(repo / ".ai-state")) is None
     assert guard.repo_relative(str(repo / ".ai-state" / "DESIGN.md")) is None
+
+
+# -- The gate's own verdicts are observable ---------------------------------------------------
+
+
+def test_a_refusal_records_a_block_naming_its_defect(run, repo: Path, fires) -> None:
+    run(repo, "Write", _write(repo, ".ai-state/decisions/loose-note.md", VALID_DRAFT))
+
+    assert fires == [
+        (
+            ("guard_decision_records", "block", "misplaced"),
+            {"session_id": "", "project_dir": repo},
+        )
+    ]
+
+
+def test_an_allowed_judged_call_records_a_pass(run, repo: Path, fires) -> None:
+    run(repo, "Write", _write(repo, f"{DRAFT_DIR}/{DRAFT_NAME}", VALID_DRAFT))
+
+    assert [args[:2] for args, _ in fires] == [("guard_decision_records", "pass")]
+
+
+def test_a_call_the_gate_does_not_judge_records_nothing(run, repo: Path, fires) -> None:
+    run(repo, "Write", _write(repo, "docs/guide.md", "text"))
+
+    assert fires == []
+
+
+def test_the_payload_session_id_reaches_the_row(
+    repo: Path, fires, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = _payload(repo, "Write", _write(repo, f"{DRAFT_DIR}/{DRAFT_NAME}", VALID_DRAFT))
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({**payload, "session_id": "s-1"})))
+
+    guard.main()
+
+    assert fires[0][1]["session_id"] == "s-1"
+
+
+def test_a_recorder_that_fails_leaves_the_refusal_intact(
+    run, repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*args, **kwargs):
+        raise OSError("log unwritable")
+
+    monkeypatch.setattr(_hook_utils, "record_gate_fire", fail)
+    result = run(repo, "Write", _write(repo, ".ai-state/decisions/loose-note.md", VALID_DRAFT))
+
+    _assert_denied(result, "directly under decisions/")

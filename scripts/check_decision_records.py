@@ -23,8 +23,9 @@ Commit payload: a PreToolUse hook fires before any command of the Bash call runs
 alone misses a record that ``git add x && git commit`` stages. The scope is the one the
 id-citation gate uses (``_commit_scope.hook_scope_files``); when the call restages (a ``git add``
 before the commit, or ``-a``) a path is judged by its working-tree text, else by its index blob.
-A command that is no ``git commit`` exits 0 silently, findings print to stderr as the commit
-refusal text, a clean commit prints nothing. A payload or scope the gate cannot read passes with
+A command that is no ``git commit`` exits 0 silently and records nothing, findings print to stderr
+as the commit refusal text, a clean commit prints nothing; a judged commit records a ``gate_fire``
+row (block or pass) so the observation log shows that the gate ran. A payload or scope the gate cannot read passes with
 one stderr line, never a block on a transient, as the id-citation gate does. Declared limits:
   - a record the same call itself creates or rewrites (heredoc, ``cp``, ``mv``, ``sed -i``) is not
     on disk when the hook fires, so only a write from an earlier call is seen;
@@ -87,6 +88,11 @@ from _git_runner import run_git
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+# Appended, never inserted first: ``hooks/`` must not shadow a module this script imports. The
+# recorder is imported on use, so a copy with no ``hooks/`` beside it loses the row, not the gate.
+sys.path.append(str(SCRIPT_DIR.parent / "hooks"))
+
+GATE_NAME = "check_decision_records"
 
 EXIT_CLEAN = 0
 EXIT_FINDINGS = 1
@@ -173,9 +179,16 @@ def _judge_commit_payload(raw: str) -> int:
     command = _payload_command(payload)
     if not _is_git_commit(command):
         return EXIT_CLEAN
+    code, root = _judge_commit(payload, command)
+    _record_fire(code, payload, root)
+    return code
+
+
+def _judge_commit(payload: object, command: str) -> tuple[int, Path | None]:
+    """The exit code for the commit a payload is about to run, and the repository judged."""
     scope = hook_scope_files(payload, Path.cwd())
     if not isinstance(scope, tuple):  # under the payload signal: no repository, or git contended
-        return _pass_safe("the commit scope is unavailable")
+        return _pass_safe("the commit scope is unavailable"), None
     root, files = scope
     try:
         if is_plugin_cache_path(root):
@@ -183,11 +196,27 @@ def _judge_commit_payload(raw: str) -> int:
         context = _gather_context(root)
         changes = _commit_changes(root, files, restages=_restages(command))
     except (InputError, OSError) as error:
-        return _pass_safe(str(error))
+        return _pass_safe(str(error)), root
     refusals = _refusals(changes, context)
     if refusals:
         sys.stderr.write(commit_refusal_text(refusals, find_rule_text()) + "\n")
-    return EXIT_FINDINGS if refusals else EXIT_CLEAN
+    return (EXIT_FINDINGS if refusals else EXIT_CLEAN), root
+
+
+def _record_fire(code: int, payload: object, root: Path | None) -> None:
+    """Record the judged commit as a ``gate_fire`` row; a recorder that fails costs only the row."""
+    session_id = payload.get("session_id") if isinstance(payload, dict) else None
+    try:
+        from _hook_utils import record_gate_fire
+
+        record_gate_fire(
+            GATE_NAME,
+            "block" if code == EXIT_FINDINGS else "pass",
+            session_id=session_id if isinstance(session_id, str) else "",
+            project_dir=root,
+        )
+    except Exception:
+        pass
 
 
 def _pass_safe(reason: str) -> int:

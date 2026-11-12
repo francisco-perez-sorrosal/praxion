@@ -9,6 +9,9 @@ imported from this file's location. ``decisions_gate.sh`` runs this file only fo
 could concern the decisions tree.
 
 A refusal is the only output. An allowed call prints nothing and writes nothing to stderr.
+Each judged call also records a ``gate_fire`` row (block or pass), so the observation log shows
+that the gate ran and what it decided; a call the gate does not judge records nothing.
+
 Fail-open: any error in this adapter lets the call through, and the commit gate still holds.
 
 Declared limit: a path is judged only when addressed lexically through the project's
@@ -50,6 +53,7 @@ try:
         Change,
         Read,
         Refused,
+        Verdict,
         judge_change,
         judge_read,
     )
@@ -60,6 +64,7 @@ except Exception:
         raise
     sys.exit(0)
 
+GATE_NAME = "guard_decision_records"
 GIT_ENTRY = ".git"
 READ_TOOL = "Read"
 WRITE_TOOL = "Write"
@@ -70,9 +75,8 @@ Request = Union[Change, Read]  # noqa: UP007 -- runtime alias on 3.9
 
 def main() -> None:
     payload = json.loads(sys.stdin.read())
-    request = build_request(
-        payload.get("tool_name", ""), payload.get("tool_input") or {}, payload.get("cwd") or ""
-    )
+    cwd = payload.get("cwd") or ""
+    request = build_request(payload.get("tool_name", ""), payload.get("tool_input") or {}, cwd)
     if request is None:
         return
     if isinstance(request, Read):
@@ -81,6 +85,27 @@ def main() -> None:
         verdict = judge_change(request, WRITE_TIME_CONTEXT)
     if isinstance(verdict, Refused):
         print(json.dumps(deny_output(refusal_text(verdict, find_rule_text()))))
+    _record_fire(verdict, payload.get("session_id"), cwd)
+
+
+def _record_fire(verdict: Verdict, session_id: object, cwd: str) -> None:
+    """Record the verdict as a ``gate_fire`` row.
+
+    The recorder is imported here, so a missing or broken one costs the row, never the gate.
+    """
+    try:
+        from _hook_utils import record_gate_fire
+
+        refused = isinstance(verdict, Refused)
+        record_gate_fire(
+            GATE_NAME,
+            "block" if refused else "pass",
+            ", ".join(defect.value for defect in verdict.defects) if refused else "",
+            session_id=session_id if isinstance(session_id, str) else "",
+            project_dir=Path(cwd) if cwd else None,
+        )
+    except Exception:
+        pass
 
 
 def deny_output(reason: str) -> dict:

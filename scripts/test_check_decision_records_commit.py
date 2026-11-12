@@ -19,9 +19,12 @@ from pathlib import Path
 import pytest
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
+HOOKS_DIR = SCRIPT_DIR.parent / "hooks"
+for directory in (SCRIPT_DIR, HOOKS_DIR):
+    if str(directory) not in sys.path:
+        sys.path.insert(0, str(directory))
 
+import _hook_utils  # noqa: E402
 import check_decision_records as cli  # noqa: E402
 from test_check_decision_records import (  # noqa: E402
     DRAFT,
@@ -41,6 +44,16 @@ SECOND_NUMBERED = ".ai-state/decisions/008-adopt-duckdb.md"
 COMMIT = 'git commit -m "add a record"'
 HEREDOC_COMMIT = "git commit -m \"$(cat <<'EOF'\nadd a record\nEOF\n)\""
 NO_CATEGORY_DRAFT = record(category=None)
+
+
+@pytest.fixture(autouse=True)
+def fires(monkeypatch: pytest.MonkeyPatch) -> list[tuple[tuple, dict]]:
+    """Every gate-fire row the gate records in this process, so no test writes a real one."""
+    recorded: list[tuple[tuple, dict]] = []
+    monkeypatch.setattr(
+        _hook_utils, "record_gate_fire", lambda *args, **kwargs: recorded.append((args, kwargs))
+    )
+    return recorded
 
 
 @pytest.fixture
@@ -417,3 +430,40 @@ def test_the_script_run_as_a_process_refuses_and_passes_a_commit(feature):
     git(feature, "reset", "-q")
     clean = run_script(feature, COMMIT)
     assert (clean.returncode, clean.stdout, clean.stderr) == (0, "", "")
+
+
+# -- The gate's own verdicts are observable -----------------------------------------------
+
+
+def test_a_refused_commit_records_a_block(feature, monkeypatch, capsys, fires):
+    stage(feature, NUMBERED, GOOD_NUMBERED)
+    judge_commit(feature, COMMIT, monkeypatch, capsys)
+    assert fires == [
+        (("check_decision_records", "block"), {"session_id": "", "project_dir": feature})
+    ]
+
+
+def test_a_clean_commit_records_a_pass(feature, monkeypatch, capsys, fires):
+    stage(feature, DRAFT, GOOD_DRAFT)
+    judge_commit(feature, COMMIT, monkeypatch, capsys)
+    assert [args[:2] for args, _ in fires] == [("check_decision_records", "pass")]
+
+
+def test_the_payload_session_id_reaches_the_row(feature, monkeypatch, capsys, fires):
+    raw = json.loads(payload(feature, COMMIT)) | {"session_id": "s-1"}
+    judge(json.dumps(raw), monkeypatch, capsys)
+    assert fires[0][1]["session_id"] == "s-1"
+
+
+def test_a_command_that_is_no_commit_records_nothing(feature, monkeypatch, capsys, fires):
+    judge_commit(feature, "git status", monkeypatch, capsys)
+    assert fires == []
+
+
+def test_a_recorder_that_fails_leaves_the_verdict_intact(feature, monkeypatch, capsys):
+    def fail(*args, **kwargs):
+        raise OSError("log unwritable")
+
+    monkeypatch.setattr(_hook_utils, "record_gate_fire", fail)
+    stage(feature, NUMBERED, GOOD_NUMBERED)
+    assert judge_commit(feature, COMMIT, monkeypatch, capsys)[0] == 1

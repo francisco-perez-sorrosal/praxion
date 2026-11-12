@@ -902,62 +902,71 @@ def _classify_one(adr_name, ref, deletions, renames, lazy_shapes, removers, have
         return "unclassified", "none", "history unavailable; cause not determined"
     renamed_to = _rename_target(ref, renames)
     if renamed_to:
-        # Mirror of `removed-by-self`, and needed for the same reason: the
-        # decision that *performed* a rename cites the old path because that is
-        # the path it decided about. Reporting "update the path" there asks the
-        # record to erase its own subject -- `132-rename-architecture-to-design`
-        # flagged for `.ai-state/ARCHITECTURE.md` is the decision working, not
-        # decaying. `removers` is already the right index: `_REMOVAL_INTENT`
-        # matches `rename` among its verbs, so no second scan is needed -- this
-        # branch simply returned before ever consulting it.
-        #
-        # Intent alone is too weak here, and unlike `removed-by-later` this
-        # verdict *silences* a finding rather than ranking candidates for a
-        # human, so a false positive hides a genuinely stale path. `036` matches
-        # on "**Replac**e hardcoded SPIRIT lens" and `096` on "live-file
-        # **migrat**ions"; neither has anything to do with renaming
-        # `ARCHITECTURE.md`. The discriminating evidence is that a decision
-        # which renamed X to Y also *touched* Y, so Y appears in its own
-        # `affected_files` -- true for `132`, false for both impostors. A
-        # decision that renamed without listing the target falls through to
-        # `renamed`/`update-path`, which is the safe direction: repair, never
-        # silence.
-        own = next(
-            (
-                paths
-                for name, _, paths, gone in removers
-                if name == adr_name and _covers(paths, gone, ref)
-            ),
-            None,
-        )
-        if own is not None and renamed_to in own:
-            return "renamed-by-self", "none", f"this decision renamed it to {renamed_to}"
-        return "renamed", "update-path", f"renamed to {renamed_to}"
-
+        return _renamed_verdict(adr_name, ref, renamed_to, removers)
     deleted_on = _deletion_date(ref, deletions)
     if deleted_on:
-        owners = [(n, d) for n, d, paths, gone in removers if _covers(paths, gone, ref)]
-        if any(n == adr_name for n, _ in owners):
-            return "removed-by-self", "none", f"this decision removed it ({deleted_on})"
-        if owners:
-            # Removal intent is matched broadly, so several decisions can claim the
-            # same path. Rank by date proximity to the deletion: the decision that
-            # actually caused it is the one closest in time. Naming all of them
-            # would make the disposition ("record the supersession link") require
-            # the reader to re-do this attribution by hand.
-            ranked = [n for n, _ in sorted(owners, key=lambda o: _date_distance(o[1], deleted_on))]
-            # Ordering is a hint, not a verdict. Date proximity is a weak proxy
-            # for causation -- an unrelated decision landing near the deletion can
-            # outrank the real remover -- so candidates are offered for the human
-            # disposition step rather than asserted. The CLASS is the reliable
-            # part: some decision removed this, and no link records it.
-            detail = (
-                f"removed {deleted_on}; candidate removers, nearest-dated first: "
-                f"{', '.join(ranked)} -- confirm which, then record the link"
-            )
-            return "removed-by-later", "link-supersession", detail
-        return _residual(f"deleted {deleted_on}, no owning decision found", lazy_shapes)
+        return _removed_verdict(adr_name, ref, deleted_on, removers, lazy_shapes)
     return _residual("absent, with no deletion recorded", lazy_shapes)
+
+
+def _renamed_verdict(adr_name, ref, renamed_to, removers) -> tuple[str, str, str]:
+    """The verdict for a reference that a rename moved: the decision that did it, or a repair."""
+    # Mirror of `removed-by-self`, and needed for the same reason: the
+    # decision that *performed* a rename cites the old path because that is
+    # the path it decided about. Reporting "update the path" there asks the
+    # record to erase its own subject -- `132-rename-architecture-to-design`
+    # flagged for `.ai-state/ARCHITECTURE.md` is the decision working, not
+    # decaying. `removers` is already the right index: `_REMOVAL_INTENT`
+    # matches `rename` among its verbs, so no second scan is needed -- this
+    # branch simply returned before ever consulting it.
+    #
+    # Intent alone is too weak here, and unlike `removed-by-later` this
+    # verdict *silences* a finding rather than ranking candidates for a
+    # human, so a false positive hides a genuinely stale path. `036` matches
+    # on "**Replac**e hardcoded SPIRIT lens" and `096` on "live-file
+    # **migrat**ions"; neither has anything to do with renaming
+    # `ARCHITECTURE.md`. The discriminating evidence is that a decision
+    # which renamed X to Y also *touched* Y, so Y appears in its own
+    # `affected_files` -- true for `132`, false for both impostors. A
+    # decision that renamed without listing the target falls through to
+    # `renamed`/`update-path`, which is the safe direction: repair, never
+    # silence.
+    own = next(
+        (
+            paths
+            for name, _, paths, gone in removers
+            if name == adr_name and _covers(paths, gone, ref)
+        ),
+        None,
+    )
+    if own is not None and renamed_to in own:
+        return "renamed-by-self", "none", f"this decision renamed it to {renamed_to}"
+    return "renamed", "update-path", f"renamed to {renamed_to}"
+
+
+def _removed_verdict(adr_name, ref, deleted_on, removers, lazy_shapes) -> tuple[str, str, str]:
+    """The verdict for a reference whose file was deleted: its remover, candidates, or residual."""
+    owners = [(n, d) for n, d, paths, gone in removers if _covers(paths, gone, ref)]
+    if any(n == adr_name for n, _ in owners):
+        return "removed-by-self", "none", f"this decision removed it ({deleted_on})"
+    if owners:
+        # Removal intent is matched broadly, so several decisions can claim the
+        # same path. Rank by date proximity to the deletion: the decision that
+        # actually caused it is the one closest in time. Naming all of them
+        # would make the disposition ("record the supersession link") require
+        # the reader to re-do this attribution by hand.
+        ranked = [n for n, _ in sorted(owners, key=lambda o: _date_distance(o[1], deleted_on))]
+        # Ordering is a hint, not a verdict. Date proximity is a weak proxy
+        # for causation -- an unrelated decision landing near the deletion can
+        # outrank the real remover -- so candidates are offered for the human
+        # disposition step rather than asserted. The CLASS is the reliable
+        # part: some decision removed this, and no link records it.
+        detail = (
+            f"removed {deleted_on}; candidate removers, nearest-dated first: "
+            f"{', '.join(ranked)} -- confirm which, then record the link"
+        )
+        return "removed-by-later", "link-supersession", detail
+    return _residual(f"deleted {deleted_on}, no owning decision found", lazy_shapes)
 
 
 def _residual(detail: str, lazy_shapes: list[str] | None) -> tuple[str, str, str]:

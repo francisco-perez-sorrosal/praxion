@@ -84,6 +84,7 @@ _TOOL_INSTALL_BLURB: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 _STALE_COVERAGE_REFRESH_STATUSES: frozenset[str] = frozenset({"timed-out", "failed"})
+_ISO_UTC_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def _render_coverage_staleness_note(report: Report) -> str | None:
@@ -97,15 +98,15 @@ def _render_coverage_staleness_note(report: Report) -> str | None:
 
     if report.coverage_refresh not in _STALE_COVERAGE_REFRESH_STATUSES:
         return None
-    lines = [
-        "## Coverage Data Is Stale",
-        "",
+    paragraph = (
         f"The `--refresh-coverage` attempt {report.coverage_refresh} for this run; "
         "the coverage figures below reflect the pre-existing `coverage.xml` "
-        "artifact, not a fresh measurement.",
-        "",
-    ]
-    return "\n".join(lines)
+        "artifact, not a fresh measurement."
+    )
+    if report.coverage_artifact_mtime is not None:
+        modified = datetime.fromtimestamp(report.coverage_artifact_mtime, tz=timezone.utc)
+        paragraph += f" The artifact was last modified {modified.strftime(_ISO_UTC_FORMAT)}."
+    return "\n".join(["## Coverage Data Is Stale", "", paragraph, ""])
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +149,7 @@ def render_markdown(report: Report) -> str:
 
 
 def _render_header(report: Report) -> str:
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    generated_at = datetime.now(timezone.utc).strftime(_ISO_UTC_FORMAT)
     aggregate = report.aggregate
     lines = [
         "# Project Metrics Report",

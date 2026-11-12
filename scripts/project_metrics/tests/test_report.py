@@ -1063,6 +1063,58 @@ class TestReportAggregateSummary:
         )
 
 
+class TestStaleCoverageIsNeverPresentedAsCurrent:
+    """A coverage figure read from a stale artifact is qualified wherever it is
+    stated, and the staleness note names the artifact's own modification time
+    so a reader can judge whether the staleness matters."""
+
+    @staticmethod
+    def _stale_report(**overrides: Any) -> Any:
+        from dataclasses import replace
+
+        from scripts.project_metrics.schema import ToolAvailability
+
+        report = _report_with_coverage(0.8502)
+        availability = dict(report.tool_availability)
+        availability["coverage"] = ToolAvailability(status="available", version="stale")
+        return replace(report, tool_availability=availability, **overrides)
+
+    def test_aggregate_sentence_qualifies_a_stale_artifact_figure(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(self._stale_report())
+
+        assert "Line coverage is 85.02% (from a stale artifact)." in md
+
+    def test_aggregate_sentence_stays_unqualified_for_a_current_artifact(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        md = render_markdown(_report_with_coverage(0.8502))
+
+        assert "Line coverage is 85.02%." in md
+
+    def test_staleness_note_names_the_artifact_modification_time(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        # 2026-04-01T09:30:00Z
+        report = self._stale_report(
+            coverage_refresh="timed-out", coverage_artifact_mtime=1775035800.0
+        )
+
+        section = _extract_section(render_markdown(report), "Coverage Data Is Stale")
+
+        assert "2026-04-01T09:30:00Z" in section
+
+    def test_staleness_note_omits_the_time_when_no_artifact_mtime_was_captured(self) -> None:
+        from scripts.project_metrics.report import render_markdown
+
+        report = self._stale_report(coverage_refresh="failed", coverage_artifact_mtime=None)
+
+        section = _extract_section(render_markdown(report), "Coverage Data Is Stale")
+
+        assert "modified" not in section
+
+
 # ---------------------------------------------------------------------------
 # Tool Availability table — one row per collector with status + detail.
 # ---------------------------------------------------------------------------

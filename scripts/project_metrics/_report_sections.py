@@ -34,6 +34,8 @@ __all__ = [
     "render_cost",
 ]
 
+# The `version` the coverage collector reports when the artifact predates HEAD.
+_COVERAGE_STALE_VERSION = "stale"
 
 # Aggregate-column formatting — mirrors the AggregateBlock field types.
 # Strings render raw. Integers render raw. Floats render :.2f. Nulls render
@@ -106,19 +108,25 @@ def _render_aggregate_paragraph(report: Report) -> str:
     truck = aggregate.truck_factor
     top_score = fmt_float_2(aggregate.hotspot_top_score)
     gini = fmt_float_2(aggregate.hotspot_gini)
-    coverage = aggregate.coverage_line_pct
 
-    coverage_sentence = (
-        "Coverage is not computed."
-        if coverage is None
-        else f"Line coverage is {fmt_pct(coverage)}."
-    )
     return (
         f"The repository carries {sloc} SLOC across {files} files in "
         f"{langs} languages; 90-day churn totals {churn} changes with "
         f"change entropy {entropy}. Truck factor is {truck}; top hot-spot "
-        f"score is {top_score} with Gini {gini}. {coverage_sentence}"
+        f"score is {top_score} with Gini {gini}. {_coverage_sentence(report)}"
     )
+
+
+def _coverage_sentence(report: Report) -> str:
+    """State the coverage figure, qualified when its artifact is stale."""
+
+    coverage = report.aggregate.coverage_line_pct
+    if coverage is None:
+        return "Coverage is not computed."
+    availability = report.tool_availability.get("coverage")
+    is_stale = availability is not None and availability.version == _COVERAGE_STALE_VERSION
+    qualifier = " (from a stale artifact)" if is_stale else ""
+    return f"Line coverage is {fmt_pct(coverage)}{qualifier}."
 
 
 def _skip_marker_for_aggregate_column(column: str, report: Report) -> str:

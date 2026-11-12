@@ -182,6 +182,49 @@
         }
       }
     },
+    "praxion-repo|sonnet|default|mcp|plugin-dir|subscription": {
+      "claude_code_version": "2.1.322",
+      "profile": {
+        "credential": "subscription",
+        "cwd_kind": "praxion-repo",
+        "key": "praxion-repo|sonnet|default|mcp|plugin-dir|subscription",
+        "model": "sonnet",
+        "plugin_dir": "/Users/fperez/dev/praxion",
+        "setting_sources": null,
+        "strict_mcp_config": false
+      },
+      "recorded": "2026-11-11",
+      "targets": {
+        "agent:implementer": {
+          "cache_creation": 35852,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 35854
+        },
+        "agent:researcher": {
+          "cache_creation": 26973,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 26975
+        },
+        "agent:verifier": {
+          "cache_creation": 62406,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-opus-5-5",
+          "tokens": 62408
+        },
+        "main": {
+          "cache_creation": 49664,
+          "cache_read": 11382,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 61048
+        }
+      }
+    },
     "praxion-repo|sonnet|default|no-mcp|installed": {
       "claude_code_version": "2.1.296",
       "profile": {
@@ -340,6 +383,28 @@
           "input_tokens": 2,
           "model": "claude-sonnet-5-5",
           "tokens": 55177
+        }
+      }
+    },
+    "unmanaged|sonnet|default|mcp|plugin-dir|subscription": {
+      "claude_code_version": "2.1.322",
+      "profile": {
+        "credential": "subscription",
+        "cwd_kind": "unmanaged",
+        "key": "unmanaged|sonnet|default|mcp|plugin-dir|subscription",
+        "model": "sonnet",
+        "plugin_dir": "/Users/fperez/dev/praxion",
+        "setting_sources": null,
+        "strict_mcp_config": false
+      },
+      "recorded": "2026-11-11",
+      "targets": {
+        "main": {
+          "cache_creation": 27119,
+          "cache_read": 11382,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 38503
         }
       }
     },

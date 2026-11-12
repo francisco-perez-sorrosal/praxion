@@ -16,7 +16,8 @@ The convention, as data:
 - every linked file exists, no file is linked twice, and every topic file in
   the directory is linked (an unlinked file is a dropped entry: shorten
   entries, never drop them);
-- the index stays inside the harness load limit.
+- the index stays inside the harness load limit, and warns once it passes
+  ``INDEX_BUDGET`` (40 lines or 5,000 bytes), the size it is meant to keep.
 
 Two consumers share this module. ``hooks/guard_memory_index.py`` calls
 ``gate_messages`` before a Write or Edit lands and refuses one that *adds*
@@ -41,17 +42,37 @@ import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import NamedTuple
 
 CONFIG_DIR_VARIABLE = "CLAUDE_CONFIG_DIR"
 INDEX_NAME = "MEMORY.md"
 
 # The harness's own guidance for an index entry: one line, under ~150 characters.
 MAX_LINE_CHARS = 150
+
+
+class IndexSize(NamedTuple):
+    """How big an index is, counted the way the harness counts it."""
+
+    lines: int
+    bytes: int
+
+    @classmethod
+    def of(cls, text: str) -> IndexSize:
+        return cls(lines=len(text.splitlines()), bytes=len(text.encode("utf-8")))
+
+    def exceeds(self, limit: IndexSize) -> bool:
+        """Past `limit` on either axis."""
+        return self.lines > limit.lines or self.bytes > limit.bytes
+
+    def __str__(self) -> str:
+        return f"{self.lines:,} lines, {self.bytes:,} bytes"
+
+
+# The size an index is meant to stay within: it loads into every session.
+INDEX_BUDGET = IndexSize(lines=40, bytes=5_000)
 # The harness loads the first 200 lines or 25 KB of an index, whichever is hit first.
-LOAD_LINE_CAP = 200
-LOAD_BYTE_CAP = 25_000
-# The audit warns once an index passes this share of either cap.
-NEAR_LIMIT_SHARE = 0.8
+LOAD_LIMIT = IndexSize(lines=200, bytes=25_000)
 
 CONVENTION = (
     "A memory index holds one-line pointers of at most 150 characters, "
@@ -128,22 +149,42 @@ def _link_findings(index: Path, text: str) -> list[Finding]:
 
 
 def _size_findings(text: str) -> list[Finding]:
-    lines, size = len(text.splitlines()), len(text.encode("utf-8"))
-    if lines > LOAD_LINE_CAP or size > LOAD_BYTE_CAP:
+    """At most one finding: within the budget none, past it a warning, past the load limit a failure."""
+    size = IndexSize.of(text)
+    if size.exceeds(LOAD_LIMIT):
         return [
             Finding(
                 "over-load-limit",
                 "fail",
                 0,
-                f"{lines} lines, {size} bytes: entries past {LOAD_LINE_CAP} lines or "
-                f"{LOAD_BYTE_CAP} bytes are not loaded",
+                f"{size}: entries past {LOAD_LIMIT.lines} lines or "
+                f"{LOAD_LIMIT.bytes:,} bytes are not loaded",
             )
         ]
-    if lines > LOAD_LINE_CAP * NEAR_LIMIT_SHARE or size > LOAD_BYTE_CAP * NEAR_LIMIT_SHARE:
-        return [
-            Finding("near-load-limit", "warn", 0, f"{lines} lines, {size} bytes of the load limit")
-        ]
+    if size.exceeds(INDEX_BUDGET):
+        return [Finding("over-budget", "warn", 0, _over_budget_detail(size))]
     return []
+
+
+def _over_budget_detail(size: IndexSize) -> str:
+    return f"{size}, past the budget of {INDEX_BUDGET.lines} lines or {INDEX_BUDGET.bytes:,} bytes"
+
+
+def budget_warning(before: str, after: str) -> str | None:
+    """A nudge for a write that leaves an index past the budget and larger than it was.
+
+    Silent for a write that shrinks or holds the index, and for one past the
+    load limit, which `gate_messages` refuses instead.
+    """
+    size, previous = IndexSize.of(after), IndexSize.of(before)
+    if not size.exceeds(INDEX_BUDGET) or size.exceeds(LOAD_LIMIT):
+        return None
+    if size.bytes <= previous.bytes and size.lines <= previous.lines:
+        return None
+    return (
+        f"the index is now {_over_budget_detail(size)}: "
+        "one pointer line per memory; move detail into its topic file"
+    )
 
 
 def added_lines(before: str, after: str) -> list[str]:
@@ -169,7 +210,7 @@ def gate_messages(before: str, after: str) -> list[str]:
         for line in added_lines(before, after)
         for finding in _judge_line(line, 0)
     ]
-    grew = len(after.encode("utf-8")) > len(before.encode("utf-8"))
+    grew = IndexSize.of(after).bytes > IndexSize.of(before).bytes
     over = _size_findings(after)
     if grew and over and over[0].kind == "over-load-limit":
         messages.append(f"the index would pass the harness load limit ({over[0].detail})")

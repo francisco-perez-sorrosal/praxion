@@ -13,16 +13,21 @@ from pathlib import Path
 
 import pytest
 from check_memory_index import (
-    LOAD_LINE_CAP,
+    INDEX_BUDGET,
+    LOAD_LIMIT,
     MAX_LINE_CHARS,
+    IndexSize,
     added_lines,
     all_indexes,
     audit,
+    budget_warning,
     gate_messages,
     line_findings,
     main,
     project_index,
 )
+
+LOAD_LINE_CAP = LOAD_LIMIT.lines
 
 POINTER = "- [Short title](topic.md) — when it applies and the one rule"
 LONG_POINTER = "- [Long title](topic.md) — " + "x" * MAX_LINE_CHARS
@@ -78,12 +83,90 @@ def test_canary_an_index_past_the_harness_line_cap_is_over_the_load_limit(tmp_pa
     assert _kinds(audit(index)) == ["over-load-limit"]
 
 
-def test_an_index_near_the_cap_warns_without_failing(tmp_path: Path) -> None:
-    count = int(LOAD_LINE_CAP * 0.9)
+def _lines_index(count: int) -> str:
+    return "".join(f"- [T{n}](t{n}.md) — hook\n" for n in range(count))
+
+
+def _bytes_index(total_bytes: int) -> str:
+    """One long pointer-shaped line (it also trips too-long, which these tests ignore)."""
+    head = "- [T](t.md) - "
+    return head + "x" * (total_bytes - len(head) - 1) + "\n"
+
+
+def _size_findings(
+    tmp_path: Path, name: str, text: str, topics: tuple[str, ...]
+) -> list[tuple[str, str]]:
+    """The (kind, severity) of each size finding for an index built in its own subdirectory."""
+    root = tmp_path / name
+    root.mkdir()
+    findings = audit(_memory_dir(root, text, topics=topics))
+    return [(f.kind, f.severity) for f in findings if f.kind in ("over-budget", "over-load-limit")]
+
+
+def test_index_size_counts_lines_and_utf8_bytes() -> None:
+    assert IndexSize.of("a\nbé\n") == IndexSize(lines=2, bytes=6)
+
+
+def test_the_index_budget_is_strictly_below_the_load_limit_on_both_axes() -> None:
+    assert INDEX_BUDGET.lines < LOAD_LIMIT.lines
+    assert INDEX_BUDGET.bytes < LOAD_LIMIT.bytes
+
+
+def test_canary_one_byte_over_the_budget_warns_and_exactly_at_it_is_quiet(tmp_path: Path) -> None:
+    over, at = _bytes_index(INDEX_BUDGET.bytes + 1), _bytes_index(INDEX_BUDGET.bytes)
+    assert IndexSize.of(over).bytes == INDEX_BUDGET.bytes + 1
+    assert _size_findings(tmp_path, "over", over, ("t.md",)) == [("over-budget", "warn")]
+    assert _size_findings(tmp_path, "at", at, ("t.md",)) == []
+
+
+def test_canary_one_line_over_the_budget_warns_and_exactly_at_it_is_quiet(tmp_path: Path) -> None:
+    over_topics = tuple(f"t{n}.md" for n in range(INDEX_BUDGET.lines + 1))
+    over, at = _lines_index(INDEX_BUDGET.lines + 1), _lines_index(INDEX_BUDGET.lines)
+    assert _size_findings(tmp_path, "over", over, over_topics) == [("over-budget", "warn")]
+    assert _size_findings(tmp_path, "at", at, over_topics[:-1]) == []
+
+
+def test_the_over_budget_detail_names_lines_bytes_and_the_budget(tmp_path: Path) -> None:
+    text = _bytes_index(INDEX_BUDGET.bytes + 1)
+    findings = audit(_memory_dir(tmp_path, text, topics=("t.md",)))
+    (detail,) = [f.detail for f in findings if f.kind == "over-budget"]
+    for phrase in ("1 lines", f"{INDEX_BUDGET.bytes + 1:,} bytes", "40 lines", "5,000 bytes"):
+        assert phrase in detail
+
+
+def test_canary_past_the_load_limit_fails_with_no_second_size_finding(tmp_path: Path) -> None:
+    count = LOAD_LIMIT.lines + 1
     topics = tuple(f"t{n}.md" for n in range(count))
-    index_text = "".join(f"- [T{n}](t{n}.md) — hook\n" for n in range(count))
-    findings = audit(_memory_dir(tmp_path, index_text, topics=topics))
-    assert [(f.kind, f.severity) for f in findings] == [("near-load-limit", "warn")]
+    assert _size_findings(tmp_path, "past", _lines_index(count), topics) == [
+        ("over-load-limit", "fail")
+    ]
+
+
+def test_budget_warning_fires_when_a_write_grows_the_index_past_the_budget() -> None:
+    before, after = _lines_index(INDEX_BUDGET.lines), _lines_index(INDEX_BUDGET.lines + 1)
+    message = budget_warning(before, after)
+    assert message is not None
+    assert "41 lines" in message
+    assert "one pointer line per memory; move detail into its topic file" in message
+
+
+def test_budget_warning_is_quiet_for_a_write_that_ends_exactly_at_the_ceiling() -> None:
+    assert budget_warning(_lines_index(10), _lines_index(INDEX_BUDGET.lines)) is None
+
+
+def test_budget_warning_is_quiet_for_a_write_that_shrinks_an_index_still_above_it() -> None:
+    assert budget_warning(_lines_index(60), _lines_index(50)) is None
+
+
+def test_budget_warning_is_quiet_for_a_write_that_stays_under_the_budget() -> None:
+    assert budget_warning(_lines_index(3), _lines_index(4)) is None
+
+
+def test_budget_warning_leaves_growth_past_the_load_limit_to_the_gate() -> None:
+    before = _lines_index(LOAD_LIMIT.lines)
+    after = _lines_index(LOAD_LIMIT.lines + 1)
+    assert budget_warning(before, after) is None
+    assert gate_messages(before, after)
 
 
 def test_added_lines_is_a_multiset_difference() -> None:

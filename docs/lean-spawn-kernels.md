@@ -90,6 +90,8 @@ Verification paths for each item are in the how-to: [stop](lean-spawn-how-to.md#
 
 A ledger that listed its own eligible roles could widen the list in the commit that switches a role, and the list would be no rule at all. The pin is therefore one literal in `scripts/kernel_eligibility.py`, read by the gate at the parent commit. A commit that changes the pin may change no adoption record and no flag, and a move to `switched` is judged against the pin as it stood before the commit. Making the `implementer` eligible was such a commit of its own; its trial record lands later, with its run, in the run-preparation commit after the merge (draft decision `dec-461`, which amends [`dec-460`](../.ai-state/decisions/460-role-kernels-generated-and-injected.md)'s clause that only the five pilot roles may be switched). Eligibility is permission to start a trial, not evidence.
 
+A test that needs an example role which must never be lean asserts that against the pin rather than assuming it, so a later pin move fails the test at no cost instead of at the next switch. The guard is in `tests/acceptance/test_managed_sessions_receive_todays_process_text.py`, which asserts the role named `INHERITING_ROLE` is absent from `eligible_roles`.
+
 ## What the spawn hook does
 
 `hooks/inject_kernel.py` is registered once per slot (`--slot 1` to the index's slot count) on `SubagentStart`, synchronously, under the matcher `^praxion:.*`. Each slot prints its own string. Stdout is empty or one JSON object, and the exit code is always 0, so the hook can never block a spawn.

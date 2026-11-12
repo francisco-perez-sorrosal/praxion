@@ -159,6 +159,8 @@ Rework sessions follow the standard pipeline contract — the architect agent ma
 
 Either way, the rework continues from where it paused — you do not need to restart anything.
 
+**Steering a `--bg` session by message does not work.** A `SendMessage` to a background session is held for its user's approval (a permission-mode mismatch) and expires undelivered (observed 2026-09-27, not re-probed). To change a session's course, stop it and relaunch with the decision in its opening prompt, from a script file when the invoking session is worktree-isolated.
+
 ## After reworks complete
 
 When all rework sessions report Completed (in the dashboard or via notifications), the rework worktree branches each contain the rework's fixes ready to merge back. The orchestrator session is what merges them — you signal completion by returning to the orchestrator pane and asking it to continue the pipeline. The orchestrator typically:

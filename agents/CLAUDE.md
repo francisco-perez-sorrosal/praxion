@@ -19,6 +19,8 @@ After adding or removing an agent, update `.claude-plugin/plugin.json` under the
 
 Load the `agent-crafting` skill before creating or modifying agent definitions. It covers prompt structure, tool selection, and frontmatter conventions.
 
+An agent `description` change trips two frozen Codex export guards, `tests/acceptance/fixtures/project_gating/base_exports.json` and `tests/acceptance/fixtures/routing_facts/base_codex_agents.json` (recorded 2026-11-12). Re-pin only the changed agents' digests, each with that guard's own driver (`tests/acceptance/drivers/gating_readings.py`, `tests/acceptance/drivers/routing_facts.py`). Run the change's full derived scope (`python3 scripts/resolve_test_scope.py | sh -e`) before committing: a targeted run caught the first guard and missed the second.
+
 ## Pipeline Context
 
 Agents communicate through shared documents in `.ai-work/` (ephemeral) and `.ai-state/` (persistent). See the `swe-agent-coordination-protocol` rule for pipeline ordering and boundary discipline.

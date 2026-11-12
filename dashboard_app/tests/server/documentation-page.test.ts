@@ -34,14 +34,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The page's module graph pulls in the full renderer registry (including
-// @scalar/api-reference-react and recharts, via ApiReferenceShell / the chart
-// renderers). Under full-suite concurrent worker load, the first cold import
-// of that graph in this file can exceed vitest's 5s default test timeout even
-// though the assertions themselves run in milliseconds — bump the budget for
-// this file only.
-vi.setConfig({ testTimeout: 45000 });
-
 import type { DocumentationSurfaceData } from "@/server/view-models/documentation";
 import type { ManifestSurface } from "@/server/types";
 
@@ -92,15 +84,17 @@ function surfaceData(overrides: Partial<DocumentationSurfaceData> & { surface: M
   };
 }
 
+// The page's module graph pulls in the full renderer registry (including
+// @scalar/api-reference-react and recharts). Its cold import takes seconds
+// under whole-suite worker load; importing at collection time keeps that cost
+// out of every test's timer, which the assertions (milliseconds) never need.
+const { default: DocumentationPage } = await import("@/app/documentation/page");
+
 // ─── Render helper ────────────────────────────────────────────────────────────
 
 async function renderPage(
   params: Record<string, string | string[] | undefined> = {}
 ): Promise<string> {
-  // Deferred import: the page may not be fully restructured when tests first
-  // run (concurrent BDD/TDD). If the module is missing, the test fails with
-  // ImportError — the expected RED state.
-  const { default: DocumentationPage } = await import("@/app/documentation/page");
   const element = await DocumentationPage({ searchParams: Promise.resolve(params) });
   return renderToStaticMarkup(element);
 }

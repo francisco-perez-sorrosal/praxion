@@ -327,7 +327,18 @@ def test_the_flag_is_set_only_by_the_literal_true_the_last_duplicate_winning(
 
 @pytest.mark.parametrize(
     "value",
-    ["true", "true  # lean", "True", "TRUE", "yes", "false", '"true"', "true\nomitClaudeMd: no"],
+    [
+        "true",
+        "true  # lean",
+        "true#x",
+        "true#",
+        "True",
+        "TRUE",
+        "yes",
+        "false",
+        '"true"',
+        "true\nomitClaudeMd: no",
+    ],
 )
 def test_the_hook_and_the_commit_gate_read_the_flag_alike(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str

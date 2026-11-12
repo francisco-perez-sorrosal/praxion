@@ -155,7 +155,8 @@ EVENT_NAMES = {Event.SESSION: "SessionStart", Event.SUBAGENT: "SubagentStart"}
 # The only text that sets the flag, as the commit gate reads it (`kernel_ledger_checks.OMIT_SET`):
 # one reading of one fact, and any other spelling reads as inheriting, the safe direction.
 _OMIT_SET = "true"
-_OMIT_FLAG = re.compile(r"^omitClaudeMd:[ \t]*([^\s#]*)", re.MULTILINE)
+# A `#` starts a YAML comment only after whitespace, so `true#x` is the string, not the flag.
+_OMIT_FLAG = re.compile(r"^omitClaudeMd:[ \t]*((?:[^\s#]|(?<=\S)#)*)", re.MULTILINE)
 # An agent name is a file name in an `agents/` directory, never a path out of it.
 _AGENT_NAME = re.compile(r"\w[\w.-]*")
 

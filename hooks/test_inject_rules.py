@@ -188,6 +188,7 @@ def _hook_env(plugin_root: Path) -> dict[str, str]:
     env = {**os.environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root), "HOME": str(plugin_root / "home")}
     env.pop("MUTANT_UNDER_TEST", None)
     env.pop("CLAUDE_CONFIG_DIR", None)
+    env.pop("CLAUDE_PROJECT_DIR", None)
     return env
 
 

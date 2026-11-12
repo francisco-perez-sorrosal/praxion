@@ -165,6 +165,16 @@ def test_no_spawn_in_an_unmanaged_scope_receives_anything(
     assert _received(plugin_root, unmanaged, agent_type).strip() == ""
 
 
+def test_a_spawn_after_a_directory_change_keeps_the_start_directorys_scope(
+    plugin_root: Path, managed: Path, unmanaged: Path
+) -> None:
+    started_at = {"CLAUDE_PROJECT_DIR": str(managed)}
+
+    text = _received(plugin_root, unmanaged, _INHERITING_ROLE, env=started_at)
+
+    assert _core_units_in(text) == [True] * 3
+
+
 def test_a_custom_agent_whose_definition_cannot_be_read_counts_as_inheriting(
     plugin_root: Path, managed: Path
 ) -> None:

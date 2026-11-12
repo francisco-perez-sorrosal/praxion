@@ -640,7 +640,9 @@ def _requested_delivery(payload: dict, slot: int | None) -> tuple[Event, Deliver
     """The event the payload names and its delivery; a spawn's carries no notice and writes
     nothing, since its session has already reported and written."""
     plugin_root = _resolve_plugin_root()
-    cwd = Path(payload.get("cwd") or os.getcwd())
+    # The start directory decides the scope: a payload's `cwd` follows the session's `cd`, which
+    # would strip a spawn of the managed delivery its session's main context keeps.
+    cwd = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd())
     scope = scope_of(str(cwd))
     if payload.get("hook_event_name") != EVENT_NAMES[Event.SUBAGENT]:
         effects = slot in (None, EFFECTS_SLOT)

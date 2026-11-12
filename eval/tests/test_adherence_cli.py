@@ -18,6 +18,7 @@ import pytest
 from praxion_evals.adherence import (
     arms,
     cli,
+    managed_fixture,
     model,
     session_loop,
     tasks,
@@ -218,8 +219,28 @@ def test_a_dry_run_leaves_another_kits_line_without_confinement_or_places(capsys
 
     assert lines, "the dry run plans sessions"
     for line in lines:
-        assert list(line) == ["role", "arm", "task_id", "mode", "argv", "env_names"]
+        assert list(line) == ["role", "arm", "task_id", "mode", "argv", "env_names", "env_switches"]
         assert "--settings" not in line["argv"]
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_shows_the_switches_a_session_on_an_unmanaged_fixture_launches_with(
+    capsys, tmp_path
+):
+    lines = dry_run(capsys, tmp_path, "--role", ROLE, "--max-tasks", "1")
+
+    assert lines, "the dry run plans sessions"
+    assert all(
+        line["env_switches"] == managed_fixture.UNMANAGED_BEHAVIOUR_SWITCHES for line in lines
+    )
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_shows_no_switch_for_a_fixture_whose_overlay_carries_state(capsys, tmp_path):
+    lines = dry_run(capsys, tmp_path, "--role", "architect-validator", "--max-tasks", "1")
+
+    assert lines, "the dry run plans sessions"
+    assert all(line["env_switches"] == {} for line in lines)
 
 
 @pytest.mark.usefixtures("no_launch")

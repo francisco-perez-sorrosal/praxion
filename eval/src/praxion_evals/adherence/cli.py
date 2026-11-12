@@ -40,7 +40,15 @@ from datetime import UTC, datetime
 from fnmatch import fnmatchcase
 from pathlib import Path
 
-from praxion_evals.adherence import arms, report, results, run_index, session_loop, tasks
+from praxion_evals.adherence import (
+    arms,
+    managed_fixture,
+    report,
+    results,
+    run_index,
+    session_loop,
+    tasks,
+)
 from praxion_evals.adherence.confinement import Confinement, settings_of
 from praxion_evals.adherence.infra_stop import (
     COUNTING_KINDS,
@@ -682,12 +690,20 @@ def _print_dry_run(
                     "mode": task.mode,
                     "argv": build_argv(spec),
                     "env_names": env_names,
+                    "env_switches": dict(_planned_switches(task)),
                 }
                 if confinement is not None:  # only a confined kit's line shows where it runs
                     line["places"] = _planned_places(run_root, sandbox, task, copy)
                     line["program_order"] = list(confinement.program_order)
                 print(json.dumps(line))
     return EXIT_COMPLETE
+
+
+def _planned_switches(task: TaskSpec) -> Mapping[str, str]:
+    """The managed-only switches the task's launches add, which a real run reads off the built
+    fixture; the dry run reads them off the directories the fixture is built from."""
+    overlays = (tasks.OVERLAYS_DIR / name for name in tasks.kit_for(task.role).overlays)
+    return managed_fixture.switches_planned((tasks.REPOS_DIR / task.fixture_id, *overlays))
 
 
 def _planned_copy(run_root: Path, task: TaskSpec, arm: Arm) -> Path:

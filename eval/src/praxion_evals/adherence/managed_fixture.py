@@ -10,7 +10,7 @@ managed, so it is left exactly as it was.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from types import MappingProxyType
 
@@ -46,3 +46,12 @@ def switches_for(project: Path) -> Mapping[str, str]:
     if state.is_dir() and not any(state.iterdir()):
         return UNMANAGED_BEHAVIOUR_SWITCHES
     return NO_SWITCHES
+
+
+def switches_planned(sources: Iterable[Path]) -> Mapping[str, str]:
+    """What `switches_for` will say for a fixture copied from the ``sources`` directories, before
+    it is built: none when a source already carries state, the switches otherwise."""
+    carries_state = any(
+        (state := source / STATE_DIRNAME).is_dir() and any(state.iterdir()) for source in sources
+    )
+    return NO_SWITCHES if carries_state else UNMANAGED_BEHAVIOUR_SWITCHES

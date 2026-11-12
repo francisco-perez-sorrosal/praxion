@@ -23,6 +23,10 @@ Hand one well-gated goal to the step-loop driver's goal mode: a fresh worker per
 - Add `pending=0` so the goal's own failing tests become part of completion.
 - A goal whose tests the loop writes must count every test it asks for in the pass count.
 - Pass the goal's oracle to `--protect`: the target tests of a make-green goal, the module under test of a test-writing goal.
+- Protect a directory by a path with a slash inside it, such as `tests/acceptance tests/e2e`: a bare top-level `--protect tests/` is refused after normalisation, because each entry must hold a `/` (observed 2026-10-10). Until that is fixed, name the sub-directories instead.
+- Run the check once before setting `--expects`: the scaffold writes its baseline line (`pass=N fail=0 skip=S pending=0`) to the goal's `TEST_RESULTS.md`, and skips lower N below the collected count. `>=` means at least, so a one-test goal reads `pass>=N+1 fail=0 pending=0`. The scaffold refuses a goal the check already meets, so a pure refactor needs a test that encodes it.
+- A scenario that skips on an off-pin toolchain cannot be a goal: the gate can never be met until the pinned toolchain is on the worker's PATH, and the loop stalls.
+- Land a finished goal in this order: reword the progress commit with `git commit --amend -F` (the driver commits with the goal sentence as the subject), fast-forward the scratch branch into the target, then move the ledger row by hand and make one state commit.
 - A run is opt-in and paid: it costs real API credits.
 - Never start a run from a hook, CI or a pipeline step.
 - A person launches the terminal form; never launch it yourself.

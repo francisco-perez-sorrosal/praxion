@@ -36,7 +36,7 @@ Before listing feature steps, check for **phase signals** -- does the current co
 
 Each step is one commit, leaves system working.
 
-When a step changes or repurposes a key a script emits, or relocates a named section, enumerate its consumers with a grep that has **no include filter**, across `commands/ skills/ agents/ rules/ docs/` and `scripts/ codex/ hooks/ fitness/`. Slash commands, skills and agents read JSON payloads by key name in prose, and no test executes them; code that parses by document shape (a table found after a heading) never mentions the anchor you search for, so grep for the parsing helpers too. Give a new meaning a new key rather than reusing an old name, and when an agent is told to use a tool, its `tools:` frontmatter is part of the consumer set.
+When a step changes or repurposes a key a script emits, or relocates a named section, enumerate its consumers with a grep that has **no include filter**, across `skills/ agents/ rules/ docs/` and `scripts/ codex/ hooks/ fitness/`. Skills and agents read JSON payloads by key name in prose, and no test executes them; code that parses by document shape (a table found after a heading) never mentions the anchor you search for, so grep for the parsing helpers too. Give a new meaning a new key rather than reusing an old name, and when an agent is told to use a tool, its `tools:` frontmatter is part of the consumer set.
 
 In a step's `Files:` name each path, or a whole tree by its bare directory path (`docs/diagrams`, no trailing slash, no `*`). The step-loop driver commits literal paths, so a glob there stops the loop with `files-glob` rather than matching anything.
 

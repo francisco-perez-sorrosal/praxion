@@ -10,17 +10,39 @@ Check the system-level symlinks that `/praxion-complete-install` created, then h
 
 ## Procedure
 
-1. **Resolve the plugin root.** Use `CLAUDE_PLUGIN_ROOT` if set; otherwise locate `~/.claude/plugins/cache/bit-agora/praxion/*/`.
+1. **Resolve the plugin root and run the read-only health check.** One block does both: it takes the root Claude Code substituted for the plugin-root token, else the install path the plugin registry records for Praxion, and runs the check from there. Text that was not substituted is only ever data to it, and it never lists the plugin cache.
 
-   If the plugin is not installed, report: *"Praxion plugin not found — nothing to uninstall."*
+```bash
+root=$(cat <<'PRAXION_ROOT'
+${CLAUDE_PLUGIN_ROOT}
+PRAXION_ROOT
+)
+[ -d "$root" ] || root=$(python3 - <<'PY'
+import json, os
 
-2. **Run the read-only health check:**
+registry = os.path.expanduser("~/.claude/plugins/installed_plugins.json")
+try:
+    with open(registry, encoding="utf-8") as f:
+        plugins = json.load(f)["plugins"]
+    entries = [e for key, listed in plugins.items() if key.startswith("praxion@") for e in listed]
+    entries.sort(key=lambda e: e.get("scope") != "user")
+    print(next(e["installPath"] for e in entries
+               if isinstance(e.get("installPath"), str) and os.path.isdir(e["installPath"])))
+except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration):
+    pass
+PY
+)
+if [ -n "$root" ]; then
+  echo "Praxion plugin root: $root"
+  "$root/install.sh" code --check
+else
+  echo "Praxion plugin not found — nothing to uninstall"
+fi
+```
 
-   ```bash
-   "${CLAUDE_PLUGIN_ROOT:-$(ls -d ~/.claude/plugins/cache/bit-agora/praxion/*/ 2>/dev/null | head -1)}/install.sh" code --check
-   ```
+   If it prints "Praxion plugin not found" (plugin not installed), stop there: there is nothing to uninstall.
 
-   Summarize what it reports: which rule and script symlinks point at the plugin cache and would be removed, plus any leftover legacy remnants it warns about. `--check` is read-only — it never prompts and never writes.
+2. **Summarize what the check reported:** which rule and script symlinks point at the plugin cache and would be removed, plus any leftover legacy remnants it warns about. `--check` is read-only — it never prompts and never writes.
 
 3. **Hand the user the exact command to run in their own terminal:** <!-- LEGACY-CHUB-CLEANUP -->
 

@@ -1,5 +1,6 @@
-"""The update path's pure core: which links count as the plugin cache, which
-state a global instructions entry is in, and what to do to each script link.
+"""The install refresh's pure core: which links count as the plugin cache, which
+state a global instructions entry is in, what to do to each script link, and what
+the hand path does about the instructions and how it exits.
 
 Both are lexical, so the tests need no filesystem and no mock: snapshots are
 built by hand. The cache table is the same file the bash rule is tested against,
@@ -9,6 +10,7 @@ which keeps the two implementations of "what counts as the cache" equal.
 from __future__ import annotations
 
 import dataclasses
+import posixpath
 import sys
 from pathlib import Path
 
@@ -19,23 +21,43 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _install_refresh import (  # noqa: E402
+    ALTERNATE,
+    PRIMARY,
+    AskForValues,
+    AskReason,
     BinEntry,
     CachedRender,
+    Carried,
+    CarryForward,
+    Current,
     EntryKind,
+    Failed,
+    FailureKind,
     ForeignLink,
     InstructionsSnapshot,
     Keep,
+    LeaveAlone,
+    LeaveAloneReason,
+    LeftAlone,
     Link,
     MissingCachedRender,
+    NoAnswer,
     NoInstructions,
     OfferedScript,
     Remove,
     Repoint,
+    SetUp,
+    Skipped,
+    SkipPoint,
     SnapshotKind,
+    Unreadable,
     UserOwned,
     cache_version_dir,
     classify_instructions,
+    exit_status,
+    plan_hand_path_instructions,
     plan_script_links,
+    render_slot,
     unreachable,
 )
 
@@ -44,6 +66,7 @@ CACHE_TARGETS_TABLE = (
 )
 LINK_DIR = "/home/example/.claude"
 VERSION_DIR = "/home/example/.claude/plugins/cache/example-market/praxion/0.60.0"
+RENDER = f"{VERSION_DIR}/claude/config/CLAUDE.md"
 
 
 def _cache_rows() -> list:
@@ -108,8 +131,8 @@ def test_link_outside_every_cache_version_directory_is_foreign_whether_live_or_d
 
 
 def test_live_link_into_a_cache_version_directory_is_a_cached_render():
-    snapshot = _link(f"{VERSION_DIR}/claude/config/CLAUDE.md")
-    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(VERSION_DIR)
+    snapshot = _link(RENDER)
+    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(VERSION_DIR, RENDER)
 
 
 def test_dangling_link_into_a_cache_version_directory_is_a_missing_cached_render():
@@ -119,7 +142,39 @@ def test_dangling_link_into_a_cache_version_directory_is_a_missing_cached_render
 
 def test_relative_link_text_into_the_cache_is_a_cached_render():
     snapshot = _link("plugins/cache/example-market/praxion/0.60.0/CLAUDE.md")
-    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(VERSION_DIR)
+    assert classify_instructions(snapshot, LINK_DIR) == CachedRender(
+        VERSION_DIR, f"{VERSION_DIR}/CLAUDE.md"
+    )
+
+
+def test_a_render_that_is_not_the_primary_file_is_named_as_it_is():
+    alternate = f"{VERSION_DIR}/claude/config/CLAUDE.alternate.md"
+    state = classify_instructions(_link(alternate), LINK_DIR)
+    assert state == CachedRender(VERSION_DIR, alternate)
+
+
+def test_the_render_is_normalised_the_way_the_link_text_is():
+    text = f"{VERSION_DIR}/claude/rules/../config/./CLAUDE.alternate.md"
+    state = classify_instructions(_link(text), LINK_DIR)
+    assert state == CachedRender(VERSION_DIR, f"{VERSION_DIR}/claude/config/CLAUDE.alternate.md")
+
+
+@pytest.mark.parametrize(("link_dir", "target", "is_cache"), _cache_rows())
+def test_every_cache_row_names_a_render_inside_its_version_directory(link_dir, target, is_cache):
+    state = classify_instructions(InstructionsSnapshot(SnapshotKind.LINK, target, True), link_dir)
+    if not is_cache:
+        assert state == ForeignLink()
+        return
+    assert state.version_dir == cache_version_dir(target, link_dir)
+    assert state.render == posixpath.normpath(posixpath.join(link_dir, target))
+
+
+@pytest.mark.parametrize(
+    "render", ["/home/example/elsewhere/CLAUDE.md", f"{VERSION_DIR}-beta/claude/config/CLAUDE.md"]
+)
+def test_a_render_outside_its_version_directory_cannot_be_built(render):
+    with pytest.raises(ValueError, match="inside"):
+        CachedRender(VERSION_DIR, render)
 
 
 @pytest.mark.parametrize("kind", list(SnapshotKind))
@@ -132,7 +187,7 @@ def test_every_snapshot_kind_maps_to_exactly_one_state(kind):
 
 def test_states_are_immutable():
     with pytest.raises(dataclasses.FrozenInstanceError):
-        CachedRender(VERSION_DIR).version_dir = "elsewhere"  # type: ignore[misc]
+        CachedRender(VERSION_DIR, RENDER).version_dir = "elsewhere"  # type: ignore[misc]
 
 
 def test_unreachable_names_the_value_it_was_given():
@@ -302,3 +357,145 @@ def test_each_link_class_gets_exactly_its_action(target_class, offered, expected
 @pytest.mark.parametrize("kind", [EntryKind.FILE, EntryKind.OTHER])
 def test_a_file_or_other_entry_gets_no_action_at_all(kind, offered):
     assert _plan([_entry_of(kind, "clone-live")], _offered_list(offered)) == ()
+
+
+# -- What the hand path does about the instructions -------------------------------
+
+INSTALLED_DIR = VERSION_DIR
+EARLIER_DIR = "/home/example/.claude/plugins/cache/example-market/praxion/0.59.0"
+VALUES = {"USER_NAME": "Ada", "GITHUB_HANDLE": "ada", "EMAIL": "ada@example.org"}
+NOTHING_MISSING = frozenset()
+SOME_MISSING = frozenset({"EMAIL"})
+UNREAD = Unreadable()
+
+IN_INSTALLED = CachedRender(INSTALLED_DIR, RENDER)
+IN_EARLIER = CachedRender(EARLIER_DIR, f"{EARLIER_DIR}/claude/config/CLAUDE.md")
+
+
+def _plan_for(state, readback=UNREAD, *, is_cache_version=True):
+    return plan_hand_path_instructions(state, readback, is_cache_version, INSTALLED_DIR)
+
+
+@pytest.mark.parametrize(
+    ("state", "readback", "expected"),
+    [
+        pytest.param(UserOwned(), UNREAD, LeaveAlone(LeaveAloneReason.OWN_FILE), id="own-file"),
+        pytest.param(
+            ForeignLink(), UNREAD, LeaveAlone(LeaveAloneReason.OUTSIDE_CACHE), id="outside-cache"
+        ),
+        pytest.param(
+            IN_INSTALLED, UNREAD, AskForValues(AskReason.UNREADABLE), id="cached-unreadable"
+        ),
+        pytest.param(
+            IN_INSTALLED, Carried(VALUES, NOTHING_MISSING), Current(), id="installed-complete"
+        ),
+        pytest.param(
+            IN_INSTALLED,
+            Carried(VALUES, SOME_MISSING),
+            CarryForward(VALUES, SOME_MISSING),
+            id="installed-incomplete",
+        ),
+        pytest.param(
+            IN_EARLIER,
+            Carried(VALUES, NOTHING_MISSING),
+            CarryForward(VALUES, NOTHING_MISSING),
+            id="earlier-complete",
+        ),
+        pytest.param(
+            IN_EARLIER,
+            Carried(VALUES, SOME_MISSING),
+            CarryForward(VALUES, SOME_MISSING),
+            id="earlier-incomplete",
+        ),
+        pytest.param(NoInstructions(), UNREAD, AskForValues(AskReason.MISSING), id="absent"),
+        pytest.param(MissingCachedRender(), UNREAD, AskForValues(AskReason.MISSING), id="dangling"),
+    ],
+)
+def test_each_state_gets_the_plan_its_precedence_row_names(state, readback, expected):
+    assert _plan_for(state, readback) == expected
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [
+        pytest.param(UserOwned(), LeaveAlone(LeaveAloneReason.OWN_FILE), id="own-file"),
+        pytest.param(ForeignLink(), LeaveAlone(LeaveAloneReason.OUTSIDE_CACHE), id="foreign-link"),
+        pytest.param(IN_INSTALLED, LeaveAlone(LeaveAloneReason.CHECKOUT), id="cached-render"),
+        pytest.param(IN_EARLIER, LeaveAlone(LeaveAloneReason.CHECKOUT), id="earlier-render"),
+        pytest.param(NoInstructions(), LeaveAlone(LeaveAloneReason.CHECKOUT), id="absent"),
+        pytest.param(MissingCachedRender(), LeaveAlone(LeaveAloneReason.CHECKOUT), id="dangling"),
+    ],
+)
+def test_a_checkout_run_names_a_persons_file_and_a_foreign_link_before_the_checkout(
+    state, expected
+):
+    carried = Carried(VALUES, NOTHING_MISSING)
+    assert _plan_for(state, carried, is_cache_version=False) == expected
+
+
+def test_the_installed_version_is_judged_by_directory_not_by_render_name():
+    alternate = CachedRender(INSTALLED_DIR, f"{INSTALLED_DIR}/{ALTERNATE}")
+    assert _plan_for(alternate, Carried(VALUES, NOTHING_MISSING)) == Current()
+
+
+def test_a_plan_with_no_applicable_state_is_refused():
+    with pytest.raises(AssertionError, match="unhandled"):
+        _plan_for("not a state")
+
+
+def test_a_cached_render_with_no_readback_is_refused():
+    with pytest.raises(AssertionError, match="unhandled"):
+        _plan_for(IN_INSTALLED, "not a readback")
+
+
+def test_the_two_render_slots_are_two_files_in_the_same_directory():
+    assert PRIMARY != ALTERNATE
+    assert posixpath.dirname(PRIMARY) == posixpath.dirname(ALTERNATE)
+
+
+@pytest.mark.parametrize(
+    ("state", "slot"),
+    [
+        pytest.param(IN_INSTALLED, ALTERNATE, id="link-names-the-primary"),
+        pytest.param(
+            CachedRender(INSTALLED_DIR, f"{INSTALLED_DIR}/{ALTERNATE}"),
+            PRIMARY,
+            id="link-names-the-alternate",
+        ),
+        pytest.param(IN_EARLIER, PRIMARY, id="link-names-an-earlier-version"),
+        pytest.param(NoInstructions(), PRIMARY, id="no-link"),
+        pytest.param(MissingCachedRender(), PRIMARY, id="dangling-link"),
+        pytest.param(UserOwned(), PRIMARY, id="own-file"),
+        pytest.param(ForeignLink(), PRIMARY, id="foreign-link"),
+    ],
+)
+def test_a_render_goes_to_the_primary_slot_unless_the_link_resolves_to_it(state, slot):
+    assert render_slot(state, INSTALLED_DIR) == slot
+
+
+@pytest.mark.parametrize(
+    ("outcome", "status"),
+    [
+        pytest.param(SetUp(), 0, id="set-up"),
+        pytest.param(Current(), 0, id="current"),
+        pytest.param(LeftAlone(LeaveAloneReason.OWN_FILE), 0, id="own-file"),
+        pytest.param(LeftAlone(LeaveAloneReason.OUTSIDE_CACHE), 0, id="outside-cache"),
+        pytest.param(LeftAlone(LeaveAloneReason.CHECKOUT), 3, id="checkout"),
+        pytest.param(Skipped(SkipPoint.OFFER), 3, id="skipped-at-the-offer"),
+        pytest.param(Skipped(SkipPoint.CONFIRM), 3, id="skipped-at-the-confirmation"),
+        pytest.param(NoAnswer(), 3, id="no-answer"),
+        *(pytest.param(Failed(kind), 1, id=f"failed-{kind.value}") for kind in FailureKind),
+    ],
+)
+def test_each_outcome_exits_with_its_status(outcome, status):
+    assert exit_status(outcome) == status
+
+
+def test_an_outcome_that_is_not_one_is_refused():
+    with pytest.raises(AssertionError, match="unhandled"):
+        exit_status("not an outcome")
+
+
+def test_plans_and_outcomes_are_immutable():
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        Failed(FailureKind.READING).kind = FailureKind.WRITING  # type: ignore[misc]

@@ -480,12 +480,15 @@ Usage: $(basename "$0") [code|desktop|cursor [path]|codex path] [--check] [--dry
   --relink     Re-symlink config, rules, and scripts (no prompts)
   --complete-install
                Marketplace-only users: finish a 'claude plugin install
-               praxion@bit-agora' by symlinking rules and CLI scripts —
+               praxion@bit-agora' by symlinking rules and CLI scripts and
+               bringing ~/.claude/CLAUDE.md to the installed version —
                the surfaces the plugin mechanism does not cover natively.
                Prompts before each system-level change. Also offers to
                remove leftover context-hub state from earlier Praxion
-               versions. Printed by /praxion-complete-install inside a
-               Claude Code session for you to run in your own terminal.
+               versions. Ends with a report of each step and exits
+               non-zero when a step failed. Printed by
+               /praxion-complete-install inside a Claude Code session
+               for you to run in your own terminal.
                Only valid with 'code'.
   --complete-uninstall
                Reverse of --complete-install: remove the rule/script

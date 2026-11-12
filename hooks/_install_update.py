@@ -41,6 +41,7 @@ import render_claude_md as _render_mod
 from _install_refresh import (
     BinEntry,
     CachedRender,
+    Carried,
     EntryKind,
     ForeignLink,
     InstructionsSnapshot,
@@ -49,14 +50,17 @@ from _install_refresh import (
     MissingCachedRender,
     NoInstructions,
     OfferedScript,
+    Readback,
     Remove,
     Repoint,
     ScriptAction,
     SnapshotKind,
+    Unreadable,
     UserOwned,
     cache_version_dir,
     classify_instructions,
     plan_script_links,
+    render_slot,
     unreachable,
 )
 
@@ -422,7 +426,7 @@ def _update_instructions(home: Path, root: Path) -> str | None:
         return None
     if isinstance(state, CachedRender):
         if state.version_dir != cache_version_dir(str(root), link_dir):
-            carry_forward_instructions(home, root, Path(state.version_dir))
+            carry_forward_instructions(home, root, state)
         return None
     if isinstance(state, (NoInstructions, MissingCachedRender)):
         return _fresh_instructions_setup(home, root)
@@ -448,31 +452,79 @@ def _fresh_instructions_setup(home: Path, root: Path) -> str:
     return _install_complete_line()
 
 
-def carry_forward_instructions(home: Path, root: Path, version_dir: Path) -> None:
-    """Render `root`'s template with the values `version_dir`'s render carried, and link it.
+def carry_forward_instructions(home: Path, root: Path, state: CachedRender) -> None:
+    """Render `root`'s template with the values the render `state` names carried, and link it.
 
-    Raises UnrecoverableRenderError, before anything is written, when the
-    previous render cannot be read back as its own template's: falling back to
-    defaults would replace the user's identity with today's derived one. The
-    render is renamed into place before the link is swapped, so ~/.claude/CLAUDE.md
-    resolves to a complete render, the previous one or the new one, whatever fails.
+    The values are read back from `state.render`, the file the link names, not from
+    the version's primary render: a second render beside it can be the live one.
+    Raises UnrecoverableRenderError, before anything is written, when that render
+    cannot be opened, decoded or read back as its version's template: falling back
+    to defaults would replace the user's identity with today's derived one.
     """
-    carried = _render_mod.recover_values(
-        (version_dir / _TEMPLATE_RELATIVE).read_text(encoding="utf-8"),
-        (version_dir / _RENDER_RELATIVE).read_text(encoding="utf-8"),
-    )
+    try:
+        carried = _earlier_values(state)
+    except OSError as error:
+        raise UnrecoverableRenderError from error
     if carried is None:
         raise UnrecoverableRenderError
+    write_instructions(home, root, carried)
+
+
+def read_back(state: CachedRender, root: Path) -> Readback:
+    """The values the linked render carried, and which keys `root`'s template still lacks.
+
+    Reads the template of the version that rendered the file the link names, that
+    file, and `root`'s template. `Unreadable` when the file does not read back as its
+    version's template filled in (edited by hand, cut short, another template's). A
+    file that cannot be opened raises its `OSError`: that is a fault to report, never
+    a render to ask about again. Prints nothing and keeps nothing.
+    """
+    carried = _earlier_values(state)
+    if carried is None:
+        return Unreadable()
+    installed_template = (root / _TEMPLATE_RELATIVE).read_text(encoding="utf-8")
+    return Carried(carried, _missing_keys(installed_template, carried))
+
+
+def _earlier_values(state: CachedRender) -> dict[str, str] | None:
+    """The values the render `state` names carried, or None when it does not read back.
+
+    An undecodable file is one that does not read back; a file that cannot be
+    opened raises its `OSError`.
+    """
+    try:
+        template = (Path(state.version_dir) / _TEMPLATE_RELATIVE).read_text(encoding="utf-8")
+        render = Path(state.render).read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return None
+    return _render_mod.recover_values(template, render)
+
+
+def write_instructions(home: Path, root: Path, values: dict[str, str]) -> None:
+    """Render `root`'s template with `values` into one of its two renders, then link it.
+
+    The slot is `PRIMARY` unless the link resolves to `root`'s own `PRIMARY`, then
+    `ALTERNATE`: what the link resolves to is what the person reads, and a write
+    never replaces it, whatever fails. A key `values` lacks is filled from today's
+    derived values; a derived value never replaces one given. The render is renamed
+    into place before the link is swapped, so ~/.claude/CLAUDE.md resolves to a
+    complete render, the previous one or the new one. Prints nothing of its own and
+    saves no other copy of the values: the terminal path shares this writer.
+    `render_claude_md` still warns on stderr, naming the placeholders, of a key left
+    unfilled.
+    """
+    link = home / _CLAUDE_MD_SUBPATH
+    state = classify_instructions(snapshot_instructions(link), str(link.parent))
     template_path = root / _TEMPLATE_RELATIVE
-    missing = _missing_keys(template_path.read_text(encoding="utf-8"), carried)
+    missing = _missing_keys(template_path.read_text(encoding="utf-8"), values)
     # Derived only when a key is missing: it reads today's git identity.
-    values = _with_defaults(carried, missing, _render_mod.derive_defaults()) if missing else carried
-    rendered_path = root / _RENDER_RELATIVE
+    filled = _with_defaults(values, missing, _render_mod.derive_defaults()) if missing else values
+    rendered_path = root / render_slot(state, os.path.normpath(root))
     _build_and_rename(
         rendered_path,
-        lambda temporary: _render_mod.render_claude_md(template_path, temporary, values),
+        lambda temporary: _render_mod.render_claude_md(template_path, temporary, filled),
     )
-    _replace_link(home / _CLAUDE_MD_SUBPATH, str(rendered_path))
+    _replace_link(link, str(rendered_path))
 
 
 # Each placeholder is its name inside `{{` and `}}`, as PLACEHOLDER_PATTERN reads it.

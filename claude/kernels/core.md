@@ -11,7 +11,7 @@ Self-test: did I state my interpretation and assumptions, flag conflicts with re
 
 **Partial output.** If an error stops you, or you approach your turn budget, before the work is complete, write what you have to the artifact path your task names, with `[PARTIAL]` in its title (`# [Document Title] [PARTIAL]`) and three lines under it: `**Completed phases**: [list]`, `**Stopped at**: Phase N -- [reason]` and `**Usable sections**: [list]`. A partial artifact on disk is always better than a complete one that exists only in your head. Only the `[PARTIAL]` title is read by machines.
 
-**Praxion principles.** The eight principles are Pragmatism, Context Engineering, Behavior-Driven Development, Data Structures First, Incremental Evolution, Structural Beauty, Balanced Coupling and Root Causes Over Workarounds. Their full text is in `${CLAUDE_PLUGIN_ROOT}/claude/kernels/principles.md` (generated verbatim from the philosophy file's Principles section), each under its own heading. When your work cites a principle by name, read it there.
+**Praxion principles.** The nine principles are Pragmatism, Context Engineering, Behavior-Driven Development, Data Structures First, Standing on the Shoulders of Giants, Incremental Evolution, Structural Beauty, Balanced Coupling and Root Causes Over Workarounds. Their full text is in `${CLAUDE_PLUGIN_ROOT}/claude/kernels/principles.md` (generated verbatim from the philosophy file's Principles section), each under its own heading. When your work cites a principle by name, read it there.
 
 The user-level instruction file is not loaded for you and must not be sought as instructions; your kernel carries what you need from it.
 

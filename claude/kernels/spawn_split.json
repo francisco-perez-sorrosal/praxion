@@ -1,5 +1,5 @@
 {
-  "manifest_sha256": "4abf7905b27bd4533dc3ea09a65551954a13ec87d39e1635377c652743c100e1",
+  "manifest_sha256": "ae3ca280dc013db16a3e1f2c929f3dfe61cd418d2a78920b26052c021d7ce97d",
   "schema": 1,
   "units": {
     "swe/agent-intermediate-documents": {

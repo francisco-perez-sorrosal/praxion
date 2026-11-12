@@ -33,6 +33,7 @@ modules:
   ledger-writer: {audience: [ledger-writer]}
   principles-digest: {audience: [promethean, systems-architect]}
   principles-anchor: {audience: [verifier]}
+  principles-prior-art: {audience: [promethean, systems-architect, researcher]}
   delegator: {audience: [roadmap-cartographer]}
   local-context-engineer: {audience: [context-engineer]}
   local-verifier: {audience: [verifier]}
@@ -415,6 +416,11 @@ entries:
     scope: role
     form: verbatim
     agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Standing on the Shoulders of Giants"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect, researcher]
   - source: claude/config/CLAUDE.md.tmpl
     heading: "Incremental Evolution"
     scope: role

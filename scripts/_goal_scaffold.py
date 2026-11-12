@@ -130,7 +130,8 @@ def parse_spec(args: argparse.Namespace, repo: Path) -> GoalSpec:
         _refuse("no --paths were given, so no iteration could change anything", "name the files")
     protect = tuple(
         sorted(
-            _paths(args.protect or (), repo), key=lambda p: not p.startswith(OUTER_LOOP_PREFIXES)
+            _protected(args.protect or (), repo),
+            key=lambda p: not p.startswith(OUTER_LOOP_PREFIXES),
         )
     )
     guarded = protected_set(protect)
@@ -170,6 +171,14 @@ def _paths(raw: tuple[str, ...], repo: Path) -> tuple[str, ...]:
         return tuple(dict.fromkeys(normalise_path(path, repo) for path in raw))
     except OutsideRepoError as outside:
         _refuse(str(outside), "name paths inside the repository")
+
+
+def _protected(raw: tuple[str, ...], repo: Path) -> tuple[str, ...]:
+    """The --protect paths; a top-level directory keeps a slash, which the plan reader needs."""
+    return tuple(
+        f"{path}/" if "/" not in path and path != "." and (repo / path).is_dir() else path
+        for path in _paths(raw, repo)
+    )
 
 
 def _plan_text(spec: GoalSpec) -> str:

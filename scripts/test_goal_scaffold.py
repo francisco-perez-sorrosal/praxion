@@ -355,6 +355,14 @@ def test_each_protected_path_gets_one_anchored_edit_rule_and_no_write_rule(repo)
     assert not not_edit_rules(rules)
 
 
+def test_a_bare_top_level_directory_is_protected_as_a_directory(repo):
+    done = scaffold(protect=("tests",))
+
+    assert done.exit == 0
+    assert goal_step(repo).read_only == ("tests/",)
+    assert "Edit(/tests/**)" in deny_rules(repo)
+
+
 def test_the_merge_keeps_every_setting_and_entry_and_adds_each_rule_once(repo):
     (repo / SETTINGS_FILE).parent.mkdir(parents=True, exist_ok=True)
     (repo / SETTINGS_FILE).write_text(json.dumps(EARLIER_SETTINGS), encoding="utf-8")

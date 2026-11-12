@@ -49,7 +49,6 @@ export type SentinelDigest = {
   /** Chronological, the most recent runs only. */
   series: SentinelLogPoint[];
   suggested: number | null;
-  timestamp: string | null;
 };
 
 export type MetricsDigest = {
@@ -260,8 +259,7 @@ export function digestSentinel(data: SentinelData): SentinelDigest | null {
     isPartial: newest?.isPartial ?? false,
     notReachedCount: newest?.notReachedCount ?? 0,
     series: data.logSeries.slice(-SENTINEL_TREND_RUNS),
-    suggested: latest?.suggested ?? null,
-    timestamp: newest?.fileTimestamp ?? latest?.timestamp ?? null
+    suggested: latest?.suggested ?? null
   };
 }
 

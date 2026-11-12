@@ -307,25 +307,20 @@ describe("digestSentinel", () => {
       important: null,
       isPartial: true,
       notReachedCount: 2,
-      suggested: null,
-      timestamp: "2026-10-01T09:30:00.000Z"
+      suggested: null
     });
   });
 
-  it("ages the digest by the file's time, not by the run stamp the filename names", () => {
-    const data: SentinelData = {
-      log: null,
-      logSeries: [],
-      reports: [reportWith({ fileTimestamp: "2026-10-02T18:26:00.000Z", runStamp: "2026-09-11 17:10" })]
-    };
+  it("carries no age of its own, since the Overview renders none for the audits", () => {
+    const data: SentinelData = { log: null, logSeries: [], reports: [reportWith({})] };
 
-    expect(digestSentinel(data)?.timestamp).toBe("2026-10-02T18:26:00.000Z");
+    expect(digestSentinel(data)).not.toHaveProperty("timestamp");
   });
 
   it("uses the log's last row only when there is no report at all", () => {
     const data: SentinelData = { log: null, logSeries: [LOG_POINT], reports: [] };
 
-    expect(digestSentinel(data)).toMatchObject({ grade: "D", important: 3, timestamp: "2026-09-30 09:00:00" });
+    expect(digestSentinel(data)).toMatchObject({ grade: "D", important: 3 });
   });
 
   it("reads a grade the log wrote as free text as not graded", () => {

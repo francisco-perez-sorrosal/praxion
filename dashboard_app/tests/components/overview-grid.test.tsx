@@ -56,8 +56,7 @@ const FULL: OverviewData = {
     isPartial: true,
     notReachedCount: 3,
     series: [],
-    suggested: 3,
-    timestamp: null
+    suggested: 3
   },
   workshops: {
     active: [{ currentStep: "Wire the alpha reader", progress: { done: 2, total: 5 }, slug: "alpha-active", updatedAt: "2026-10-02T12:00:00.000Z" }],

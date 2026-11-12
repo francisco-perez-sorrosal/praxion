@@ -142,6 +142,52 @@ def test_no_args_mode_reads_the_working_tree_diff_plus_untracked(
     assert {"pkg/foo.py", "pkg/new_untracked.py"} <= set(payload["changed"]["paths"])
 
 
+def test_a_clean_working_tree_says_on_stderr_why_nothing_was_selected(
+    base_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    assert rts.main(["--repo-root", str(base_repo)]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "clean tree" in captured.err
+    assert "--changed-from <base revision>" in captured.err
+
+
+def test_a_clean_working_tree_json_run_keeps_its_stdout_and_says_why_on_stderr(
+    base_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    assert rts.main(["--repo-root", str(base_repo), "--json"]) == 0
+
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["decision"] == "nothing-to-run"
+    assert "clean tree" in captured.err
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param(["--changed", "ignored.log"], id="explicit-paths"),
+        pytest.param(["--changed-from", "HEAD"], id="a-base-revision-on-a-clean-tree"),
+    ],
+)
+def test_a_run_not_reading_the_bare_working_tree_prints_no_clean_tree_line(
+    base_repo: Path, capsys: pytest.CaptureFixture, extra: list[str]
+) -> None:
+    assert rts.main(["--repo-root", str(base_repo), *extra]) == 0
+
+    assert "clean tree" not in capsys.readouterr().err
+
+
+def test_a_run_that_reads_a_changed_path_prints_no_clean_tree_line(
+    base_repo: Path, capsys: pytest.CaptureFixture
+) -> None:
+    (base_repo / "pkg" / "foo.py").write_text("value = 3\n", encoding="utf-8")
+
+    assert rts.main(["--repo-root", str(base_repo)]) == 0
+
+    assert "clean tree" not in capsys.readouterr().err
+
+
 # -- Widen reasons ---------------------------------------------------------
 
 

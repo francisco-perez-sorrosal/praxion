@@ -581,6 +581,24 @@ def test_the_withheld_reason_and_the_two_commands_are_named():
     assert "measure_token_budget.py" in wrong
 
 
+def test_the_wrong_command_message_states_the_matching_rule():
+    wrong = message_of(
+        judged(
+            log=(
+                BASELINE,
+                log_row(phase="final", reading="measured", head=FINAL_HEAD, command=BUDGET_COMMAND),
+            )
+        ),
+        "wrong-command",
+    )
+
+    assert "token by token, in order" in wrong
+    assert "only options and their values" in wrong
+    assert "placeholder" in wrong
+    assert "one whole token" in wrong
+    assert "literal text" in wrong
+
+
 def test_the_two_reading_kinds_that_differ_are_named():
     estimate = log_row(phase="final", reading="estimate", head=FINAL_HEAD, command=PROMPT_COMMAND)
 

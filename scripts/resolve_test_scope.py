@@ -170,6 +170,11 @@ REASON_POCKET_CONFIG = "pocket-config-changed"
 REASON_NO_ADAPTER = "no-adapter"
 REASON_FULL = "full-requested"
 
+CLEAN_TREE_NOTE = (
+    "# read a clean tree (no changed or untracked path), so selected nothing; "
+    "--changed-from <base revision> judges committed work"
+)
+
 EXIT_OK = 0
 EXIT_ERROR = 2
 
@@ -718,6 +723,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     repo_root = resolve_repo_root(args.repo_root, script_dir=SCRIPT_DIR)
     try:
         changed = changed_paths(args, repo_root)
+        if changed.source == SOURCE_WORKING_TREE and not changed.paths:
+            print(CLEAN_TREE_NOTE, file=sys.stderr)
         files = repo_files(repo_root)
         if args.per_path:
             payloads = [to_payload(each) for each in resolve_each(repo_root, changed.paths, files)]

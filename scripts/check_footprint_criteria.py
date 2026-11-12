@@ -411,7 +411,10 @@ def _row_defects(criterion: Criterion, row: Measurement) -> list[Finding]:
     if not _same_instrument(criterion.command, row.command):
         message = (
             f"{row.phase} row ran {row.command!r}, which is not {criterion.command!r} "
-            "with options added"
+            "with options added: the logged command must repeat the criterion's command "
+            "token by token, in order, and may add only options and their values after "
+            "them; a placeholder in the criterion stands for one whole token, so a "
+            "placeholder joined to other text inside one token is compared as literal text"
         )
         found.append(_unmeasured(criterion, "wrong-command", message))
     return found

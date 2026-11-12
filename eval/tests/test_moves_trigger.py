@@ -232,6 +232,38 @@ def test_a_commit_amended_after_the_context_arrived_reads_as_repaired(git):
     assert t.final == Passed()
 
 
+def test_a_commit_whose_message_mentions_amend_is_not_a_repair(git):
+    mention = "git commit -m 'document git commit --amend flow'"
+
+    t = trigger_of(
+        git,
+        COMMIT_FORM,
+        START,
+        shell("t1", CHAINED),
+        ToolResult("t1", COMMITTED),
+        shell("t2", mention),
+        ToolResult("t2", COMMITTED),
+    )
+
+    assert t.history == "right_first_time"
+
+
+def test_a_commit_amended_after_a_multiline_message_reads_as_repaired(git):
+    heredoc = "git commit -m \"$(cat <<'EOF'\nAdd the notes\nEOF\n)\" --amend"
+
+    t = trigger_of(
+        git,
+        COMMIT_FORM,
+        START,
+        shell("t1", CHAINED),
+        ToolResult("t1", COMMITTED),
+        shell("t2", heredoc),
+        ToolResult("t2", COMMITTED),
+    )
+
+    assert t.history == "repaired"
+
+
 def test_a_commit_a_gate_refused_and_the_session_recomposed_reads_as_right_first_time(git):
     t = trigger_of(
         git,

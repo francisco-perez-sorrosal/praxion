@@ -30,6 +30,7 @@ the graded end state; a trigger failure is derived from the two, never stored.
 from __future__ import annotations
 
 import re
+import shlex
 from collections.abc import Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatch
@@ -69,7 +70,8 @@ from praxion_evals.adherence.moves.session_record import (
 CREATING_WRITE = "Write"
 
 # The rewrite that repairs a commit.
-_AMEND = re.compile(r"git\s+(?:\S+\s+)*commit\b.*--amend\b")
+_AMEND_FLAG = "--amend"
+_COMMAND_SEPARATORS = frozenset({"&&", "||", ";", "|"})
 # How the harness words a hook's refusal in the tool result it stands in for.
 _GATE_REFUSAL = re.compile(
     r"PreToolUse:\S+ hook error: \[[^\]]*\]:?\s*(?P<reason>.*?)\s*(?:\nThis hook comes from [^\n]*)?\Z",
@@ -145,8 +147,29 @@ class _Action:
 
     def amended_by(self, later: _Action) -> bool:
         if later.command is not None:
-            return bool(_AMEND.search(later.command))
+            return _amends(later.command)
         return later.file_path is not None and later.file_path == self.file_path
+
+
+def _amends(command: str) -> bool:
+    """Whether some ``git ... commit`` in the command carries ``--amend`` as a token of its own,
+    so a message that merely mentions the flag, quoted or spanning lines, is no amend."""
+    try:
+        tokens = shlex.split(command)
+    except ValueError:  # unbalanced quotes: fall back to whitespace tokens
+        tokens = command.split()
+    seen_git = in_commit = False
+    for token in tokens:
+        if token in _COMMAND_SEPARATORS:
+            seen_git = in_commit = False
+        elif in_commit:
+            if token == _AMEND_FLAG:
+                return True
+        elif token == "git":
+            seen_git = True
+        elif token == "commit" and seen_git:
+            in_commit = True
+    return False
 
 
 def _actions(declaration: MoveDeclaration, events: Sequence[Event]) -> tuple[_Action, ...]:

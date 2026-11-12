@@ -57,6 +57,7 @@ from _step_loop_files import (  # noqa: E402
 )
 from _step_loop_gate import Marker, end_source, parse_marker  # noqa: E402
 from _step_loop_record import declared_max_turns  # noqa: E402
+from _step_loop_record_gate import GATE_DIRECTORY  # noqa: E402
 from _step_loop_render import Invocation, parse_request_id  # noqa: E402
 from iteration_ledger import read_ledger  # noqa: E402
 
@@ -71,9 +72,11 @@ _AGENT_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
 # The bounds of one probe: a stale request in a busy session must not read every transcript of
 # it, nor run the Stop guard into the harness's timeout.
 MAX_TRANSCRIPTS, MAX_BYTES_READ, DEADLINE_SECONDS = 64, 16 * 1024 * 1024, 5.0
+# A gate run past its bound still gets this long to record its own exit (the launcher's grace).
+LAUNCHER_GRACE_SECONDS = 30.0
 _TRANSCRIPT_PREFIX, _TRANSCRIPT_GLOBS = "agent-", ("agent-*.jsonl", "workflows/*/agent-*.jsonl")
 
-NotHeldReason = Literal["no-transcript-in-session", "running", "unreadable"]
+NotHeldReason = Literal["no-transcript-in-session", "running", "unreadable", "gate-running"]
 _REASON_PRECEDENCE: tuple[NotHeldReason, ...] = ("unreadable", "running")
 
 
@@ -107,6 +110,7 @@ class NotHeld:
 
 Verdict = Union[Held, NotHeld]  # noqa: UP007 -- runtime value, 3.9 floor
 RUNNING = NotHeld("running")
+GATE_RUNNING = NotHeld("gate-running")
 
 
 @dataclass(frozen=True)
@@ -128,16 +132,46 @@ def ended_unrecorded(
 
 
 def judge_outstanding(
-    work_root: Path, subagents_dir: Path, invocation: Invocation
+    work_root: Path, subagents_dir: Path, invocation: Invocation, now: float | None = None
 ) -> tuple[tuple[Outstanding, Verdict], ...]:
-    """Every outstanding request with its verdict; no transcript is read without a request."""
+    """Every outstanding request with its verdict; no transcript is read without a request. A
+    request whose gate run started and is still inside its bound is in flight: `record` is
+    waiting on that run (`now`, epoch seconds, defaults to the clock)."""
     deadline = time.monotonic() + DEADLINE_SECONDS
     outstanding = outstanding_requests(work_root)
     if not outstanding:
         return ()
+    at = time.time() if now is None else now
     transcripts = _load_transcripts(subagents_dir, min(o.issued_at for o in outstanding), deadline)
     repo_root = work_root.parent
-    return tuple((o, _judge(o, transcripts, repo_root, invocation)) for o in outstanding)
+    return tuple(
+        (o, GATE_RUNNING)
+        if _gate_in_flight(work_root / o.slug / GATE_DIRECTORY / o.request, at)
+        else (o, _judge(o, transcripts, repo_root, invocation))
+        for o in outstanding
+    )
+
+
+def _gate_in_flight(run_dir: Path, now: float) -> bool:
+    """Whether a gate run of the request has a start record, no exit or cut record, and a start
+    plus bound (and the launcher's grace) still ahead of `now`. A record that cannot be read is
+    no run in flight, so the guard judges the request as before."""
+    try:
+        starts = sorted(run_dir.glob("*.start"))
+    except OSError:
+        return False
+    return any(_run_in_flight(start, now) for start in starts)
+
+
+def _run_in_flight(start: Path, now: float) -> bool:
+    if start.with_suffix(".exit").exists() or start.with_suffix(".cut").exists():
+        return False
+    try:
+        lines = start.read_text(encoding="utf-8").splitlines()
+        started, bound = float(lines[0]), float(lines[2])
+    except (OSError, ValueError, IndexError):
+        return False
+    return now < started + bound + LAUNCHER_GRACE_SECONDS
 
 
 def outstanding_requests(work_root: Path) -> tuple[Outstanding, ...]:

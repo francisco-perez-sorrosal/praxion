@@ -211,6 +211,62 @@ def test_a_running_agent_does_not_hold_the_request(world: World) -> None:
     assert (world.held(), world.verdicts()) == ((), [probe.NotHeld("running")])
 
 
+NOW, BOUND = 10_000.0, 540.0
+
+
+def gate_run(task: Path, *, started: float, ended: str = "") -> None:
+    """One gate run of the request's derived scope, as the detached launcher records it:
+    `ended` is "", "exit" or "cut"."""
+    run_dir = task / "gate" / REQUEST
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "1.start").write_text(f"{started!r}\npytest -q\n{BOUND!r}\n", encoding="utf-8")
+    if ended == "exit":
+        (run_dir / "1.exit").write_text(f"0 {started + 1}\n", encoding="utf-8")
+    if ended == "cut":
+        (run_dir / "1.cut").write_text("", encoding="utf-8")
+
+
+def verdicts_at(world: World, now: float = NOW):
+    return [v for _, v in probe.judge_outstanding(world.work, world.subagents, INVOCATION, now)]
+
+
+def test_an_ended_agent_whose_gate_run_is_inside_its_bound_is_in_flight_not_held(world):
+    """`record` is waiting on the gate run, so the stop holds nothing: blocking it re-prompts
+    a turn whose `record` can only answer that the gate is still running."""
+    gate_run(world.issue(), started=NOW - 60)
+    world.put(MARKED)
+
+    assert verdicts_at(world) == [probe.NotHeld("gate-running")]
+
+
+@pytest.mark.parametrize(
+    ("started", "ended"),
+    [
+        pytest.param(NOW - 60, "exit", id="exited"),
+        pytest.param(NOW - 60, "cut", id="cut-off"),
+        pytest.param(NOW - BOUND - 3600, "", id="past-its-bound"),
+    ],
+)
+def test_an_ended_agent_whose_gate_run_is_over_is_held(world, started, ended):
+    gate_run(world.issue(), started=started, ended=ended)
+    world.put(MARKED)
+
+    (verdict,) = verdicts_at(world)
+
+    assert isinstance(verdict, probe.Held)
+
+
+def test_an_unreadable_gate_start_record_is_no_run_in_flight(world):
+    task = world.issue()
+    (task / "gate" / REQUEST).mkdir(parents=True)
+    (task / "gate" / REQUEST / "1.start").write_text("not a time\n", encoding="utf-8")
+    world.put(MARKED)
+
+    (verdict,) = verdicts_at(world)
+
+    assert isinstance(verdict, probe.Held)
+
+
 def test_a_request_no_transcript_of_the_session_names_is_not_held(world: World) -> None:
     world.issue()
     other = [user("Spawn request: s9-a1-implement"), assistant("r1", say("[COMPLETE]"))]

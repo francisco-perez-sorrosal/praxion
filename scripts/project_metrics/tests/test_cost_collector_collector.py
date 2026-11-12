@@ -30,6 +30,8 @@ from typing import Any
 
 import pytest
 
+from hooks._observation_log.checkouts import CheckoutListing
+
 # ---------------------------------------------------------------------------
 # The dec-378 executable guard, proven through the real collect() path.
 # ---------------------------------------------------------------------------
@@ -62,7 +64,9 @@ class TestCostCollectorFaultInjection:
         # No real worktree discovery for this test -- isolates it from the
         # ambient environment entirely (determinism, not just speed).
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+            cost_collector,
+            "repository_checkouts",
+            lambda repo_root: CheckoutListing((), "not needed"),
         )
         # The fault: force the classifier to call a genuine pre-attribution
         # row "attributed". The guard must catch this WITHOUT trusting the
@@ -115,7 +119,9 @@ class TestCostCollectorFaultInjection:
         wal_path.write_text(json.dumps(row_a) + "\n" + json.dumps(row_b) + "\n")
 
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+            cost_collector,
+            "repository_checkouts",
+            lambda repo_root: CheckoutListing((), "not needed"),
         )
 
         # The fault: the dedup core silently drops the second entry but
@@ -181,7 +187,9 @@ class TestCostCollectorProductionWiring:
         repo = tmp_path / "praxion"
         _populate_repo(repo, attributed_row, calibration_log_excerpt_path)
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+            cost_collector,
+            "repository_checkouts",
+            lambda repo_root: CheckoutListing((), "not needed"),
         )
         monkeypatch.chdir(repo)
 
@@ -217,7 +225,9 @@ class TestCostCollectorProductionWiring:
         elsewhere = tmp_path / "elsewhere"
         elsewhere.mkdir()
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+            cost_collector,
+            "repository_checkouts",
+            lambda repo_root: CheckoutListing((), "not needed"),
         )
         monkeypatch.chdir(elsewhere)
 
@@ -253,7 +263,9 @@ class TestCostCollectorArchives:
             row = {**attributed_row, "agent_id": f"archived-{position}"}
             (state / f"observations.jsonl.{position}").write_text(json.dumps(row) + "\n")
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (None, "not needed")
+            cost_collector,
+            "repository_checkouts",
+            lambda repo_root: CheckoutListing((), "not needed"),
         )
 
         result = cost_collector.CostCollector(repo_root=str(repo)).collect(

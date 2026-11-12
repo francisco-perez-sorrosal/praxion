@@ -25,11 +25,11 @@ same object. Four callers are pinned for that reason:
 
 - `_attributed_from_row` calls `_classify` -- the fault-injection test
   replaces `_classify` and expects the guard to reject the result.
-- `discover_sources` calls `_resolve_main_checkout` -- `TestDiscoverSources`
-  asserts on the patched checkout, and the fault-injection and
+- `discover_sources` calls `repository_checkouts` -- `TestDiscoverSources`
+  asserts on the patched checkout list, and the fault-injection and
   production-wiring tests patch it only to stay off real git. Moved, the
   first would fail loudly; the others would keep passing while shelling out
-  to `git rev-parse`, which is the silent half of the hazard.
+  to `git worktree list`, which is the silent half of the hazard.
 - `dedup_attributed_rows` and `_independent_audit_census` call
   `_dedup_by_agent_id` -- the miscounted-dedup test replaces it and expects
   the guard to catch the misreport. Its fixture reaches only the census;
@@ -56,9 +56,8 @@ Source discovery (see `discover_sources` below)
 A `session_id` is not scoped to one checkout -- the same session can produce
 different committed summaries in different worktrees -- so the corpus is the
 union of every checkout's own write-ahead log: the checkout this collector
-runs from, the main checkout (resolved via `git rev-parse
---path-format=absolute --git-common-dir`), and every sibling worktree under
-the main checkout's `.claude/worktrees/` directory. Enumerating the same set
+runs from and every checkout `git worktree list` reports for the repository
+(the main checkout and each linked worktree, wherever it lives). Enumerating the same set
 of checkouts regardless of which one the collector is invoked from is what
 gives two runs -- one from a worktree, one from the main checkout -- an
 identical source set.
@@ -74,6 +73,7 @@ from pathlib import Path
 from typing import Any
 
 from hooks._observation_log import reader
+from hooks._observation_log.checkouts import repository_checkouts
 from scripts.project_metrics.collectors.base import (
     Available,
     CollectionContext,
@@ -93,7 +93,6 @@ from scripts.project_metrics.collectors.cost_collector_read import (
     _mtime_iso,
     _partition_provenance,
     _read_summary_rows,
-    _resolve_main_checkout,
     read_agent_stop_rows,
 )
 from scripts.project_metrics.collectors.cost_collector_report import (
@@ -231,26 +230,40 @@ def dedup_attributed_rows(
 # ---------------------------------------------------------------------------
 
 
+def _checkout_wal_segments(dir_path: Path) -> tuple[list[tuple[str, Path]], list[str]]:
+    """One checkout's log segments as `(kind, path)` -- the active log first,
+    then each archive from the newest -- plus a message per archive position
+    missing between present ones."""
+
+    listing = reader.segment_listing(dir_path / ".ai-state", archives=True)
+    segments = [
+        (_SOURCE_KIND_WAL if segment.name == _WAL_FILENAME else _SOURCE_KIND_WAL_ARCHIVE, segment)
+        for segment in reversed(listing.segments)
+    ]
+    gaps = [f"missing log archive between present archives: {gap}" for gap in listing.missing]
+    return segments, gaps
+
+
 def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
     """Enumerate every WAL/archive/summary file across the repository's checkouts.
 
-    Enumerates `[repo_root, main_checkout, *sibling_worktrees]` for WAL and
-    archive files first, then the same checkout list for the committed
-    summary file -- two full passes, not one pass interleaving kinds per
-    checkout, so the discovered order is stable regardless of which checkout
-    the collector runs from -- the property that lets every checkout see the
-    same source set, so a report from a worktree and one from main agree.
-    A checkout's segments come from the log reader's discovery: the active
-    log first, then each archive from the newest, so across files the newer
-    segment keeps an `agent_id` the dedup sees twice. An archive position
-    missing between present ones is an `issues` entry naming its path.
-    A file is only included when it exists; de-duplication is by resolved
-    path, so a checkout that happens to equal `repo_root` (or one already
-    seen under another name) contributes its files exactly once.
+    Enumerates `[repo_root, *checkouts git lists]` for WAL and archive files
+    first, then the same checkout list for the committed summary file -- two
+    full passes, not one pass interleaving kinds per checkout, so the
+    discovered order is stable regardless of which checkout the collector
+    runs from -- the property that lets every checkout see the same source
+    set, so a report from a worktree and one from main agree. A checkout's
+    segments come from the log reader's discovery: the active log first, then
+    each archive from the newest, so across files the newer segment keeps an
+    `agent_id` the dedup sees twice. An archive position missing between
+    present ones is an `issues` entry naming its path. A file is only
+    included when it exists; de-duplication is by resolved path, so a
+    checkout that happens to equal `repo_root` (or one already seen under
+    another name) contributes its files exactly once.
 
     Defined here, not in `cost_collector_read.py`: its bare
-    `_resolve_main_checkout` call is a patch seam (module docstring,
-    "Patch seams").
+    `repository_checkouts` call is a patch seam (module docstring, "Patch
+    seams").
     """
 
     issues: list[str] = []
@@ -259,15 +272,11 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
     # context carries the literal ".").
     checkout_dirs: list[Path] = [Path(repo_root).resolve()]
 
-    main_checkout, error = _resolve_main_checkout(repo_root)
-    if main_checkout is None:
-        issues.append(f"worktree discovery unavailable: {error}")
+    listing = repository_checkouts(Path(repo_root))
+    if listing.error is not None:
+        issues.append(f"worktree discovery unavailable: {listing.error}")
     else:
-        main_path = Path(main_checkout).resolve()
-        checkout_dirs.append(main_path)
-        worktrees_dir = main_path / ".claude" / "worktrees"
-        if worktrees_dir.is_dir():
-            checkout_dirs.extend(sorted(p for p in worktrees_dir.iterdir() if p.is_dir()))
+        checkout_dirs.extend(checkout.root.resolve() for checkout in listing.checkouts)
 
     seen_paths: set[str] = set()
     sources: list[SourceRef] = []
@@ -292,13 +301,11 @@ def discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]:
         )
 
     for dir_path in checkout_dirs:
-        listing = reader.segment_listing(dir_path / ".ai-state", archives=True)
-        for gap in listing.missing:
-            issue = f"missing log archive between present archives: {gap}"
-            if issue not in issues:  # a checkout reached twice names its gaps once
-                issues.append(issue)
-        for segment in reversed(listing.segments):
-            kind = _SOURCE_KIND_WAL if segment.name == _WAL_FILENAME else _SOURCE_KIND_WAL_ARCHIVE
+        segments, gaps = _checkout_wal_segments(dir_path)
+        issues.extend(
+            gap for gap in gaps if gap not in issues
+        )  # a checkout reached twice names its gaps once
+        for kind, segment in segments:
             _add(dir_path, kind, segment)
     for dir_path in checkout_dirs:
         _add(dir_path, _SOURCE_KIND_SUMMARY, dir_path / ".ai-state" / _SUMMARY_FILENAME)

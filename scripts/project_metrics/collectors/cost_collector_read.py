@@ -1,7 +1,7 @@
 """Cost collector -- read-pass primitives.
 
 Companion module to `cost_collector.py`: the four-way honesty classification,
-`AttributedRow`'s shape, the low-level source-discovery seam, the streaming
+`AttributedRow`'s shape, the streaming
 JSONL reader, and the last-in-file/first-across-file dedup core
 (`_dedup_by_agent_id`). Split out of `cost_collector.py` for module size;
 the names the entry module and its tests use are imported back there and
@@ -31,7 +31,6 @@ census, so an understated total can never be published as an honest one.
 from __future__ import annotations
 
 import json
-import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -42,10 +41,6 @@ from typing import TypeVar
 from hooks._observation_log import reader
 
 _T = TypeVar("_T")
-
-# Mirrors git_collector.py's own subprocess-timeout pattern: a single, bounded
-# `git rev-parse` call must never hang this collector.
-_GIT_SUBPROCESS_TIMEOUT_SECONDS: float = 10.0
 
 _AGENT_STOP_EVENT_TYPE = "agent_stop"
 
@@ -197,44 +192,6 @@ class SourceRef:
 
 def _mtime_iso(path: Path) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
-
-
-# ---------------------------------------------------------------------------
-# Source discovery -- the injectable git seam `discover_sources` calls.
-# ---------------------------------------------------------------------------
-
-
-def _resolve_main_checkout(repo_root: str) -> tuple[str | None, str | None]:
-    """Resolve the main checkout's root directory via `git rev-parse`.
-
-    `--git-common-dir` reports the shared `.git` directory every worktree of
-    a repository points at; its parent directory is the main checkout's own
-    root. Returns `(main_checkout, None)` on success or `(None, reason)` on
-    any failure -- a bounded, injectable seam so `discover_sources`'s tests
-    never shell out to real git.
-    """
-
-    try:
-        completed = subprocess.run(
-            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=_GIT_SUBPROCESS_TIMEOUT_SECONDS,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        return None, f"git rev-parse failed: {exc!r}"
-
-    if completed.returncode != 0:
-        reason = completed.stderr.strip() or "git rev-parse exited non-zero"
-        return None, reason
-
-    common_dir = completed.stdout.strip()
-    if not common_dir:
-        return None, "git rev-parse returned no output"
-
-    return str(Path(common_dir).parent), None
 
 
 # ---------------------------------------------------------------------------

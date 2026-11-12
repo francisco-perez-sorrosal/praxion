@@ -28,8 +28,8 @@ pipeline's learnings):
 - `SourceRef` -- frozen dataclass:
   `path, kind, checkout, mtime_iso, lines_scanned, agent_stop_rows,
   attributed_rows`.
-- `_resolve_main_checkout(repo_root: str) -> tuple[str | None, str | None]`
-  -- the injectable module-level seam wrapping `git rev-parse`; tests
+- `repository_checkouts(repo_root: Path) -> CheckoutListing` -- the
+  injectable module-level seam over `git worktree list`; tests
   monkeypatch this rather than shelling out, mirroring
   `git_collector.py`'s `shutil.which` monkeypatch convention.
 - `discover_sources(repo_root: str) -> tuple[list[SourceRef], list[str]]`
@@ -57,6 +57,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from hooks._observation_log.checkouts import Checkout, CheckoutListing
 
 # ---------------------------------------------------------------------------
 # Provenance classification -- the four-way honesty partition.
@@ -306,10 +308,21 @@ def _touch(path: Path, content: str = "") -> None:
     path.write_text(content)
 
 
+def _listing(*roots: Path) -> CheckoutListing:
+    """A checkout listing for `roots`, the first being the main checkout."""
+    return CheckoutListing(
+        tuple(
+            Checkout(root, root / ".ai-state", root.name, index == 0, "")
+            for index, root in enumerate(roots)
+        ),
+        None,
+    )
+
+
 class TestDiscoverSources:
     """`discover_sources` enumerates the documented source set, de-duplicated
     by resolved path. Git is never shelled out to in these tests --
-    `_resolve_main_checkout` is monkeypatched, the module-level seam this
+    `repository_checkouts` is monkeypatched, the module-level seam this
     test file pins for exactly that purpose.
     """
 
@@ -333,7 +346,11 @@ class TestDiscoverSources:
         )
 
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (str(checkout), None)
+            cost_collector,
+            "repository_checkouts",
+            lambda repo_root: _listing(
+                checkout, checkout / ".claude" / "worktrees" / "other-pipeline"
+            ),
         )
 
         sources, issues = cost_collector.discover_sources(str(checkout))
@@ -365,7 +382,7 @@ class TestDiscoverSources:
             _touch(state / name, "{}\n")
         _touch(state / "observations.jsonl.bak", "{}\n")
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (str(checkout), None)
+            cost_collector, "repository_checkouts", lambda repo_root: _listing(checkout)
         )
 
         sources, issues = cost_collector.discover_sources(str(checkout))
@@ -387,7 +404,7 @@ class TestDiscoverSources:
         for name in ("observations.jsonl", "observations.jsonl.1", "observations.jsonl.3"):
             _touch(state / name, "{}\n")
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (str(checkout), None)
+            cost_collector, "repository_checkouts", lambda repo_root: _listing(checkout)
         )
 
         sources, issues = cost_collector.discover_sources(str(checkout))
@@ -409,7 +426,7 @@ class TestDiscoverSources:
         for name in ("observations.jsonl", "observations.jsonl.2"):
             _touch(state / name, "{}\n")
         monkeypatch.setattr(
-            cost_collector, "_resolve_main_checkout", lambda repo_root: (str(checkout), None)
+            cost_collector, "repository_checkouts", lambda repo_root: _listing(checkout)
         )
 
         _, issues = cost_collector.discover_sources(str(checkout))
@@ -428,8 +445,8 @@ class TestDiscoverSources:
 
         monkeypatch.setattr(
             cost_collector,
-            "_resolve_main_checkout",
-            lambda repo_root_arg: (str(main_checkout), None),
+            "repository_checkouts",
+            lambda repo_root_arg: _listing(main_checkout),
         )
 
         sources, issues = cost_collector.discover_sources(str(repo_root))
@@ -451,8 +468,8 @@ class TestDiscoverSources:
 
         monkeypatch.setattr(
             cost_collector,
-            "_resolve_main_checkout",
-            lambda repo_root_arg: (None, "not a git repository"),
+            "repository_checkouts",
+            lambda repo_root_arg: CheckoutListing((), "not a git repository"),
         )
 
         sources, issues = cost_collector.discover_sources(str(repo_root))
@@ -462,6 +479,68 @@ class TestDiscoverSources:
             "repo_root only -- no worktree/main paths."
         )
         assert "worktree discovery unavailable: not a git repository" in issues
+
+    def test_includes_a_worktree_that_lives_outside_the_claude_worktrees_directory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+
+        main_checkout = tmp_path / "main"
+        elsewhere = tmp_path / "elsewhere"
+        _touch(main_checkout / ".ai-state" / "observations.jsonl", "{}\n")
+        _touch(elsewhere / ".ai-state" / "observations.jsonl", "{}\n")
+        monkeypatch.setattr(
+            cost_collector,
+            "repository_checkouts",
+            lambda repo_root: _listing(main_checkout, elsewhere),
+        )
+
+        sources, _ = cost_collector.discover_sources(str(main_checkout))
+
+        assert {s.checkout for s in sources} == {"main", "elsewhere"}
+
+    def test_finds_a_linked_worktree_that_git_reports_through_the_real_listing(
+        self, tmp_path: Path
+    ) -> None:
+        import subprocess
+
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+
+        main_checkout = tmp_path / "main"
+        elsewhere = tmp_path / "elsewhere"
+        main_checkout.mkdir()
+        identity = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+        for args in (
+            ["init", "-q"],
+            [*identity, "commit", "-q", "--allow-empty", "-m", "base"],
+            ["worktree", "add", "-q", "--detach", str(elsewhere)],
+        ):
+            subprocess.run(
+                ["git", "-C", str(main_checkout), *args], check=True, capture_output=True
+            )
+        _touch(elsewhere / ".ai-state" / "observations.jsonl", "{}\n")
+
+        sources, issues = cost_collector.discover_sources(str(main_checkout))
+
+        assert issues == []
+        assert [s.checkout for s in sources] == ["elsewhere"]
+
+    def test_names_the_missing_archive_between_present_ones_through_the_per_checkout_listing(
+        self, tmp_path: Path
+    ) -> None:
+        import scripts.project_metrics.collectors.cost_collector as cost_collector
+
+        state = tmp_path / ".ai-state"
+        for name in ("observations.jsonl", "observations.jsonl.2"):
+            _touch(state / name, "{}\n")
+
+        segments, gaps = cost_collector._checkout_wal_segments(tmp_path)
+
+        assert [(kind, path.name) for kind, path in segments] == [
+            ("wal", "observations.jsonl"),
+            ("wal-archive", "observations.jsonl.2"),
+        ]
+        assert [g for g in gaps if "observations.jsonl.1" in g]
 
 
 # ---------------------------------------------------------------------------

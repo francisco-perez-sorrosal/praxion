@@ -214,6 +214,7 @@ def run_command(
 ) -> CommandRun:  # fmt: skip
     """`bash <root>/install.sh code --complete-install` in the machine's HOME, on a terminal."""
     env = machine.env()
+    env["PATH"] = f"{_tool_stand_ins(machine)}{os.pathsep}{env['PATH']}"
     if python is not None:
         env["PATH"] = f"{_python_shim(machine, python)}{os.pathsep}{env['PATH']}"
     master, slave = os.openpty()
@@ -281,6 +282,19 @@ def _waits_for_input(segment: str) -> bool:
 
 def _clean(raw: bytes | bytearray) -> str:
     return _ANSI.sub("", bytes(raw).decode("utf-8", errors="replace")).replace("\r", "")
+
+
+def _tool_stand_ins(machine: pu.Machine) -> Path:
+    """A stand-in for each optional tool the installer's shared steps offer to install when it is
+    missing (`scc`), so every host holds the same conversation. Without it the offer appears only
+    where the host lacks the tool, and its text (a `github.com` install line) reads as the
+    instructions offer and takes that answer."""
+    stand_ins = machine.root / "tool-stand-ins"
+    stand_ins.mkdir(parents=True, exist_ok=True)
+    scc = stand_ins / "scc"
+    scc.write_text('#!/bin/sh\necho "scc version 3.4.0 (stand-in)"\n', encoding="utf-8")
+    scc.chmod(0o755)
+    return stand_ins
 
 
 def _python_shim(machine: pu.Machine, python: str) -> Path:

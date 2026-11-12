@@ -418,6 +418,51 @@ def test_a_record_for_another_request_is_refused_naming_the_pending_one(tmp_path
     assert snapshot(root) == written
 
 
+def test_a_record_refused_after_a_step_block_revision_names_the_cause_and_the_way_back(tmp_path):
+    # The ledger holds attempt 1 under a step digest the plan no longer has, as after a revision
+    # made while attempt 2 was out: the loop opens a new series and does not reissue s1-a2.
+    first = IterationRecord(
+        step=f"{STEP}1",
+        attempt=1,
+        agent_id="agent-1",
+        verdict="mismatch",
+        decided_by="check",
+        test_result="Result: none",
+        commit=None,
+        stop_reason="completed",
+        request="s1-a1-implement",
+        step_digest="0" * 12,
+    )
+    wip = WIP.replace(
+        f"- [ ] {STEP}1: Do it\n",
+        f"- [ ] {STEP}1: Do it\n  - Attempts: {STEP}1 count=2 request=s1-a2-implement\n",
+    )
+    root = build(tmp_path, TWO_STEP_PLAN, wip, [first])
+    written = snapshot(root)
+
+    reply = call(root, "record", "--request", "s1-a2-implement", "--not-started", "revised")
+
+    message = reply.doc["error"]["message"]
+    assert (reply.doc["error"]["code"], reply.exit) == REFUSED
+    assert (
+        "Revising any step block of IMPLEMENTATION_PLAN.md while a request is outstanding"
+        in message
+    )
+    assert "put the revised block back as it was when the request was issued" in message
+    assert "record the request, then re-apply the revision and run next" in message
+    assert "record the outstanding request before revising any step block" in message
+    assert snapshot(root) == written
+
+
+def test_the_refusal_of_an_unknown_request_does_not_mention_a_revision(tmp_path):
+    root = build(tmp_path)
+    call(root, "next")
+
+    reply = call(root, "record", "--request", "s9-a1-implement", *RELAY)
+
+    assert "re-apply" not in reply.doc["error"]["message"]
+
+
 # --- drive -----------------------------------------------------------------------------------
 
 

@@ -111,6 +111,34 @@ def test_the_handoff_paragraph_gives_the_same_order():
     assert paragraph.index("record the return first") < paragraph.index("Files:")
 
 
+BLOCKED_STOP_STATEMENTS = (
+    "IMPLEMENTATION_PLAN.md",
+    "only a revised step block clears this stop",
+    "the following next then issues the step afresh under the revised block",
+    "appended iteration-ledger record or an edit of WIP.md leaves the stop standing",
+)
+
+
+def missing_from_blocked_stop(text):
+    return [statement for statement in BLOCKED_STOP_STATEMENTS if statement not in text]
+
+
+def blocked_stop():
+    return StopView("blocked-marker", "1", "the return was blocked", (), SLUG, INVOKE)
+
+
+def test_the_blocked_stop_block_says_how_the_stop_clears():
+    text = stop_stderr(blocked_stop())
+
+    assert missing_from_blocked_stop(text) == []
+
+
+def test_the_blocked_handoff_paragraph_says_how_the_stop_clears():
+    text = stop_next_action(blocked_stop())
+
+    assert missing_from_blocked_stop(text) == []
+
+
 def test_a_kept_goal_iteration_commits_with_the_goal_sentence(tmp_path):
     goal = build_goal(tmp_path)
 

@@ -324,7 +324,11 @@ def _pending(inputs: LoopInputs, request: str) -> Spawn:
     found = f"stops ({action.cause})" if isinstance(action, Stop) else "does not reissue it"
     raise RecordRefusedError(
         "request-not-pending",
-        f"record failed because the loop {found} for {request}. To fix: run status and resolve it.",
+        f"record failed because the loop {found} for {request}. Revising any step block of"
+        " IMPLEMENTATION_PLAN.md while a request is outstanding produces this refusal. To fix: put"
+        " the revised block back as it was when the request was issued, record the request, then"
+        " re-apply the revision and run next; if no block was revised, run status and resolve it."
+        " To avoid it, record the outstanding request before revising any step block.",
     )
 
 

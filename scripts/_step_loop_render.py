@@ -395,7 +395,12 @@ _ACTIONS = {  # `{step}` is the stop's step id
     "stalled": (
         "read ITERATION_*.patch and the progress record, then reset the goal or take it by hand"
     ),
-    "blocked-marker": "resolve the blocker, then record the resolution in the step block",
+    "blocked-marker": (
+        "resolve the blocker, then revise the step's block in IMPLEMENTATION_PLAN.md and record the"
+        " return: only a revised step block clears this stop, an appended iteration-ledger record"
+        " or an edit of WIP.md leaves the stop standing, and the following next then issues the"
+        " step afresh under the revised block"
+    ),
     "conflict-marker": (
         "record the return first, then add the path to the step's Files: or split the step"
     ),

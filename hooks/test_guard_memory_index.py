@@ -125,10 +125,12 @@ def test_canary_a_write_past_the_byte_ceiling_lands_and_warns(tmp_path: Path) ->
 
 
 def test_canary_an_edit_adding_the_forty_first_line_warns(tmp_path: Path) -> None:
-    before = _index_of(40, 2_300)
-    last = before.splitlines()[-1]
+    lines = _index_of(40, 2_300).splitlines()
+    anchor = "- [last](last.md) — the one line no other line contains"
+    before = "\n".join([*lines[:-1], anchor]) + "\n"
+    assert before.count(anchor) == 1, "the Edit tool refuses an old_string that is not unique"
     index = _index(tmp_path, PROJECT, before)
-    edit = {"file_path": str(index), "old_string": last, "new_string": f"{last}\n{POINTER}"}
+    edit = {"file_path": str(index), "old_string": anchor, "new_string": f"{anchor}\n{POINTER}"}
     decision = _decision(_run(tmp_path, "Edit", edit))
     assert decision is not None
     assert "41 lines" in decision["additionalContext"]

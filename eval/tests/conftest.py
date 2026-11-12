@@ -121,6 +121,7 @@ def tool_use(tid, name, inp, parent=None, subagent_type=None):
 
 
 scenario = "lightweight-fix"
+rule_marker_files = set()
 if "reply with nothing but every marker" in prompt.lower():
     scenario = "preflight"
     found = set()
@@ -129,9 +130,12 @@ if "reply with nothing but every marker" in prompt.lower():
         if base.is_dir():
             for md in base.rglob("*.md"):
                 try:
-                    found |= set(pattern.findall(md.read_text(encoding="utf-8")))
+                    text = md.read_text(encoding="utf-8")
                 except OSError:
-                    pass
+                    continue
+                found |= set(pattern.findall(text))
+                if "PRXLIVE-RULE-" in text:
+                    rule_marker_files.add(str(md.resolve()))
     result["result"] = "\n".join(sorted(found))
 elif schema is not None:
     task = prompt.split("Task:", 1)[-1]
@@ -209,7 +213,7 @@ if control.get("judge_overload"):
 events.append(result)
 if log_path:
     with open(log_path, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"scenario": scenario}) + "\n")
+        fh.write(json.dumps({"scenario": scenario, "rule_marker_files": sorted(rule_marker_files)}) + "\n")
 print("\n".join(json.dumps(e) for e in events))
 """
 

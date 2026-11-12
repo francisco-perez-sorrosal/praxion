@@ -360,17 +360,20 @@ def test_preflight_isolation_breach_fails_the_proof_even_with_every_nonce_echoed
     assert proof["status"] == "failed"
 
 
-def test_head_preflight_nonce_lands_in_the_coordination_protocol_rule():
-    """REQ-level intent and the JSON key `coordination_rule` both name the
-    coordination-protocol rule; the HEAD preflight must plant its nonce
-    there — the same file the canary degrades — not in an unrelated rule."""
-    import inspect
-
+def test_head_preflight_plants_the_rule_nonce_in_the_coordination_protocol_rule_alone(
+    tmp_path, fake_claude
+):
+    """The `coordination_rule` surface names the rule the canary degrades; the
+    nonce must sit in that file, not in an unrelated rule."""
     from praxion_evals.live import cli
+    from praxion_evals.live.materialize import CANARY_FILE
 
-    source = inspect.getsource(cli._run_variant)
+    cli.main(["--k", "1", "--output", str(tmp_path / "baseline.json")])
 
-    assert "plant_nonces(preflight_copy.root, CANARY_FILE)" in source
+    preflight = next(c for c in fake_claude.calls() if c["scenario"] == "preflight")
+    files = preflight["rule_marker_files"]
+    assert files
+    assert all(path.endswith(CANARY_FILE) for path in files)
 
 
 # ---------------------------------------------------------------------------

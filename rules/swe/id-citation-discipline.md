@@ -83,6 +83,7 @@ Describe behavior, constraints, or intent. Do not embed REQ/AC/step references. 
 - **ADR citations (`dec-NNN`)** — allowed in comments when the code implements a decision whose rationale is non-obvious and the ADR is worth pointing at. Cite only finalized ADRs, never draft identifiers.
 - **Sentinel check IDs** — allowed inside sentinel's own implementation (`agents/sentinel.md` references, test files for sentinel logic). The check IDs are part of sentinel's contract, not pipeline-local identifiers.
 - **Teaching material** — skills, rules, and project documentation may use illustrative placeholders (`REQ-01`, `AC-NN`, `dec-NNN`) to teach conventions. These are placeholder shapes, not references to concrete entries. See `shipped-artifact-isolation.md` for the broader placeholder-vs-reference distinction.
+- **Whole-file exemptions are not narrow** — an exempt path switches off every pattern for that file, not only the grammar it was added for, so plan identifiers then land in it unflagged. For a few fixture literals prefer the same-line `id-citation-discipline:ignore` marker.
 
 ### Self-Test Before Committing Code
 

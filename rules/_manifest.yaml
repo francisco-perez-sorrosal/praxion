@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-11-04T16:38:17Z'
+generated_at: '2026-11-12T12:59:59Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -167,7 +167,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 8414
+  chars: 9257
   paths:
   - fitness/**
   - scripts/check_*.py
@@ -181,7 +181,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 8863
+  chars: 9139
   paths:
   - '**/*.py'
   - '**/*.ts'
@@ -236,7 +236,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 9003
+  chars: 11318
   paths:
   - tests/**
   - test_*

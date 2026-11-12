@@ -33,6 +33,9 @@ A deterministic canary cannot prove a judgment gate; a golden bad-case cannot re
 | Pattern | Why it fails | What to do instead |
 |---|---|---|
 | Check asserts a section/field *exists* | passes on an empty section — a hollow artifact looks complete | assert the section has ≥1 substantive entry (a row, a value, a non-placeholder line) |
+| Check enumerates the cases it knows (strip, filter, match a list) | an input outside the enumeration slips through unexamined | prefer a totalising check: parse instead of strip, assert the inputs form a partition, bound every slot, and emit a well-formed result on every path |
+| Check is an inexact heuristic shipped as if exact | each precision patch moves the false negatives instead of naming them | ship the declared limits: one anchored pattern plus a table of accepted false negatives, rather than a fourth precision patch |
+| A gate's scope is a chain of sets where the first non-empty one wins (a widening rule such as dirty files, then a step's files) | a narrower answer wins and the wider scope reads clear, so the gate passes on files it should have refused | union the sets: a widening rule adds scope and never replaces it |
 | Instruction greps for a pattern another rule forbids | the pattern can never appear → 0 hits → a false "all clear" | read from the source-of-truth artifact instead (e.g., a traceability file, not test-name greps) |
 | Instruction reads `X` that no instruction writes | the consumer reads emptiness; the feature is silently inert | wire a producer first, or cite the existing one; if neither exists, delete the consumer |
 | New CODE gate with only a happy-path test | proves the code runs, not that the gate catches violations | add a canary: a test that drives a bad input and asserts the flag |

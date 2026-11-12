@@ -65,6 +65,8 @@ evaluation/metric-computation code. For ML training stochasticity, apply the met
 model in `rules/ml/eval-driven-verification.md` instead.
 
 - No reliance on dictionary ordering, filesystem sort order, or other platform-variant behavior
+- Local green is not CI green: a test can pass here by an accident of the platform. When CI fails on a test that passes locally, reproduce CI's interpreter version first, then its platform (BSD vs GNU coreutils, `sh`, signals) -- on macOS (observed 2026-10, not re-probed) BSD `touch` accepts options after a filename that GNU `touch` rejects, which hid a false test premise until CI ran
+- Freeze only what the code decides. A frozen reading of anything the machine supplies (ambient pass-through variables such as `TERM`, absolute paths, locale) describes the machine, not the code: filter those names at compare time, and run an environment-sensitive suite once with `env -u TERM` before pushing. A test that converses with an installer stands in for every optional tool the installer offers, so a missing tool on CI cannot shift the scripted answers
 - No tests that pass "most of the time" -- flaky tests are broken tests
 
 ### No Hardcoded Paths
@@ -90,6 +92,7 @@ Use factories, builders, or fixture functions for complex test objects.
 - Only include fields relevant to the behavior under test -- minimal data, not exhaustive
 - Avoid inline dictionaries or constructors with many positional arguments
 - Shared test data lives in shared fixture files (e.g., `conftest.py` in pytest, setup modules in Jest) or dedicated factory modules, not copy-pasted across tests
+- Fake secrets that prove a redactor works (tokens shaped like a Slack, Stripe or GitHub credential) are assembled from parts at runtime, never written as one literal: GitHub's server-side push protection (observed 2026-10, not re-probed) scans the blobs of every pushed commit, ignores `.gitleaks.toml`, and a later commit does not clear a literal an earlier one added
 
 ### Fixtures Under Gitignored Paths
 
@@ -97,6 +100,8 @@ A committed bad-case fixture only reaches a fresh checkout or CI if git tracks i
 
 - Build such inputs at runtime in the framework temp dir (`tmp_path`, `t.TempDir()`, `os.tmpdir()`) -- gitignore constrains git, not filesystem reads, so the runtime construction is itself the proof the test can actually fail
 - Choose the fixture strategy by whether the input's location is git-tracked: a committed fixture when the path is tracked, runtime construction when it is ignored
+- A fixture whose name collides with a repo-wide ignored basename is untracked even in a tracked directory: it exists on disk in the worktree, passes every local gate, and vanishes on merge. After adding fixture files run `git check-ignore -v` over them (or `git status --ignored --short` on the fixture directory), and rename a collision (for example a `.tmpl` suffix the copy strips)
+- Reproduce a CI-only failure in a clean clone in a scratch directory, never in the main checkout: gitignored and untracked state in the working tree masks exactly this class of failure
 
 ### Mocking Boundaries
 
@@ -105,6 +110,7 @@ Mock at system boundaries: external APIs, databases, file systems, network calls
 - Never mock the unit under test
 - Never mock internal implementation details (private methods, internal data structures)
 - Prefer fakes (in-memory implementations) over mocks when the boundary has complex behavior
+- Test the I/O adapter, not only the pure core: a parser that slices column-positioned output of a real command can fail open behind five green tests that all hand the pure function a literal list. Drive the adapter against the real boundary at least once
 
 ### No Logic in Tests
 
@@ -129,6 +135,7 @@ Tests leave no trace -- no temporary files, database records, environment variab
 - Use context managers (`with`) or teardown fixtures for resource cleanup
 - Prefer framework-provided temporary directory mechanisms over manual file creation and deletion
 - Global state modifications (environment variables, module-level caches) must be reverted in teardown, not left for other tests to inherit
+- A permission test that strips read bits leaves unreadable directories in the framework's temp root; restore them (`chmod u+rwx`) in teardown. Before calling a directory empty, check its permissions: `find` and `du` report 0 for a subdirectory without a read bit
 
 ### No Commented-Out Tests
 

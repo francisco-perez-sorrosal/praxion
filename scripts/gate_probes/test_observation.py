@@ -440,6 +440,20 @@ def test_a_counter_that_exited_with_an_error_fails_the_counted_judge_quoting_its
     assert "wal-absent" in reason
 
 
+def test_a_counters_error_line_longer_than_the_clip_still_names_the_counter():
+    deep_interpreter = "/" + "/".join(["nested-checkout"] * 25) + "/bin/python"
+    reason = observation.judge_counted(
+        _answer(
+            exit_code=2,
+            stderr=f"{deep_interpreter}: can't open file 'scripts/spawn_count.py': [Errno 2]",
+        ),
+        EXPECTED,
+    )
+
+    assert reason is not None
+    assert "(exit 2 from spawn_count.py: " in reason
+
+
 def test_a_counter_that_never_answered_fails_the_counted_judge():
     reason = observation.judge_counted(observation.CounterAnswer(None, "", ""), EXPECTED)
 

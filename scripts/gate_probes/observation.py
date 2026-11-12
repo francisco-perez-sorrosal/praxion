@@ -342,7 +342,7 @@ def _describe(answer: CounterAnswer) -> str:
         return f"no answer from the counter within {COUNTER_TIMEOUT_S} s"
     said = _last_line(answer.stderr) if answer.stderr.strip() else " ".join(answer.stdout.split())
     said = said[:_OBSERVED_CHARS]
-    return f"exit {answer.exit_code}: {said or 'no output'}"
+    return f"exit {answer.exit_code} from {COUNTER.name}: {said or 'no output'}"
 
 
 def _last_line(text: str) -> str:

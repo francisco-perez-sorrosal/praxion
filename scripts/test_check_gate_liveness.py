@@ -260,6 +260,23 @@ def test_canary_flags_a_gate_a_skill_body_runs_that_the_ambient_interpreter_cann
     assert "skills/auditing/SKILL.md:1" in findings[0]["evidence"]
 
 
+def test_canary_flags_a_skill_local_script_its_own_body_runs(tmp_path: Path) -> None:
+    """A skill's `scripts/` call is relative to the skill, not to the repo root."""
+    _write(tmp_path, "skills/auditing/scripts/check_thing.py", "import yaml\n")
+    _write(tmp_path, "skills/auditing/SKILL.md", "Run `python scripts/check_thing.py`.\n")
+    findings = gl.check_ambient_import(tmp_path)
+    assert [f["file"] for f in findings] == ["skills/auditing/scripts/check_thing.py"]
+    assert "yaml" in findings[0]["evidence"]
+
+
+def test_a_skill_call_falls_back_to_the_root_script_when_it_has_no_local_one(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "scripts/check_thing.py", "import yaml\n")
+    _write(tmp_path, "skills/auditing/SKILL.md", "Run `python3 scripts/check_thing.py`.\n")
+    assert [f["file"] for f in gl.check_ambient_import(tmp_path)] == ["scripts/check_thing.py"]
+
+
 def test_a_skill_reference_file_is_outside_the_ambient_scope(tmp_path: Path) -> None:
     """Reference-file call sites are a declared limit, not part of the scope."""
     _write(tmp_path, "scripts/check_thing.py", "import yaml\n")

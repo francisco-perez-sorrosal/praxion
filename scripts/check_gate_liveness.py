@@ -275,6 +275,8 @@ def check_uninvoked_gate(root: Path) -> list[dict]:
 # nothing between the instruction and the process declares which interpreter
 # that is. A skill counts by its `SKILL.md` only; a call written in one of its
 # reference files is outside this scope (a declared limit, not an oversight).
+# A `scripts/` path in a `SKILL.md` names the skill's own script when it has
+# one, and the repo-root script otherwise.
 #
 # Everything else is excluded because it resolves its own interpreter and so
 # cannot exhibit this failure: hooks and shell scripts go through
@@ -379,6 +381,14 @@ def _third_party_imports(entry: Path, root: Path, seen: set[Path] | None = None)
     return needed
 
 
+def _called_script(site: Path, named: str, root: Path) -> str:
+    """The repo-relative path a call written in `site` runs."""
+    local = site.parent / named
+    if site.name == "SKILL.md" and local.is_file():
+        return str(local.relative_to(root))
+    return named
+
+
 def check_ambient_import(root: Path) -> list[dict]:
     """GL05: a gate invoked through the ambient interpreter must be loadable by it.
 
@@ -400,7 +410,8 @@ def check_ambient_import(root: Path) -> list[dict]:
             if _IGNORE in line:
                 continue
             for match in _AMBIENT_INVOCATION.finditer(line):
-                first_use.setdefault(match.group(1), (str(site.relative_to(root)), lineno))
+                target = _called_script(site, match.group(1), root)
+                first_use.setdefault(target, (str(site.relative_to(root)), lineno))
 
     findings: list[dict] = []
     for target, (caller, lineno) in sorted(first_use.items()):

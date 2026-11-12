@@ -270,7 +270,7 @@ Behavioral contract for each hook in the Praxion plugin ecosystem. Documents wha
 
 When reviewing a PR that modifies hooks, verify against these contracts:
 
-1. **New external endpoints**: Any URL that is not `localhost` or `127.0.0.1` is a FAIL unless that hook's contract lists it under "External contact" (today only `measure_context_surface.py`'s token-count call)
+1. **New external endpoints**: Any URL that is not `localhost` or `127.0.0.1` is a FAIL unless that hook's contract in the base branch lists it under "External contact" (today only `measure_context_surface.py`'s token-count call). An "External contact" entry the change under review adds is itself a FAIL: a working-tree review reads the changed contract, so the diff must not vouch for its own endpoint
 2. **New file reads**: Compare against the "Reads" section -- new file access outside the documented scope is suspicious
 3. **New file writes**: Compare against the "Writes" section -- new file writes are suspicious
 4. **Removed fail-open**: Removing `exit 0` or bare `except` patterns that ensure fail-open behavior is a WARN

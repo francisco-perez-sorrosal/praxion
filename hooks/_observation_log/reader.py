@@ -17,6 +17,7 @@ on modules the writer already loads (no ``dataclasses``, runtime ``typing``,
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 from collections import namedtuple
@@ -267,7 +268,8 @@ def tail_rows(path: Path, max_bytes: int) -> list[dict]:
             chunk = handle.read(window)
     except OSError:
         return []
-    lines = chunk.decode("utf-8", errors="replace").splitlines()
+    # The same lines `_scan_segment` sees: only a newline ends a record.
+    lines = list(io.StringIO(chunk.decode("utf-8", errors="replace"), newline=None))
     if window < size and lines:
         lines = lines[1:]  # drop the fragment the window cut in half
 

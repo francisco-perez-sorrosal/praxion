@@ -28,6 +28,7 @@ from hooks._observation_log.reader import (
     row_time,
     segment_listing,
     segments,
+    tail_rows,
 )
 
 
@@ -81,6 +82,17 @@ def test_a_json_valid_row_with_a_raw_line_separator_is_one_row(
 
     assert read.rows == (row,)
     assert read.malformed_lines == (2,)
+
+
+@pytest.mark.parametrize("separator", ["\u0085", "\u2028", "\u2029"])
+def test_a_tail_read_keeps_a_row_with_a_raw_line_separator_whole(
+    tmp_path: Path, separator: str
+) -> None:
+    row = {"event_type": "recovery", "summary": f"a{separator}b"}
+    line = json.dumps(row, ensure_ascii=False)
+    path = _segment(tmp_path, f"{line}\nnot-json\n".encode())
+
+    assert tail_rows(path, 1_000_000) == [row]
 
 
 # -- discovery: the segments a history reader walks ---------------------------------

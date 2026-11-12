@@ -21,7 +21,7 @@ import secrets
 import shutil
 import subprocess
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -182,19 +182,40 @@ def _finish(dest: Path, variant: Variant, target: TargetIdentity) -> Materializa
 
 
 def make_read_only(root: Path) -> None:
-    _set_tree_writable(root, writable=False)
+    for path in (root, *root.rglob("*")):
+        _set_mode(path, lambda mode: mode & ~0o222)
 
 
 def make_writable(root: Path) -> None:
-    _set_tree_writable(root, writable=True)
+    """Give the owner write access to every file under `root`, and full access to every directory.
+
+    Each directory is opened (owner read, write and search) before it is listed, so one that lost
+    its read bit is restored with everything below it, never skipped the way a glob skips it."""
+    _set_mode(root, lambda mode: mode | 0o700)
+    for directory, subdirectories, files in os.walk(root):
+        for name in subdirectories:
+            _set_mode(Path(directory, name), lambda mode: mode | 0o700)
+        for name in files:
+            _set_mode(Path(directory, name), lambda mode: mode | 0o200)
 
 
-def _set_tree_writable(root: Path, *, writable: bool) -> None:
-    for path in (root, *root.rglob("*")):
-        if path.is_symlink():
-            continue
-        mode = path.stat().st_mode
-        path.chmod(mode | 0o200 if writable else mode & ~0o222)
+def remove_tree(root: Path) -> None:
+    """Remove a tree this process built, its read-only parts included; warn if any of it stays.
+
+    A warning rather than a raise: removal runs after a run's results are written, and a tree
+    left behind must not turn a finished run into a failed one."""
+    if not root.exists():
+        return
+    try:
+        make_writable(root)
+        shutil.rmtree(root)
+    except OSError as error:
+        print(f"warning: {root} was not removed ({error}); remove it by hand", file=sys.stderr)
+
+
+def _set_mode(path: Path, change: Callable[[int], int]) -> None:
+    if not path.is_symlink():  # chmod would follow it out of the tree
+        path.chmod(change(path.stat().st_mode))
 
 
 def _copy_entry(source: Path, dest: Path) -> None:

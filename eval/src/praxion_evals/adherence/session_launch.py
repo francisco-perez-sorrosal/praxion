@@ -9,7 +9,6 @@ the run's context or state back.
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 import tempfile
 import time
@@ -46,7 +45,7 @@ from praxion_evals.adherence.model import (
 )
 from praxion_evals.adherence.transcript import Refusal, refused_commands
 from praxion_evals.harness.judge_client import JudgeClient
-from praxion_evals.live.materialize import install_user_scope
+from praxion_evals.live.materialize import install_user_scope, remove_tree
 from praxion_evals.live.report import CREDENTIAL_KEYS
 from praxion_evals.live.results import Errored as LiveErrored
 from praxion_evals.live.session import (
@@ -230,7 +229,7 @@ def attempt[R](
         return settled, finish(result, charged, tails, model, refused)
     finally:
         if not launch.keep_sandbox:
-            shutil.rmtree(root, ignore_errors=True)
+            remove_tree(root)
 
 
 def _assessed[R](

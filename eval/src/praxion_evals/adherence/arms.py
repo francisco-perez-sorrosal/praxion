@@ -34,6 +34,7 @@ from praxion_evals.live.materialize import (
     frontmatter_closing,
     make_read_only,
     make_writable,
+    remove_tree,
     tree_entries,
 )
 from praxion_evals.live.session import SandboxPaths
@@ -83,8 +84,7 @@ def build_arm(
         shutil.copytree(original.root, dest, symlinks=True)
         return _patch_and_seal(original, dest, role, arm, turn_cap)
     except BaseException:
-        make_writable(dest)
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_tree(dest)
         raise
 
 

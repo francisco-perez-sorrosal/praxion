@@ -84,8 +84,8 @@ from praxion_evals.harness.judge_client import JudgeClient, select_judge_client
 from praxion_evals.live.materialize import (
     Materialization,
     install_user_scope,
-    make_writable,
     materialize_path,
+    remove_tree,
 )
 from praxion_evals.live.report import require_credential
 from praxion_evals.live.session import (
@@ -467,8 +467,7 @@ def _clean_up(context: Context) -> None:
     if context.config.keep_sandbox:
         print(f"sandbox kept: {context.run_root}")
         return
-    make_writable(context.run_root)  # a plugin copy inside it is read-only
-    shutil.rmtree(context.run_root, ignore_errors=True)
+    remove_tree(context.run_root)  # a plugin copy inside it is read-only
 
 
 def _finalize(context: Context, state: RunState, interrupted: bool) -> results.RunResults:

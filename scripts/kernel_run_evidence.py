@@ -171,11 +171,6 @@ def read_results(results_dir: Path) -> RunReading:
     )
 
 
-def read_run_files(results_dir: Path) -> tuple[RunFile, ...]:
-    """The results files of `results_dir` that parsed; the unreadable ones are `read_results`'."""
-    return read_results(results_dir).files
-
-
 def _why_unreadable(exc: Exception) -> str:
     """The reason a file was kept apart, in words that name what is wrong with it."""
     if isinstance(exc, UnicodeDecodeError):

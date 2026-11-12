@@ -105,11 +105,11 @@ def test_json_that_is_no_results_file_is_passed_over_not_reported(tmp_path: Path
     assert dict(reading.unreadable) == {}
 
 
-def test_the_files_alone_are_what_read_run_files_gives(tmp_path: Path) -> None:
+def test_the_files_alone_are_what_read_results_gives_as_files(tmp_path: Path) -> None:
     ev.plant(tmp_path, ev.whole(ev.PASSING), ev.whole(ev.EARLY))
     spoil(tmp_path, ev.EARLY, NOT_JSON)
 
-    files = kre.read_run_files(tmp_path / kri.RESULTS_DIR)
+    files = kre.read_results(tmp_path / kri.RESULTS_DIR).files
 
     assert [file.run_id for file in files] == [ev.PASSING]
 

@@ -65,7 +65,7 @@ def evidence_reading(tmp_path: Path, record: dict):
         "standing": {ROLE: entry},
     }
     (tmp_path / FILE_NAME).write_text(json.dumps(data), encoding="utf-8")
-    return kre.read_run_files(tmp_path)[0].recorded
+    return kre.read_results(tmp_path).files[0].recorded
 
 
 def index_reading(record: dict):

@@ -22,7 +22,7 @@ import kernel_run_evidence as kre  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = REPO_ROOT / ".ai-state" / "eval_ledger" / "adherence"
 EVAL_MODEL = REPO_ROOT / "eval" / "src" / "praxion_evals" / "adherence" / "model.py"
-COMMITTED_FILES = kre.read_run_files(RESULTS_DIR)
+COMMITTED_FILES = kre.read_results(RESULTS_DIR).files
 INDEX = json.loads((RESULTS_DIR / "index.json").read_text(encoding="utf-8"))["runs"]
 RUN_ROLES = [(run_id, role) for run_id, entry in INDEX.items() for role in entry["roles"]]
 

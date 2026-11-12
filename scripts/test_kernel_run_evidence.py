@@ -1,7 +1,7 @@
 """Tests for kernel_run_evidence.py: what the gate derives from a cited run's results files.
 
 Hermetic: each case plants results files built from literal dicts in `tmp_path` and reads them
-back through `read_run_files`. A known-bad lineage or standing is refused beside the known-good
+back through `read_results`. A known-bad lineage or standing is refused beside the known-good
 one that is read.
 """
 
@@ -86,7 +86,7 @@ def results(run_id: str, sessions: list[dict], **extra) -> dict:
 def read(tmp_path: Path, *files: dict) -> tuple[kre.RunFile, ...]:
     for data in files:
         (tmp_path / f"{data['run']['id']}.json").write_text(json.dumps(data), encoding="utf-8")
-    return kre.read_run_files(tmp_path)
+    return kre.read_results(tmp_path).files
 
 
 # -- A one-part file written before the standing key ----------------------------------------
@@ -395,7 +395,7 @@ def test_json_that_is_no_results_file_is_passed_over_and_the_rest_still_read(tmp
 
 
 def test_a_directory_that_does_not_exist_holds_no_results_files(tmp_path):
-    assert kre.read_run_files(tmp_path / "missing") == ()
+    assert kre.read_results(tmp_path / "missing").files == ()
 
 
 def test_sessions_keep_their_file_order_and_whether_they_were_measured(tmp_path):

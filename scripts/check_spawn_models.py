@@ -50,7 +50,7 @@ the verifier of any routing change. It starts no model session.
 
 Usage: python3 scripts/check_spawn_models.py <transcripts-dir> [--repo-root DIR] [--json]
 Exit codes: 0 no spawn unexplained, 1 some spawn unexplained, 2 input error (the transcripts
-directory or the agent definitions cannot be read).
+directory or the agent definitions cannot be read, or the directory holds no session transcript).
 Stdlib-only and Python 3.9-safe, since it runs under the ambient interpreter.
 """
 
@@ -240,6 +240,11 @@ def main(argv: list[str]) -> int:
         floors = read_floors(repo_root)
         if not floors:
             raise OSError(f"no agent definition with a model under {repo_root / 'agents'}")
+        if not any(args.transcripts_dir.glob("*.jsonl")):
+            raise OSError(
+                f"no session transcript (*.jsonl) directly in {args.transcripts_dir}; "
+                "pass the project's transcript directory, not one session's"
+            )
         judged = judge(read_spawns(args.transcripts_dir), floors)
     except OSError as error:
         print(f"spawn models: cannot read the inputs: {error}", file=sys.stderr)

@@ -425,6 +425,16 @@ def test_a_missing_transcripts_directory_exits_two(tmp_path):
     assert "cannot read the inputs" in result.stderr
 
 
+def test_a_directory_holding_no_session_transcript_exits_two(tmp_path):
+    _record(tmp_path, [spawn("implementer", ran=_repo_floor("implementer"))])
+
+    result = _run(str(tmp_path / SESSION), "--repo-root", str(REPO_ROOT))
+
+    assert result.returncode == 2
+    assert "no session transcript" in result.stderr
+    assert "0 spawns" not in result.stdout
+
+
 def test_a_checkout_without_agent_definitions_exits_two(tmp_path):
     (tmp_path / "transcripts").mkdir()
 

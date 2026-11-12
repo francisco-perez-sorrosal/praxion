@@ -197,6 +197,15 @@ def test_an_empty_or_non_string_cwd_is_unmanaged(cwd: object) -> None:
     assert scope_of(cwd) == Unmanaged()
 
 
+def test_an_empty_cwd_is_not_read_as_the_process_directory_of_a_managed_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(_project_root(tmp_path))
+
+    assert locate("") is None
+    assert scope_of("") == Unmanaged()
+
+
 @pytest.mark.skipif(os.geteuid() == 0, reason="root reads past permission bits")
 def test_an_unreadable_path_is_unmanaged(tmp_path: Path) -> None:
     root = _project_root(tmp_path)

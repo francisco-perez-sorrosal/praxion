@@ -1,15 +1,6 @@
 ---
 name: lens-fanout
-description: >
-  Launches an isolated multi-lens research fan-out for a question that has at least two
-  plausible, genuinely rival answers: one Workflow-encoded run spawns N lens agents in
-  parallel with construction-level isolation (no agent can read a sibling's output), then
-  one aggregator reconciles the fragments into a Divergence Map. Refuses to launch when
-  the question does not have rival answers, when the derived lens set falls outside the
-  2-6 range, or when a findings artifact already exists at the target slug. User-invoked
-  only -- never triggers from model judgement. Trigger terms: multi-perspective research,
-  isolated lens fan-out, parallel research agents, Workflow-encoded lens collection,
-  lens independence, divergence map.
+description: Launches an isolated multi-lens research fan-out for a question with at least two rival answers, then reconciles the fragments into a Divergence Map. User-invoked only.
 argument-hint: "<question> [--lenses a,b,c] [--slug <task-slug>] [--sources a,b] [--proposer-model <name>|default]"
 arguments:
   question:

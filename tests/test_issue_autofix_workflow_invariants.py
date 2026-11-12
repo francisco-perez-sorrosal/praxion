@@ -32,6 +32,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -40,10 +41,10 @@ P1_WORKFLOW_FILE = PROJECT_ROOT / ".github" / "workflows" / "reusable-ci-autofix
 
 SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
-# The exact commits P1 (`reusable-ci-autofix.yml`) pins — P5 must match
-# character-for-character, never re-resolve to a newer/older SHA.
-CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # actions/checkout v7.0.1
-SETUP_UV_SHA = "c771a70e6277c0a99b617c7a806ffedaca235ff9"  # astral-sh/setup-uv v9.0.0
+# The checkout and setup-uv pins are read from P1 (`reusable-ci-autofix.yml`) rather than named
+# here: P5 must match it, and Dependabot moves the pin in every workflow at once.
+CHECKOUT_ACTION = "actions/checkout@"
+SETUP_UV_ACTION = "astral-sh/setup-uv@"
 # The claude-code-action pin is read from P1 rather than named here: Dependabot moves it in
 # every workflow at once, and the action's bundled Claude Code resolves the model aliases.
 CLAUDE_CODE_ACTION = "anthropics/claude-code-action@"
@@ -353,24 +354,17 @@ def test_every_uses_reference_is_sha_pinned() -> None:
         )
 
 
-def test_checkout_pin_matches_p1_exact_commit() -> None:
-    parsed = _parsed()
-    refs = _uses_refs(parsed)
-    matching = [ref for ref in refs if ref.startswith("actions/checkout@")]
-    assert matching, "Expected an `actions/checkout` step"
-    assert any(ref == f"actions/checkout@{CHECKOUT_SHA}" for ref in matching), (
-        f"actions/checkout must pin to P1's exact commit {CHECKOUT_SHA} (got {matching})"
-    )
+def _pinned_refs(parsed: dict, action_prefix: str) -> set[str]:
+    return {ref for ref in _uses_refs(parsed) if ref.startswith(action_prefix)}
 
 
-def test_setup_uv_pin_matches_p1_exact_commit() -> None:
-    parsed = _parsed()
-    refs = _uses_refs(parsed)
-    matching = [ref for ref in refs if ref.startswith("astral-sh/setup-uv@")]
-    assert matching, "Expected an `astral-sh/setup-uv` step"
-    assert any(ref == f"astral-sh/setup-uv@{SETUP_UV_SHA}" for ref in matching), (
-        f"astral-sh/setup-uv must pin to P1's exact commit {SETUP_UV_SHA} (got {matching})"
-    )
+@pytest.mark.parametrize("action_prefix", [CHECKOUT_ACTION, SETUP_UV_ACTION])
+def test_action_pin_matches_p1s_one_commit(action_prefix: str) -> None:
+    p1 = _pinned_refs(yaml.safe_load(P1_WORKFLOW_FILE.read_text()), action_prefix)
+    mine = _pinned_refs(_parsed(), action_prefix)
+
+    assert len(p1) == 1, f"P1 must pin {action_prefix} to one commit (got {sorted(p1)})"
+    assert mine == p1, f"{action_prefix} must pin to P1's commit {sorted(p1)} (got {sorted(mine)})"
 
 
 def _claude_code_action_refs(parsed: dict) -> set[str]:

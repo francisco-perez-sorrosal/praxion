@@ -33,6 +33,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_FILE = PROJECT_ROOT / ".github" / "workflows" / "sentinel.yml"
+AUDITS_WORKFLOW_FILE = PROJECT_ROOT / ".github" / "workflows" / "audits.yml"
 AUTOFIX_WORKFLOW_FILES = (
     PROJECT_ROOT / ".github" / "workflows" / "reusable-ci-autofix.yml",
     PROJECT_ROOT / ".github" / "workflows" / "issue-autofix.yml",
@@ -41,11 +42,10 @@ SENTINEL_AGENT_FILE = PROJECT_ROOT / "agents" / "sentinel.md"
 
 SHA_PIN_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
-# The exact commits the sibling autofix/audit workflows already pin — this
-# workflow must match them character-for-character, never re-resolve to a
-# newer/older SHA of its own.
-CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"  # actions/checkout v7.0.1
-SETUP_UV_SHA = "c771a70e6277c0a99b617c7a806ffedaca235ff9"  # astral-sh/setup-uv v9.0.0
+# The checkout and setup-uv pins are read from the scheduled-audits workflow rather than named
+# here: this workflow must match it, and Dependabot moves the pin in every workflow at once.
+CHECKOUT_ACTION = "actions/checkout@"
+SETUP_UV_ACTION = "astral-sh/setup-uv@"
 # The claude-code-action pin is read from the autofix workflows rather than named here:
 # Dependabot moves it in every workflow at once, and the action's bundled Claude Code resolves
 # the `--model` alias.
@@ -405,23 +405,19 @@ def test_claude_code_action_pin_matches_the_autofix_workflows_one_commit() -> No
     )
 
 
-def test_checkout_pin_matches_the_scheduled_audits_pin() -> None:
-    refs = _uses_refs(_parsed())
-    matching = [ref for ref in refs if ref.startswith("actions/checkout@")]
-    assert matching, "Expected an `actions/checkout` step"
-    assert any(ref == f"actions/checkout@{CHECKOUT_SHA}" for ref in matching), (
-        f"actions/checkout must pin to the same commit already used by the "
-        f"scheduled-audits workflow, {CHECKOUT_SHA} (got {matching})"
-    )
+def _pinned_refs(parsed: dict, action_prefix: str) -> set[str]:
+    return {ref for ref in _uses_refs(parsed) if ref.startswith(action_prefix)}
 
 
-def test_setup_uv_pin_matches_the_scheduled_audits_pin() -> None:
-    refs = _uses_refs(_parsed())
-    matching = [ref for ref in refs if ref.startswith("astral-sh/setup-uv@")]
-    assert matching, "Expected an `astral-sh/setup-uv` step"
-    assert any(ref == f"astral-sh/setup-uv@{SETUP_UV_SHA}" for ref in matching), (
-        f"astral-sh/setup-uv must pin to the same commit already used by the "
-        f"scheduled-audits workflow, {SETUP_UV_SHA} (got {matching})"
+@pytest.mark.parametrize("action_prefix", [CHECKOUT_ACTION, SETUP_UV_ACTION])
+def test_action_pin_matches_the_scheduled_audits_pin(action_prefix: str) -> None:
+    audits = _pinned_refs(yaml.safe_load(AUDITS_WORKFLOW_FILE.read_text()), action_prefix)
+    mine = _pinned_refs(_parsed(), action_prefix)
+
+    assert len(audits) == 1, f"the scheduled-audits workflow must pin {action_prefix} to one commit"
+    assert mine == audits, (
+        f"{action_prefix} must pin to the scheduled-audits commit {sorted(audits)} "
+        f"(got {sorted(mine)})"
     )
 
 

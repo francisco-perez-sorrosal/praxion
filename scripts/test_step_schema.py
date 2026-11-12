@@ -365,6 +365,28 @@ def test_checklist_line_mentioning_a_step_later_on_yields_no_claim_for_it() -> N
     assert schema.parse_wip_claims(text) == {}
 
 
+MARKED_STEP = f"{STEP} 3"
+
+
+@pytest.mark.parametrize(
+    ("line", "claim"),
+    [
+        pytest.param(f"- [x] [COMPLETE] {MARKED_STEP}: Do it", "COMPLETE", id="complete"),
+        pytest.param(f"- [ ] [IN-PROGRESS] {MARKED_STEP}: Do it", "IN-PROGRESS", id="in-progress"),
+        pytest.param(f"- [ ] `[IMPLEMENTING]` **{MARKED_STEP}**: x", "IN-PROGRESS", id="emphasis"),
+    ],
+)
+def test_a_claim_marker_between_the_checkbox_and_the_step_still_claims_the_step(line, claim):
+    assert schema.parse_wip_claims(line + "\n") == {MARKED_STEP: claim}
+    assert schema.checklist_step_id(line) == MARKED_STEP
+
+
+def test_a_bracket_outside_the_marker_vocabulary_before_the_step_claims_nothing() -> None:
+    line = f"- [x] [maybe] {MARKED_STEP}: Do it"
+
+    assert (schema.parse_wip_claims(line + "\n"), schema.checklist_step_id(line)) == ({}, None)
+
+
 # Verbatim excerpt: sidecar-placement/sidecar-placement's WIP status table.
 _STATUS_TABLE_EXCERPT = (
     "| Step | Assignee | Status | Files |\n"

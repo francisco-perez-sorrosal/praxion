@@ -332,11 +332,14 @@ _IN_PROGRESS_MARKER_RE = re.compile(r"\[IN-PROGRESS\]|\[IMPLEMENTING\]", re.IGNO
 _PENDING_MARKER_RE = re.compile(r"\[ \]")
 
 # A checklist line's checkbox, and -- anchored immediately after it, past any
-# bold/backtick emphasis -- the "Step <id>" it claims (a step mentioned later
-# on the same line, e.g. a pre-mortem cross-reference, is not a claim for that
-# step).
+# bold/backtick emphasis and at most one claim marker of the closed vocabulary
+# above -- the "Step <id>" it claims (a step mentioned later on the same line,
+# e.g. a pre-mortem cross-reference, is not a claim for that step).
 _CHECKLIST_BOX_RE = re.compile(r"^\s*-\s*\[(?P<box>[ xX])\]\s*(?P<rest>.*)$")
-_ANCHORED_STEP_RE = re.compile(rf"^Step\s+(?P<id>{_STEP_ID_CORE})\b(?P<body>.*)$")
+_ANCHORED_STEP_RE = re.compile(
+    r"^(?P<marker>(?i:\[(?:COMPLETE|IN-PROGRESS|IMPLEMENTING)\])[\s*`]*)?"
+    rf"Step\s+(?P<id>{_STEP_ID_CORE})\b(?P<body>.*)$"
+)
 
 _TABLE_ROW_RE = re.compile(r"^\s*\|(?P<cells>.+)\|\s*$")
 _TABLE_DELIMITER_CELL_RE = re.compile(r":?-+:?")
@@ -423,7 +426,8 @@ def _checklist_claims(text: str) -> list[tuple[str, Claim]]:
         if step_match is None:
             continue
         step_id = f"Step {step_match.group('id')}"
-        claims.append((step_id, _claim_from_checkbox(box, step_match.group("body"))))
+        marked = (step_match.group("marker") or "") + step_match.group("body")
+        claims.append((step_id, _claim_from_checkbox(box, marked)))
     return claims
 
 

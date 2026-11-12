@@ -8,15 +8,15 @@ Test hook scripts directly by piping JSON input:
 
 ```bash
 # PreToolUse — simulate a git commit
-echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m test"},"session_id":"test","cwd":"/tmp"}' | python3 hooks/check_code_quality.py
+printf '%s\n' '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m test"},"session_id":"test","cwd":"/tmp"}' | python3 hooks/check_code_quality.py
 echo "Exit code: $?"
 
 # PostToolUse — simulate a Python file write
-echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/test.py","content":"def foo( x,y ): pass"},"session_id":"test","cwd":"/tmp"}' | python3 hooks/format_code.py
+printf '%s\n' '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/test.py","content":"def foo( x,y ): pass"},"session_id":"test","cwd":"/tmp"}' | python3 hooks/format_code.py
 echo "Exit code: $?"
 
 # SessionStart
-echo '{"hook_event_name":"SessionStart","source":"startup","session_id":"test","cwd":"/tmp"}' | python3 hooks/my_hook.py
+printf '%s\n' '{"hook_event_name":"SessionStart","source":"startup","session_id":"test","cwd":"/tmp"}' | python3 hooks/my_hook.py
 ```
 
 **Environment variables** to set before testing:

@@ -8,6 +8,7 @@ JSON output formats for hook scripts. Output goes to stdout (exit 0) or stderr (
 - [decision: "block"](#decision-block)
 - [updatedInput](#updatedinput)
 - [permissionDecision](#permissiondecision)
+- [systemMessage](#systemmessage)
 - [Combining Output Fields](#combining-output-fields)
 - [Error Output (exit 2)](#error-output-exit-2)
 - [Python Template](#python-template)
@@ -109,6 +110,16 @@ With session-wide permission update:
 ```
 
 **Known issue**: `"behavior": "deny"` may be ignored for Edit tool (#37210).
+
+## systemMessage
+
+Shows a warning line to the person at the terminal. Use it for any report a human must read.
+
+```json
+{"systemMessage": "[hook-name] install refresh failed; run /praxion-complete-install"}
+```
+
+A hook's stderr on exit 0 reaches nobody: the hook reference (read 2026-11-10) says Claude never sees stderr from a hook that exits 0, and offers debug logging as the only way to read it. `systemMessage` is a universal JSON output field, and SessionStart does not discard it (SessionStart plain-text stdout becomes Claude's context). So print one JSON object on stdout, combine the lines when several fire in one run, and keep everything else off stdout. Before claiming a hook "reports" something, name the channel and check it against the reference.
 
 ## Combining Output Fields
 

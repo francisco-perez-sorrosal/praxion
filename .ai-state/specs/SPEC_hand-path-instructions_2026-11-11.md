@@ -21,9 +21,9 @@
 
 **Pipeline branch**: `fix/hand-path-instructions`
 **ADRs (promoted at merge)**:
-- `dec-draft-133a8cf4` (architectural): the hand path's instructions step beside the update path;
-- `dec-draft-5ef88cee` (behavioral): both skills resolve the substituted root;
-- `dec-draft-249348a7` (implementation): two render slots, and readers follow the link.
+- `dec-505` (architectural): the hand path's instructions step beside the update path;
+- `dec-506` (behavioral): both skills resolve the substituted root;
+- `dec-507` (implementation): two render slots, and readers follow the link.
 
 **Related specs**: `SPEC_install-refresh_2026-11-10.md` (the five instruction states and the carry-forward the hand path reuses) and `SPEC_hook-report-channel_2026-11-11.md` (the failure line, now a `systemMessage`, that names this command).
 
@@ -76,9 +76,9 @@ Health readings:
 
 ## Key Decisions
 
-- **Two render slots, and every reader follows the link** (`dec-draft-249348a7`). The architect weighed moving the hand-edited render aside and rejected it. That would break REQ-08's inode guard, and a second slot that readers did not follow would fail the next update at every release. The guard test was made to bite only after review: the stale primary and the alternate first held the same identity.
-- **The hand path calls the Python the update path owns** (`dec-draft-133a8cf4`), never a bash re-implementation. The installer's hardcoded maintainer identity (td-627) never reaches it.
-- **Substituted root, else registry** (`dec-draft-5ef88cee`). Unsubstituted text is read through a quoted heredoc, so it can never expand from the shell. The person's own `CLAUDE_PLUGIN_ROOT` export (as on the maintainer's machine, pointing at a dev checkout) is never read.
+- **Two render slots, and every reader follows the link** (`dec-507`). The architect weighed moving the hand-edited render aside and rejected it. That would break REQ-08's inode guard, and a second slot that readers did not follow would fail the next update at every release. The guard test was made to bite only after review: the stale primary and the alternate first held the same identity.
+- **The hand path calls the Python the update path owns** (`dec-505`), never a bash re-implementation. The installer's hardcoded maintainer identity (td-627) never reaches it.
+- **Substituted root, else registry** (`dec-506`). Unsubstituted text is read through a quoted heredoc, so it can never expand from the shell. The person's own `CLAUDE_PLUGIN_ROOT` export (as on the maintainer's machine, pointing at a dev checkout) is never read.
 - **A deliberate change to the hook's observable output.** The update refresh's failure line names `UnrecoverableRenderError` where it named the raw exception type. The four cases are `PermissionError`, `IsADirectoryError`, `FileNotFoundError`, and `UnicodeDecodeError` for an undecodable render.
 - **Process:**
   - The step loop stopped at step 5 on td-605: a review-forced step whose fixes were committed outside the loop cannot be reviewed in it. Steps 6 to 12 ran outside the loop under the same gates.

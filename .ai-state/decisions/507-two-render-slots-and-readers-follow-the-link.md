@@ -1,7 +1,8 @@
 ---
-id: dec-draft-249348a7
+id: dec-507
+draft_id: dec-draft-249348a7
 title: "A version directory has two render slots: a write never replaces the file the instructions link resolves to, and every reader follows the link"
-status: proposed
+status: accepted
 category: implementation
 date: 2026-11-11
 summary: "claude/config/CLAUDE.md stays the primary render and claude/config/CLAUDE.alternate.md is written only when the link resolves to the installed version's own primary render; carry-forward, read-back and the current check read the render the link names (CachedRender gains render), so an in-place hand edit is never overwritten and the next update carries forward from the live render."

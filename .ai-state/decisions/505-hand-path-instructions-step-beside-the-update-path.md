@@ -1,7 +1,8 @@
 ---
-id: dec-draft-133a8cf4
+id: dec-505
+draft_id: dec-draft-133a8cf4
 title: "The hand path's instructions step is a Python entry beside the update path, sharing its classifier, recovery and atomic writer"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-11
 summary: "/praxion-complete-install's command gains an instructions step: install_claude.sh runs the new hooks/_install_hand_path.py, which composes the update path's five-state classifier, recover_values and build-and-rename writer and adds only the terminal conversation (offer, value questions with git-derived defaults, confirmation); each step fails soft and the closing report says done only when nothing failed and the instructions are not left behind."

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-5ef88cee
+id: dec-506
+draft_id: dec-draft-5ef88cee
 title: "The hand-path skills resolve the plugin root from the substituted token kept inert, with an inline registry fallback; the registry readers stay separate"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-11
 summary: "Both /praxion-complete-install and /praxion-complete-uninstall read ${CLAUDE_PLUGIN_ROOT} through a quoted heredoc so unsubstituted text never expands from the shell, fall back to an inline registry reader (praxion entries, user scope first, an existing installPath), and never list the cache; the installer's and the hook's registry readers stay as they are because they answer different questions."

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-11T19:02:17Z'
+generated_at: '2026-11-12T01:30:28Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -8,7 +8,7 @@ surfaces:
   path: README.md
   type: markdown
   title: Praxion
-  last_modified: '2026-11-10'
+  last_modified: '2026-11-11'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-ledger
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-11-10'
+  last_modified: '2026-11-11'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-10'
+  last_modified: '2026-11-11'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-10'
+  last_modified: '2026-11-11'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -3729,6 +3729,24 @@ surfaces:
   title: The startup-context diet closes its preload, catalogue and manifest-axis items by recorded decision
   last_modified: '2026-11-11'
   renderer: adr_card
+- id: ai-state-decisions-505-hand-path-instructions-step-beside-the-update-path
+  path: .ai-state/decisions/505-hand-path-instructions-step-beside-the-update-path.md
+  type: markdown
+  title: The hand path's instructions step is a Python entry beside the update path, sharing its classifier, recovery and atomic writer
+  last_modified: '2026-11-11'
+  renderer: adr_card
+- id: ai-state-decisions-506-hand-path-skills-resolve-the-substituted-root
+  path: .ai-state/decisions/506-hand-path-skills-resolve-the-substituted-root.md
+  type: markdown
+  title: The hand-path skills resolve the plugin root from the substituted token kept inert, with an inline registry fallback; the registry readers stay separate
+  last_modified: '2026-11-11'
+  renderer: adr_card
+- id: ai-state-decisions-507-two-render-slots-and-readers-follow-the-link
+  path: .ai-state/decisions/507-two-render-slots-and-readers-follow-the-link.md
+  type: markdown
+  title: 'A version directory has two render slots: a write never replaces the file the instructions link resolves to, and every reader follows the link'
+  last_modified: '2026-11-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -3988,6 +4006,12 @@ surfaces:
   type: markdown
   title: 'Spec: gate-repairs (the five rows Phase 3 leans on)'
   last_modified: '2026-10-27'
+  renderer: default_markdown
+- id: ai-state-specs-spec-hand-path-instructions-2026-11-11
+  path: .ai-state/specs/SPEC_hand-path-instructions_2026-11-11.md
+  type: markdown
+  title: 'Spec: hand-path-instructions (the command the refresh''s failure line names finishes the job)'
+  last_modified: '2026-11-11'
   renderer: default_markdown
 - id: ai-state-specs-spec-hook-report-channel-2026-11-11
   path: .ai-state/specs/SPEC_hook-report-channel_2026-11-11.md
@@ -4705,6 +4729,9 @@ groups:
   - ai-state-decisions-502-hook-scripts-stay-off-the-path
   - ai-state-decisions-503-likec4-server-only-where-it-has-a-model
   - ai-state-decisions-504-diet-closes-catalogue-and-manifest-items
+  - ai-state-decisions-505-hand-path-instructions-step-beside-the-update-path
+  - ai-state-decisions-506-hand-path-skills-resolve-the-substituted-root
+  - ai-state-decisions-507-two-render-slots-and-readers-follow-the-link
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4749,6 +4776,7 @@ groups:
   - ai-state-specs-spec-diagrams-2026-04-30
   - ai-state-specs-spec-eval-kit-repairs-2026-11-01
   - ai-state-specs-spec-gate-repairs-2026-10-27
+  - ai-state-specs-spec-hand-path-instructions-2026-11-11
   - ai-state-specs-spec-hook-report-channel-2026-11-11
   - ai-state-specs-spec-install-refresh-2026-11-10
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20

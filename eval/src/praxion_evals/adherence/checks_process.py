@@ -70,9 +70,6 @@ class Mode:
 
 
 PARALLEL_MODE = Mode("parallel mode", re.compile(r"\bparallel\b", re.I), "Mode: parallel")
-ACCEPTANCE_DESIGN_MODE = Mode(
-    "acceptance-design mode", re.compile(r"acceptance-design", re.I), "Mode: acceptance-design"
-)
 
 
 def in_mode(check: MechanicalCheck, mode: Mode) -> MechanicalCheck:

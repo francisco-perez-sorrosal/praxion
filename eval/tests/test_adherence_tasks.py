@@ -16,7 +16,7 @@ import pytest
 
 from praxion_evals.adherence import model, role_kits, tasks
 from praxion_evals.adherence.catalog_rows import DIFF_MODE, ON_DEMAND_MODE, SHADOWING_MODE
-from praxion_evals.adherence.checks_process import ACCEPTANCE_DESIGN_MODE, PARALLEL_MODE
+from praxion_evals.adherence.checks_process import PARALLEL_MODE
 from praxion_evals.adherence.model import (
     CONVENTION_MARKER,
     PILOT_ROLES,
@@ -41,6 +41,7 @@ KIT_ROLES = sorted(tasks.FULL_SET_ROLES)
 SMOKE_ROLES = [role for role in ROLES if role not in tasks.FULL_SET_ROLES]
 SMOKE_LIST = 3
 ARM_WORDS = re.compile(r"lean|full", re.IGNORECASE)
+ACCEPTANCE_DESIGN_DIRECTIVE = re.compile(r"acceptance-design", re.IGNORECASE)
 UNFILLED_TOKEN = re.compile(r"@@[A-Z]+@@")
 TEMPLATE = {"researcher": "module-boundaries", "verifier": "plan-adherence"}
 FIXTURE = "ledger-cli"
@@ -665,7 +666,7 @@ def test_no_prompt_names_an_arm_or_puts_the_role_in_a_mode_it_was_not_given(role
         assert not ARM_WORDS.search(prompt), task.task_id
         assert not PARALLEL_MODE.pattern.search(prompt), task.task_id
         directed = task.mode == "acceptance-design"
-        assert directed == bool(ACCEPTANCE_DESIGN_MODE.pattern.search(prompt)), task.task_id
+        assert directed == bool(ACCEPTANCE_DESIGN_DIRECTIVE.search(prompt)), task.task_id
 
 
 @pytest.mark.parametrize("role", MODE_OF)

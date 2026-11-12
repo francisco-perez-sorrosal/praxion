@@ -9,7 +9,6 @@ import pytest
 
 from praxion_evals.adherence.checks_common import COMMON_CHECKS, synthetic_evidence
 from praxion_evals.adherence.checks_process import (
-    ACCEPTANCE_DESIGN_MODE,
     PARALLEL_MODE,
     change_confined_to,
     forbidden_reads,
@@ -81,7 +80,7 @@ def test_a_check_in_a_mode_applies_when_the_prompt_names_it():
 
 
 def test_a_mode_checks_canary_names_the_mode_so_it_is_flagged_not_skipped():
-    check = in_mode(_always_fails(), ACCEPTANCE_DESIGN_MODE)
+    check = in_mode(_always_fails(), PARALLEL_MODE)
 
     assert isinstance(check.evaluate(check.violation()), Failed)
 

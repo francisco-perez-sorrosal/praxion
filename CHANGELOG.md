@@ -1,3 +1,27 @@
+## v0.63.0 (2026-11-12)
+
+### Feat
+
+- Start the likec4 MCP server only where it has a model
+
+### Fix
+
+- Let the Stop guard pass while a gate run is live
+- Read a claim marker before a WIP step's id
+- Review a step's work committed outside the loop
+- Budget a marked step's whole review cycle
+- Keep the instructions step past a failed cleanup
+- Harden the hand-path skills' registry fallback
+- Resolve the installed version in the hand-path skills
+- Let the hand path finish the instructions
+- Keep every hook script off the PATH
+- Let a default fill a key left as its placeholder
+- Keep test runs off the tracked specs index
+
+### Perf
+
+- Trim the four longest agent descriptions
+
 ## v0.62.0 (2026-11-11)
 
 ### Feat

@@ -38,7 +38,11 @@ SegmentRead = namedtuple("SegmentRead", ("path", "rows", "malformed_lines", "err
 # `(path, entries, malformed_lines, error)`: `SegmentRead`'s shape for a copier.
 # `entries` is a tuple of `(text, row)`: the stored line without its newline and
 # the object it parses to, never upcast, so a copy is byte-faithful.
-RawSegmentRead = namedtuple("RawSegmentRead", ("path", "entries", "malformed_lines", "error"))
+# `last_line_bytes` is the size, newline included, of the last non-blank line,
+# whether or not it parsed: a torn tail is still the last thing appended.
+RawSegmentRead = namedtuple(
+    "RawSegmentRead", ("path", "entries", "malformed_lines", "error", "last_line_bytes")
+)
 
 # `(segments, missing, error)`. `segments` holds the paths that exist: archives by
 # descending position (oldest first), then the active log. `missing` holds the
@@ -144,7 +148,7 @@ def read_segment(path: Path) -> SegmentRead:
     ``malformed_lines`` by its 1-based line number and excluded from
     ``rows`` -- never silently dropped, never fatal to the rest of the read.
     """
-    entries, malformed, error = _scan_segment(path)
+    entries, malformed, error, _ = _scan_segment(path)
     rows = tuple(upcast(row) for _, row in entries)
     return SegmentRead(path=path, rows=rows, malformed_lines=malformed, error=error)
 
@@ -156,12 +160,12 @@ def read_raw_segment(path: Path) -> RawSegmentRead:
     share, this shows what the file holds. Same tagged errors, same line
     numbering, never raises.
     """
-    entries, malformed, error = _scan_segment(path)
-    return RawSegmentRead(path=path, entries=entries, malformed_lines=malformed, error=error)
+    entries, malformed, error, last_line_bytes = _scan_segment(path)
+    return RawSegmentRead(path, entries, malformed, error, last_line_bytes)
 
 
-def _scan_segment(path: Path) -> tuple[tuple, tuple[int, ...], str | None]:
-    """`(entries, malformed_lines, error)` for one segment, never raising.
+def _scan_segment(path: Path) -> tuple[tuple, tuple[int, ...], str | None, int]:
+    """`(entries, malformed_lines, error, last_line_bytes)` for one segment, never raising.
 
     A line is what text-mode file iteration yields, never `str.splitlines()`,
     which also breaks at U+0085, U+2028, U+2029 and other separators a
@@ -169,6 +173,7 @@ def _scan_segment(path: Path) -> tuple[tuple, tuple[int, ...], str | None]:
     """
     entries: list[tuple[str, dict]] = []
     malformed: list[int] = []
+    last_line_bytes = 0
     try:
         # errors="replace": a torn multi-byte sequence must cost one malformed
         # line, never the whole segment (strict decoding raises ValueError).
@@ -176,16 +181,17 @@ def _scan_segment(path: Path) -> tuple[tuple, tuple[int, ...], str | None]:
             for line_no, line in enumerate(handle, start=1):
                 if not line.strip():
                     continue
+                last_line_bytes = len(line.encode("utf-8"))
                 row = _parse_row(line)
                 if row is None:
                     malformed.append(line_no)
                 else:
                     entries.append((line.removesuffix("\n"), row))
     except FileNotFoundError:
-        return (), (), "missing"
+        return (), (), "missing", 0
     except OSError as exc:
-        return (), (), f"unreadable: {exc}"
-    return tuple(entries), tuple(malformed), None
+        return (), (), f"unreadable: {exc}", 0
+    return tuple(entries), tuple(malformed), None, last_line_bytes
 
 
 def _parse_row(line: str) -> dict | None:

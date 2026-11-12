@@ -339,6 +339,14 @@ def test_a_raw_read_strips_the_newline_and_keeps_a_last_line_without_one(
     assert [text for text, _ in raw.entries] == ['{"a": 1}', '{"b": 2}']
 
 
+def test_a_raw_read_sizes_the_last_line_even_when_it_is_a_torn_fragment(tmp_path: Path) -> None:
+    path = _segment(tmp_path, b'{"a": 1}\n{"torn": "yy\n\n')
+
+    raw = read_raw_segment(path)
+
+    assert raw.last_line_bytes == len(b'{"torn": "yy\n')
+
+
 def test_a_raw_read_reports_malformed_lines_as_the_shared_read_does(tmp_path: Path) -> None:
     path = _segment(tmp_path, b'{"a": 1}\nnot-json\n\n[1, 2]\n{"b": 2}\n')
 

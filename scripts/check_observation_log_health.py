@@ -187,7 +187,7 @@ class SegmentFacts:
     rows: int
     oldest: Stamped | None
     newest: Stamped | None
-    last_row_bytes: int
+    last_line_bytes: int
     helper_stops: int
     agent_stops: int
     session_starts: tuple[tuple[str | None, str], ...]  # (log_mode_source, session_id)
@@ -302,7 +302,6 @@ def summarize(read: reader.RawSegmentRead) -> SegmentFacts:
             starts.append(
                 (None if source is None else str(source), str(raw.get("session_id") or ""))
             )
-    last_text = read.entries[-1][0] if read.entries else ""
     return SegmentFacts(
         path=read.path,
         error=read.error,
@@ -310,7 +309,7 @@ def summarize(read: reader.RawSegmentRead) -> SegmentFacts:
         rows=len(read.entries),
         oldest=oldest,
         newest=newest,
-        last_row_bytes=len(last_text.encode("utf-8")) + 1 if last_text else 0,
+        last_line_bytes=read.last_line_bytes,
         helper_stops=helpers,
         agent_stops=agents,
         session_starts=tuple(starts),
@@ -405,10 +404,10 @@ def _coverage_summary(view: LogView, oldest: Stamped | None, newest: Stamped | N
 
 def check_rotation_state(view: LogView, policy: Policy) -> Outcome:
     active_facts = next((f for f in view.facts if f.path == view.active), None)
-    last_row_bytes = active_facts.last_row_bytes if active_facts else 0
+    last_line_bytes = active_facts.last_line_bytes if active_facts else 0
     size, cap = view.active_bytes, policy.size_cap_bytes
     findings = []
-    if size - last_row_bytes >= cap:
+    if size - last_line_bytes >= cap:
         findings.append(
             _finding(
                 "P10",

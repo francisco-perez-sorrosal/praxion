@@ -386,6 +386,21 @@ def test_p10_the_append_that_crossed_the_cap_is_normal_and_does_not_warn(
     assert len(_information(report, "P10")) == 1
 
 
+def test_p10_a_torn_trailing_fragment_is_measured_as_the_last_append(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = _state(tmp_path)
+    one, size = _log_of_rows_filling(state, 3)
+    fragment = '{"torn": "' + "y" * (2 * one)
+    with clh.reader.log_path(state).open("a", encoding="utf-8") as handle:
+        handle.write(fragment)
+    monkeypatch.setattr(clh.retention, "SIZE_CAP_BYTES", size + 1)  # the rows alone stay under it
+
+    report = _run(tmp_path)
+
+    assert _warnings(report, "P10") == []
+
+
 # -- P11 segment integrity ---------------------------------------------------------------------
 
 

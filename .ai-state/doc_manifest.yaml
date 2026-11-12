@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-12T01:30:28Z'
+generated_at: '2026-11-12T01:42:37Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -3747,6 +3747,12 @@ surfaces:
   title: 'A version directory has two render slots: a write never replaces the file the instructions link resolves to, and every reader follows the link'
   last_modified: '2026-11-11'
   renderer: adr_card
+- id: ai-state-decisions-508-held-roles-close-as-final
+  path: .ai-state/decisions/508-held-roles-close-as-final.md
+  type: markdown
+  title: 'The four held lean-spawn roles close as final: the verifier, context-engineer, discipline-consultant and skill-genesis keep the full arm'
+  last_modified: '2026-11-11'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4732,6 +4738,7 @@ groups:
   - ai-state-decisions-505-hand-path-instructions-step-beside-the-update-path
   - ai-state-decisions-506-hand-path-skills-resolve-the-substituted-root
   - ai-state-decisions-507-two-render-slots-and-readers-follow-the-link
+  - ai-state-decisions-508-held-roles-close-as-final
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

@@ -14,6 +14,10 @@
 # measured the full arm on the whole rules, so a re-trial from a later freeze compares its
 # lean arm against the split, and its full-arm figures are not comparable with theirs. This
 # note moves no role.
+# From 2026-11-11 (dec-508) the four held roles (verifier, context-engineer,
+# discipline-consultant, skill-genesis) are closed as final: no kit is owed and no trial is
+# planned. Each re-opens as a trial only on that decision's reversal trigger. This note
+# moves no role either.
 version: 1
 roles:
   researcher:

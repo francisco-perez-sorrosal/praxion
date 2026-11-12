@@ -185,6 +185,10 @@ tail -f ~/.phoenix/phoenix.err   # stderr
    `./install.sh codex <project>` so the generated hooks omit the unsupported
    `async` field.
 
+**Traces land under the wrong project, or a session shows no root span:**
+
+Phoenix routes spans to projects by the resource attribute `openinference.project.name` (not `project_name`); the relay sets it from the project directory basename in `span_factory.py`. A session span is a root only when it is started without a parent: giving it a synthetic parent context makes Phoenix treat it as non-root, and the Traces view then hides the session. Both were found while debugging the span hierarchy and have not been re-probed against a current Phoenix.
+
 **Tool spans show zero duration:**
 
 The `PreToolUse` observability hook is not firing. Check that `hooks/hooks.json` has an empty-matcher entry for `send_event.py` under `PreToolUse`, and that Claude Code picked up the registration (restart the session after editing `hooks.json`). Without `PreToolUse`, the chronograph falls back to emitting instant spans with no duration.

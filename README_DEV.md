@@ -213,6 +213,7 @@ The flags are read by each hook via `is_disabled()` in `hooks/_hook_utils.py`, e
 - When adding or modifying rules, load the `rule-crafting` skill
 - Follow commit conventions in `rules/` (auto-loaded by Claude when relevant); for PR workflow (branch naming, `.ai-state/` safety, merge policy), see [`rules/swe/vcs/pr-conventions.md`](rules/swe/vcs/pr-conventions.md) — path-scoped, loads only on PR-adjacent surfaces
 - Worktrees live under `.claude/worktrees/<name>/`. Pipeline worktrees use Claude Code's `EnterWorktree`; scratch worktrees use `/create-worktree` (both share the same home). Legacy `.trees/<name>/` remains readable during the deprecation window — run `scripts/migrate_worktree_home.sh` for per-worktree `git worktree move` commands
+- In a pipeline worktree, the commit gate runs the main checkout's `scripts/check_id_citation_discipline.py`, not the branch's, so an exemption added on the branch cannot cover its own commit until it merges. Check the staged files with main's copy first (`python3 <main checkout>/scripts/check_id_citation_discipline.py --repo-root . --files <staged>`). Prefer the same-line `id-citation-discipline:ignore` on a few fixture literals to a whole-file exemption, which switches off every pattern for that file, not only the one it was meant for
 - **Never modify `~/.claude/plugins/cache/`** -- it contains installed copies that get overwritten on reinstall; always edit source files in this repo
 - **Token budget**: Always-loaded content (CLAUDE.md files + rules) must stay under 25,000 tokens (~87,500 chars) as a failure-mode guardrail — the principle is that every always-loaded token must earn its attention share (applied in >30% of sessions, or unconditionally relevant). Before adding a new rule, apply the attention-relevance test first, then verify the budget. Prefer skills with reference files for procedural content; reserve rules for declarative domain knowledge. Rationale: `.ai-state/decisions/050-always-loaded-budget-revision.md`
 - **id-citation discipline is shipped, not self-applied (intentional asymmetry).** `scripts/check_id_citation_discipline.py` installs into *managed* projects' pre-commit (via `/onboard-project`) to keep ephemeral `REQ-*`/`AC-*`/`Step N` citations out of their committed code. It is deliberately **not** in Praxion's own `.pre-commit-config.yaml`: as the discipline's author and test-bed, Praxion's suite necessarily embeds `REQ-*`/`AC-*` strings as *fixtures* (the detector and the spec-drift machinery testing themselves), so a self-run reports ~180 mostly-legitimate "violations". Documenting the exemption is more honest than annotating fixtures that are *meant* to look like citations. Revisit if non-test source starts accruing citations — audit with `python3 scripts/check_id_citation_discipline.py`.
@@ -333,6 +334,11 @@ Use this flow to test a pet project from a Praxion checkout:
 
 Start a fresh Codex or AGENTS.md-aware agent session in the target project after
 installing so startup discovery sees the generated `AGENTS.md`.
+
+Two exporter facts matter when you change `codex/config/` or `cursor/config/`:
+
+- Each generated Codex agent TOML names the canonical definition and the Praxion root by absolute path (`export-codex-agents.py` resolves the root). Exporting a base tree and a head tree therefore differs in every wrapper even when nothing real changed; replace each tree's root with a placeholder before diffing, and read zero differing files after that as clean. The Cursor rules exporter writes no such path and compares byte for byte. Observed 2026-10-20.
+- The exporters must run from a copy that carries only their own directory, as the move instrument's narrowed checkouts do, so do not import from `scripts/` in them; the resident-file check in `rules_bridge_parsing.py` and `export-cursor-rules.py` is duplicated for that reason, with a test holding it equal to `scripts/_resident_of.py`.
 
 ## Progressive Disclosure and Satellite Files
 
@@ -499,6 +505,9 @@ Resolves `td-036` in `.ai-state/TECH_DEBT_LEDGER.md`.
 - `./install.sh --check` — confirms all symlinks, plugin, hooks, and permissions are healthy
 - `/context` inside Claude Code — shows which skills and reference files are loaded in the current context window
 - `claude plugin list` — verifies the plugin is registered and its version
+- Run tests with `uv run pytest`, not a bare `python3 -m pytest`: the ambient `python3` (pyenv) lacks pytest-xdist, so the repository's `addopts` fails with `unrecognized arguments: -n`.
+- The session exports `CLAUDE_PLUGIN_ROOT` to every command. The root `conftest.py` drops it for pytest only, so an installer or render script you run by hand still sees it and writes into the live checkout (that is how `~/.claude/CLAUDE.md` once ended up holding placeholder values). Isolate such a run: unset the variable and point it at a scratch home. No installer guard exists for this; it is a trap to know, not a protection.
+- A test that converses with the installer stands in for every optional tool the installer offers (`scc`, `uv` and `.venv`, the Obsidian dependencies), and feeds its answers, because an installer whose input ends at the first prompt exits 1 under `set -e` and writes nothing. CI lacks `scc`, which shifted every scripted answer once while macOS stayed green. To reproduce a Linux-only red, hide the tool from `PATH` with a shadow directory of symlinks to `/opt/homebrew/bin` minus that tool; `tests/acceptance/drivers/hand_path_command.py` shows the stand-in.
 
 ## Plugin Development
 
@@ -542,6 +551,15 @@ For live-edit development on Praxion itself, use `praxion-claude-dev` (a thin wr
 For a clone install, run `./install.sh code --relink`. A clone's links, a regular-file `~/.claude/CLAUDE.md` and links outside the plugin cache are never touched.
 
 When the first session reports that it could not finish, run `/praxion-complete-install` and then, in your own terminal, the command it prints; it finishes the rules, the scripts and `~/.claude/CLAUDE.md`, and asks for your personal values only when it cannot read them back from the current file. `bash install.sh --check` names every stale or missing rule link.
+
+When you change a hook or an agent, no session can exercise that change in the checkout that made it. To see it live without a release, launch `praxion-claude-dev` (or `claude --plugin-dir`). To prove the shipped path, refresh the installed plugin, which is a chain, not a command:
+
+1. `git push origin main`: the marketplace fetches from GitHub, so an unpushed commit never lands.
+2. Run the Release workflow (see [Creating a release](#creating-a-release-manual-from-github-ui)). A version bump is required: reinstalling the same version is a no-op against the existing cache directory.
+3. `claude plugin marketplace update bit-agora`, then `claude plugin update praxion@bit-agora`.
+4. Restart the session: agents load at session start, so a session that ran the update has not exercised it. When a rule's install type changed, `./install.sh code --relink` belongs before the restart.
+
+Before a step whose purpose is to spawn the thing you just built, diff the installed copy against the checkout (`diff -q ~/.claude/plugins/cache/bit-agora/praxion/<version>/agents/<name>.md agents/<name>.md`): a new agent can appear in the session roster from the working tree while the cache the spawn resolves satellite files through is stale. The cache is nested by version, and older versions stay on disk after an update. `--dev-link` does not help here: it links `hooks/`, `scripts/` and `skills/` only, never `agents/`. The marketplace repository's own `version` field is advisory; `claude plugin update` fetches the source repository's HEAD. Verified 2026-07-30 under the earlier plugin name; the chain is unchanged in shape.
 
 ### Uninstall ordering
 

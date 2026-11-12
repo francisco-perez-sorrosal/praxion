@@ -77,7 +77,8 @@ See `eval/EVAL_PLAN.md` for the full design narrative, deferred families, and op
 ```sh
 cd eval
 
-# 1. Dry run: print the planned sessions, spend nothing, write nothing.
+# 1. Dry run: print the planned sessions, spend nothing, write nothing. It builds no arms,
+#    so it cannot show how an arm copies the checkout; see the note below the block.
 uv run praxion-evals-adherence .. --role researcher --role verifier --dry-run
 
 # 2. Smoke run, both arms, two pairs per role, with the judge's golden cases.
@@ -100,7 +101,9 @@ uv run praxion-evals-adherence .. --close <run id> --reason "<why>"
 uv run praxion-evals-adherence .. --reindex
 ```
 
-The first positional argument is the plugin checkout under test (default: this repository's root). Inside a Claude Code session, export `CLAUDE_CODE_OAUTH_TOKEN=""` first so the judge client does not reuse the session's token.
+The first positional argument is the plugin checkout under test (default: this repository's root). Inside a Claude Code session, export `CLAUDE_CODE_OAUTH_TOKEN=""` first so the judge client does not reuse the session's token. Export it empty rather than unsetting it: the CLI loads a `.env` with `load_dotenv` (it never overrides a variable already in the environment), so an unset token is re-added from `.env`, while an empty exported value survives and the client falls through to `ANTHROPIC_API_KEY`. Run from the repository root, or pass `--output`: the CLI resolves its output directory from the current directory, so a run from `eval/` strands the report and log row under `eval/.ai-state/`.
+
+Before the first paid run of a new entry or kit, build its arms once on the real checkout by calling the builder directly (no session) and look at the workspace size: a dry run builds none, and a rehearsal that copies the checkout its own way hides a builder that copies every linked worktree and `.venv` (one run copied 13 GB in five minutes before the builder copied only what `git ls-files --cached --others --exclude-standard` lists, as `live/materialize.py` does).
 
 | Option | Meaning |
 |--------|---------|
@@ -136,7 +139,7 @@ The report states counts and bounds. A role with fewer complete pairs than the t
 
 ## Development
 
-- `uv run pytest` — test suite (behavioral + harness families).
+- `uv run pytest` — test suite (behavioral + harness families). The package needs Python 3.13 and has no xdist or coverage plugin, so `-n` and `--no-cov` are refused here; from the repository root run `uv run --project eval python -m pytest <files>`. The full run took about 7 minutes (4,301 tests) on 2026-11-12.
 - `uv run ruff format .` and `uv run ruff check --fix .` — formatting + lint.
 - `uv run pyright src/` — static type check (basic mode).
 

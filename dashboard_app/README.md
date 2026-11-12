@@ -113,6 +113,8 @@ cd dashboard_app && ./node_modules/.bin/next build
 cd dashboard_app && pnpm dev
 ```
 
+Open the dev server at `http://localhost:<port>`, not `127.0.0.1`: Next's dev-origin check hydrates only the `localhost` origin, so charts stay blank on the IP origin (`next start` serves either). A `next-server` child can keep its port after you kill its parent; free it by port (`lsof -t -iTCP:<port>`) before restarting. Observed 2026-11 on Next 16.2, not re-probed since.
+
 React component-render tests are deferred — see `.ai-state/TECH_DEBT_LEDGER.md`.
 
 ## Package layout

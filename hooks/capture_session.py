@@ -171,7 +171,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from _observation_log import reader, writer
-from _observation_log.location import locate
+from _observation_log.location import SUMMARY_FILENAME, locate
 from _observation_log.modes import Mode, resolve_mode
 from _observation_log.registry import EventClass
 
@@ -253,10 +253,6 @@ TRANSCRIPT_TAIL_BYTES = 1024 * 1024  # 1 MiB
 # Outcomes a synthetic suspension stop can carry in its `outcome` field.
 OUTCOME_TURN_LIMIT = "turn-limit"
 OUTCOME_STOPPED = "stopped"
-
-# The committed per-session summary (see module docstring). Upserted, never
-# appended-to, at every `session_stop`.
-SUMMARY_FILENAME = "observations_summary.jsonl"
 
 # Event types the summary aggregates by count. An explicit, narrow set --
 # not every event_type -- so the summary stays the "compact row" P0.5

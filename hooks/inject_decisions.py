@@ -40,7 +40,7 @@ import sys
 from pathlib import Path
 
 from _hook_utils import is_disabled
-from _project_scope import Managed, scope_of
+from _project_scope import Managed, is_hook_written_state, scope_of
 
 # -- Constants ----------------------------------------------------------------
 
@@ -251,18 +251,28 @@ def _session_tokens(cwd: Path) -> dict[str, int]:
         for token in tokens:
             weighted[token] = max(weighted.get(token, 0), weight)
 
-    for line in _git_lines(cwd, "status", "--porcelain"):
-        add(_tokenize(line[3:]), _WEIGHT_WORKTREE)  # strip the two-char XY prefix
+    dirty_paths = [line[3:] for line in _git_lines(cwd, "status", "--porcelain")]  # past "XY "
+    add(_path_tokens(dirty_paths), _WEIGHT_WORKTREE)
 
     branch = _git_lines(cwd, "rev-parse", "--abbrev-ref", "HEAD")
     if branch and branch[0] not in ("HEAD", "main", "master"):
         add(_tokenize(branch[0]), _WEIGHT_BRANCH)
 
     for paths in _recent_commit_paths(cwd):
-        add({token for path in paths for token in _tokenize(path)}, _WEIGHT_HISTORY)
+        add(_path_tokens(paths), _WEIGHT_HISTORY)
 
     ranked = sorted(weighted.items(), key=lambda item: (-item[1], item[0]))
     return dict(ranked[:_MAX_QUERY_TOKENS])
+
+
+def _path_tokens(paths: list[str]) -> set[str]:
+    """Topical tokens of the paths a session touched.
+
+    A state file Praxion's own hooks rewrite is dirty in every session and
+    rides every state commit, so it is evidence of no topic: read as work, the
+    summary row alone outvoted the real task with observation-log decisions.
+    """
+    return {token for path in paths if not is_hook_written_state(path) for token in _tokenize(path)}
 
 
 def _singular(word: str) -> str:

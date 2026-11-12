@@ -34,6 +34,8 @@ def _load_module():
 
 decisions = _load_module()
 
+from _project_scope import HOOK_WRITTEN_STATE_FILES  # noqa: E402 - hooks/ is on the path now
+
 
 def _write_index(cwd: Path, body_rows: str) -> None:
     """Create .ai-state/decisions/DECISIONS_INDEX.md with the given table rows."""
@@ -714,6 +716,61 @@ class TestSessionSignalWeighting:
         subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "focused"], check=True)
 
         assert decisions._session_tokens(repo)["vendored"] == decisions._WEIGHT_HISTORY
+
+
+def _track_and_dirty(repo: Path, relative_path: str) -> None:
+    """Commit a file at ``relative_path``, then leave an uncommitted edit on it."""
+    target = repo / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("committed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "--", relative_path], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "track"], check=True)
+    target.write_text("committed\nrewritten since\n", encoding="utf-8")
+
+
+class TestHookWrittenStateIsNotTopicalEvidence:
+    """Praxion's own hooks leave tracked state files dirty in every session.
+
+    The Stop hook's summary row rides the next state commit by design, so a
+    session starts with it modified whatever the work is about. Read as work
+    in progress, those paths outvote the real task on every managed project.
+    """
+
+    @pytest.mark.parametrize("filename", sorted(HOOK_WRITTEN_STATE_FILES))
+    def test_a_tree_dirty_only_with_hook_written_state_reads_as_a_clean_tree(
+        self, filename: str, main_repo_on_main: Path
+    ) -> None:
+        clean_tokens = decisions._session_tokens(main_repo_on_main)
+
+        _track_and_dirty(main_repo_on_main, f".ai-state/{filename}")
+
+        assert decisions._session_tokens(main_repo_on_main) == clean_tokens
+
+    def test_a_real_edit_beside_hook_written_state_still_names_the_work(
+        self, main_repo_on_main: Path
+    ) -> None:
+        _track_and_dirty(main_repo_on_main, ".ai-state/observations_summary.jsonl")
+        _track_and_dirty(main_repo_on_main, "warehouse/shipment.py")
+
+        tokens = decisions._session_tokens(main_repo_on_main)
+
+        assert tokens["warehouse"] == decisions._WEIGHT_WORKTREE
+        assert "observations" not in tokens
+
+    def test_a_same_named_file_outside_the_state_directory_is_ordinary_work(
+        self, main_repo_on_main: Path
+    ) -> None:
+        _track_and_dirty(main_repo_on_main, "exports/observations_summary.jsonl")
+
+        tokens = decisions._session_tokens(main_repo_on_main)
+
+        assert tokens["observations"] == decisions._WEIGHT_WORKTREE
+
+    def test_other_state_files_stay_topical(self, main_repo_on_main: Path) -> None:
+        # The ledger is edited by the work itself, never by a hook on its own.
+        _track_and_dirty(main_repo_on_main, ".ai-state/TECH_DEBT_LEDGER.md")
+
+        assert decisions._session_tokens(main_repo_on_main)["ledger"] == decisions._WEIGHT_WORKTREE
 
 
 @pytest.fixture

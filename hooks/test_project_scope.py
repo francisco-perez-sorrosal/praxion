@@ -19,7 +19,18 @@ import pytest
 # directory's files side by side, so a package-qualified import would escape it.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _project_scope import Managed, Unmanaged, locate, scope_of  # noqa: E402
+from _project_scope import (  # noqa: E402
+    DOC_MANIFEST_FILENAME,
+    HOOK_WRITTEN_STATE_FILES,
+    STATE_DIRNAME,
+    SUMMARY_FILENAME,
+    TOKEN_BASELINE_FILENAME,
+    Managed,
+    Unmanaged,
+    is_hook_written_state,
+    locate,
+    scope_of,
+)
 
 STATE = ".ai-state"
 GIT = ".git"
@@ -236,3 +247,46 @@ def test_the_two_cases_are_told_apart_by_type_and_never_mutate(tmp_path: Path) -
     assert not isinstance(unmanaged, Managed)
     with pytest.raises(AttributeError):
         managed.root = tmp_path  # type: ignore[misc]
+
+
+# -- Hook-written state ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("filename", sorted(HOOK_WRITTEN_STATE_FILES))
+def test_a_hook_written_file_is_recognised_in_the_state_directory(filename: str) -> None:
+    assert is_hook_written_state(f"{STATE_DIRNAME}/{filename}")
+
+
+def test_a_nested_project_keeps_its_own_hook_written_state() -> None:
+    assert is_hook_written_state(f"services/billing/{STATE_DIRNAME}/{SUMMARY_FILENAME}")
+
+
+def test_a_path_git_quoted_for_its_space_is_still_recognised() -> None:
+    assert is_hook_written_state(f'"my project/{STATE_DIRNAME}/{SUMMARY_FILENAME}"')
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        SUMMARY_FILENAME,  # at the checkout root, outside any state directory
+        f"exports/{SUMMARY_FILENAME}",
+        f"{STATE_DIRNAME}/archive/{SUMMARY_FILENAME}",  # below the state directory, not in it
+        f"{STATE_DIRNAME}/TECH_DEBT_LEDGER.md",  # state the work itself edits
+        f"not{STATE_DIRNAME}/{SUMMARY_FILENAME}",
+        "",
+    ],
+)
+def test_any_other_path_is_ordinary_work(path: str) -> None:
+    assert not is_hook_written_state(path)
+
+
+def test_each_hook_written_name_is_the_one_its_writer_writes() -> None:
+    # The set is declared here once; two of its files are written from scripts/,
+    # which carry their own path. A writer that renames its file must fail here,
+    # or the renamed file silently reads as the session's work again.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import check_doc_manifest_freshness
+    import measure_token_budget
+
+    assert measure_token_budget._BASELINE_RELATIVE_PATH == (STATE_DIRNAME, TOKEN_BASELINE_FILENAME)
+    assert check_doc_manifest_freshness.MANIFEST_REL == f"{STATE_DIRNAME}/{DOC_MANIFEST_FILENAME}"

@@ -8,6 +8,10 @@ directory to the nearest such directory and stops at the first ``.git`` entry,
 so a separate clone nested inside a managed project never borrows its host's
 state.
 
+It also names the tracked state files Praxion's own hooks rewrite
+(`HOOK_WRITTEN_STATE_FILES`), declared here once so a reader of git's dirty or
+committed paths can tell a session's work from its by-products.
+
 Runs on every hook call: ``pathlib`` and ``collections`` only, no subprocess,
 at most two ``stat`` calls per directory level.
 """
@@ -19,6 +23,30 @@ from pathlib import Path
 
 STATE_DIRNAME = ".ai-state"
 CHECKOUT_MARKER = ".git"  # a directory in a clone, a file in a linked worktree
+
+# Tracked files in the state directory that Praxion's own hooks rewrite as a
+# by-product of any session: the Stop hook's per-session summary row (dec-377),
+# the commit gate's ratchet sample, the post-commit chain's doc manifest. They
+# ride the next state commit, so a session finds them modified whatever it
+# works on: their dirtiness says a session ran, never what it was about.
+SUMMARY_FILENAME = "observations_summary.jsonl"
+TOKEN_BASELINE_FILENAME = "token_budget_baseline.json"
+DOC_MANIFEST_FILENAME = "doc_manifest.yaml"
+HOOK_WRITTEN_STATE_FILES = frozenset(
+    {SUMMARY_FILENAME, TOKEN_BASELINE_FILENAME, DOC_MANIFEST_FILENAME}
+)
+
+
+def is_hook_written_state(path):
+    """Whether a path, as git prints it, names one of `HOOK_WRITTEN_STATE_FILES`.
+
+    Judged by the last two components: a project nested below the checkout root
+    keeps its state in its own ``.ai-state/``, and a file of the same name
+    anywhere else is ordinary work. Git quotes a path that holds a space.
+    """
+    directory, _, name = path.strip('"').rpartition("/")
+    return name in HOOK_WRITTEN_STATE_FILES and directory.rpartition("/")[2] == STATE_DIRNAME
+
 
 # ``project`` names the directory that holds the state, never a resolved link
 # target: ``.ai-state`` may be a symlink to a directory kept elsewhere.

@@ -10,8 +10,14 @@ unchanged: ``locate`` walks up from the working directory to the nearest
 from __future__ import annotations
 
 try:  # imported as ``hooks._observation_log`` (repo root on the path)
-    from .._project_scope import CHECKOUT_MARKER, STATE_DIRNAME, Location, locate
+    from .._project_scope import (
+        CHECKOUT_MARKER,
+        STATE_DIRNAME,
+        SUMMARY_FILENAME,
+        Location,
+        locate,
+    )
 except ImportError:  # imported bare, with ``hooks/`` on the path (every hook script)
-    from _project_scope import CHECKOUT_MARKER, STATE_DIRNAME, Location, locate
+    from _project_scope import CHECKOUT_MARKER, STATE_DIRNAME, SUMMARY_FILENAME, Location, locate
 
-__all__ = ("CHECKOUT_MARKER", "STATE_DIRNAME", "Location", "locate")
+__all__ = ("CHECKOUT_MARKER", "STATE_DIRNAME", "SUMMARY_FILENAME", "Location", "locate")

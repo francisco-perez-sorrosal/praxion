@@ -44,6 +44,11 @@ def bin_dir(tmp_path: Path) -> Path:
     return path
 
 
+def _cache_dir(tmp_path: Path) -> Path:
+    """Where the scratch home keeps the plugin's cached versions, one directory each."""
+    return tmp_path / "home" / ".claude" / "plugins" / "cache" / "market" / "praxion"
+
+
 def _link_scripts(tmp_path: Path, plugin: Path) -> subprocess.CompletedProcess:
     script = (
         "set -euo pipefail\n"
@@ -51,7 +56,7 @@ def _link_scripts(tmp_path: Path, plugin: Path) -> subprocess.CompletedProcess:
         'info() { echo "info: $*"; }\n'
         + _function("script_is_user_facing")
         + _function("link_user_scripts")
-        + f'SCRIPT_DIR="{plugin}"\nlink_user_scripts\n'
+        + f'SCRIPT_DIR="{plugin}"\nPLUGIN_CACHE_DIR="{_cache_dir(tmp_path)}"\nlink_user_scripts\n'
     )
     return subprocess.run(
         ["bash", "-c", script],
@@ -109,3 +114,37 @@ def test_a_link_to_a_clone_checkout_is_left_pointing_there_and_named(
     assert (bin_dir / _OFFERED).readlink() == clone_script
     assert f"warn: {_OFFERED} left alone" in done.stderr
     assert done.stdout.splitlines()[-1] == "0"
+
+
+@pytest.mark.parametrize("older_script_still_there", [True, False])
+def test_a_link_into_another_cached_version_follows_this_one(
+    older_script_still_there: bool, tmp_path: Path, plugin: Path, bin_dir: Path
+) -> None:
+    # The plugin's own link, left by the version installed before this one: the hand path is
+    # how such a link reaches the new version when no session refreshed it.
+    older = _cache_dir(tmp_path) / "0.1.0" / "scripts" / _OFFERED
+    older.parent.mkdir(parents=True)
+    if older_script_still_there:
+        older.write_text("#!/bin/sh\n")
+    (bin_dir / _OFFERED).symlink_to(older)
+
+    done = _link_scripts(tmp_path, plugin)
+
+    assert done.returncode == 0, done.stderr
+    assert (bin_dir / _OFFERED).readlink() == plugin / "scripts" / _OFFERED
+    assert "left alone" not in done.stderr
+    assert done.stdout.splitlines()[-1] == "1"
+
+
+def test_a_cached_link_under_another_name_is_not_taken_for_this_script(
+    tmp_path: Path, plugin: Path, bin_dir: Path
+) -> None:
+    other = _cache_dir(tmp_path) / "0.1.0" / "scripts" / "another-tool"
+    other.parent.mkdir(parents=True)
+    other.write_text("#!/bin/sh\n")
+    (bin_dir / _OFFERED).symlink_to(other)
+
+    done = _link_scripts(tmp_path, plugin)
+
+    assert (bin_dir / _OFFERED).readlink() == other
+    assert f"warn: {_OFFERED} left alone" in done.stderr

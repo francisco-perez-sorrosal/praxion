@@ -745,9 +745,11 @@ link_rules_and_count() {
 }
 
 # Links the user-facing scripts into ~/.local/bin and prints how many: standard output
-# carries the count alone, for run_fail_soft. A name that holds a regular file, or a link to
-# anything but the offered script, is the person's own: it is left as it is and named. Only a
-# free name is linked and a link already to the script is kept, so the count is what is linked.
+# carries the count alone, for run_fail_soft. A free name is linked, a link already to the
+# script is kept, and a link to the same script in another cached version of the plugin is the
+# plugin's own from before an update, so it follows this version. Anything else under the name
+# (a regular file, a link into a clone checkout or elsewhere) is the person's own: it is left
+# as it is and named. The count is what ends up linked to this version.
 link_user_scripts() {
     local scripts_src="${SCRIPT_DIR}/scripts"
     local bin_dir="${HOME}/.local/bin"
@@ -757,9 +759,16 @@ link_user_scripts() {
         script_is_user_facing "$script" || continue
         name="$(basename "$script")"
         entry="${bin_dir}/${name}"
-        if [ -L "$entry" ] && [ "$(readlink "$entry")" = "$script" ]; then
-            :
-        elif [ -e "$entry" ] || [ -L "$entry" ]; then
+        if [ -L "$entry" ]; then
+            case "$(readlink "$entry")" in
+                "$script") ;;
+                "${PLUGIN_CACHE_DIR}"/*/scripts/"${name}") ln -sf "$script" "$entry" ;;
+                *)
+                    warn "${name} left alone: ${entry} is not a link to this script" >&2
+                    continue
+                    ;;
+            esac
+        elif [ -e "$entry" ]; then
             warn "${name} left alone: ${entry} is not a link to this script" >&2
             continue
         else

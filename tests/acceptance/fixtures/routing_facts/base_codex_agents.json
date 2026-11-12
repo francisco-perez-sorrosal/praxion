@@ -1,7 +1,7 @@
 {
  "agents": {
   "agentic-transactions-architect": {
-   "instructions_digest": "76bbc053e49bf32a867d442d1519760f83b2a74478c9663b4f730d60b44ea972",
+   "instructions_digest": "a7efff2f9cc861f214d312a397dc382eb3d5ec191178cb9e3fa58598bb04a3ef",
    "model": "gpt-5.5",
    "model_reasoning_effort": "high"
   },
@@ -41,7 +41,7 @@
    "model_reasoning_effort": "medium"
   },
   "interface-designer": {
-   "instructions_digest": "f2a929ef095434e21d57c64aa59c99353359af3d7fcf623228155c796313b7c9",
+   "instructions_digest": "3a0d4a99fc50fb7781a5941abf9b25e0123e3bf047033bfd2e0603e3253db5a6",
    "model": "gpt-5.5",
    "model_reasoning_effort": "high"
   },
@@ -56,12 +56,12 @@
    "model_reasoning_effort": "medium"
   },
   "roadmap-cartographer": {
-   "instructions_digest": "1e48d2a6fda78d02c2c8548a4ccae8af8dee5af43fa4671a736e12b8b4dac470",
+   "instructions_digest": "403328eed7d4f6c375707aa3d4838fdd57649ee3d903cd1496b41e6cd7d3d48e",
    "model": "gpt-5.5",
    "model_reasoning_effort": "high"
   },
   "sentinel": {
-   "instructions_digest": "3f189d7c2ffef34b56eb7167b9edd79bee6a6c698574a8a67b9b4d1874c71760",
+   "instructions_digest": "3891b46cd28dadebcf79f1e4b4adeeb4961332a6095e4a53a5eabbff6961ffaa",
    "model": "gpt-5.4",
    "model_reasoning_effort": "medium"
   },

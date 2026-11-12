@@ -225,6 +225,19 @@ def test_a_log_unreadable_in_every_segment_skips_as_reader_unreachable(tmp_path:
     assert report["skipped"]["P09"]["detail"].startswith("unreadable:")
 
 
+def test_an_unlistable_state_directory_with_no_active_log_skips_as_reader_unreachable(
+    tmp_path: Path, chmod: Callable[[Path, int], None]
+) -> None:
+    state = _state(tmp_path)
+    _archive(state, 1, [_row()])
+    chmod(state, 0o100)  # enterable, not listable, and no active log to stat
+
+    report = _run(tmp_path)
+
+    assert {report["skipped"][c]["reason"] for c in clh.CHECK_IDS[:5]} == {clh.SKIP_UNREACHABLE}
+    assert str(state) in report["skipped"]["P09"]["detail"]
+
+
 def test_an_empty_log_skips_as_carrying_no_history(tmp_path: Path) -> None:
     _write(_state(tmp_path), [])
 

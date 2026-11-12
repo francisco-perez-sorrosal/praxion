@@ -322,6 +322,12 @@ def summarize(read: reader.RawSegmentRead) -> SegmentFacts:
 def log_skip(view: LogView) -> dict | None:
     """Why the log-reading checks cannot run, or `None` when they can."""
     if not view.listing.segments:
+        if view.listing.error is not None:
+            return {
+                "reason": SKIP_UNREACHABLE,
+                "path": str(view.active),
+                "detail": view.listing.error,
+            }
         return {"reason": SKIP_ABSENT, "path": str(view.active)}
     if all(f.error is not None for f in view.facts):
         return {"reason": SKIP_UNREACHABLE, "path": str(view.active), "detail": view.facts[0].error}

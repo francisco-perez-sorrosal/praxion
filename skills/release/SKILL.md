@@ -13,6 +13,7 @@ Cut a stable release. Praxion's release is a **manual CI workflow** (`.github/wo
 1. **Preconditions**:
    - Confirm the current branch is `main` (`git rev-parse --abbrev-ref HEAD`). If not, stop and report -- releases cut from `main`.
    - Confirm `origin/main` contains everything to be released: `git fetch origin` then `git rev-list --left-right --count main...origin/main`. The CI workflow checks out `origin/main`, so any local commits not yet pushed will be **excluded** from the release. If local `main` is ahead, push it first (`git push origin main`) before dispatching; surface this to the user.
+   - Read the push's CI run before dispatching (`gh run list --branch main --limit 3`; `gh run view <run-id>` on a failure). CI clones shallow, and a local suite runs with full history, so a shallow-clone failure is visible only there.
 2. **Check release staleness**: run `python3 scripts/check_release_staleness.py` and record its verdict in the report to the user. This diagnostic is advisory by design (it does not block the cut), but the release process is the one recurring decision point where "what artifacts are unreleased" is actionable -- reading its output here is how any document elsewhere that asserts an artifact has or hasn't shipped stays honest against what this release will actually publish.
 4. **Map `$ARGUMENTS` to the `increment` input**:
    - `$ARGUMENTS` empty -- `increment=auto` (Commitizen detects the bump type from conventional commits since the last tag)
@@ -21,6 +22,7 @@ Cut a stable release. Praxion's release is a **manual CI workflow** (`.github/wo
 6. **Watch to completion**: find the run (`gh run list --workflow=release.yml --limit 1`) and `gh run watch <run-id> --exit-status`. If it fails, report the failing step and stop.
 7. **Report results**: the new version + tag, and the GitHub release URL (`gh release view "v<version>" --json url,tagName,name`). Confirm the tag includes its own `CHANGELOG.md` entry.
 8. **Marketplace note**: if consumers install via the marketplace, remind the user the marketplace entry / cache may need refreshing (`claude plugin marketplace update`, then `claude plugin update praxion`) to serve the new version.
+   Also sync the local checkout: the workflow pushes a bump commit, so run `git fetch origin` then `git merge --ff-only origin/main` before the next local commit.
 
 ## Notes
 

@@ -124,6 +124,8 @@ Dispatch systems-architect with:
 Passing the absolute path is defense-in-depth: it prevents subagents from resolving
 the file against an unexpected working directory.
 
+When you start a rework session yourself (for instance `claude --bg` in the worktree), write "do not push" in its opening prompt: sessions have pushed their branches to origin unasked.
+
 ## --dry-run mode
 
 When `--dry-run` is passed, the skill performs all validation steps (auto-discovery,

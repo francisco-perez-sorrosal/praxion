@@ -106,6 +106,7 @@ mechanized claim about what the outgoing window knew).
      stop. Do not re-run with `--force` on your own initiative: the override records a
      non-quiescent tree into the artifact and is the user's call.
    - **Exit 2 or 3** — report per **Error grammar** below and stop.
+   - The composer measures the fork point against `origin/<default>`, so an unpushed local main makes the report's `base_sha` lag by those commits. Say so in the handoff, or push first when the user has allowed it.
 3. **Fill the judgement sections.** Open the written file and replace each
    `_[to fill at the checkpoint]_` placeholder that is still present:
    - **Next action** (`--session` only) — what the next window should do first, and why.

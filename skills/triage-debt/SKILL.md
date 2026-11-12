@@ -97,6 +97,10 @@ passing its batch ids, the run's `anchor`, and the instructions below. Each judg
 Judges never touch `.ai-state/TECH_DEBT_LEDGER.md` or `TECH_DEBT_RESOLVED.md`. Only §4 does,
 and only after the user confirms.
 
+Each judge's brief forbids running formatters and `pre-commit` in the checkout: a sweep judge that ran
+`pre-commit run --all-files` once rewrote about thirty files of the main checkout. When the fan-out
+returns, compare `git status --short` and `HEAD` with what they were before it, and stop on any difference.
+
 ### 3. Merge and confirm
 
 Read every `TRIAGE_PROPOSALS_<batch>.md` fragment and merge them into one pass over all rows.

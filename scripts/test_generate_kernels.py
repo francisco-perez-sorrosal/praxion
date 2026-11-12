@@ -471,6 +471,83 @@ def test_a_template_without_a_principles_section_is_refused() -> None:
         gk.principles_section({TEMPLATE: template})
 
 
+def test_the_principle_headings_are_the_templates_level_three_headings_in_order() -> None:
+    template = ks.split_sections(TEMPLATE, TEMPLATE_TEXT)
+
+    assert gk.principle_headings({TEMPLATE: template}) == ("Wisdom", "Craft")
+
+
+def test_a_template_without_a_principles_section_has_no_headings_to_read() -> None:
+    template = ks.split_sections(TEMPLATE, "## Template\n\nUser-level text.\n")
+
+    with pytest.raises(gk.KernelPlanError, match="no 'Principles' section"):
+        gk.principle_headings({TEMPLATE: template})
+
+
+@pytest.mark.parametrize(
+    ("count", "word"), [(1, "one"), (8, "eight"), (13, "thirteen"), (20, "twenty"), (21, "21")]
+)
+def test_the_pointer_states_its_count_as_a_number_word_and_as_digits_beyond_twenty(
+    count: int, word: str
+) -> None:
+    headings = [f"Principle {n}" for n in range(count)]
+
+    filled = gk.fill_principle_markers(f"The {gk.COUNT_MARKER} are {gk.NAMES_MARKER}.", headings)
+
+    assert filled.startswith(f"The {word} are Principle 0")
+
+
+@pytest.mark.parametrize(
+    ("headings", "joined"),
+    [
+        (["A"], "A"),
+        (["A", "B"], "A and B"),
+        (["A", "B", "C"], "A, B and C"),
+    ],
+)
+def test_the_pointer_lists_the_names_with_commas_and_a_closing_and(
+    headings: list[str], joined: str
+) -> None:
+    filled = gk.fill_principle_markers(
+        f"{gk.COUNT_MARKER} principles: {gk.NAMES_MARKER}.", headings
+    )
+
+    assert filled.endswith(f": {joined}.")
+
+
+@pytest.mark.parametrize(
+    ("text", "fragment"),
+    [
+        (f"Only {gk.NAMES_MARKER} here.", f"{gk.COUNT_MARKER} 0 times"),
+        (f"Only {gk.COUNT_MARKER} here.", f"{gk.NAMES_MARKER} 0 times"),
+        (f"{gk.COUNT_MARKER} {gk.COUNT_MARKER} {gk.NAMES_MARKER}", f"{gk.COUNT_MARKER} 2 times"),
+        (f"{gk.COUNT_MARKER} {gk.NAMES_MARKER} {gk.NAMES_MARKER}", f"{gk.NAMES_MARKER} 2 times"),
+        (f"{gk.COUNT_MARKER} {gk.NAMES_MARKER} @@PRINCIPLE_ORDER@@", "unfilled marker"),
+    ],
+)
+def test_a_pointer_whose_markers_are_missing_repeated_or_unfilled_is_refused(
+    text: str, fragment: str
+) -> None:
+    with pytest.raises(gk.KernelPlanError, match=fragment):
+        gk.fill_principle_markers(text, ["A", "B"])
+
+
+def test_a_template_with_no_principle_heading_names_nothing_and_is_refused() -> None:
+    with pytest.raises(gk.KernelPlanError, match="no principle headings"):
+        gk.fill_principle_markers(f"{gk.COUNT_MARKER} {gk.NAMES_MARKER}", [])
+
+
+def test_the_pointer_in_a_generated_kernel_names_the_templates_principles(repo: Path) -> None:
+    manifest = manifest_rows()
+    manifest["authored"].append(authored_row(gk.POINTER_TEXT))
+    write(repo, km.MANIFEST_PATH, yaml.safe_dump(manifest, sort_keys=False))
+    pointer = f"The {gk.COUNT_MARKER} principles are {gk.NAMES_MARKER}."
+    write(repo, f"claude/kernels/src/{gk.POINTER_TEXT}.md", pointer + "\n")
+    run(repo)
+
+    assert "The two principles are Wisdom and Craft." in kernel_texts(repo)["core.md"]
+
+
 def test_the_kernel_version_changes_when_a_kernel_byte_does(repo: Path) -> None:
     before = km.load_index(_generated(repo))
     write(repo, SHARED_RULE, SHARED_SOURCE_TEXT.replace("Shared text", "Shared words"))

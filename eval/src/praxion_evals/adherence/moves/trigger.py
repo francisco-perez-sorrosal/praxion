@@ -74,7 +74,7 @@ _AMEND_FLAG = "--amend"
 _COMMAND_SEPARATORS = frozenset({"&&", "||", ";", "|"})
 # How the harness words a hook's refusal in the tool result it stands in for.
 _GATE_REFUSAL = re.compile(
-    r"PreToolUse:\S+ hook error: \[[^\]]*\]:?\s*(?P<reason>.*?)\s*(?:\nThis hook comes from [^\n]*)?\Z",
+    r"PreToolUse:\S+ hook error: \[.*?\](?::|(?=\s*\Z))\s*(?P<reason>.*?)\s*(?:\nThis hook comes from [^\n]*)?\Z",
     re.DOTALL,
 )
 

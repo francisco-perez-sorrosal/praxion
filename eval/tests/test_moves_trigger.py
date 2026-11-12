@@ -329,6 +329,22 @@ def test_a_gate_refusal_carrying_the_governing_text_arrives_by_the_gate_channel(
     assert timing_of(t, "gate_refusal") == "before execution"
 
 
+def test_a_gate_refusal_from_a_hook_command_holding_a_bracket_keeps_its_whole_reason(git):
+    reason = "PreToolUse:Bash hook error: [[ -f gate ]] && hooks/gate.sh]: the subject is too long"
+
+    t = trigger_of(git, COMMIT_FORM, START, shell("t1", CHAINED), ToolResult("t1", reason))
+
+    assert t.refusals == ("the subject is too long",)
+
+
+def test_a_gate_refusal_that_gives_no_reason_is_still_a_refusal(git):
+    bare = "PreToolUse:Bash hook error: [hooks/gate.sh]"
+
+    t = trigger_of(git, COMMIT_FORM, START, shell("t1", CHAINED), ToolResult("t1", bare))
+
+    assert t.refusals == (bare,)
+
+
 # -- The results file's words, from a record on disk ------------------------------------------
 
 

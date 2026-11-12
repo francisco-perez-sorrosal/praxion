@@ -10,6 +10,7 @@ are the hook's own test module's, as in the other install suites.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -19,6 +20,8 @@ from test_auto_complete_install import (
     _NEW_TEMPLATE,
     _PREVIOUS_TEMPLATE,
     _TODAYS,
+    HOOKS_DIR,
+    REPO_ROOT,
     _cached_version,
     _fill,
     _link_instructions,
@@ -63,6 +66,63 @@ def installed(plugin_root):
     """The installed version's root, its template ready."""
     _seed_template(plugin_root, _NEW_TEMPLATE)
     return plugin_root
+
+
+_READ_THEN_WRITE = """
+import sys
+from pathlib import Path
+import _install_update as update
+
+home, root, version_dir, render = (Path(arg) for arg in sys.argv[1:])
+readback = update.read_back(update.CachedRender(str(version_dir), str(render)), root)
+update.write_instructions(home, root, dict(readback.values))
+"""
+# A locale whose text encoding is ASCII, for a child process: no coercion to UTF-8 either.
+_ASCII_LOCALE = {"LC_ALL": "C", "PYTHONCOERCECLOCALE": "0", "PYTHONUTF8": "0"}
+_ACCENTED_TEMPLATE = (
+    "# Instructions caf\u00e9\nuser: {{USERNAME}}\nmail: {{EMAIL}}\nweb: {{GITHUB_URL}}\n"
+)
+
+
+class TestTemplatesAreReadAsUtf8:
+    """Reading a render back and rewriting it, in a process whose locale encoding is ASCII.
+
+    Kills the mutants that read a template or a render with the locale's encoding.
+    The mutation sensor still lists them: it runs a mutant only against the tests that
+    reached it in its own process, and this test reaches it in a child.
+    The mutants that respell the codec as `UTF-8` survive by design: Python
+    normalises the name, so the two spellings are one codec and no input tells them
+    apart. A mutant that gives `write_instructions` a different base directory for
+    the link's text survives for a reason of the same kind: the base can only change
+    the answer when the home directory itself lies inside a plugin cache version
+    directory, which no install has; and one that resolves the link for every state
+    alone changes the slot only for a link outside the cache, which the callers
+    never reach this writer with.
+    """
+
+    def test_an_accented_template_and_render_are_read_whatever_the_locale(
+        self, fake_home, installed, tmp_path
+    ):
+        _seed_template(installed, _ACCENTED_TEMPLATE)
+        previous = _previous_render(fake_home, _ACCENTED_TEMPLATE)
+        _link_instructions(fake_home, previous)
+
+        result = subprocess.run(
+            [sys.executable, "-c", _READ_THEN_WRITE, str(fake_home), str(installed)]
+            + [str(previous.parents[2]), str(previous)],
+            env={
+                **os.environ,
+                **_ASCII_LOCALE,
+                "PYTHONPATH": os.pathsep.join([str(HOOKS_DIR), str(REPO_ROOT / "scripts")]),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+        rewritten = installed / "claude" / "config" / "CLAUDE.md"
+        assert "caf\u00e9" in rewritten.read_text(encoding="utf-8")
 
 
 class TestReadBack:

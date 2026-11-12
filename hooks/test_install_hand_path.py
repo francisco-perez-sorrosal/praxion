@@ -115,6 +115,57 @@ def _ruin(render: Path) -> None:
     render.write_text(render.read_text(encoding="utf-8") + "A line added by hand.\n", "utf-8")
 
 
+# -- What each plan says, asked of the step that carries it out -------------------------------------
+
+
+class TestCarryOut:
+    """`_carry_out` over string streams and a `tmp_path` home: the words it offers and where it stopped."""
+
+    def _carry_out(self, plan, answers, home, root, earlier=None):
+        err = io.StringIO()
+        outcome = hand_path._carry_out(plan, earlier, home, str(root), io.StringIO(answers), err)
+        return outcome, err.getvalue()
+
+    def test_the_carry_forward_offer_names_the_version_and_that_the_values_are_kept(
+        self, fake_home, installed
+    ):
+        plan = refresh.CarryForward(_CARRIED, frozenset())
+
+        _, said = self._carry_out(plan, "2\n", fake_home, installed, earlier="9.9.8")
+
+        assert (
+            f"{INSTRUCTIONS} was rendered from version 9.9.8; this renders it again "
+            "from this version's template, keeping your values."
+        ) in said
+
+    def test_declining_the_carry_forward_offer_is_skipped_at_the_offer(self, fake_home, installed):
+        plan = refresh.CarryForward(_CARRIED, frozenset())
+
+        outcome, _ = self._carry_out(plan, "2\n", fake_home, installed, earlier="9.9.8")
+
+        assert outcome == refresh.Skipped(refresh.SkipPoint.OFFER)
+
+    def test_declining_the_offer_to_ask_for_values_is_skipped_at_the_offer(
+        self, fake_home, installed
+    ):
+        plan = refresh.AskForValues(refresh.AskReason.MISSING)
+
+        outcome, _ = self._carry_out(plan, "2\n", fake_home, installed)
+
+        assert outcome == refresh.Skipped(refresh.SkipPoint.OFFER)
+
+    def test_declining_the_confirmation_is_skipped_at_the_confirmation(self, fake_home, installed):
+        plan = refresh.AskForValues(refresh.AskReason.MISSING)
+
+        outcome, _ = self._carry_out(plan, "1\n\n\n\nn\n", fake_home, installed)
+
+        assert outcome == refresh.Skipped(refresh.SkipPoint.CONFIRM)
+
+    def test_a_plan_of_no_known_kind_is_refused_and_named(self, fake_home, installed):
+        with pytest.raises(AssertionError, match="not a plan"):
+            self._carry_out("not a plan", "", fake_home, installed)
+
+
 # -- A readable earlier render: carried forward ---------------------------------------------------
 
 

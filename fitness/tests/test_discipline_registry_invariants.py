@@ -309,6 +309,9 @@ def _split_into_table_blocks(markdown_text: str) -> list[list[str]]:
 # A raw, *unescaped* pipe still splits, which is exactly what the row-shape
 # canaries below supply and rely on.
 _UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+# The row's own outer delimiters: one leading pipe, one trailing pipe that is not
+# itself an escaped cell character. `str.strip("|")` cannot tell the two apart.
+_OUTER_DELIMITERS_RE = re.compile(r"^\||(?<!\\)\|$")
 
 
 def _split_escaped_row(line: str) -> list[str]:
@@ -320,7 +323,7 @@ def _split_escaped_row(line: str) -> list[str]:
     document the escape. The discipline registry documents no such convention
     and is parsed unchanged.
     """
-    cells = _UNESCAPED_PIPE_RE.split(line.strip().strip("|"))
+    cells = _UNESCAPED_PIPE_RE.split(_OUTER_DELIMITERS_RE.sub("", line.strip()))
     return [cell.strip().replace("\\|", "|") for cell in cells]
 
 
@@ -894,6 +897,13 @@ def test_accepts_a_ledger_row_whose_escaped_pipe_stays_inside_one_cell() -> None
         f"the escape must be unescaped to a literal pipe in the cell value; got: {claim!r}"
     )
     assert not check_ledger_row_has_eleven_columns(rows)
+
+
+def test_split_keeps_an_escaped_pipe_that_ends_the_last_cell() -> None:
+    r"""A cell whose content ends in `\|` directly before the row's closing
+    delimiter keeps its literal pipe: only the unescaped closing delimiter is
+    dropped, not every trailing pipe character."""
+    assert _split_escaped_row(r"| a | b\||") == ["a", "b|"]
 
 
 def test_accepts_ledger_row_with_exactly_eleven_columns() -> None:

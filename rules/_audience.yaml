@@ -69,7 +69,7 @@ authored:
     path: claude/kernels/src/ledger-writer.md
     module: ledger-writer
     condenses: "rules/swe/agent-intermediate-documents.md#`TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair {#tech_debt_ledger-summary}"
-    pinned_sha: "e087d6f2bec7db6555b7c54aedddbfc3f56574ae"
+    pinned_sha: "d4e8b95ae91093604567e03a819c9403c7a2f2ab"
   - id: ledger-writer-verifier-overlay
     path: claude/kernels/src/ledger-writer-verifier-overlay.md
     module: local-verifier
@@ -237,7 +237,7 @@ entries:
     scope: role
     form: condensed
     text: ledger-writer
-    pin: "e087d6f2bec7db6555b7c54aedddbfc3f56574ae"
+    pin: "d4e8b95ae91093604567e03a819c9403c7a2f2ab"
     groups: [ledger-writer]
   - source: rules/swe/agent-intermediate-documents.md
     heading: "Document Lifecycle"

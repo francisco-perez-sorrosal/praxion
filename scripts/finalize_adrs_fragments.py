@@ -26,10 +26,26 @@ FRAGMENT_ADR_PATTERN = re.compile(r"^(?P<ts>\d{8}-\d{4})-(?P<rest>[a-z0-9-]+)\.m
 # Optional `branch:` field in fragment frontmatter — when present, the value
 # is the authoritative branch name written by the creating agent, immune to
 # the single-fragment hyphenated-branch ambiguity the filename heuristic
-# stumbles on (td-017). The value matches the same `[a-z0-9-]+` sanitize
-# alphabet used to build the filename's branch slug.
-FRONTMATTER_BRANCH_PATTERN = re.compile(r"""^branch:\s*["']?([a-z0-9-]+)["']?\s*$""", re.MULTILINE)
+# stumbles on (td-017). The protocol asks for the sanitized slug, but authors
+# also write the branch as git prints it (`feat/x`), so the value is captured
+# as written and `read_draft_branch` sanitizes it the way the filename was.
+FRONTMATTER_BRANCH_PATTERN = re.compile(
+    r"""^branch:[ \t]*["']?([^"'\n]+?)["']?[ \t]*$""", re.MULTILINE
+)
 TIMESTAMP_FORMAT = "%Y%m%d-%H%M"
+SLUG_MAX_LENGTH = 40
+
+
+def sanitize_slug(raw: str, max_len: int = SLUG_MAX_LENGTH) -> str:
+    """Lowercase, strip to [a-z0-9-], collapse runs, cap length.
+
+    The one transformation behind every `<user>`, `<branch>` and `<slug>`
+    segment of a fragment filename, so a value read back from frontmatter or
+    from git is comparable with what the author encoded.
+    """
+    lowered = raw.lower()
+    kept = re.sub(r"[^a-z0-9-]+", "-", lowered).strip("-")
+    return kept[:max_len]
 
 
 def parse_fragment_filename(
@@ -112,12 +128,14 @@ def parse_fragment_filename(
 
 
 def read_draft_branch(path: Path) -> str | None:
-    """Return the optional `branch:` value from a fragment's frontmatter.
+    """Return the fragment's frontmatter `branch:` value as a filename slug.
 
-    Returns None if the field is absent (older fragments predating td-017),
-    if the file is unreadable, or if the value does not match the sanitize
-    alphabet. The fall-through to filename-heuristic parsing preserves the
-    pre-td-017 behavior for those cases.
+    The value is sanitized the way the filename's branch segment was, so a
+    branch written as git prints it (`feat/x`) reads as `feat-x`. Returns None
+    if the field is absent (older fragments predating td-017), if the file is
+    unreadable, or if nothing of the value survives sanitizing. The
+    fall-through to filename-heuristic parsing preserves the pre-td-017
+    behavior for those cases.
     """
     try:
         content = path.read_text(encoding="utf-8")
@@ -126,7 +144,7 @@ def read_draft_branch(path: Path) -> str | None:
     match = FRONTMATTER_BRANCH_PATTERN.search(content)
     if match is None:
         return None
-    return match.group(1)
+    return sanitize_slug(match.group(1)) or None
 
 
 def _split_user_branch_slug(

@@ -18,8 +18,8 @@ A document that both relays an external coefficient *and* runs its own analysis 
 |------|---------|
 | `SKILL.md` | Core methodology: the content boundary, appraisal sequence, claim-vs-warrant discipline, and the objection checklist |
 | `references/source-strength-and-transfer.md` | Source-strength hierarchy and why it is not a simple ladder; study design versus claim strength; external validity and transfer into a setting whose assumptions differ |
-| `references/claim-provenance.md` | Citation drift, preprint versus peer-reviewed weighting, replication status, vendor and benchmark provenance |
-| `references/writing-warranted-claims.md` | The warrant template, worked before/after examples, the dossier-entry shape, and what to do when a claim cannot be warranted at all |
+| `references/claim-provenance.md` | Citation drift, popular framing that adds claims a source never made, preprint versus peer-reviewed weighting, replication status, vendor and benchmark provenance |
+| `references/writing-warranted-claims.md` | The warrant template, worked before/after examples, the dossier-entry shape, what to do when a claim cannot be warranted at all, and the section that holds overstated, unverified and contested claims |
 
 ## When it fires
 

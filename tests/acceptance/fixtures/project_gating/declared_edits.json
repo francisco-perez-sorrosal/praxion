@@ -13,6 +13,6 @@
   },
   {
     "before": "",
-    "after": "A small defect found during a task is fixed in its own commit after the feature, not filed; file a row only for debt that is not small or could not be fixed this session (bar and flow: `tech-debt-ledger.md`)."
+    "after": "During a task, a small defect is fixed in its own commit after the feature, not filed, and a row is filed only for debt that is not small or could not be fixed this session (bar and flow: `tech-debt-ledger.md`)."
   }
 ]

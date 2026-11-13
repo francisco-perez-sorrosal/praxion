@@ -109,6 +109,96 @@ def test_active_wip_unchecked_step_blocks(tmp_path: Path) -> None:
     assert "active-pipeline" in _codes(verdict)
 
 
+TIDY_IMPORT = "tidy an import"
+STALE_HELPER = "rename the stale helper"
+DEAD_BRANCH = "delete the dead branch"
+ALL_FINAL_RECORD = (
+    "# Follow-ups\n"
+    f"- [fixed 4f3c2a1] {TIDY_IMPORT}\n"
+    f"- [ledgered td-987] {STALE_HELPER}\n"
+    f"- [dropped not worth it] {DEAD_BRANCH}\n"
+)
+
+
+def _follow_up_reason(verdict: Any) -> Any:
+    return next(r for r in verdict.reasons if r.code == "open-follow-ups")
+
+
+def test_one_open_follow_up_among_final_items_blocks(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    record = ALL_FINAL_RECORD + f"- [open] {STALE_HELPER}\n"
+    _make_task(ai_work, "owes-debt", {"FOLLOW_UPS.md": record})
+    verdict = _classify(ai_work, "owes-debt")
+    assert verdict.classification == "BLOCK"
+    reason = _follow_up_reason(verdict)
+    assert (reason.blocker, reason.severity) == ("FOLLOW_UPS.md", "block")
+
+
+def test_all_final_follow_ups_add_no_reason(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "settled", {"FOLLOW_UPS.md": ALL_FINAL_RECORD})
+    verdict = _classify(ai_work, "settled")
+    assert verdict.classification == "SAFE"
+    assert verdict.reasons == []
+
+
+def test_directory_without_a_follow_up_record_is_classified_as_before(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "no-record", {"LEARNINGS.md": "# Learnings\n"})
+    verdict = _classify(ai_work, "no-record")
+    assert verdict.classification == "WARN"
+    assert _codes(verdict) == {"unmerged-learnings"}
+
+
+def test_open_follow_up_beside_unchecked_wip_adds_its_own_reason(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(
+        ai_work,
+        "both",
+        {"WIP.md": "# WIP\n- [ ] Wire consumer\n", "FOLLOW_UPS.md": f"- [open] {STALE_HELPER}\n"},
+    )
+    verdict = _classify(ai_work, "both")
+    assert verdict.classification == "BLOCK"
+    assert _codes(verdict) == {"active-pipeline", "open-follow-ups"}
+
+
+def test_unreadable_follow_up_line_counts_as_open_and_is_shown_raw(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    damaged = f"- [fixed] {STALE_HELPER}"
+    _make_task(ai_work, "damaged", {"FOLLOW_UPS.md": f"{ALL_FINAL_RECORD}  {damaged}  \n"})
+    verdict = _classify(ai_work, "damaged")
+    assert verdict.classification == "BLOCK"
+    assert damaged in _follow_up_reason(verdict).remedy
+
+
+def test_follow_up_reason_message_counts_and_describes_each_open_item(tmp_path: Path) -> None:
+    ai_work = tmp_path / ".ai-work"
+    record = f"- [open] {STALE_HELPER}\n- [fixed 4f3c2a1] {TIDY_IMPORT}\n- [open] {DEAD_BRANCH}\n"
+    _make_task(ai_work, "two-open", {"FOLLOW_UPS.md": record})
+    reason = _follow_up_reason(_classify(ai_work, "two-open"))
+    assert reason.remedy == (
+        f"FOLLOW_UPS.md has 2 open follow-up(s): {STALE_HELPER}; {DEAD_BRANCH}. "
+        "Fix or ledger each, or pass --force"
+    )
+
+
+def test_open_follow_up_shows_in_text_and_json_verdicts_and_exits_one(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "owes-debt", {"FOLLOW_UPS.md": f"- [open] {STALE_HELPER}\n"})
+    with pytest.raises(SystemExit) as text_exit:
+        cws.main(["--ai-work-root", str(ai_work)])
+    assert text_exit.value.code == 1
+    assert "open-follow-ups: FOLLOW_UPS.md — FOLLOW_UPS.md has 1 open follow-up(s)" in (
+        capsys.readouterr().out
+    )
+    with pytest.raises(SystemExit):
+        cws.main(["--ai-work-root", str(ai_work), "--json"])
+    [task] = json.loads(capsys.readouterr().out)["task_dirs"]
+    assert [r["code"] for r in task["reasons"]] == ["open-follow-ups"]
+
+
 def test_block_exit_code_is_nonzero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     ai_work = tmp_path / ".ai-work"
     _make_task(ai_work, "blocked", {"REWORK_MANIFEST.md": "x\n"})
@@ -520,14 +610,14 @@ def test_wip_severity_changes_when_policy_overridden(
 #
 # Two directory shapes are needed because SYSTEMS_PLAN.md uses an elif branch:
 # when traceability.yml is present, the spec reason is suppressed (traceability wins).
-# Shape 1 covers the 7 non-SYSTEMS_PLAN artifacts; Shape 2 covers SYSTEMS_PLAN via
+# Shape 1 covers the 8 non-SYSTEMS_PLAN artifacts; Shape 2 covers SYSTEMS_PLAN via
 # the spec branch (no traceability.yml present).
 
 
 def test_detected_blockers_equal_registry_non_delete_artifacts(tmp_path: Path) -> None:
     import artifact_registry
 
-    # Shape 1 (traceability branch): 7 files, each triggering one reason.
+    # Shape 1 (traceability branch): 8 files, each triggering one reason.
     ai_work = tmp_path / ".ai-work"
     _make_task(
         ai_work,
@@ -540,6 +630,7 @@ def test_detected_blockers_equal_registry_non_delete_artifacts(tmp_path: Path) -
             "traceability.yml": "requirements: {}\n",
             "RECOVERY_LOG.md": "auto-marked step 1\n",
             "PRE_REFACTOR_PLAN.md": "## Goal\nrefactor\n",
+            "FOLLOW_UPS.md": f"- [open] {STALE_HELPER}\n",
         },
     )
 

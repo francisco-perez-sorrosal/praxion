@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-12T02:02:55Z'
+generated_at: '2026-11-13T08:23:34Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -49,13 +49,13 @@ surfaces:
   path: AGENTS.md
   type: markdown
   title: Development Guidelines for Codex
-  last_modified: '2026-10-31'
+  last_modified: '2026-11-12'
   renderer: default_markdown
 - id: changelog
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-12'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-12'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -521,7 +521,7 @@ surfaces:
   path: docs/lean-spawn-kernels.md
   type: markdown
   title: 'Lean spawn: role kernels and the adoption ledger'
-  last_modified: '2026-11-07'
+  last_modified: '2026-11-12'
   diataxis: explanation
   audience: developer
   renderer: explanation_shell
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-12'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-12'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -676,13 +676,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-12'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-12'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3759,6 +3759,18 @@ surfaces:
   title: The step loop's iteration budget counts a marked step's whole review cycle
   last_modified: '2026-11-11'
   renderer: adr_card
+- id: ai-state-decisions-510-generated-principle-names-and-prior-art-module
+  path: .ai-state/decisions/510-generated-principle-names-and-prior-art-module.md
+  type: markdown
+  title: Kernel principle names come from the template; a prior-art module delivers the new principle
+  last_modified: '2026-11-13'
+  renderer: adr_card
+- id: ai-state-decisions-511-small-debt-follow-up-record
+  path: .ai-state/decisions/511-small-debt-follow-up-record.md
+  type: markdown
+  title: Small debt is fixed after the feature through a follow-up record the cleanup gate blocks on
+  last_modified: '2026-11-13'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4116,6 +4128,12 @@ surfaces:
   type: markdown
   title: 'Spec: P3.1 -- Intentional Compaction (Phase-Boundary Handoff with Continuity Guarantees + a Compaction Safety Net)'
   last_modified: '2026-09-19'
+  renderer: default_markdown
+- id: ai-state-specs-spec-process-principles-2026-11-12
+  path: .ai-state/specs/SPEC_process-principles_2026-11-12.md
+  type: markdown
+  title: 'Spec: process-principles (a ninth principle, and small debt fixed after the feature instead of filed)'
+  last_modified: '2026-11-12'
   renderer: default_markdown
 - id: ai-state-specs-spec-production-gate-cohort-2026-06-26
   path: .ai-state/specs/SPEC_production-gate-cohort_2026-06-26.md
@@ -4746,6 +4764,8 @@ groups:
   - ai-state-decisions-507-two-render-slots-and-readers-follow-the-link
   - ai-state-decisions-508-held-roles-close-as-final
   - ai-state-decisions-509-loop-budget-counts-the-review-cycle
+  - ai-state-decisions-510-generated-principle-names-and-prior-art-module
+  - ai-state-decisions-511-small-debt-follow-up-record
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4805,6 +4825,7 @@ groups:
   - ai-state-specs-spec-multidisciplinary-identities-2026-07-30
   - ai-state-specs-spec-p5-issue-autofix-2026-07-24
   - ai-state-specs-spec-process-economy-p3-1-2026-09-18
+  - ai-state-specs-spec-process-principles-2026-11-12
   - ai-state-specs-spec-production-gate-cohort-2026-06-26
   - ai-state-specs-spec-project-gating-2026-11-06
   - ai-state-specs-spec-project-metrics-2026-04-23

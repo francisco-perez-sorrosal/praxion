@@ -1,7 +1,8 @@
 ---
-id: dec-draft-66ca6b02
+id: dec-511
+draft_id: dec-draft-66ca6b02
 title: "Small debt is fixed after the feature through a follow-up record the cleanup gate blocks on"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-12
 summary: "Debt found during a task that meets a seven-condition small bar goes to a per-task FOLLOW_UPS.md record (open, fixed <sha>, ledgered td-NNN, dropped <reason>) parsed by one grammar module; the orchestrator closes each item after the feature, and the cleanup gate BLOCKs while any item is open."

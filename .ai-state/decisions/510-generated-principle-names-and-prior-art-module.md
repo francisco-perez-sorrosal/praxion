@@ -1,7 +1,8 @@
 ---
-id: dec-draft-d170480e
+id: dec-510
+draft_id: dec-draft-d170480e
 title: "Kernel principle names come from the template; a prior-art module delivers the new principle"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-12
 summary: "The kernels' principles pointer takes its count and names from the philosophy template's headings through the generator, and a new principles-prior-art kernel module delivers the principle Standing on the Shoulders of Giants to the promethean, the systems architect and the researcher."

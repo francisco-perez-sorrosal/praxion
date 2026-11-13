@@ -23,8 +23,8 @@
 
 **Pipeline branch**: `feat/process-principles`
 **ADRs (promoted at merge)**: both are drafts today and take their `dec-NNN` ids at the merge:
-- `dec-draft-d170480e` (architectural): the kernels' principles pointer takes its count and names from the template's headings through the generator, and a prior-art kernel module delivers the new principle to the three choosing roles;
-- `dec-draft-66ca6b02` (architectural): small debt goes to a per-task follow-up record the cleanup gate blocks on, and the orchestrator closes it after the feature.
+- `dec-510` (architectural): the kernels' principles pointer takes its count and names from the template's headings through the generator, and a prior-art kernel module delivers the new principle to the three choosing roles;
+- `dec-511` (architectural): small debt goes to a per-task follow-up record the cleanup gate blocks on, and the orchestrator closes it after the feature.
 
 **Related specs**: `SPEC_audience-split_2026-11-09.md` (the kernel modules and the spawn split this change adds a module to), and `SPEC_apply-rule-moves_2026-10-31.md`, `SPEC_model-routing-move_2026-11-01.md`, `SPEC_routing-facts_2026-11-02.md`, `SPEC_project-gating_2026-11-06.md` (the earlier pipelines whose frozen guards were re-pinned here).
 
@@ -97,11 +97,11 @@ Health readings:
 
 ## Key Decisions
 
-- **A new kernel module for exactly the three roles, and a generator-derived pointer** (`dec-draft-d170480e`).
+- **A new kernel module for exactly the three roles, and a generator-derived pointer** (`dec-510`).
   - Delivery: a module whose audience equals the entry's own is the manifest's rule, following the `adr-reader` precedent. Widening `principles-digest` would have sent five unrequested principles to the researcher (about 1,300 tokens per spawn); putting the principle in `core` would push the cartographer's string past the cap, to about 10,200.
   - Names: markers in the authored pointer text, filled by the generator. The existing freshness check and manifest invariant I8 then guard against drift with no new invariant. A derived pointer file, or a hand list plus a comparison test, were rejected (the second still needs a hand edit per principle).
   - Cost: one more module file, and the researcher is left about 990 characters below the cap, recorded as a constraint in `.ai-state/DESIGN.md`.
-- **Small debt through a per-task record with a closed state set** (`dec-draft-66ca6b02`).
+- **Small debt through a per-task record with a closed state set** (`dec-511`).
   - One parser (`scripts/_follow_ups.py`), the existing cleanup gate reused, the registry policy `block-if-active`. A section in `LEARNINGS.md` (no closed states) and a new ledger status (persistent, and filling the ledger is what the rule stops) were rejected.
   - An unreadable or misshapen line counts as open, the safe direction. The gate does not check that a `fixed` sha is a real commit or that a `ledgered` row exists; the verifier judges that.
   - Only the orchestrator writes the three final states. This is writer discipline in the ledger reference, not checked mechanically.

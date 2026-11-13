@@ -199,6 +199,25 @@ def test_open_follow_up_shows_in_text_and_json_verdicts_and_exits_one(
     assert [r["code"] for r in task["reasons"]] == ["open-follow-ups"]
 
 
+@pytest.mark.parametrize(
+    ("policy", "classification"),
+    [("block-if-active", "BLOCK"), ("consume-marker", "WARN"), ("delete", "SAFE")],
+)
+def test_open_follow_up_severity_follows_the_registry_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, policy: str, classification: str
+) -> None:
+    ai_work = tmp_path / ".ai-work"
+    _make_task(ai_work, "owes-debt", {"FOLLOW_UPS.md": f"- [open] {STALE_HELPER}\n"})
+    registry_policy = cws.cleanup_policy_for
+    monkeypatch.setattr(
+        cws,
+        "cleanup_policy_for",
+        lambda name: policy if name == "FOLLOW_UPS.md" else registry_policy(name),
+    )
+
+    assert _classify(ai_work, "owes-debt").classification == classification
+
+
 def test_block_exit_code_is_nonzero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     ai_work = tmp_path / ".ai-work"
     _make_task(ai_work, "blocked", {"REWORK_MANIFEST.md": "x\n"})

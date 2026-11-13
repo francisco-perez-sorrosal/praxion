@@ -116,7 +116,7 @@ Health readings:
 - **Verification:**
   - The final verdict is PASS WITH FINDINGS: all 12 requirements and all 3 footprint criteria are met, with REQ-07 graded WARN (meaning kept by inference, plus text residue). Counts: 36 PASS, 15 WARN, 0 FAIL. The calibration verdict reads `correct`.
   - Dispositions of the 15 WARN: REQ-07's unscoped clause became td-645 and is resolved by `3979aeab`, which scoped the sentence to a task. The verifier-text residue, the ledger reference's numbering and overlay trigger, the missing transcription instruction, the cleanup check's hand-built list, its missing severity test, the oversized test file and the two architecture-guide gaps were fixed in the follow-up pass. The parser's other bullet shapes and the unreadable record became td-649. The mutation survivors became td-646. The one advisory finding left unfiled is the test-results block shapes in `TEST_RESULTS.md`, an ephemeral artifact deleted with `.ai-work/`.
-  - The record was closed by the follow-up pass: 14 items, 9 `fixed`, 4 `ledgered` (td-353 an existing row, td-648, and td-649 for two items), 1 `dropped` (already fixed on the default branch by `3aa7ac84`; the duplicate fix `e7eedc74` was reverted in `4418740c`).
+  - The record was closed by the follow-up pass: 14 items, 9 `fixed`, 4 `ledgered` (td-353 an existing row, td-648, and td-649 for two items), 1 `dropped` (already fixed on the default branch by `3aa7ac84`; the duplicate fix `e7eedc74` was reverted in `4418740c`). A fifteenth item, the answered UQ-01 below, was fixed after the pass (`02f88924`).
 - **Out of scope, filed (open at archival):**
   - td-646: mutation survivors in the cleanup check's world-read functions (232 of 705 mutants over about 20 functions).
   - td-647: the Codex principles mirror is a hand copy of the template; generating it is the root fix.
@@ -125,7 +125,7 @@ Health readings:
   - td-650: nothing in the step loop's driver carries an implementer's `Follow-ups:` line into the record; the reference now tells the orchestrator to copy it.
   - td-353: an existing row, open since 2026-10-08, that one follow-up item pointed at; not edited here.
 - **For the user, not ruled here:**
-  - UQ-01: the researcher's copy of the principle opens "With the representation chosen" with no antecedent, since its kernel carries the principle without Data Structures First. The decided text was kept verbatim.
+  - UQ-01, answered by the user on 2026-11-12 (fix it so it makes sense everywhere): the researcher's copy of the principle opened "With the representation chosen" with no antecedent, since its kernel carries the principle without Data Structures First. The opening now names its antecedent in the sentence, "Once a building block's data structures are chosen, the next choices of *how*", changed at the source so the philosophy, the three kernels and the Codex copy carry one text (`02f88924`; the frozen guards it moved are re-pinned in `cd6ed5ce`).
   - The widening of the verifier's bar (SQ-04) and the relink that moves the installed always-loaded reading (SQ-02).
   - A paid reading of the spawn-startup tokens of the three roles, offered with the release.
   - The CI-equivalent run on a trial merge with `main`, which the pipeline's pre-mortem placed before the merge is asked for.

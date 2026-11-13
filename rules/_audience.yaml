@@ -13,6 +13,9 @@
 # form: verbatim (the source bytes) or condensed (an authored text under
 # claude/kernels/src/, pinned to the source it stands for, so a changed source forces
 # a review of the text). No section is removed from its source by being classified.
+# A section delivered verbatim to a role must read standing alone: the role receives
+# it without its neighbours, so a sentence that leans on the section before it ("with
+# that chosen") has no antecedent there. Name the antecedent in the sentence itself.
 #
 # The wire shape is read in one place, scripts/kernel_model.py; scripts/check_kernel_manifest.py
 # holds the manifest to the sources. Regenerate the kernels with scripts/generate_kernels.py.

@@ -107,7 +107,7 @@ A debt is **small** only when all seven conditions hold:
 - [dropped <reason>] <description>
 ```
 
-An unreadable line, or a final state with a missing or misshapen argument, counts as open. The verifier and the orchestrator append `open` lines; only the orchestrator writes a final state. The implementer never writes the record: it reports small out-of-scope debt on its `Follow-ups:` line.
+An unreadable line, or a final state with a missing or misshapen argument, counts as open. The verifier and the orchestrator append `open` lines; only the orchestrator writes a final state. The implementer never writes the record: it reports small out-of-scope debt on its `Follow-ups:` line, and the orchestrator copies each item of that line into the record as an `open` line when it takes the step's return.
 
 **Direct and Lightweight tiers.** With no task directory, the session's task list holds the follow-ups. The same flow runs before the session closes, and the closing digest names each outcome.
 

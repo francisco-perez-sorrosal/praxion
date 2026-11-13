@@ -50,7 +50,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from _follow_ups import is_open, parse_record
+from _follow_ups import open_items
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _script_cli import configure_logging
 from artifact_registry import cleanup_policy_for
@@ -154,7 +154,7 @@ def _open_follow_up_reason(task_dir: Path) -> Reason | None:
     severity = _severity_for(FOLLOW_UPS_FILE)
     if severity not in ("block", "warn"):
         return None
-    owed = [item.description for item in parse_record(_read(record)) if is_open(item)]
+    owed = [item.description for item in open_items(_read(record))]
     if not owed:
         return None
     return Reason(

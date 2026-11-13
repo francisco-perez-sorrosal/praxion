@@ -12,7 +12,7 @@ Back-link: [`../SKILL.md`](../SKILL.md) · Index entry in [`../../../rules/swe/a
 
 - **verifier** — appends per-change findings (dead-code survivors, bloat, duplication, size/nesting breaches) during Phase 5/5.5
 - **sentinel** — appends repo-wide findings via its TD dimension (hotspots, cyclic SCCs, coverage-floor breaches, p95 complexity crossings); TD05 audits the ledger but never writes
-- **orchestrator** — the main agent appends rows under explicit user direction when a grounded finding fits neither verifier's per-change nor sentinel's periodic-audit scope, or when a standalone Direct-tier fix surfaces adjacent debt (the Stay-Surgical redirect: record the finding, don't expand the fix to address it). Exception, not routine; verifier/sentinel may re-source orchestrator rows on later runs
+- **orchestrator** — the main agent appends rows under explicit user direction when a grounded finding fits neither verifier's per-change nor sentinel's periodic-audit scope, or when a standalone Direct-tier fix surfaces adjacent debt that is not small (the Stay-Surgical redirect: record the finding, don't expand the fix to address it). Exception, not routine; verifier/sentinel may re-source orchestrator rows on later runs
 - **architect-validator** — appends per-PR drift findings (`class: drift`, `goal-ref-type: architecture`, `owner-role: systems-architect`) in `--mode=pre-merge` or `--mode=on-demand`. Reserved for code↔DSL↔ADR triangle validation
 
 Consumer agents (systems-architect, implementation-planner, implementer, test-engineer, doc-engineer) read the ledger, filter by their `owner-role`, and update `status` / `resolved-by` / `last-seen` on existing rows when they address an item. No agent outside the four writers above creates new ledger rows.
@@ -83,6 +83,33 @@ Pipelines in separate worktrees write independently; conflicts reconcile at merg
 ## Consumer-contract framing
 
 The ledger's input contract on its five consumer agents is **permission, not obligation** — non-action is a valid outcome. The contract line does not make every consumer process every open item on every run, which would degrade per-agent phase-budget discipline.
+
+## Small debt is fixed, not filed
+
+A debt is **small** only when all seven conditions hold:
+
+1. One commit touches at most two production files, plus their tests.
+2. No design decision is needed.
+3. No decision record (ADR) is written.
+4. No new dependency is added.
+5. No acceptance, end-to-end or frozen test changes.
+6. Nothing on the user's ask-first list is touched.
+7. No shipped contract changes (a command-line flag, a hook payload, a canonical block, an agent's return contract), and the fix fits in the current session.
+
+**Filing rule.** File a row only for debt that is not small, or whose fix could not be finished this session; the row's `notes` give that reason. Small debt is fixed in its own commit after the feature. A follow-up that would change the feature's behaviour was never small. The sentinel and the architect-validator find debt with no task at hand and keep filing a row for every finding.
+
+**Follow-up record.** In a pipeline, `.ai-work/<task-slug>/FOLLOW_UPS.md` holds one line per follow-up, in one of four shapes:
+
+```
+- [open] <description>
+- [fixed <sha>] <description>
+- [ledgered td-NNN] <description>
+- [dropped <reason>] <description>
+```
+
+An unreadable line, or a final state with a missing or misshapen argument, counts as open. The verifier and the orchestrator append `open` lines; only the orchestrator writes a final state. The implementer never writes the record: it reports small out-of-scope debt on its `Follow-ups:` line.
+
+**Direct and Lightweight tiers.** With no task directory, the session's task list holds the follow-ups. The same flow runs before the session closes, and the closing digest names each outcome.
 
 ## Producer overlays
 
@@ -186,7 +213,7 @@ Populate `location`, dates, `notes` (one sentence + why-filed), and remaining sc
 1. **Explicit user direction** — the user asks to file a grounded finding as tracked debt.
 2. **`defer-with-rationale` disposition** — the architect recorded defer on a Continuous Improvement Signal per [`disposition-vocabulary.md`](disposition-vocabulary.md); the documented defer criteria become the row's `notes`. Verifier or sentinel remain preferred if the finding fits their scope on a later pass.
 3. **Scope gap** — a grounded finding fits neither verifier's per-change scope (Phase 5/5.5) nor sentinel's periodic-audit scope (TD/TT/EC dimensions). File with honest `source: orchestrator` rather than misattributing to verifier or sentinel.
-4. **Standalone Direct-tier session, adjacent debt surfaced by a fix** — the fix reveals a grounded problem outside its own declared scope; the orchestrator records the finding as a row rather than expanding the fix to address it (the Stay-Surgical redirect).
+4. **Standalone Direct-tier session, adjacent debt that is not small** — the fix reveals a grounded problem outside its own declared scope that fails the small bar in § Small debt is fixed, not filed; the orchestrator records the finding as a row rather than expanding the fix to address it (the Stay-Surgical redirect). Small adjacent debt follows the follow-up flow instead.
 
 **When NOT to append.** Per-change findings during verification → § Producer overlays → **verifier**. Metrics/repo-wide audit signals → **sentinel**. Per-PR structural drift → **architect-validator**. Verifier and sentinel may **re-source** orchestrator rows on subsequent runs.
 

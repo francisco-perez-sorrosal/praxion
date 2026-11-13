@@ -89,12 +89,12 @@ The ledger's input contract on its five consumer agents is **permission, not obl
 A debt is **small** only when all seven conditions hold:
 
 1. One commit touches at most two production files, plus their tests.
-2. No design decision is needed.
-3. No decision record (ADR) is written.
-4. No new dependency is added.
-5. No acceptance, end-to-end or frozen test changes.
-6. Nothing on the user's ask-first list is touched.
-7. No shipped contract changes (a command-line flag, a hook payload, a canonical block, an agent's return contract), and the fix fits in the current session.
+2. No design decision is needed and no decision record (ADR) is written.
+3. No new dependency is added.
+4. No acceptance, end-to-end or frozen test changes.
+5. Nothing on the user's ask-first list is touched.
+6. No shipped contract changes (a command-line flag, a hook payload, a canonical block, an agent's return contract).
+7. The fix fits in the current session.
 
 **Filing rule.** File a row only for debt that is not small, or whose fix could not be finished this session; the row's `notes` give that reason. Small debt is fixed in its own commit after the feature. A follow-up that would change the feature's behaviour was never small. The sentinel and the architect-validator find debt with no task at hand and keep filing a row for every finding.
 
@@ -119,7 +119,7 @@ Field definitions, enums, and `dedup_key` live in § Schema above. Each writer p
 
 ### verifier (Phase 5 / 5.5)
 
-**When to write.** For each per-change debt finding surfaced during convention compliance (Phase 5) or behavioral-contract compliance (Phase 5.5): `[DEAD-CODE-UNREMOVED]`, `[BLOAT]`, duplication, function-size or file-size ceiling breaches, nesting-depth violations.
+**When to write.** For each per-change debt finding that is not small (§ Small debt is fixed, not filed), surfaced during convention compliance (Phase 5) or behavioral-contract compliance (Phase 5.5): `[DEAD-CODE-UNREMOVED]`, `[BLOAT]`, duplication, function-size or file-size ceiling breaches, nesting-depth violations. In a pipeline a small finding becomes an `open` line of the task's follow-up record instead of a row.
 
 **Producer defaults** (all other fields per § Schema):
 

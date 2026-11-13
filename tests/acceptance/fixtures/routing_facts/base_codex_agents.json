@@ -46,12 +46,12 @@
    "model_reasoning_effort": "high"
   },
   "promethean": {
-   "instructions_digest": "fa69a98af11fb62b0b54b27ac9c55d34429f1e2c76cda4d80544d12ce048bbfd",
+   "instructions_digest": "3c6dfd2c0477d33e8ba322c7425618af2aa82729cfae7b26c0a7db6acefd9277",
    "model": "gpt-5.5",
    "model_reasoning_effort": "high"
   },
   "researcher": {
-   "instructions_digest": "1167a5949dda0ea64f0b424c88028ba589560feecfe15f934c177f091ba73e84",
+   "instructions_digest": "a52c2d0a0f9c203a5355a813b03f37ef3c7473d1fdb1b4910b02e818cfef405c",
    "model": "gpt-5.4",
    "model_reasoning_effort": "medium"
   },
@@ -71,7 +71,7 @@
    "model_reasoning_effort": "medium"
   },
   "systems-architect": {
-   "instructions_digest": "5f61327bfdfa9efcc84c69005ad9723b8afcb8f3d58bd21c2a8f75113a09fc22",
+   "instructions_digest": "f172ce0954217286d8c8b968f7e7da8e907027007a5bad770d8de9d7246e8a24",
    "model": "gpt-5.5",
    "model_reasoning_effort": "high"
   },

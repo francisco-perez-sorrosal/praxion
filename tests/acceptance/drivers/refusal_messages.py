@@ -6,8 +6,6 @@ Each surface is reached only from outside, as its real caller reaches it:
   its stdout, stderr and exit status kept apart;
 - the footprint check, run at `--stage verify` over a scratch repository whose task
   directory holds a spec with criteria and a measurement log;
-- the kernel-texts test, run by pytest over a sandbox copy of `scripts/` and `claude/`
-  in which the principles pointer has been edited;
 - the session commit gate, run as the harness runs a PreToolUse hook: the Bash payload
   on stdin, from inside a scratch repository with something staged;
 - the task-brief reminder, from the main checkout of a repository whose pipeline
@@ -24,7 +22,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -35,8 +32,6 @@ RESOLVER = REPO_ROOT / "scripts" / "resolve_test_scope.py"
 FOOTPRINT_CHECK = REPO_ROOT / "scripts" / "check_footprint_criteria.py"
 COMMIT_GATE = REPO_ROOT / "hooks" / "commit_gate.sh"
 ID_CITATION_CHECK = REPO_ROOT / "scripts" / "check_id_citation_discipline.py"
-POINTER_SOURCE = "claude/kernels/src/principles-pointer.md"
-KERNEL_TEXTS_TEST = "scripts/test_kernel_authored_texts.py"
 
 
 @dataclass(frozen=True)
@@ -171,48 +166,6 @@ def verify_footprints(
 
 def wrong_command_findings(findings: list[dict]) -> list[dict]:
     return [f for f in findings if f.get("reason") == "wrong-command"]
-
-
-# -- The kernel-texts test over a sandbox copy ---------------------------------------------------
-
-
-def kernel_texts_sandbox(destination: Path) -> Path:
-    """A copy of this checkout's `scripts/` and `claude/`, enough for the kernel-texts test."""
-    ignore = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc")
-    for directory in ("scripts", "claude"):
-        shutil.copytree(REPO_ROOT / directory, destination / directory, ignore=ignore)
-    return destination
-
-
-def drop_from_pointer(sandbox: Path, *names: str) -> None:
-    """Remove every mention of each principle name from the sandbox's pointer text."""
-    pointer = sandbox / POINTER_SOURCE
-    text = pointer.read_text(encoding="utf-8")
-    absent = [name for name in names if name not in text]
-    if absent:
-        raise AssertionError(f"the pointer does not name {absent}, so it cannot lose them:\n{text}")
-    for name in names:
-        text = text.replace(name, "")
-    pointer.write_text(text, encoding="utf-8")
-
-
-def run_kernel_texts_test(sandbox: Path) -> Run:
-    return _run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            KERNEL_TEXTS_TEST,
-            "-q",
-            "--tb=short",
-            "-p",
-            "no:cacheprovider",
-            "-o",
-            "addopts=",
-        ],
-        sandbox,
-        timeout=300,
-    )
 
 
 # -- The session commit gate -----------------------------------------------------------------

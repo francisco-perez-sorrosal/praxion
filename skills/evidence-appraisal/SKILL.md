@@ -14,8 +14,8 @@ A claim built on a misread or over-extended source fails silently: the number ca
 **Satellite files** (loaded on-demand):
 
 - [references/source-strength-and-transfer.md](references/source-strength-and-transfer.md) -- the source-strength hierarchy and why it is not a simple ladder, study design versus claim strength (what an observational result can and cannot license), external validity and transfer -- the single most common real failure
-- [references/claim-provenance.md](references/claim-provenance.md) -- preprint versus peer-reviewed weighting and replication status, citation drift, vendor and marketing claims as a distinct evidentiary class, benchmark provenance
-- [references/writing-warranted-claims.md](references/writing-warranted-claims.md) -- how to write a claim with its warrant attached so a later reader can re-appraise it, worked before/after examples, the warrant template
+- [references/claim-provenance.md](references/claim-provenance.md) -- preprint versus peer-reviewed weighting and replication status, citation drift, popular framing that adds claims a real source never made, vendor and marketing claims as a distinct evidentiary class, benchmark provenance
+- [references/writing-warranted-claims.md](references/writing-warranted-claims.md) -- how to write a claim with its warrant attached so a later reader can re-appraise it, worked before/after examples, the warrant template, the section that holds overstated, unverified and contested claims
 
 ## Gotchas
 
@@ -24,11 +24,13 @@ A claim built on a misread or over-extended source fails silently: the number ca
 - **External validity is the most common real failure, not a footnote.** A result true in its original setting is imported into a setting where the mechanism's assumptions don't hold -- different scale, different population, different tooling, different incentive structure. The result is not wrong; the import is. See [source-strength-and-transfer.md](references/source-strength-and-transfer.md#external-validity-and-transfer).
 - **Claim strength must not exceed design strength.** An observational correlation licenses "associated with," never "causes." Restating it as a causal claim is the single most common laundering step between a source and a downstream decision.
 - **Citation drift compounds each time a claim is restated.** The original hedge ("in our benchmark, under these conditions") is dropped first, then the qualifier, then the confidence interval -- until a tentative finding reads as an established fact. Always trace a striking claim back to its earliest form before relaying it further.
+- **A popular account can add claims its source never made.** A viral thread or a summary post about a real paper may credit it with a headline number, a fixed recipe, or a guarantee the paper does not report. That is invention under the source's name, not drift: check each striking claim against the primary source, and quarantine what the source does not say so it feeds no design decision. See [claim-provenance.md](references/claim-provenance.md#popular-framing-of-a-real-source).
 - **Preprint status and peer-review status are facts about the source, not verdicts on the claim** -- but they change how much independent replication should be demanded before the claim is treated as established. Weight, don't dismiss or defer wholesale. See [claim-provenance.md](references/claim-provenance.md#preprint-vs-peer-reviewed-weighting).
 - **Vendor and marketing claims are a distinct evidentiary class, not a weaker version of research.** The incentive structure (sell the product) selects which comparisons get published and how. Quarantine them -- use them as a hypothesis to test, never as a settled input to a decision.
 - **Benchmark provenance is a claim in itself: who ran it, on what, with what incentive to win.** A benchmark commissioned by the vendor whose product it favors carries a different evidentiary weight than an independently run one, even when the methodology looks identical on paper.
 - **Effect size versus statistical significance is a practical question here too** -- a significant effect from an outside source can still be too small to justify the architectural cost of acting on it. Judge relevance to the decision, not just whether the source reports a p-value; the inferential machinery for that judgment lives in applied-statistics.
 - **A single source, however strong, is one source.** Require independent traditions -- different authors, different methods, different incentive structures -- to converge before treating a claim as established enough to build on unreviewed.
+- **Look for the evidence against a claim, not only for it.** A search that stops at the first agreeing source finds agreement. Before a claim becomes load-bearing, search for counter-evidence -- a failed replication, a critique, a competing result -- and label a contested or weakly evidenced claim as such where it is written. See [writing-warranted-claims.md](references/writing-warranted-claims.md#the-overstated-or-unverified-section).
 
 ## The Six-Question Appraisal
 
@@ -36,8 +38,8 @@ Before an imported claim becomes load-bearing, answer these in order. A gap at a
 
 1. **What is the source, and what does its design license?** Identify whether the claim rests on an RCT, an observational study, a benchmark, a vendor whitepaper, or a blog post -- then check whether the claim being made matches what that design can support. See [source-strength-and-transfer.md](references/source-strength-and-transfer.md#study-design-versus-claim-strength).
 2. **Does the source's setting match ours?** Scale, population, tooling, incentive structure, and time period all bound external validity. Name the specific dimension along which our setting differs, if any. See [source-strength-and-transfer.md](references/source-strength-and-transfer.md#external-validity-and-transfer).
-3. **Has the claim drifted from its original form?** Trace it back at least one hop -- to the paper, not the summary of the summary. Note any hedge, qualifier, or confidence interval that was dropped along the way. See [claim-provenance.md](references/claim-provenance.md#citation-drift).
-4. **What is its review and replication status?** Preprint or peer-reviewed; replicated once, replicated independently, or standing alone. See [claim-provenance.md](references/claim-provenance.md#preprint-vs-peer-reviewed-weighting).
+3. **Has the claim drifted from its original form?** Trace it back at least one hop -- to the paper, not the summary of the summary. Note any hedge, qualifier, or confidence interval that was dropped along the way. When the claim reached you through a popular account, check its striking claims against the source itself; what the source does not say is quarantined. See [claim-provenance.md](references/claim-provenance.md#citation-drift) and [its section on popular framing](references/claim-provenance.md#popular-framing-of-a-real-source).
+4. **What is its review and replication status, and what stands against it?** Preprint or peer-reviewed; replicated once, replicated independently, or standing alone; and what a search for counter-evidence found. See [claim-provenance.md](references/claim-provenance.md#preprint-vs-peer-reviewed-weighting).
 5. **Whose incentive produced this number?** Independent research, a vendor benchmark, or marketing copy -- and if a vendor or marketing source, quarantine it rather than treat it as a settled input. See [claim-provenance.md](references/claim-provenance.md#vendor-and-marketing-claims).
 6. **Does the claim as written carry its warrant?** A reader six months from now, with no access to this conversation, should be able to tell what the claim licenses and what it doesn't from the sentence alone. See [writing-warranted-claims.md](references/writing-warranted-claims.md).
 
@@ -53,9 +55,11 @@ Treat a claim as established enough to build architecture on only when independe
 | Does the causal language match the design's strength? | The claim overstates what the source licenses |
 | Was the source's setting compared to ours along at least one dimension? | The transfer has not been checked; the result may not hold here |
 | Was the claim traced to its earliest stated form? | Citation drift may have inflated it; you are relaying a relay |
+| Were a popular account's striking claims checked against the primary source? | The dossier may relay an invention under the source's name |
 | Is the source's review/replication status stated? | Confidence in the claim is unanchored |
 | If vendor or marketing-sourced, is it flagged as such? | The claim is being treated as research when its incentive structure differs |
 | Does more than one independent source converge on this? | The claim rests on a single unreplicated data point |
+| Was counter-evidence searched for, and is a contested or weak claim labelled so? | Agreement was found because only agreement was sought |
 | Does the claim in the dossier carry its warrant (source, design, setting, hedge)? | A later reader cannot re-appraise it without redoing this work |
 
 Two disciplines make this checklist useful rather than obstructive, matching the sibling statistician checklist: **name the specific decision the objection would change** -- an objection that changes no decision is not worth raising -- and **name the settling action** -- read the primary source, find an independent replication, or run our own small check. An appraisal objection without a settling action is a vague doubt, not a finding.

@@ -36,6 +36,20 @@ By step 4, the condition ("under condition X"), the confidence interval, and the
 
 **Practical check.** For any claim relayed more than one hop from its origin, trace it back to the earliest available statement of it -- the actual paper or the actual benchmark writeup, not a summary of a summary. Compare the earliest form to the form currently being relayed. Any dropped hedge, qualifier, or interval is a finding: either restate the claim at its original strength, or explicitly note what was simplified and why that simplification is safe for the decision at hand.
 
+## Popular Framing of a Real Source
+
+Citation drift drops qualifiers. Popular framing goes further: it adds claims. A viral thread, a launch post, or a video about a real paper may credit the paper with a headline number, a fixed recipe, or a guarantee the paper never reports, and the paper's name then lends those additions its authority.
+
+One observed case: a widely shared thread about a peer-reviewed 2024 paper on multi-perspective article writing credited the method with beating a search engine's first result, a fixed set of five personas, and a self peer-review step. The paper reports none of the three. A design built on the thread would have copied features the method does not have.
+
+**Practical check.** When a claim arrives through a popular account, read the primary source and sort every striking claim into one of three kinds:
+
+- **In the source.** Relay it at the strength the source states.
+- **Overstated.** The source says something weaker. Restate the claim at the source's strength and note what the account inflated.
+- **Not in the source.** Quarantine it: it goes into the dossier's overstated-or-unverified section (see [writing-warranted-claims.md](writing-warranted-claims.md#the-overstated-or-unverified-section)) and feeds no design decision until an independent source supports it.
+
+The quarantine is of the claim, not of the source: the paper keeps its weight for what it does say. Rank the findings that remain by source quality, primary literature (papers, proceedings, standards bodies) before secondary summaries, instead of citing the popular account beside the paper as its equal.
+
 ## Vendor and Marketing Claims
 
 Vendor and marketing claims are a distinct evidentiary class, not a weaker version of independent research, because the incentive structure that produced them is structurally different: the point of the artifact is to sell something, and every methodological choice (which baseline to compare against, which workload to benchmark, which metric to report) can be -- and often is -- selected for favorable results without any dishonesty at any single step.

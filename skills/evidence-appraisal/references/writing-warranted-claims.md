@@ -41,7 +41,7 @@ This version lets a later reader decide, without re-deriving anything, whether t
 Claim: <the claim, at the strength the source licenses>
 Source: <author/org, year, design type>
 Setting: <where/how it was measured; how it compares to ours, if relevant>
-Confidence: <review status, replication status, single-source or converging, vendor/marketing flag if applicable>
+Confidence: <review status, replication status, single-source or converging, what a search for counter-evidence found, a contested or weak-evidence label where it applies, vendor/marketing flag if applicable>
 ```
 
 Use this four-line form in any evidence dossier, ADR, or design doc section that leans on an imported claim. It costs four lines and saves a re-derivation.
@@ -53,6 +53,18 @@ If a claim central to a decision cannot be traced to a specific source, design, 
 > Claim: <the claim>. Source: unattributed / could not be traced to a primary source. Treat as anecdotal until a source is found or the claim is independently tested.
 
 An honest "this is unwarranted" is more useful to a later reader than a warrant fabricated to look rigorous.
+
+## The Overstated-or-Unverified Section
+
+Research output that met claims it could not support keeps them in a section of their own, titled `Overstated or unverified`, instead of dropping them silently or citing them beside the supported findings as equals. A reader who has met the popular claim elsewhere then finds it named and answered. Each entry gives:
+
+- the claim as it circulates, and where it was met;
+- what the primary source says in its place, or that the source does not make the claim;
+- one label: `overstated` (the source says something weaker), `unverified` (no supporting source was found), or `contested` (credible sources disagree; cite both sides).
+
+Nothing in this section is an input to a design decision. An entry leaves it only when an independent source supports the claim, and it is then rewritten in the four-line form at the strength that source licenses.
+
+The same search that fills this section is run for the supported findings: look for the failed replication, the critique, the competing result, and record what the search found in the `Confidence` line, including when it found nothing.
 
 ## Related
 

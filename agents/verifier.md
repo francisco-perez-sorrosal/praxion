@@ -281,8 +281,8 @@ When tests exist or are expected:
 3. **Disposition every failing test** in `TEST_RESULTS.md`. A failure is never closeable by calling it "pre-existing" — classify each one and act:
    - **Regression** — failing now, not listed in `TEST_BASELINE.md`. This pipeline caused it. Emit `FAIL`; the failure routes to rework via Phase 12.5.
    - **Pre-existing** — failing now and listed in `TEST_BASELINE.md`. Disposition it: if the debt is small, record it in `FOLLOW_UPS.md` as an `open` line; otherwise append a `td-NNN` row per [`skills/software-planning/references/tech-debt-ledger.md`](../skills/software-planning/references/tech-debt-ledger.md) § Producer overlays → **verifier**, and emit a `WARN` citing the row id.
-   - **Undisposed pre-existing** — a failure labelled pre-existing with neither a fix nor a `td-NNN` row is a report-completeness `FAIL`: "pre-existing" alone is not a disposition.
-   - **No baseline** — when `TEST_BASELINE.md` is absent, every current failure is unverified; disposition each as pre-existing (fix or `td-NNN` row) and record one `WARN` that the baseline was missing.
+   - **Undisposed pre-existing** — a failure labelled pre-existing with neither a fix, an `open` line in `FOLLOW_UPS.md` nor a `td-NNN` row is a report-completeness `FAIL`: "pre-existing" alone is not a disposition.
+   - **No baseline** — when `TEST_BASELINE.md` is absent, every current failure is unverified; disposition each as pre-existing (fix, `FOLLOW_UPS.md` line or `td-NNN` row) and record one `WARN` that the baseline was missing.
    - **Fixed** — listed in `TEST_BASELINE.md`, passing now: record as a boy-scout win.
 4. Check whether critical paths in the new code have test coverage.
 5. Note untested edge cases in complex logic.
@@ -293,7 +293,7 @@ When tests exist or are expected:
    - `Mutation: survivors=…` naming a survivor inside a function that performs a world read (subprocess, git, filesystem, network, environment, or clock) → `WARN` naming the function(s), plus, when small, an `open` line in `FOLLOW_UPS.md`, otherwise a `TECH_DEBT_LEDGER` row (category `coverage-gap`), describing a world-read function with a surviving mutant and no test through the real adapter — never cite a specific ledger row id in this file.
    - `Mutation: unavailable reason=not-flat-layout` → recorded with no finding: the declared refusal for a layout the sensor cannot mutate.
 
-   Golden bad-cases: a tagged step whose line reads `Mutation: unavailable reason=run-failed (…)` must FAIL as blocked; a line `survivors=1 mutants=40 (subprocess_call: 1)` with a world-read `subprocess_call` fires the WARN, naming it and filing the `TECH_DEBT_LEDGER` row.
+   Golden bad-cases: a tagged step whose line reads `Mutation: unavailable reason=run-failed (…)` must FAIL as blocked; a line `survivors=1 mutants=40 (subprocess_call: 1)` with a world-read `subprocess_call` fires the WARN, naming it and recording it: an `open` line in `FOLLOW_UPS.md` when small, otherwise the `TECH_DEBT_LEDGER` row.
 9. **Audit closure check** (integration-checkpoint steps only) — when a step's `TEST_RESULTS.md` section carries an `Audit: missed=<n>` line with `n > 0`, confirm the diff closed each missed case (the missing edge was added) before treating the step as done; an unresolved `missed` count is a `FAIL`.
 
 #### Loading and invoking the `test-coverage` skill (permission, not obligation)

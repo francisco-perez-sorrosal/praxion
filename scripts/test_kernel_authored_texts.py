@@ -19,13 +19,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import check_agent_shared_blocks as gate  # noqa: E402
+import generate_kernels as gk  # noqa: E402
 import kernel_sources as ks  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TEXTS_DIR = REPO_ROOT / "claude" / "kernels" / "src"
 
 INJECTION_CAP = 10_000
-PRINCIPLE_COUNT = 8
 
 # The set is closed on purpose: a text added or dropped here is a decision about what
 # a kernel may say, made in the diff that changes this list.
@@ -155,18 +155,24 @@ PRINCIPLES_DERIVED = (
 )
 
 
-def test_the_principles_pointer_leads_to_a_file_holding_all_eight_principles() -> None:
+def test_the_principles_pointer_source_holds_the_markers_the_generator_fills() -> None:
     pointer = TEXTS["principles-pointer"]
+
+    assert pointer.count(gk.COUNT_MARKER) == pointer.count(gk.NAMES_MARKER) == 1
+
+
+def test_the_delivered_pointer_leads_to_a_file_holding_every_principle_it_names() -> None:
+    core = (REPO_ROOT / "claude" / "kernels" / "core.md").read_text(encoding="utf-8")
+    pointer = next(p for p in core.split("\n\n") if PRINCIPLES_DERIVED in p)
     named = re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+?)`", pointer)
     template = (REPO_ROOT / ks.USER_TEMPLATE).read_text(encoding="utf-8")
-    principles = [s.heading for s in ks.split_sections(ks.USER_TEMPLATE, template) if s.level == 3][
-        :PRINCIPLE_COUNT
-    ]
+    sections = {ks.USER_TEMPLATE: ks.split_sections(ks.USER_TEMPLATE, template)}
+    principles = gk.principle_headings(sections)
 
     assert named == [
         PRINCIPLES_DERIVED
     ]  # a committed .md the sandbox can read; the generator derives it
-    assert len(principles) == PRINCIPLE_COUNT
+    assert principles
     assert [name for name in principles if name not in pointer] == []
     derived = REPO_ROOT / PRINCIPLES_DERIVED
     if derived.exists():  # absent until the generator's derived-artifacts step lands

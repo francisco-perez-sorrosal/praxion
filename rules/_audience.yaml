@@ -13,6 +13,9 @@
 # form: verbatim (the source bytes) or condensed (an authored text under
 # claude/kernels/src/, pinned to the source it stands for, so a changed source forces
 # a review of the text). No section is removed from its source by being classified.
+# A section delivered verbatim to a role must read standing alone: the role receives
+# it without its neighbours, so a sentence that leans on the section before it ("with
+# that chosen") has no antecedent there. Name the antecedent in the sentence itself.
 #
 # The wire shape is read in one place, scripts/kernel_model.py; scripts/check_kernel_manifest.py
 # holds the manifest to the sources. Regenerate the kernels with scripts/generate_kernels.py.
@@ -33,6 +36,7 @@ modules:
   ledger-writer: {audience: [ledger-writer]}
   principles-digest: {audience: [promethean, systems-architect]}
   principles-anchor: {audience: [verifier]}
+  principles-prior-art: {audience: [promethean, systems-architect, researcher]}
   delegator: {audience: [roadmap-cartographer]}
   local-context-engineer: {audience: [context-engineer]}
   local-verifier: {audience: [verifier]}
@@ -68,7 +72,7 @@ authored:
     path: claude/kernels/src/ledger-writer.md
     module: ledger-writer
     condenses: "rules/swe/agent-intermediate-documents.md#`TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair {#tech_debt_ledger-summary}"
-    pinned_sha: "b8d60d49f5a19e6753115dae81aaf23baffa64be"
+    pinned_sha: "d4e8b95ae91093604567e03a819c9403c7a2f2ab"
   - id: ledger-writer-verifier-overlay
     path: claude/kernels/src/ledger-writer-verifier-overlay.md
     module: local-verifier
@@ -236,7 +240,7 @@ entries:
     scope: role
     form: condensed
     text: ledger-writer
-    pin: "b8d60d49f5a19e6753115dae81aaf23baffa64be"
+    pin: "d4e8b95ae91093604567e03a819c9403c7a2f2ab"
     groups: [ledger-writer]
   - source: rules/swe/agent-intermediate-documents.md
     heading: "Document Lifecycle"
@@ -415,6 +419,11 @@ entries:
     scope: role
     form: verbatim
     agents: [promethean, systems-architect]
+  - source: claude/config/CLAUDE.md.tmpl
+    heading: "Standing on the Shoulders of Giants"
+    scope: role
+    form: verbatim
+    agents: [promethean, systems-architect, researcher]
   - source: claude/config/CLAUDE.md.tmpl
     heading: "Incremental Evolution"
     scope: role

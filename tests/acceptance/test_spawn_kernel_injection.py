@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.acceptance.drivers import kernel_adoption, kernel_sandbox, kernel_spawn
+from tests.acceptance.drivers import kernel_adoption, kernel_sandbox, kernel_spawn, principle_names
 from tests.acceptance.drivers.kernel_sandbox import (
     CONTRACT_RULE,
     INJECTION_CAP,
@@ -188,11 +188,7 @@ def test_the_principles_pointer_leads_to_readable_principle_text_inside_the_plug
     project = kernel_spawn.project_checkout(tmp_path / "elsewhere")
     kernel_adoption.record(sandbox.root, kernel_adoption.at_trial("researcher"))
     injected = spawn(sandbox.root, project, "praxion:researcher").joined
-    principles = [
-        s.heading
-        for s in kernel_sandbox.markdown_sections(sandbox.read(kernel_sandbox.USER_TEMPLATE))
-        if s.level == 3
-    ][:8]
+    principles = principle_names.principle_headings(sandbox.read(kernel_sandbox.USER_TEMPLATE))
 
     readable = [
         p

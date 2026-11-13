@@ -24,6 +24,10 @@ Every change starts from a desired behavior - what the system should do - not fr
 
 Behavior defines what to build; the representation is the first - and most leveraged - decision about how. For every building block of an architecture - component, module, agent contract, pipeline artifact - choose its data structures deliberately before writing the behavior that consumes them: enumerate the legal states, name each invariant and its enforcer, parse at the boundary so the interior can trust its types. Every illegal state made unrepresentable deletes a class of validation, defensive code, and tests before it is written. The design pass, techniques, and review checklist live in the `data-structure-design` skill; persistence-layer schemas remain with `data-modeling`.
 
+### Standing on the Shoulders of Giants
+
+Once a building block's data structures are chosen, the next choices of *how* (technique, process, algorithm, library, language) start from what the field has proven: the standard, the canonical text, the mature library, the idiom its community converged on, weighed by evidence (primary and peer-reviewed sources first, independent traditions agreeing before a claim becomes load-bearing, still current). For a proof of concept, a supporting subsystem or anything off the critical path, the proven solution is the default: a well-known library buys speed and reliability at once. Where the project's needs are its own (a constraint, scale, domain fit or degree of control no proven option gives), building its own solution is sound engineering, chosen with the prior art in view and the reason stated, so the choice can evolve either way as the needs grow or the field catches up. The failures are inventing without looking and adopting by habit against what the project needs. Borrowed claims are appraised in the `evidence-appraisal` skill.
+
 ### Incremental Evolution
 
 The simplest thing that works is the seed, not the ceiling. Systems grow through purposeful, incremental steps - each expanding capability while preserving what already works. Don't over-design for futures you don't yet need, but build with changeability in mind: clean boundaries and cohesive modules that welcome growth without predicting its shape. Leave what you touch better than you found it - but don't wander beyond the change's scope.
@@ -31,6 +35,10 @@ The simplest thing that works is the seed, not the ceiling. Systems grow through
 ### Structural Beauty
 
 Reliable systems are beautiful ones. Well-organized code is easier to trust, navigate, and evolve. Clean boundaries, cohesive modules, consistent patterns, readable flow - these are not decoration but structural signals. When code reads well and navigates naturally, the underlying design is sound. When something feels ugly or tangled, stop and reshape before building further. Beauty serves reliability, and reliability enables evolution. Beauty decomposes into eight reviewable dimensions - storytelling, simplicity, clarity of intent, expressiveness, purity, sustainability, durability, creativity - whose canon, tension resolutions, and review checks live in the `beautiful-code` skill.
+
+### Balanced Coupling
+
+Design is the management of knowledge flow between parts. Every dependency is shared knowledge; the craft is keeping integration strength (how much two parts must know about each other) in balance with distance (how far apart they live). When distant parts share deep knowledge, change ripples outward - tight coupling; when neighbors share nothing that binds them, intent scatters - low cohesion. So gather what changes together, separate what changes for different reasons, and depend on abstractions rather than details. The SOLID principles are heuristics in service of this single idea - not commandments. Apply them where they remove coupling that actually hurts; skip them where they would add ceremony for change that will never come (Incremental Evolution still governs - don't abstract for futures you don't need). The discipline holds for every consumer, human or agent: a well-bounded module protects an agent's context from the pollution of unrelated concerns exactly as it protects a reader's attention - this is Context Engineering at the level of code structure. And it matters more now, not less: generation makes code cheap, so poor structure accrues debt faster than ever. The author changed; the physics did not. Deep heuristics, the strength/distance/volatility model, and the agent-as-consumer lens live in the `software-design-principles` skill.
 
 ### Root Causes Over Workarounds
 
@@ -222,14 +230,15 @@ Operational infrastructure for the development philosophy in `~/.claude/CLAUDE.m
 ## Reading Order
 
 1. **CLAUDE.md** — canonical Praxion project baseline
-2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination protocol, behavioral contract, agent intermediate documents, model routing, git conventions)
-3. **`rules/**/*.md` with `paths:` frontmatter** — load when matching files are touched (ADR conventions on `.ai-state/decisions/**` with a one-line resident at session start, always-on in assistants without path scoping; diagram conventions, coding style, dashboard conventions, PR conventions, etc.)
+2. **`rules/**/*.md` without `paths:` frontmatter** — always-on conventions (coordination protocol, behavioral contract, agent intermediate documents, git conventions)
+3. **`rules/**/*.md` with `paths:` frontmatter** — load when matching files are touched (ADR conventions on `.ai-state/decisions/**` with a one-line resident at session start, always-on in assistants without path scoping; model routing on `agents/**` and the routing policy reference, with a session-start text carrying the spawn directive and its deviations; diagram conventions, coding style, dashboard conventions, PR conventions, etc.)
 4. **`skills/<name>/SKILL.md`** — load when description matches the task
 5. **`skills/<name>/references/*.md`** — on demand from the skill body
 6. **`.ai-state/DESIGN.md`** — when reasoning about Praxion's system design
 7. **`docs/architecture.md`** — when navigating the code-verified component map
 
 The ADR rule's resident file is `rules/swe/adr-conventions-resident.md`.
+The model-routing rule's session-start text is the resident file `rules/swe/agent-model-routing-resident.md`.
 
 ## Build / test / lint
 

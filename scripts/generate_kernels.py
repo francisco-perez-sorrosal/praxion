@@ -70,6 +70,14 @@ BLOCKS_FILE = "core-blocks.md"
 PRINCIPLES_FILE = "principles.md"
 PRINCIPLES_HEADING = "Principles"
 PRINCIPLES_LEVEL = 2
+PRINCIPLE_LEVEL = 3  # one principle per heading of this level under the section
+POINTER_TEXT = "principles-pointer"  # the authored text that states the principles' count and names
+COUNT_MARKER = "@@PRINCIPLE_COUNT@@"
+NAMES_MARKER = "@@PRINCIPLE_NAMES@@"
+NUMBER_WORDS = (
+    "one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+    "fifteen sixteen seventeen eighteen nineteen twenty"
+).split()
 INDEX_SCHEMA = 1
 PROJECT_FILE_RESERVE = 6  # slots kept for the working project's CLAUDE.md, ~10,000 characters each
 PARAGRAPH_GAP = "\n\n"
@@ -108,6 +116,7 @@ Edit the behavioral contract rule and regenerate: the commit gate refuses a stal
 _PREAMBLE = {literal}
 '''
 _BEHAVIOUR_NAME = re.compile(rf"^{re.escape(BEHAVIOUR_BULLET)}(.+?)\*\*", re.MULTILINE)
+_UNFILLED_MARKER = re.compile(r"@@[A-Z_]+@@")
 _PARAGRAPH_BREAK = re.compile(r"(\n\s*\n)")  # capturing, so a split rejoins to the same text
 
 
@@ -166,7 +175,10 @@ def assemble(
     placed: dict[str, list[str]] = {name: [] for name in ("core", *manifest.modules)}
     for text in manifest.authored:
         if text.condenses is None and text.id not in BLOCK_TEXTS:
-            _place(placed, text.module, authored[text.id], text.id)
+            body = authored[text.id]
+            if text.id == POINTER_TEXT:
+                body = fill_principle_markers(body, principle_headings(sections))
+            _place(placed, text.module, body, text.id)
     for entry in manifest.entries:
         module = _module_of(entry)
         if module is None or entry is contract or _block_text(entry):
@@ -200,6 +212,20 @@ def principles_section(sections: Mapping[str, Sequence[ks.Section]]) -> str:
     The section's own heading and framing sentence are classified orchestrator-only, so the
     file opens at the first principle.
     """
+    return ks.pin_extent("".join(section.text for section in _principle_sections(sections)))
+
+
+def principle_headings(sections: Mapping[str, Sequence[ks.Section]]) -> tuple[str, ...]:
+    """The headings of the template's principles, in file order: the names the pointer lists."""
+    return tuple(
+        section.heading
+        for section in _principle_sections(sections)
+        if section.level == PRINCIPLE_LEVEL
+    )
+
+
+def _principle_sections(sections: Mapping[str, Sequence[ks.Section]]) -> Sequence[ks.Section]:
+    """The sections after the template's `## Principles` heading, up to the next peer heading."""
     template = sections.get(ks.USER_TEMPLATE, ())
     start = next(
         (
@@ -215,7 +241,24 @@ def principles_section(sections: Mapping[str, Sequence[ks.Section]]) -> str:
         (i for i in range(start + 1, len(template)) if template[i].level <= PRINCIPLES_LEVEL),
         len(template),
     )
-    return ks.pin_extent("".join(section.text for section in template[start + 1 : end]))
+    return template[start + 1 : end]
+
+
+def fill_principle_markers(text: str, headings: Sequence[str]) -> str:
+    """`text` with its count and names markers replaced by the principles' count and names."""
+    if not headings:
+        raise KernelPlanError(f"{ks.USER_TEMPLATE} has no principle headings to name")
+    for marker in (COUNT_MARKER, NAMES_MARKER):
+        found = text.count(marker)
+        if found != 1:
+            raise KernelPlanError(f"the principles pointer holds {marker} {found} times, not once")
+    count = len(headings)
+    word = NUMBER_WORDS[count - 1] if count <= len(NUMBER_WORDS) else str(count)
+    names = f"{', '.join(headings[:-1])} and {headings[-1]}" if count > 1 else headings[0]
+    filled = text.replace(COUNT_MARKER, word).replace(NAMES_MARKER, names)
+    if leftover := _UNFILLED_MARKER.search(filled):
+        raise KernelPlanError(f"the principles pointer holds the unfilled marker {leftover[0]}")
+    return filled
 
 
 def _contract_entry(manifest: km.Manifest) -> km.AudienceEntry:

@@ -7,6 +7,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = REPO_ROOT / "install_codex.sh"
+PHILOSOPHY_TEMPLATE = REPO_ROOT / "claude" / "config" / "CLAUDE.md.tmpl"
+CODEX_BASELINE_TEMPLATE = REPO_ROOT / "codex" / "config" / "AGENTS.md.tmpl"
 
 
 def make_home(tmp_path: Path) -> tuple[dict[str, str], Path]:
@@ -50,6 +52,18 @@ def run_install(*args: str, env: dict[str, str] | None = None) -> subprocess.Com
         capture_output=True,
         check=False,
     )
+
+
+def principle_headings(template: Path) -> list[str]:
+    """The `### ` headings under the template's `## Principles` section, in order."""
+    headings: list[str] = []
+    in_principles = False
+    for line in template.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            in_principles = line == "## Principles"
+        elif in_principles and line.startswith("### "):
+            headings.append(line)
+    return headings
 
 
 def write_claude_md(
@@ -369,3 +383,7 @@ def test_install_codex_uninstall_preserves_user_codex_config_and_hooks(tmp_path:
     assert not (shared_codex_dir / "AGENTS.md").exists()
     assert not (shared_codex_dir / "AGENTS.override.md").exists()
     assert not (shared_codex_dir / "praxion" / "mcp_state.json").exists()
+
+
+def test_codex_baseline_carries_every_principle_of_the_philosophy_template():
+    assert principle_headings(CODEX_BASELINE_TEMPLATE) == principle_headings(PHILOSOPHY_TEMPLATE)

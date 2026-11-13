@@ -14,8 +14,10 @@ from tests.acceptance.drivers.kernel_sandbox import REPO_ROOT, frontmatter
 # The ADR-rule move reworded the reading order; the model-routing move rewords it again (it stops
 # listing model routing as always-on) and restates the routing rule's spawn directive. The
 # routing-facts change restates the resolution order and the alias paragraph to the harness's
-# current behaviour, and the tier table and its pointer line for the L tier's alias. Each index is
-# the paragraph's position in the frozen fixture.
+# current behaviour, and the tier table and its pointer line for the L tier's alias. The small-debt
+# change appends one sentence to the summary paragraph of the ledger pair in the
+# intermediate-documents rule (a small defect is fixed, not filed). Each index is the paragraph's
+# position in the frozen fixture.
 DECLARED_REWORDINGS = {
     ("CLAUDE.md", "## Agent reading order [1]", 0),
     ("rules/swe/agent-model-routing.md", "## Agent Model Routing [1]", 1),
@@ -23,6 +25,12 @@ DECLARED_REWORDINGS = {
     ("rules/swe/agent-model-routing.md", "## Agent Model Routing [1]", 3),
     ("rules/swe/agent-model-routing.md", "### Tier Table [1]", 0),
     ("rules/swe/agent-model-routing.md", "### Tier Table [1]", 1),
+    (
+        "rules/swe/agent-intermediate-documents.md",
+        "#### `TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair"
+        " {#tech_debt_ledger-summary} [1]",
+        0,
+    ),
 }
 
 

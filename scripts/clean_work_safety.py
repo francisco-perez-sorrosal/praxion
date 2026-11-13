@@ -14,6 +14,7 @@ Classification (per task directory):
     BLOCK  live/incomplete state — never delete without explicit override
            - WIP.md with an unchecked `- [ ]` step  (pipeline in flight)
            - REWORK_MANIFEST.md present              (rework may be open)
+           - FOLLOW_UPS.md with an open follow-up    (small debt still owed)
     WARN   durable-state handoff pending — confirm before deleting
            - LEARNINGS.md                            (merge to .ai-state/ first)
            - VERIFICATION_REPORT.md w/o a merged marker in LEARNINGS.md
@@ -49,6 +50,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from _follow_ups import open_items
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _script_cli import configure_logging
 from artifact_registry import cleanup_policy_for
@@ -78,6 +80,7 @@ UNCHECKED_STEP_RE = re.compile(r"^\s*[-*]\s+\[ \]", re.MULTILINE)
 # char class after the hyphen is what avoids matching prose like "REQ-uirements".
 REQ_ID_RE = re.compile(r"\bREQ-[A-Z0-9]")
 CONSUMED_RE = re.compile(r"\[CONSUMED\]")
+FOLLOW_UPS_FILE = "FOLLOW_UPS.md"
 # The marker the verifier/operator adds to LEARNINGS.md after folding a
 # verification report's recurring patterns in — clears the verification warning.
 VERIFICATION_MERGED_RE = re.compile(r"verification patterns merged", re.IGNORECASE)
@@ -140,6 +143,29 @@ def _has_unchecked_step(task_dir: Path) -> bool:
     return wip.exists() and UNCHECKED_STEP_RE.search(_read(wip)) is not None
 
 
+def _open_follow_up_reason(task_dir: Path) -> Reason | None:
+    """The BLOCK reason for a follow-up record that still owes work, else None.
+
+    Reads only through the record's parser, which decides what counts as open.
+    """
+    record = task_dir / FOLLOW_UPS_FILE
+    if not record.exists():
+        return None
+    severity = _severity_for(FOLLOW_UPS_FILE)
+    if severity not in ("block", "warn"):
+        return None
+    owed = [item.description for item in open_items(_read(record))]
+    if not owed:
+        return None
+    return Reason(
+        "open-follow-ups",
+        FOLLOW_UPS_FILE,
+        severity,
+        f"{FOLLOW_UPS_FILE} has {len(owed)} open follow-up(s): {'; '.join(owed)}. "
+        "Fix or ledger each, or pass --force",
+    )
+
+
 def _learnings_has_merge_marker(task_dir: Path) -> bool:
     learnings = task_dir / "LEARNINGS.md"
     return learnings.exists() and VERIFICATION_MERGED_RE.search(_read(learnings)) is not None
@@ -183,6 +209,9 @@ def detect_reasons(task_dir: Path) -> list[Reason]:
                     "rework worktrees may still be open — complete rework, or pass --force",
                 )
             )
+    open_follow_ups = _open_follow_up_reason(task_dir)
+    if open_follow_ups is not None:
+        reasons.append(open_follow_ups)
 
     # WARN — durable-state handoff pending.
     if (task_dir / "LEARNINGS.md").exists():

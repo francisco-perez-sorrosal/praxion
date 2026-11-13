@@ -28,6 +28,7 @@ export const CANONICAL_WORKSHOP_ARTIFACTS: string[] = [
   "traceability.yml",
   "VERIFICATION_REPORT.md",
   "REWORK_MANIFEST.md",
+  "FOLLOW_UPS.md",
   "PROGRESS.md",
   "RECOVERY_LOG.md"
 ] as const;

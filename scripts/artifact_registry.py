@@ -552,6 +552,18 @@ ARTIFACTS: tuple[Artifact, ...] = (
         cleanup_policy="block-if-active",  # BLOCK: an open manifest means rework may be live
         description="Clustered remediation worktree manifest.",
     ),
+    # No floor: the record exists only when a finder records something.
+    Artifact(
+        "FOLLOW_UPS.md",
+        "ai-work",
+        "ephemeral",
+        "conditional",
+        dashboard=True,
+        snapshot=True,
+        production_gate="producer:orchestrator",
+        cleanup_policy="block-if-active",  # BLOCK while any item is open
+        description="Small debt found during the task, fixed after the feature",
+    ),
     Artifact(
         "PROGRESS.md",
         "ai-work",

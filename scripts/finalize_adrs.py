@@ -51,6 +51,7 @@ from finalize_adrs_backlinks import backfill_re_affirmed_by
 from finalize_adrs_crossrefs import detect_unrewritten_ids, rewrite_cross_references
 from finalize_adrs_fragments import FRAGMENT_ADR_PATTERN
 from finalize_adrs_fragments import parse_fragment_filename as _parse_fragment_filename
+from finalize_adrs_fragments import sanitize_slug as _sanitize
 
 # -- Constants ----------------------------------------------------------------
 
@@ -153,13 +154,6 @@ def _current_git_branch_slug() -> str | None:
     if not branch or branch == "HEAD":
         return None
     return _sanitize(branch)
-
-
-def _sanitize(raw: str, max_len: int = 40) -> str:
-    """Lowercase, strip to [a-z0-9-], collapse runs, cap length."""
-    lowered = raw.lower()
-    kept = re.sub(r"[^a-z0-9-]+", "-", lowered).strip("-")
-    return kept[:max_len]
 
 
 # -- Git helpers --------------------------------------------------------------
@@ -665,11 +659,18 @@ def _find_already_promoted(decisions_dir: Path, draft_id: str) -> Path | None:
     return None
 
 
-def promote_draft(draft_path: Path, nnn: int, state_git_root: Path) -> tuple[Path, str]:
+def promote_draft(
+    draft_path: Path, nnn: int, state_git_root: Path, *, slug: str | None = None
+) -> tuple[Path, str]:
     """Promote a single draft to a finalized ADR.
 
     Performs rename + frontmatter `id:` rewrite only. Cross-reference
     rewrite is the caller's responsibility (see `rewrite_cross_references`).
+
+    `slug` is the slug a promotion plan already parsed for this draft. A batch
+    passes it: by the time its last draft is promoted the siblings have left
+    `drafts/`, and a second parse would have nothing to tell that draft's
+    branch from its slug. Without it the filename is parsed here.
 
     `state_git_root` is the repository whose index records the rename -- the
     project root for an in-repo project, the sidecar mount for a
@@ -687,7 +688,8 @@ def promote_draft(draft_path: Path, nnn: int, state_git_root: Path) -> tuple[Pat
     refusal path raises with the draft byte-unchanged, so the next run retries
     cleanly.
     """
-    _, _, _, slug = parse_fragment_filename(draft_path)
+    if slug is None:
+        _, _, _, slug = parse_fragment_filename(draft_path)
     new_name = f"{nnn:03d}-{slug}.md"
     new_path = DECISIONS_DIR / new_name
     new_id = f"dec-{nnn:03d}"
@@ -973,7 +975,7 @@ def _run(mode: str, branch: str | None, dry_run: bool) -> int:
     # so the old fragment file does not still carry the old id when other
     # files are updated. Order within the batch is deterministic (sort).
     for plan in plans:
-        _, old_id = promote_draft(plan.draft_path, plan.nnn, STATE_GIT_ROOT)
+        _, old_id = promote_draft(plan.draft_path, plan.nnn, STATE_GIT_ROOT, slug=plan.slug)
         if old_id != plan.old_id:
             logger.error(
                 "id mismatch for %s: plan=%s observed=%s",

@@ -33,6 +33,7 @@ PIPELINE_DOCS = [
     "TEST_RESULTS.md",
     "VERIFICATION_REPORT.md",
     "REWORK_MANIFEST.md",
+    "FOLLOW_UPS.md",
     "RECOVERY_LOG.md",
 ]
 

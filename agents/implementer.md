@@ -38,6 +38,7 @@ Before writing any code, read the planning documents in this order:
 2. **`IMPLEMENTATION_PLAN.md`** — read the full step details: Implementation, Testing, Done when, Files, `Check`, and `Read-only` when present.
 3. **`LEARNINGS.md`** — read accumulated context, gotchas, and decisions from prior steps.
 4. **Tech-debt ledger awareness (permission, not obligation).** Read `.ai-state/TECH_DEBT_LEDGER.md`. Filter entries by `owner-role = implementer` and `location` overlapping your current scope. Address items where possible within your current task; update `status` to `resolved` (with `resolved-by`) or `in-flight` as appropriate. Out-of-scope items remain `open` — do not delete. This is permission, not obligation: addressing ledger items is allowed when natural to your current scope, never required.
+   Never fix or file small out-of-scope debt you meet: report it on the `Follow-ups:` line of your return, which feeds the `FOLLOW_UPS.md` record.
 
 If any document is missing, stop and report: "Missing planning document: [name]. Cannot proceed without it."
 
@@ -211,7 +212,7 @@ Report one of:
 - `[BLOCKED]` — the blocker in one or two sentences + path to the evidence (failing test, conflicting file)
 - `[CONFLICT]` — the out-of-scope file path that forced the stop + one-line reason
 
-Keep the return to ≤5 lines. Do not echo diff content, test output, or `LEARNINGS.md` entries inline — they already live in the artifacts. Echoing them back duplicates content the orchestrator can read on demand and inflates its context on every step.
+Keep the return to ≤5 lines; an optional line `Follow-ups: <item>; <item>` inside that cap lists the small out-of-scope debt you met, omitted when there is none, and the terminal marker stays last. Do not echo diff content, test output, or `LEARNINGS.md` entries inline — they already live in the artifacts. Echoing them back duplicates content the orchestrator can read on demand and inflates its context on every step.
 
 ## Constraints
 

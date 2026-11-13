@@ -83,6 +83,8 @@ The pipeline worktree lifecycle — entry, during-execution rules, exit procedur
 
 **Native isolation (harness-enforced).** The harness itself refuses `Write`/`Edit`/`NotebookEdit` — including through a symlink whose realpath leaves the worktree — that targets outside the session worktree; this needs no hook and cannot be turned off. The one gap it leaves: a Bash-path write (heredoc, script, `sh -c`) into the main checkout from a worktree session is not blocked mechanically. The compensating control is procedural, not a hook — pathspec-scoped commits, merge gates verified from the main checkout, and `git status` re-derivation before any resume, the same discipline this protocol already requires elsewhere.
 
+**Follow-up pass at the exit.** Before the final commit the orchestrator closes every `open` line of `.ai-work/<task-slug>/FOLLOW_UPS.md` as `fixed <sha>`, `ledgered td-NNN` or `dropped <reason>`; the steps are in [agent-pipeline-details.md#exit](agent-pipeline-details.md#exit).
+
 **Key constraint for callers**: Standard/Full tiers use `EnterWorktree`/`ExitWorktree` directly from the main agent; never pass `isolation: "worktree"` to the Agent tool (see the nested-worktree limitation in the linked section).
 
 ## Task Slug Propagation
@@ -650,7 +652,7 @@ The user's responses are failure modes. They are not bugs in the plan; they are 
 
 ### Tier scaling
 
-Direct and Lightweight tiers have no phases. The discipline collapses to the intake `Surface Assumptions` ritual plus a **pre-commit digest** — the existing commit-approval gate, enriched with the assumptions and constraints taken so the user is aware before approving the commit.
+Direct and Lightweight tiers have no phases. The discipline collapses to the intake `Surface Assumptions` ritual plus a **pre-commit digest** — the existing commit-approval gate, enriched with the assumptions and constraints taken so the user is aware before approving the commit. With no task directory, the session's task list holds the follow-ups; the same follow-up flow runs before the close, and the closing digest names each outcome.
 
 ### Automated mode
 

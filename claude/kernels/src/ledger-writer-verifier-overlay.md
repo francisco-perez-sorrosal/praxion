@@ -7,4 +7,6 @@
 - `severity`: critical for a correctness risk or contract violation; important for a quality-ceiling breach or systemic duplication; suggested for surviving overrides and low-impact cleanup.
 - `class`: duplication for duplication; complexity for a size or nesting breach; for `[BLOAT]`, complexity, or dead-code when the bloat is a dedicated unused symbol.
 
+During a pipeline, a debt finding that meets the small bar becomes an `open` line in `.ai-work/<task-slug>/FOLLOW_UPS.md` (`- [open] <description>`) instead of a ledger row. This covers a WARN finding, a debt note harvested from the task's learnings, a pre-existing test failure and a world-read mutation survivor. A FAIL finding, a finding the user overrode and debt that is not small keep their row.
+
 When a `[DEAD-CODE-UNREMOVED]` FAIL is overridden by the user or deferred for scope, still file a row, with `severity` suggested, `status` open and a survivor flag in `notes`: survivors persist as tracked debt. One finding yields both a `VERIFICATION_REPORT.md` entry (this review) and a ledger row (persistence beyond the pipeline); never write debt findings into `LEARNINGS.md` or into report sections meant to stand in for the ledger.

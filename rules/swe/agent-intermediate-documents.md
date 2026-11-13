@@ -24,7 +24,7 @@ Every run uses its own `<task-slug>/` subdirectory. The slug is **kebab-case** (
 
 #### `TECH_DEBT_LEDGER.md` + `TECH_DEBT_RESOLVED.md` — living tech-debt ledger pair {#tech_debt_ledger-summary}
 
-`TECH_DEBT_LEDGER.md` (`status ∈ {open, in-flight}`) and `TECH_DEBT_RESOLVED.md` (`status ∈ {resolved, wontfix}`) share one `td-NNN` namespace. **Writers (only four):** verifier, sentinel, orchestrator, architect-validator. **Consumers** update status in place but never add rows. LEDGER is append-only; terminal rows migrate to RESOLVED at post-merge. Schema, owner-role heuristic and worktree concurrency: [`tech-debt-ledger.md`](../../skills/software-planning/references/tech-debt-ledger.md) — the single schema anchor.
+`TECH_DEBT_LEDGER.md` (`status ∈ {open, in-flight}`) and `TECH_DEBT_RESOLVED.md` (`status ∈ {resolved, wontfix}`) share one `td-NNN` namespace. **Writers (only four):** verifier, sentinel, orchestrator, architect-validator. **Consumers** update status in place but never add rows. LEDGER is append-only; terminal rows migrate to RESOLVED at post-merge. Schema, owner-role heuristic and worktree concurrency: [`tech-debt-ledger.md`](../../skills/software-planning/references/tech-debt-ledger.md) — the single schema anchor. A small defect found during a task is fixed in its own commit after the feature, not filed; file a row only for debt that is not small or could not be fixed this session (bar and flow: `tech-debt-ledger.md`).
 
 ### Document Lifecycle
 

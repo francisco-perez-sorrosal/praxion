@@ -1,6 +1,6 @@
 **Tech-debt ledger.** `.ai-state/TECH_DEBT_LEDGER.md` holds the active debt rows (`status` open or in-flight) and `.ai-state/TECH_DEBT_RESOLVED.md` the terminal ones (resolved or wontfix). They share one `td-NNN` namespace; `id` and `dedup_key` are unique across both files. A row is a grounded finding: a problem anchored in current source against current goals, or the reverse. It is not a gotcha (`LEARNINGS.md`) and not a speculative idea.
 
-**Who writes.** Only four writers create rows: the verifier (per-change findings), the sentinel (repo-wide audit findings), the orchestrator (under explicit user direction, or for adjacent debt a fix surfaced) and the architect-validator (per-PR drift findings). Every other agent only reads the ledger and, when it addresses an item, updates `status`, `resolved-by` and `last-seen` on the existing row. No other agent adds a row.
+**Who writes.** Only four writers create rows: the verifier (per-change findings), the sentinel (repo-wide audit findings), the orchestrator (under explicit user direction, or for adjacent debt a fix surfaced that is not small) and the architect-validator (per-PR drift findings). Every other agent only reads the ledger and, when it addresses an item, updates `status`, `resolved-by` and `last-seen` on the existing row. No other agent adds a row.
 
 **Append, update, migrate.**
 - Producers append to the active ledger only, never to the resolved file.

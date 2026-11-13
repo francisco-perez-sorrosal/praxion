@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-11-04T16:38:17Z'
+generated_at: '2026-11-13T01:51:24Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -44,7 +44,7 @@ rules:
   load: always_on
   core: true
   install: hook-deliver
-  chars: 4162
+  chars: 4371
   project_scope: managed
 - id: swe/adr-conventions-resident
   path: rules/swe/adr-conventions-resident.md

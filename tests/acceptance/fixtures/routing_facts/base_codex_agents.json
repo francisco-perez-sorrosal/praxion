@@ -6,7 +6,7 @@
    "model_reasoning_effort": "high"
   },
   "architect-validator": {
-   "instructions_digest": "b454fba39630afa6442a4e9f153fc6fc3fea6b6d341921aba374c8026bdf4992",
+   "instructions_digest": "19d678ab3a5ce5b5e688190fff7ef3f748cbf09f0ce58db65b163b210eb543fb",
    "model": "gpt-5.5",
    "model_reasoning_effort": "high"
   },
@@ -61,7 +61,7 @@
    "model_reasoning_effort": "high"
   },
   "sentinel": {
-   "instructions_digest": "aee934cc2ec7e8cba6fae2d44743f7e100724623a843e34671a5c305207e7b1c",
+   "instructions_digest": "3de65d8bab433e820f540dda53f7a2845aa1306ad42b54d30b18ba99c1957a5d",
    "model": "gpt-5.4",
    "model_reasoning_effort": "medium"
   },
@@ -81,7 +81,7 @@
    "model_reasoning_effort": "medium"
   },
   "verifier": {
-   "instructions_digest": "530d83fa17ae660b5047b077ff9529c92c336327a3e259a74b297de3ca12f714",
+   "instructions_digest": "59aa2ecfdba7a78783048c4ce01a01f734cdef2e35c12b4b33fe22d6afa05159",
    "model": "gpt-5.5",
    "model_reasoning_effort": "high"
   }

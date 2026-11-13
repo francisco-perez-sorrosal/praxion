@@ -10,5 +10,9 @@
   {
     "before": "**Praxion principles.** The eight principles are Pragmatism, Context Engineering, Behavior-Driven Development, Data Structures First, Incremental Evolution, Structural Beauty, Balanced Coupling and Root Causes Over Workarounds. Their full text is in `${CLAUDE_PLUGIN_ROOT}/claude/kernels/principles.md` (generated verbatim from the philosophy file's Principles section), each under its own heading. When your work cites a principle by name, read it there.",
     "after": "**Praxion principles.** The nine principles are Pragmatism, Context Engineering, Behavior-Driven Development, Data Structures First, Standing on the Shoulders of Giants, Incremental Evolution, Structural Beauty, Balanced Coupling and Root Causes Over Workarounds. Their full text is in `${CLAUDE_PLUGIN_ROOT}/claude/kernels/principles.md` (generated verbatim from the philosophy file's Principles section), each under its own heading. When your work cites a principle by name, read it there."
+  },
+  {
+    "before": "",
+    "after": "A small defect found during a task is fixed in its own commit after the feature, not filed; file a row only for debt that is not small or could not be fixed this session (bar and flow: `tech-debt-ledger.md`)."
   }
 ]

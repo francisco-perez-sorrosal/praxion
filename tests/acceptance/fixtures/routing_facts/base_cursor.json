@@ -6,7 +6,7 @@
  "ml/gpu-budget-conventions.md": "2e14d56d9a3d5aa49d9d9a67729df89d9c9500818ffb6c2886b61348baa13065",
  "swe/adr-conventions.md": "a6484ec4abe773b31f21eea6e0a50f4aa1aefc8a878afc51f1fa92457762fc54",
  "swe/agent-behavioral-contract.md": "0e0ae661b7091d152d175a610fd11871b089cb3e8e6f8b8fa57b0d2e818b5a6a",
- "swe/agent-intermediate-documents.md": "7fd5b4781412a64236f5de0f635ed7fc127f473cdd7922d794694f3c8331a0c2",
+ "swe/agent-intermediate-documents.md": "4a59798dc81f6b3bad318d2b4298bd7d331615ccfc0e6bbbcb32dd27273a9c55",
  "swe/agent-model-routing.md": "6c7109cac9680629c35a4bafce8d718adbccc69e864aa7d7f2cb94aba708876d",
  "swe/coding-style.md": "313fb56daf1d10982073336317cf750aff3406cde13f41b66453b47f17ce2c90",
  "swe/gate-liveness.md": "99b2db1c970d0a4f6525e787258e5d730920fae7da690857516702978b8added",

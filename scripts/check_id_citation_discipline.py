@@ -503,7 +503,8 @@ def format_findings(files: list[Path], repo_root: Path) -> tuple[int, list[str]]
     return total, lines
 
 
-def main(argv: list[str]) -> int:
+def run(argv: list[str]) -> tuple[int, Path]:
+    """Scan and return the exit code with the repository root the verdict applies to."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
     parser.add_argument(
         "--repo-root",
@@ -532,20 +533,20 @@ def main(argv: list[str]) -> int:
             # never escalate to a whole-repo scan that blocks the commit.
             if os.environ.get(_PAYLOAD_ENV):
                 print("hook mode: commit scope unavailable (transient); passing.")
-                return 0
+                return 0, repo_root
             raise
         if scope is _ScopeUnavailable:
             # A commit payload we could not scope (transient git failure). Pass
             # rather than gate the commit on the whole tree's pre-existing
             # violations — that is never the right hook behaviour.
             print("hook mode: commit scope unavailable (transient); passing.")
-            return 0
+            return 0, repo_root
         if scope is not None:
             repo_root, candidates = scope
             files = filter_files(candidates, repo_root)
             if not files:
                 print("hook mode: no staged code files; 0 id-citation violations.")
-                return 0
+                return 0, repo_root
         else:
             files = iter_code_files(repo_root)
 
@@ -553,7 +554,7 @@ def main(argv: list[str]) -> int:
 
     if total == 0:
         print(f"scanned {len(files)} code file(s); 0 id-citation violations.")
-        return 0
+        return 0, repo_root
 
     print("\n".join(detail_lines))
     print(f"\nscanned {len(files)} code file(s); {total} violation(s).")
@@ -562,18 +563,24 @@ def main(argv: list[str]) -> int:
     print("Remediation:    /decontaminate-ids  (or the id-decontamination skill)")
     print("Escape hatch:   add `id-citation-discipline:ignore` on the same line")
     print("                when the reference is truly intentional.")
-    return 1
+    return 1, repo_root
 
 
 if __name__ == "__main__":
-    _rc = main(sys.argv[1:])
+    _rc, _judged_root = run(sys.argv[1:])
     try:
-        # No parsed payload is in scope at this call site (main() only reads
+        # No parsed payload is in scope at this call site (run() only reads
         # its own stdin conditionally, deep inside _hook_scope_from_stdin),
         # so this row lands without a session_id -- still in the raw WAL,
         # just outside the Stop-time per-session rollup. rc is 0 (pass) or 1
-        # (block, translated to exit 2 by commit_gate.sh --blocking).
-        record_gate_fire("check_id_citation_discipline", "block" if _rc == 1 else "pass")
+        # (block, translated to exit 2 by commit_gate.sh --blocking). The row
+        # goes to the repository the verdict was judged in, which a hook
+        # payload from another checkout makes differ from the process cwd.
+        record_gate_fire(
+            "check_id_citation_discipline",
+            "block" if _rc == 1 else "pass",
+            project_dir=_judged_root,
+        )
     except Exception:
         pass
     sys.exit(_rc)

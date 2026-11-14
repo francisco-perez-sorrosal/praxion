@@ -326,3 +326,30 @@ def test_the_pre_commit_config_runs_the_checker_on_the_staged_files() -> None:
     hook = matching[0]
     assert "--files" in hook["entry"]
     assert hook.get("pass_filenames", True) is True
+
+
+def test_hook_mode_records_its_gate_fire_in_the_judged_repository(tmp_path: Path) -> None:
+    """A payload piped from another checkout is judged there, so its verdict is logged there."""
+    judged = tmp_path / "judged"
+    judged.mkdir()
+    _init_repo(judged)
+    (judged / ".ai-state").mkdir()
+    _write(judged, "src/ok.py", CLEAN_LINE)
+    _git(judged, "add", "-A")
+    elsewhere = tmp_path / "elsewhere"
+    (elsewhere / ".ai-state").mkdir(parents=True)
+    payload = json.dumps(
+        {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "x"'}, "cwd": str(judged)}
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(CHECKER)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        cwd=str(elsewhere),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (judged / ".ai-state" / "observations.jsonl").exists()
+    assert not (elsewhere / ".ai-state" / "observations.jsonl").exists()

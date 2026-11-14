@@ -20,7 +20,7 @@ from praxion_evals.adherence import (
     cli,
     managed_fixture,
     model,
-    session_loop,
+    session_arms,
     tasks,
 )
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS
@@ -192,7 +192,7 @@ def test_the_dry_run_names_the_plugin_copy_a_real_run_builds(
     every_task = tasks.generate(ROLE, cli.DEFAULT_SEED, tasks.producible_task_count(ROLE, 7))
     task = next(t for t in every_task if t.task_id.endswith(f".{variant}"))
 
-    session_loop._build_copy(tmp_path / task.role, None, task.role, arm, tasks.turn_cap_of(task))
+    session_arms.build_copy(tmp_path / task.role, None, task.role, arm, tasks.turn_cap_of(task))
 
     assert cli._planned_copy(tmp_path, task, arm) == built[0]
 

@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import os
 import random
-import shutil
 import subprocess
 import tempfile
 import urllib.request
@@ -37,7 +36,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, assert_never
 
-from praxion_evals.adherence import arms, grade, report, results, run_index, tasks
+from praxion_evals.adherence import arms, report, results, run_index, tasks
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
 from praxion_evals.adherence.infra_stop import (
@@ -64,36 +63,28 @@ from praxion_evals.adherence.model import (
     NotBuilt,
     Passed,
     Role,
-    SessionEvidence,
     SessionRecord,
-    Standard,
     TaskSpec,
     outcome_to_json,
 )
 from praxion_evals.adherence.run_ending import Continuation, finalized
+from praxion_evals.adherence.session_arms import Builds, ProofRun, build_copy, prove, record_of
 from praxion_evals.adherence.session_launch import (
     DEFAULT_TAIL_CHARS,
-    REAL_HOME,
     Launch,
-    attempt,
     injection_of,
     task_session,
 )
 from praxion_evals.adherence.settings_acceptance import refuse_unaccepted_settings
 from praxion_evals.harness.judge_client import JudgeClient, select_judge_client
 from praxion_evals.live.materialize import (
-    Materialization,
-    install_user_scope,
     materialize_path,
     remove_tree,
 )
 from praxion_evals.live.report import require_credential
 from praxion_evals.live.session import (
     CLAUDE_BINARY,
-    SandboxPaths,
-    SessionRun,
     build_env,
-    session_error,
     with_session_token,
 )
 from praxion_evals.live.spend import SpendLedger
@@ -513,8 +504,6 @@ def golden_record(cases: Mapping[str, GoldenVerdicts]) -> dict[str, Any]:
 
 # --- one role: copies, proof, tasks ---
 
-Builds = dict[tuple[Arm, int | None], ArmBuild]  # (the arm whose copy, its early-stop cap)
-
 
 def _measure_role(
     context: Context, state: RunState, role: Role, role_tasks: list[TaskSpec]
@@ -526,19 +515,20 @@ def _measure_role(
         unbuilt = NotBuilt(f"the checkout could not be copied: {type(error).__name__}: {error}")
         return _record_arms(context, state, role, {}, dict.fromkeys(config.arms, unbuilt))
     copies: dict[Arm, ArmBuild | NotBuilt] = {
-        arm: _build_copy(role_dir, original, role, arm) for arm in config.arms
+        arm: build_copy(role_dir, original, role, arm) for arm in config.arms
     }
     builds: Builds = {(a, None): c for a, c in copies.items() if isinstance(c, ArmBuild)}
     verdicts: dict[Arm, arms.ArmVerdict] = {
         a: c for a, c in copies.items() if isinstance(c, NotBuilt)
     }
-    state, proof = _prove(context, state, role, original, builds, role_tasks[0])
-    verdicts.update(proof)
+    proof = prove(_launch_of(context), state.ledger, role, original, builds, role_tasks[0])
+    state = _fold_proof(state, proof)
+    verdicts.update(proof.verdicts)
     caps = sorted({cap for t in role_tasks if (cap := tasks.turn_cap_of(t)) is not None})
     proven: list[Arm] = [a for a, v in verdicts.items() if isinstance(v, arms.ArmProven)]
     for arm in proven:
         for cap in caps:  # the early-stop twins of a proven arm; a twin that fails demotes the arm
-            twin = _build_copy(role_dir, original, role, arm, cap)
+            twin = build_copy(role_dir, original, role, arm, cap)
             if isinstance(twin, NotBuilt):
                 verdicts[arm] = twin
             else:
@@ -555,6 +545,27 @@ def _measure_role(
                 return state
             build = builds[(copy_arm, tasks.turn_cap_of(task))]
             state = _session_with_retry(context, state, task, slot, build)
+    return state
+
+
+def _record_arms(
+    context: Context,
+    state: RunState,
+    role: Role,
+    builds: Builds,
+    verdicts: Mapping[Arm, arms.ArmVerdict],
+) -> RunState:
+    per_arm = record_of(builds, verdicts)
+    updated = replace(state.results, arms={**state.results.arms, role: per_arm})
+    return _checkpoint(context, replace(state, results=updated))
+
+
+def _fold_proof(state: RunState, proof: ProofRun) -> RunState:
+    state = replace(state, ledger=proof.ledger)
+    for model in proof.models:
+        state = _note_resolved_model(state, model)
+    for refusal in proof.refusals:
+        state = _add_refusal(state, refusal)
     return state
 
 
@@ -597,98 +608,6 @@ def _slots(config: RunConfig, runnable: Sequence[Arm], task: TaskSpec) -> list[t
     if config.calibration:
         return [("full", "full"), ("lean", "full")] if "full" in runnable else []
     return [(arm, arm) for arm in ordered_arms(runnable, config.seed, task.task_id)]
-
-
-def _build_copy(
-    role_dir: Path, original: Materialization, role: Role, arm: Arm, cap: int | None = None
-) -> ArmBuild | NotBuilt:
-    try:
-        return arms.build_arm(
-            original, role_dir / (f"{arm}-cap{cap}" if cap else arm), role, arm, turn_cap=cap
-        )
-    except (arms.ArmCopyError, OSError) as error:
-        return NotBuilt(f"the {arm} copy could not be built: {error}")
-
-
-def _record_arms(
-    context: Context,
-    state: RunState,
-    role: Role,
-    builds: Builds,
-    verdicts: Mapping[Arm, arms.ArmVerdict],
-) -> RunState:
-    per_arm: dict[str, Any] = {}
-    for arm, outcome in verdicts.items():
-        build = builds.get((arm, None))
-        if isinstance(outcome, NotBuilt) or build is None:
-            per_arm[arm] = {"built": False, "reason": getattr(outcome, "reason", "not built")}
-        else:
-            proof = {
-                "first_request_tokens": outcome.first_request_tokens,
-                "cross_checked": outcome.cross_checked,
-            }
-            per_arm[arm] = {
-                "built": True,
-                "proof": proof,
-                "tree_digest": build.tree_digest,
-                "patched": list(build.patched),
-            }
-    updated = replace(state.results, arms={**state.results.arms, role: per_arm})
-    return _checkpoint(context, replace(state, results=updated))
-
-
-# --- the arm proof ---
-
-
-def _prove(
-    context: Context,
-    state: RunState,
-    role: Role,
-    original: Materialization,
-    builds: Builds,
-    first_task: TaskSpec,
-) -> tuple[RunState, dict[Arm, arms.ArmVerdict]]:
-    """One proof session per built arm, all under one planted nonce, then one decision."""
-    template = context.run_root / role / "proof-home"
-    install_user_scope(original.root, template)
-    nonce = arms.plant_proof_marker(SandboxPaths(template))
-    proof_task = replace(first_task, variant=Standard(), main_prompt=arms.proof_prompt())
-
-    def copy_home(root: Path) -> None:
-        shutil.copytree(template, root, symlinks=True, dirs_exist_ok=True)
-
-    observed: dict[Arm, arms.ProofObservation | None] = {}
-    verdicts: dict[Arm, arms.ArmVerdict] = {}
-    for (arm, _), build in builds.items():
-        ledger, done = attempt(
-            _launch_of(context), state.ledger, proof_task, build, copy_home, None, _observe
-        )
-        state = _note_resolved_model(replace(state, ledger=ledger), done.model)
-        match done.result:
-            case Errored(kind="launch_refused", detail=detail):
-                state = _add_refusal(state, f"{role} {arm} arm proof: {detail}")
-                verdicts[arm] = NotBuilt(f"the proof launch was refused: {detail}")
-            case Errored(detail=detail):
-                verdicts[arm] = NotBuilt(f"the proof session failed: {detail}")
-            case NotBuilt() as unobserved:
-                verdicts[arm] = unobserved
-            case arms.ProofObservation() as seen:
-                observed[arm] = seen
-    return state, {**verdicts, **arms.decide_proof(nonce, observed)}
-
-
-def _observe(evidence: SessionEvidence) -> arms.ProofObservation | NotBuilt:
-    """What the proof session's role answered, or why nothing was observed."""
-    run = SessionRun("", "", None if evidence.timed_out else evidence.exit_code)
-    error = session_error(evidence.envelope, run, evidence.plugin_copy, real_home=REAL_HOME)
-    if error is not None:
-        return NotBuilt(f"the proof session ended in {error.kind}: {error.detail}")
-    if evidence.spawn_id is None:
-        return NotBuilt("the role was never spawned in the proof session")
-    return arms.ProofObservation(
-        answer=evidence.role_return or "",
-        first_request_tokens=grade.first_request_tokens(evidence),
-    )
 
 
 def _probe_page(context: Context, state: RunState, runnable: Sequence[Arm]) -> RunState:

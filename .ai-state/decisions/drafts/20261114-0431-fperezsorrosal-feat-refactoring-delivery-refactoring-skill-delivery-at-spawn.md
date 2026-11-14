@@ -4,7 +4,7 @@ title: "The refactoring skill reaches a marked spawn through the single prompt-r
 status: proposed
 category: architectural
 date: 2026-11-14
-summary: "A new hook-side delivery module decides per Agent call whether a delegation to the implementer or test-engineer carries the refactoring phase marker in its own words (or is a step-loop request for a tagged step) and, when the role's definition no longer preloads the skill, the single PreToolUse emitter appends the skill body as one labelled block; the marker grammar moves to that module; the preload's removal is a held, reversible move."
+summary: "A new hook-side delivery module decides per Agent call whether a delegation to the implementer or test-engineer carries the refactoring phase marker in its own words (or is a step-loop request for a tagged step) and, when the role's definition no longer preloads the skill, the single PreToolUse emitter appends the skill body as one labelled block; the marker grammar stays in the plan reader, which the module re-exports; the preload's removal is a held, reversible move."
 tags: [refactoring, skill-delivery, preload, spawn, hooks, updated-input, step-loop, startup-context]
 made_by: agent
 agent_type: systems-architect
@@ -33,7 +33,7 @@ The hooks reference (read 2026-11-13) settles that verification negatively. `Sub
 ## Decision
 
 1. **A new component, `hooks/_skill_delivery.py`, owns the delivery decision.** It holds:
-   - the marker grammar, its single definition (`scripts/_plan_steps.py` imports it);
+   - the marker grammar, as a re-export (`MARKER_PATTERN`) of its single definition, which stays in the plan reader `scripts/_plan_steps.py` as `REFACTORING_TAG_PATTERN`. That is plan-heading grammar, and the plan reader's pinned purity forbids it any new import. The module imports it through `<CLAUDE_PLUGIN_ROOT>/scripts`. If that import fails, the interim is unaffected (the preload check comes first) and every end-state spawn of the two roles fails loudly as `grammar-unavailable`: a notice, a `failed` row and stderr, never a second copy of the grammar;
    - the classifier: the marker in the delegation's own words, outside code spans, fenced blocks and block quotes, or a step-loop pointer whose rendered request's `<step>` heading carries the marker;
    - the preload-state reader: the role's own `skills:` list in the same installation;
    - the block renderer, the failure notice, the arrival matcher and the `skill_delivery` observation row.
@@ -69,7 +69,7 @@ Rejected by the user and by `dec-504` (3): "model-initiated pull fails at the tr
 
 Positive:
 - Every unmarked spawn of the two roles saves at least 4,184 tokens once the move lands, and a marked spawn still holds one whole copy.
-- The marker has one definition across the plan reader and the delivery.
+- The marker has one definition, the plan reader's, shared by the delivery.
 - The step-loop driver's pinned three-line prompt is untouched.
 - The interim merges with no change to any real spawn.
 

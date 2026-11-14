@@ -19,6 +19,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, assert_never, get_args
 
+from praxion_evals.adherence.axis import (
+    DEFAULT_AXIS,
+    Axis,
+    InheritedContextArm,
+    SessionArm,
+    check_axis_arm,
+)
 from praxion_evals.adherence.transcript import RoleEnding
 from praxion_evals.live.results import ErrorKind as LiveErrorKind
 from praxion_evals.live.session import SessionEnvelope, ToolUse
@@ -46,7 +53,7 @@ Role = Literal[
     "roadmap-cartographer",
     "skill-genesis",
 ]
-Arm = Literal["full", "lean"]
+Arm = InheritedContextArm  # the default axis; the other axis's arms live in axis.py
 CheckKind = Literal["mechanical", "judged"]
 # The modes a kit can measure: a role's definition has several phases, a kit covers some.
 KitMode = Literal["acceptance-design", "paired", "spec", "feature"]
@@ -513,15 +520,16 @@ class NotBuilt:
 
 @dataclass(frozen=True)
 class SessionSetup:
-    arm: Arm
+    arm: SessionArm
     checkout_commit: str
     role: Role
     task_id: str
     template_id: str
     seed: int
+    axis: Axis = DEFAULT_AXIS
 
     def __post_init__(self) -> None:
-        _one_of(self.arm, ARMS, "a session's arm")
+        check_axis_arm(self.axis, self.arm)
         _one_of(self.role, ROLES, "a session's role")
         for name in ("checkout_commit", "task_id", "template_id"):
             _non_empty(getattr(self, name), f"a session's {name}")

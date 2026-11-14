@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, assert_never, cast
 
+from praxion_evals.adherence.axis import DEFAULT_AXIS
 from praxion_evals.adherence.infra_stop import EvidenceTail, StopRule
 from praxion_evals.adherence.model import (
     Assessed,
@@ -82,6 +83,7 @@ def outcome_from_json(data: _Json) -> CheckOutcome:
 
 
 def setup_to_json(setup: SessionSetup) -> dict[str, Any]:
+    """A setup as JSON; the default axis is implied, so a record of it stays as it always was."""
     return {
         "arm": setup.arm,
         "checkout_commit": setup.checkout_commit,
@@ -89,6 +91,7 @@ def setup_to_json(setup: SessionSetup) -> dict[str, Any]:
         "task_id": setup.task_id,
         "template_id": setup.template_id,
         "seed": setup.seed,
+        **({} if setup.axis == DEFAULT_AXIS else {"axis": setup.axis}),
     }
 
 
@@ -100,6 +103,7 @@ def setup_from_json(data: _Json) -> SessionSetup:
         task_id=_field(data, "task_id", "a session setup"),
         template_id=_field(data, "template_id", "a session setup"),
         seed=int(_field(data, "seed", "a session setup")),
+        axis=data.get("axis", DEFAULT_AXIS),
     )
 
 

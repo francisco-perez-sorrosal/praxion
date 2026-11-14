@@ -166,7 +166,9 @@ Apply only confirmed outcomes, one row at a time. For each:
    a segment or change an earlier stamp; a `dec-NNN` that is not a
    finalized decision; a `td-NNN` that is not a ledger row or is the row itself; a merge that
    names no other active row as survivor; or a row that is not active. A `realigned` stamp's
-   text is the premise it replaced, stale by definition, so only its `@anchor` is resolved.
+   text is the premise it replaced, stale by definition, so only its `@anchor` is resolved;
+   its `from <key>` must be the row's own base key, and a realign whose `--location` moves
+   that key is refused without one.
    A refused stamp is never written: skip the row and report the reasons. This is the
    code-level backstop behind the discard confidence gate — the judge's confidence and the
    user's confirmation are necessary, but a stamp that merely *shapes* like it cites something

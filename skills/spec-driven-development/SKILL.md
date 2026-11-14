@@ -120,10 +120,12 @@ REQ IDs flow through the pipeline in five stages via an **external two-layer mec
                             initializes .ai-work/<slug>/traceability.yml, seeding each
                             REQ's `acceptance:` from ACCEPTANCE_TESTS.md (the acceptance
                             designer never touches traceability.yml)
-3. Implementer writes   --> unit tests and production code with behavioral names; appends
+3. Implementer writes   --> unit tests and production code with behavioral names; adds
                             REQ-to-test and REQ-to-impl entries to traceability.yml (or
-                            traceability_implementer.yml fragment); a paired test-engineer
-                            may append REQ-to-test entries (traceability_test-engineer.yml)
+                            traceability_implementer.yml fragment), each into the REQ's
+                            existing list key, never under a second key of that name; a
+                            paired test-engineer may add REQ-to-test entries the same way
+                            (traceability_test-engineer.yml)
 4. Verifier produces    --> Traceability matrix in VERIFICATION_REPORT.md by reading
                             the YAML + TEST_RESULTS.md (never by grepping code)
 5. Planner archives     --> Renders YAML into archived SPEC's matrix at feature end;

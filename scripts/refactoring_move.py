@@ -13,8 +13,10 @@ Moving is idempotent and runs in either direction. All sites are checked before 
 written, so a drifted definition is never left half moved.
 
 Exit codes: 0 the state was applied or already held; 1 a site has drifted (neither of its texts
-is found exactly once) or, under `--check`, the state differs; 2 a usage error, including a root
-with no definitions. This tool lives in the Praxion checkout only and is not shipped as a command.
+is found exactly once, or a passage it inserted has been reworded) or, under `--check`, the state
+differs; 2 a usage error, including a root with no definitions, no root to default to (the working
+directory is not in a git repository), an installed-plugin cache as root, and a definition that
+cannot be read or written. This tool lives in the Praxion checkout only and is not shipped as a command.
 """
 
 from __future__ import annotations
@@ -26,9 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from _repo_root import resolve_repo_root
-
-SCRIPT_DIR = Path(__file__).resolve().parent
+from _repo_root import git_toplevel_from_cwd, is_plugin_cache_path
 
 State = Literal["preloaded", "delivered"]
 STATES: tuple[State, ...] = ("preloaded", "delivered")
@@ -45,9 +45,19 @@ class Site:
     name: str
     preloaded: str
     delivered: str
+    # Text that only an inserted passage leaves behind: where it is found without the exact
+    # delivered text, the passage was reworded, and the site is not the preloaded state.
+    inserted_trace: str | None = None
 
     def text(self, state: State) -> str:
         return self.preloaded if state == "preloaded" else self.delivered
+
+    def holds(self, text: str, state: State) -> bool:
+        """True when `text` is in `state` here: its words found once, and no stray insertion."""
+        stray = (
+            state == "preloaded" and self.inserted_trace is not None and self.inserted_trace in text
+        )
+        return text.count(self.text(state)) == 1 and not stray
 
     def __str__(self) -> str:
         return f"{self.definition} ({self.name})"
@@ -56,8 +66,9 @@ class Site:
 # The passage is read by every host, so it states a condition rather than a state: where the
 # skill is already in context it is inert. The Codex export carries it because no spawn-time
 # delivery reaches a Codex agent.
+_PASSAGE_BEGIN = "<!-- codex-wrapper:begin -->"
 _CODEX_PASSAGE = (
-    "<!-- codex-wrapper:begin -->\n"
+    f"{_PASSAGE_BEGIN}\n"
     "A step whose delegation carries `[Phase: Refactoring]` is verified against "
     "`skills/refactoring/SKILL.md`. Where that skill's text is not already in your context "
     "(a host with no spawn-time delivery, or a delivery that failed), read it before starting "
@@ -66,9 +77,15 @@ _CODEX_PASSAGE = (
 )
 
 
-def _with_codex_passage(name: str, definition: str, anchor: str) -> Site:
+def _with_codex_passage(definition: str, anchor: str) -> Site:
     """The passage is inserted after `anchor`, the last sentence of the paragraph it follows."""
-    return Site(definition, name, anchor, f"{anchor}\n\n{_CODEX_PASSAGE}")
+    return Site(
+        definition,
+        "Codex passage",
+        anchor,
+        f"{anchor}\n\n{_CODEX_PASSAGE}",
+        inserted_trace=f"{anchor}\n\n{_PASSAGE_BEGIN}",
+    )
 
 
 SITES: tuple[Site, ...] = tuple(
@@ -100,12 +117,10 @@ SITES: tuple[Site, ...] = tuple(
         "frontmatter or delivered with the delegation), and the tag signals that",
     ),
     _with_codex_passage(
-        "Codex passage",
         IMPLEMENTER,
         "names the behaviors the paired characterization tests must lock down.",
     ),
     _with_codex_passage(
-        "Codex passage",
         TEST_ENGINEER,
         "Tests written here become the regression detector that every subsequent restructuring "
         "step in the mini-pipeline must pass.",
@@ -114,15 +129,9 @@ SITES: tuple[Site, ...] = tuple(
 
 
 def held_state(text: str, site: Site) -> State | None:
-    """The state `text` holds at `site`; None when that is not decided by one occurrence.
-
-    The delivered text is tried first because an inserted passage's delivered text contains its
-    preloaded anchor.
-    """
-    for state in reversed(STATES):
-        if text.count(site.text(state)) == 1:
-            return state
-    return None
+    """The state `text` holds at `site`; None when it holds neither, or is ambiguous."""
+    held = [state for state in STATES if site.holds(text, state)]
+    return held[0] if len(held) == 1 else None
 
 
 def move(
@@ -142,10 +151,39 @@ def move(
     return moved, drifted
 
 
+class UsageError(Exception):
+    """The command cannot say which tree to move."""
+
+
+def _target_root(explicit: str | None) -> Path:
+    """The tree to move. Never a silent fallback: without a root the live checkout is not guessed."""
+    root = Path(explicit).resolve() if explicit else git_toplevel_from_cwd()
+    if root is None:
+        raise UsageError("no --root given and the working directory is not in a git repository")
+    if is_plugin_cache_path(root):
+        raise UsageError(f"{root} is an installed-plugin cache, which is never moved")
+    return root
+
+
 def _read_definitions(root: Path) -> dict[str, str]:
     """Bytes in, bytes out: a definition's line endings are never normalized by the move."""
     definitions = sorted({site.definition for site in SITES})
     return {d: (root / d).read_bytes().decode("utf-8") for d in definitions}
+
+
+def _write_definitions(root: Path, texts: Mapping[str, str], to: State) -> int:
+    for definition, text in texts.items():
+        try:
+            (root / definition).write_bytes(text.encode("utf-8"))
+        except OSError as exc:
+            return _fail(f"cannot write {definition}: {exc}")
+        print(f"refactoring-move: moved {definition} to {to}")
+    return 0
+
+
+def _fail(reason: object) -> int:
+    print(f"refactoring-move: ERROR -- {reason}", file=sys.stderr)
+    return 2
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -162,12 +200,11 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    root = resolve_repo_root(args.root, script_dir=SCRIPT_DIR)
     try:
+        root = _target_root(args.root)
         texts = _read_definitions(root)
-    except (OSError, UnicodeDecodeError) as exc:
-        print(f"refactoring-move: ERROR -- {exc}", file=sys.stderr)
-        return 2
+    except (UsageError, OSError, UnicodeDecodeError) as exc:
+        return _fail(exc)
 
     moved, drifted = move(texts, args.to)
     for site in drifted:
@@ -179,18 +216,16 @@ def main(argv: list[str] | None = None) -> int:
     if drifted:
         return 1
 
-    differing = [d for d in texts if moved[d] != texts[d]]
+    differing = {d: moved[d] for d in texts if moved[d] != texts[d]}
     if args.check:
         for definition in differing:
             print(f"refactoring-move: {definition} does not hold the {args.to} state")
         return 1 if differing else 0
 
-    for definition in differing:
-        (root / definition).write_bytes(moved[definition].encode("utf-8"))
-        print(f"refactoring-move: moved {definition} to {args.to}")
     if not differing:
         print(f"refactoring-move: already {args.to}")
-    return 0
+        return 0
+    return _write_definitions(root, differing, args.to)
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ sys.path.append(str(LIVE_ROOT / "hooks"))
 sys.path.append(str(LIVE_ROOT / "scripts"))
 
 import _skill_delivery as delivery  # noqa: E402
+import artifact_registry  # noqa: E402
 import refactoring_move as move  # noqa: E402
 
 ROLES = ("implementer", "test-engineer")
@@ -175,19 +176,25 @@ def test_check_exits_0_when_the_state_holds(preloaded: Path) -> None:
 
 # -- Drift -------------------------------------------------------------------------------------
 
-SITE_AND_TARGET = [
-    pytest.param(site, to, id=f"{site.definition.split('/')[1]}-{site.name}-to-{to}")
+# Each move starts from the state opposite to its target, so it has work to do at every site.
+MOVES = (("preloaded", "delivered"), ("delivered", "preloaded"))
+SITE_AND_MOVE = [
+    pytest.param(site, start, to, id=f"{site.definition.split('/')[1]}-{site.name}-to-{to}")
     for site in move.SITES
+    for start, to in MOVES
+]
+CODEX_SITE_AND_TARGET = [
+    pytest.param(site, to, id=f"{site.definition.split('/')[1]}-to-{to}")
+    for site in move.SITES
+    if site.name == "Codex passage"
     for to in move.STATES
 ]
 
 
-@pytest.mark.parametrize(("site", "to"), SITE_AND_TARGET)
+@pytest.mark.parametrize(("site", "start", "to"), SITE_AND_MOVE)
 def test_a_drifted_site_is_refused_by_name_and_nothing_is_written(
-    preloaded: Path, capsys: pytest.CaptureFixture[str], site: move.Site, to: str
+    preloaded: Path, capsys: pytest.CaptureFixture[str], site: move.Site, start: str, to: str
 ) -> None:
-    # Start from the state opposite to the target, so the move has work to do at every site.
-    start = "delivered" if to == "preloaded" else "preloaded"
     _run(preloaded, start)
     _edit(preloaded / site.definition, site.text(start), "edited elsewhere")
     before = _snapshot(preloaded)
@@ -199,6 +206,20 @@ def test_a_drifted_site_is_refused_by_name_and_nothing_is_written(
         f"refactoring-move: DRIFT -- {site.definition} ({site.name}): neither the preloaded nor "
         "the delivered text is found exactly once"
     ]
+
+
+@pytest.mark.parametrize(("site", "to"), CODEX_SITE_AND_TARGET)
+def test_a_reworded_codex_passage_is_drift_in_either_direction(
+    preloaded: Path, capsys: pytest.CaptureFixture[str], site: move.Site, to: str
+) -> None:
+    _run(preloaded, "delivered")
+    _edit(preloaded / site.definition, "is verified against", "is checked against")
+    before = _snapshot(preloaded)
+
+    assert _run(preloaded, to) == 1
+
+    assert _snapshot(preloaded) == before
+    assert f"{site.definition} ({site.name})" in capsys.readouterr().err
 
 
 def test_a_text_found_twice_is_drift_not_a_guess(
@@ -244,11 +265,62 @@ def test_a_root_without_the_definitions_is_a_usage_error(
     assert capsys.readouterr().err.startswith("refactoring-move: ERROR -- ")
 
 
+def test_the_default_root_is_the_git_toplevel(
+    preloaded: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(move, "git_toplevel_from_cwd", lambda: preloaded)
+
+    assert move.main(["--to", "delivered"]) == 0
+
+    assert delivery.preload_state(preloaded, "implementer") == delivery.NotPreloaded()
+
+
+def test_no_root_and_no_git_repository_is_a_usage_error_not_a_guess(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(move, "git_toplevel_from_cwd", lambda: None)
+
+    assert move.main(["--to", "delivered"]) == 2
+
+    assert "not in a git repository" in capsys.readouterr().err
+
+
+def test_an_installed_plugin_cache_is_never_moved(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cache = tmp_path / "plugins" / "cache" / "owner" / "praxion" / "1.0.0"
+    cache.mkdir(parents=True)
+
+    assert _run(cache, "delivered") == 2
+
+    assert "plugin cache" in capsys.readouterr().err
+
+
+def test_a_definition_that_cannot_be_written_is_a_usage_error_naming_it(
+    preloaded: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    write_bytes = Path.write_bytes
+
+    def write_unless_test_engineer(self: Path, data: bytes) -> int:
+        if self.name == "test-engineer.md":
+            raise PermissionError("read-only")
+        return write_bytes(self, data)
+
+    monkeypatch.setattr(Path, "write_bytes", write_unless_test_engineer)
+
+    assert _run(preloaded, "delivered") == 2
+
+    assert "cannot write agents/test-engineer.md" in capsys.readouterr().err
+
+
 # -- What the move writes ----------------------------------------------------------------------
 
+# Every registered pipeline artifact, a placeholder name by its fixed prefix.
+_PIPELINE_FILES = "|".join(
+    re.escape(name.split("<")[0]) for name in sorted(artifact_registry.all_names())
+)
 _EPHEMERAL = re.compile(
-    r"\bdec-\d+|\bdec-draft|\bREQ-\d+|\bAC-\d+|\bStep \d+|\.ai-work|"
-    r"\b(?:WIP|LEARNINGS|IMPLEMENTATION_PLAN|SYSTEMS_PLAN|CONTEXT_REVIEW|TASK_BRIEF)\.md"
+    rf"\bdec-\d+|\bdec-draft|\bREQ-\d+|\bAC-\d+|\bStep \d+|\.ai-work|\b(?:{_PIPELINE_FILES})"
 )
 
 

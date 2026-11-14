@@ -182,13 +182,17 @@ def read_task(args: argparse.Namespace) -> Task:
 PIPELINE_STATE = (".ai-work/", ".ai-state/observations")
 
 
+STATE_FILES = ".ai-state/"  # committed project state, as likely to be dirty as it is unrelated
+
+
 def uncommitted_files(repo: Path, inputs: LoopInputs) -> dict[str, tuple[str, ...]]:
     """What each marked step left behind: every path of the tree that differs from HEAD, tracked
     or not, bar the pipeline's own state. A marked return commits and restores nothing, and a
     [CONFLICT] is most often an edit outside the step's files, so the stop names them all for
-    the person who takes the work over."""
+    the person who takes the work over. A step's own files come first and the committed state
+    last, so the few names a stop spells out are the ones that matter."""
     states = series_states(inputs)
-    marked = [step.id for step in inputs.steps if isinstance(states[step.id], Marked)]
+    marked = [step for step in inputs.steps if isinstance(states[step.id], Marked)]
     if not marked:
         return {}
     left = tuple(
@@ -196,7 +200,20 @@ def uncommitted_files(repo: Path, inputs: LoopInputs) -> dict[str, tuple[str, ..
         for path in paths_differing_from_head(repo, ["."])
         if not path.startswith(PIPELINE_STATE)
     )
-    return dict.fromkeys(marked, left) if left else {}
+    if not left:
+        return {}
+    return {step.id: _own_files_first(left, step.files) for step in marked}
+
+
+def _own_files_first(paths: tuple[str, ...], own: tuple[str, ...]) -> tuple[str, ...]:
+    """`paths` with those a step's Files: names first and the committed state last."""
+
+    def rank(path: str) -> int:
+        if any(path == name or path.startswith(f"{name.rstrip('/')}/") for name in own):
+            return 0
+        return 2 if path.startswith(STATE_FILES) else 1
+
+    return tuple(sorted(paths, key=rank))
 
 
 def outside_work(repo: Path, inputs: LoopInputs, base_ref: str) -> dict[str, tuple[str, ...]]:

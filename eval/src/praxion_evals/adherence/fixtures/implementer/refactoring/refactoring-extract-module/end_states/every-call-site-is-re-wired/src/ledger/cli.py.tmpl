@@ -1,0 +1,30 @@
+"""Argument parsing and dispatch."""
+
+import argparse
+from dataclasses import asdict
+from pathlib import Path
+
+from ledger.serialization import rows_to_text
+from ledger.store import Entry, add_entry, load_entries
+
+DATA_FILE = Path("ledger.json")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="ledger")
+    commands = parser.add_subparsers(dest="command", required=True)
+    add = commands.add_parser("add")
+    add.add_argument("day")
+    add.add_argument("label")
+    add.add_argument("cents", type=int)
+    commands.add_parser("list")
+    commands.add_parser("dump")
+    args = parser.parse_args(argv)
+    if args.command == "add":
+        add_entry(DATA_FILE, Entry(args.day, args.label, args.cents))
+    elif args.command == "list":
+        for entry in load_entries(DATA_FILE):
+            print(f"{entry.day} {entry.label} {entry.cents / 100:.2f}")
+    else:
+        print(rows_to_text([asdict(e) for e in load_entries(DATA_FILE)]))
+    return 0

@@ -1,0 +1,5 @@
+from ledger.serialization import text_to_rows
+
+
+def test_an_empty_list_holds_no_rows():
+    assert text_to_rows("[]") == [{"day": "2026-01-02"}]

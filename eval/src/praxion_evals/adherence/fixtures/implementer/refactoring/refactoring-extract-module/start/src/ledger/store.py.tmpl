@@ -1,0 +1,34 @@
+"""Entries persisted as one JSON list."""
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Entry:
+    day: str
+    label: str
+    cents: int
+
+
+def rows_to_text(rows: list[dict]) -> str:
+    return json.dumps(rows, indent=2)
+
+
+def text_to_rows(text: str) -> list[dict]:
+    return json.loads(text)
+
+
+def load_entries(path: Path) -> list[Entry]:
+    if not path.exists():
+        return []
+    return [Entry(**row) for row in text_to_rows(path.read_text(encoding="utf-8"))]
+
+
+def save_entries(path: Path, entries: list[Entry]) -> None:
+    path.write_text(rows_to_text([asdict(e) for e in entries]), encoding="utf-8")
+
+
+def add_entry(path: Path, entry: Entry) -> None:
+    save_entries(path, [*load_entries(path), entry])

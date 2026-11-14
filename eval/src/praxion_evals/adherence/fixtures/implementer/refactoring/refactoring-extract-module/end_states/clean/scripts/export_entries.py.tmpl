@@ -1,0 +1,15 @@
+"""Re-print a data file with its entries sorted by day: python scripts/export_entries.py FILE."""
+
+import sys
+from pathlib import Path
+
+from ledger.serialization import rows_to_text, text_to_rows
+
+
+def main(path: str) -> None:
+    rows = text_to_rows(Path(path).read_text(encoding="utf-8"))
+    sys.stdout.write(rows_to_text(sorted(rows, key=lambda row: row["day"])))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])

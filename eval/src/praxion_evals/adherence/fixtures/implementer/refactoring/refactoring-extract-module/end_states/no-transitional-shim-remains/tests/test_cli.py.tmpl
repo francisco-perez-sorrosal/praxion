@@ -1,0 +1,16 @@
+from ledger.cli import main
+
+
+def test_an_added_entry_is_listed_with_its_amount(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    main(["add", "2026-01-02", "coffee", "350"])
+    main(["list"])
+    assert "2026-01-02 coffee 3.50" in capsys.readouterr().out
+
+
+def test_dump_prints_the_data_file_text(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    main(["add", "2026-01-02", "coffee", "350"])
+    capsys.readouterr()
+    main(["dump"])
+    assert capsys.readouterr().out == (tmp_path / "ledger.json").read_text(encoding="utf-8") + "\n"

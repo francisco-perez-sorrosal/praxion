@@ -1,0 +1,11 @@
+"""The JSON text of the data file: rows to text and back."""
+
+import json
+
+
+def rows_to_text(rows: list[dict]) -> str:
+    return json.dumps(rows, indent=4)
+
+
+def text_to_rows(text: str) -> list[dict]:
+    return json.loads(text)

@@ -136,7 +136,10 @@ def test_every_optional_field_is_a_declared_field_of_its_class():
 def test_no_other_class_marks_a_field_optional():
     marking = [event_class for event_class, spec in registry.EVENTS.items() if spec.optional]
 
-    assert marking == [registry.EventClass.TOOL_AGENT_SPAWN]
+    assert marking == [
+        registry.EventClass.TOOL_AGENT_SPAWN,
+        registry.EventClass.SKILL_DELIVERY,
+    ]
 
 
 @pytest.mark.parametrize(

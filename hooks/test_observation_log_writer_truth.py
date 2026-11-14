@@ -81,8 +81,13 @@ _SUSPENSION_ABSENT_OK = frozenset(
     }
 )
 
-# The only registry class this scenario deliberately does not drive, and why.
-_NOT_DRIVEN = {"recovery": "written by /resume-pipeline prose; bypasses the writer"}
+# The registry classes this scenario deliberately does not drive, and why. An
+# entry here must go the day the scenario drives its class: the totalising check
+# below then fails on the entry, not on the class.
+_NOT_DRIVEN = {
+    "recovery": "written by /resume-pipeline prose; bypasses the writer",
+    "skill_delivery": "written by the spawn hook's rewrite slot, which this scenario does not drive yet",
+}
 
 # The non-test modules that import the writer today. T2 below keeps this set
 # equal to what a repo scan actually finds, so "drives every writer" stays
@@ -510,7 +515,7 @@ def test_a_session_showing_its_origin_writes_a_spawn_row_with_both_optional_fiel
 
 def test_scenario_drives_every_recorded_event_class(tmp_path, monkeypatch):
     """Totalising check: the scenario's classes equal every registered class
-    except the one that bypasses the writer entirely (`_NOT_DRIVEN`)."""
+    except those declared in `_NOT_DRIVEN`."""
     ctx = _prepare(tmp_path, monkeypatch, "full")
     registry = ctx["cs"].writer.registry
 

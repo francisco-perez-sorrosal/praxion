@@ -67,7 +67,7 @@ import _step_loop_cli as cli
 import _step_loop_record as rec
 from _goal_record import protected_set
 from _goal_scaffold import scaffold
-from _handoff_inputs import resolve_base_ref
+from _handoff_inputs import HandoffError, resolve_base_ref
 from _loop_fields import GoalBudget, OutstandingAttempt, parse_attempts
 from _plan_steps import PlanStep, parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
@@ -114,6 +114,7 @@ PLAN_FILE, WIP_FILE, BRIEF_FILE, HANDOFF_FILE = (
     "HANDOFF.md",
 )
 REVIEW_FILE = "LIGHT_REVIEW_step-{}.md"
+HANDOFF_NOT_WRITTEN = "handoff-not-written"
 
 
 @dataclass(frozen=True)
@@ -249,16 +250,25 @@ def run_next(
     """The next action, carrying what a `record` took back."""
     action, counts = issuable_action(task.inputs), cli.iterations_of(task.inputs)
     frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
-    lines = cli.warning_lines(frame.warnings)
     if isinstance(action, Spawn):
         return _issue(task, action, frame, invoke)
     if isinstance(action, Complete):
         line = cli.complete_line(task.inputs.steps, counts)
-        return Reply(cli.complete_envelope(frame), (line, *lines))
+        return Reply(cli.complete_envelope(frame), (line, *cli.warning_lines(frame.warnings)))
     view = cli.stop_view(action, task.slug, invoke)
-    write_stop_handoff(task.slug, task.work, stop_next_action(view), action.cause, task.base_ref)
+    try:
+        write_stop_handoff(
+            task.slug, task.work, stop_next_action(view), action.cause, task.base_ref
+        )
+    except HandoffError as refused:  # a stop for a human stays one, whatever sits at HANDOFF.md
+        frame = frame._replace(
+            warnings=(
+                *frame.warnings,
+                (HANDOFF_NOT_WRITTEN, f"{refused}. To fix: rename it, then call next again."),
+            )
+        )
     doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
-    return Reply(doc, (stop_stderr(view), *lines))
+    return Reply(doc, (stop_stderr(view), *cli.warning_lines(frame.warnings)))
 
 
 def _issue(task: Task, action: Spawn, frame: cli.Frame, invoke: Invocation) -> Reply:

@@ -33,7 +33,11 @@ affected_reqs: [REQ-18, REQ-19, REQ-20]
    - Each arm is a checkout copy set to its state by that copy's own `scripts/refactoring_move.py --to <state>`.
    - Each arm is verified by the delivery module's preload reader.
    - Each arm is proven by a marked proof spawn before any task is scored: the delivery label (the arm copy's own `shows_arrival`) in the delivered arm, and the harness's preload message in the preloaded arm.
-2. **Refactoring-mode tasks for both roles.** Each task's delegation carries the step heading with `[Phase: Refactoring]` in its own words. The test-engineer's are in its `pre-refactor` mode, which becomes measured.
+2. **Refactoring-mode tasks for both roles, in a separate per-role pool planned only on the new axis.** Each task's delegation carries the step heading with `[Phase: Refactoring]` in its own words.
+   - Each role's pool holds at least two templates. For the test-engineer they are `pre-refactor` templates.
+   - The default axis never plans them: every role's default template pool, its frozen task list, the full-set template floor and `ROLE_MODES` are unchanged.
+   - The test-engineer's `pre-refactor` stays declared unmeasured on the default axis and is covered only on the new one.
+   - This keeps every ordinary run comparable with the runs before it.
 3. **End-state graders from the refactoring skill's verification checklist.**
    - Implementer: the tests pass, the hidden characterization tests pass, no caller imports the old location, no moved name is left defined there, no re-export shim remains.
    - Test-engineer: characterization tests exist while production files are unchanged, and they import only the fixture's public names.
@@ -64,4 +68,4 @@ Positive:
 Negative:
 - A second axis is a concept the eval's reader must learn.
 - Each template ships a start tree, a clean solution tree and one mutation per checklist item, so the graders can be proven on known-good and known-bad end states.
-- The pins on the role kits' task lists and on `pre-refactor` being unmeasured need a declared re-pin.
+- No standing pin on the role kits' default task lists or on `pre-refactor` being unmeasured moves. In exchange, ordinary runs never exercise refactoring mode.

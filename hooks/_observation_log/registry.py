@@ -36,7 +36,7 @@ SPAWN_TOOLS = frozenset({"Agent", "Task"})
 
 
 class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ targets 3.9+
-    """The 15 recording classes. Many-to-one onto the written ``event_type``:
+    """The 16 recording classes. Many-to-one onto the written ``event_type``:
     four classes below write ``tool_use``, so every existing reader's
     ``event_type == "tool_use"`` filter stays valid across the split."""
 
@@ -55,6 +55,7 @@ class EventClass(str, Enum):  # noqa: UP042 -- StrEnum needs 3.11; hooks/ target
     GATE_FIRE = "gate_fire"
     RECOVERY = "recovery"
     KERNEL_INJECTED = "kernel_injected"
+    SKILL_DELIVERY = "skill_delivery"
 
 
 # One entry per class: the ``event_type`` it writes, the producing hook or
@@ -250,6 +251,31 @@ EVENTS = MappingProxyType(
                 "project_file",
                 "log_mode",
             ),
+        ),
+        # One per delegation that asked for a skill body, written by the spawn
+        # hook's rewrite slot. A row is identified by (tool_use_id, event_type): a
+        # retried hook call repeats both, so a reader keeps one. `reason` is
+        # carried by a failed delivery only and `body_digest` by a served one, so
+        # each is optional. Evolution is additive only: a field is never renamed
+        # or retyped, since old rows stay readable beside new ones.
+        EventClass.SKILL_DELIVERY: EventSpec(
+            "skill_delivery",
+            "inject_subagent_context",
+            _FULL_AND_STANDARD,
+            (
+                "timestamp",
+                "session_id",
+                "event_type",
+                "agent_type",
+                "skill",
+                "outcome",
+                "route",
+                "reason",
+                "body_digest",
+                "tool_use_id",
+                "log_mode",
+            ),
+            frozenset({"reason", "body_digest"}),
         ),
         EventClass.RECOVERY: EventSpec(
             "recovery",

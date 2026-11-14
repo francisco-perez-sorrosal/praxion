@@ -86,8 +86,11 @@ _SUSPENSION_ABSENT_OK = frozenset(
 # below then fails on the entry, not on the class.
 _NOT_DRIVEN = {
     "recovery": "written by /resume-pipeline prose; bypasses the writer",
-    "skill_delivery": "written by the spawn hook's rewrite slot, which this scenario does not drive yet",
 }
+
+# A served delivery carries the digest of the text it added, never a failure reason; the registry
+# lists `reason` as optional, and only a failed delivery writes it.
+_SERVED_DELIVERY_ABSENT_OK = frozenset({"reason"})
 
 # The non-test modules that import the writer today. T2 below keeps this set
 # equal to what a repo scan actually finds, so "drives every writer" stays
@@ -99,6 +102,7 @@ DRIVEN_WRITER_MODULES = frozenset(
         "hooks/measure_context_surface.py",
         "hooks/_hook_utils.py",
         "hooks/inject_kernel.py",
+        "hooks/_skill_delivery.py",
     }
 )
 
@@ -184,6 +188,20 @@ SCENARIO: tuple[Step, ...] = (
             "tool_response": {},
         },
         (Expect("tool_other"),),
+    ),
+    Step(
+        "skill_delivery",
+        "inject_subagent_context",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Agent",
+            "tool_use_id": "tu1",
+            "tool_input": {
+                "subagent_type": "praxion:implementer",
+                "prompt": "Task slug: s1\n\n[Phase: Refactoring] Extract the parser.",
+            },
+        },
+        (Expect("skill_delivery", _SERVED_DELIVERY_ABSENT_OK),),
     ),
     Step(
         "tool Agent result",
@@ -315,7 +333,9 @@ def _build_project(tmp_path: Path) -> tuple[Path, Path, Path]:
 
 
 def _build_plugin(tmp_path: Path) -> Path:
-    """A plugin root whose adoption ledger puts the scenario's researcher at trial."""
+    """A plugin root whose adoption ledger puts the scenario's researcher at trial, whose
+    implementer definition does not preload the refactoring skill, and which installs that
+    skill: the three things a served skill delivery reads."""
     index = tmp_path / "plugin" / "claude" / "kernels" / "index.json"
     index.parent.mkdir(parents=True)
     ledger = tmp_path / "plugin" / ".ai-state" / "kernel_adoption.yaml"
@@ -328,7 +348,19 @@ def _build_plugin(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    return index.parents[2]
+    plugin = index.parents[2]
+    definition = plugin / "agents" / "implementer.md"
+    definition.parent.mkdir()
+    definition.write_text(
+        "---\nname: implementer\nskills: [testing-strategy]\n---\nBody.\n", encoding="utf-8"
+    )
+    skill = plugin / "skills" / "refactoring"
+    (skill / "references").mkdir(parents=True)
+    (skill / "references" / "patterns.md").write_text("# Patterns\n", encoding="utf-8")
+    (skill / "SKILL.md").write_text(
+        "---\nname: refactoring\n---\n# Refactoring\n\nStructure only.\n", encoding="utf-8"
+    )
+    return plugin
 
 
 def _isolate_env(
@@ -364,6 +396,7 @@ def _prepare(
     co = _load("capture_observations")
     mc = _load("measure_context_surface")
     ik = _load("inject_kernel")
+    isc = _load("inject_subagent_context")
     hu = importlib.import_module("_hook_utils")
     return {
         "cs": cs,
@@ -373,6 +406,7 @@ def _prepare(
             "measure_context_surface": mc,
             # The first slot is the one that writes the spawn's row.
             "inject_kernel": SimpleNamespace(main=lambda: ik.main(["--slot", "1"])),
+            "inject_subagent_context": isc,
             "record_gate_fire": hu.record_gate_fire,
         },
         "base": {"session_id": "S1", "cwd": str(proj), "transcript_path": str(parent)},

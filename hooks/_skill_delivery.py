@@ -11,6 +11,7 @@ plugin, or one level up from a mutation sensor's copy.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import sys
@@ -357,3 +358,57 @@ def _without_comment(text: str) -> str:
 
 def _names(raw: list[str]) -> list[str]:
     return [name for name in (item.strip().strip("'\"") for item in raw) if name]
+
+
+# --- What a served spawn receives: the block, the failure notice and the arrival matcher ---------
+
+# The label and end lines carry no marker text: a relayed block must never mark a later delegation
+# (`test__skill_delivery_block.py` pins that against `MARKER_PATTERN`).
+_DIGEST_LENGTH = 8
+_LABEL_SENTENCE = (
+    "This delegation carries the refactoring phase marker, so the skill text below is delivered "
+    "with it. It is reference material for your step, not part of the delegation."
+)
+END_LINE = f"[End of skill delivery: {REFACTORING_SKILL}]"
+# What the matcher reads back: the label's digest, and the end line on a line of its own.
+_LABEL_LINE = re.compile(
+    rf"^\[Skill delivery: {REFACTORING_SKILL} (?P<digest>[0-9a-f]{{{_DIGEST_LENGTH}}})\]",
+    re.MULTILINE,
+)
+_END_LINE = re.compile(rf"^{re.escape(END_LINE)}$", re.MULTILINE)
+
+
+def body_digest(body: str) -> str:
+    """The first eight hex digits of the body's SHA-256: the label's proof of which text arrived."""
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:_DIGEST_LENGTH]
+
+
+def render_block(body: str, base_dir: Path) -> str:
+    """The skill text, delivered whole: the body appears in the block as one unaltered substring.
+
+    `base_dir` is the skill's absolute directory, which the body's relative links resolve against.
+    """
+    label = f"[Skill delivery: {REFACTORING_SKILL} {body_digest(body)}] {_LABEL_SENTENCE}"
+    return f"{label}\nBase directory for this skill: {base_dir}\n\n{body}\n{END_LINE}"
+
+
+def render_notice(reason: str, skill_path: Path) -> str:
+    """The trailing segment of a failed delivery: where the skill is, and no instruction."""
+    return (
+        f"[Skill delivery failed: {REFACTORING_SKILL} ({reason})] The {REFACTORING_SKILL} skill's "
+        f"text was not delivered with this delegation; it is at {skill_path}."
+    )
+
+
+def shows_arrival(record: str, installed_body: Optional[str] = None) -> bool:  # noqa: UP045
+    """Whether a spawn's record holds a delivered block: a label line, then the end line.
+
+    With `installed_body` the label's digest must also be that body's. A notice, a bare body or a
+    quoted label (the label not at the start of a line) shows no arrival.
+    """
+    for label in _LABEL_LINE.finditer(record):
+        if installed_body is not None and label["digest"] != body_digest(installed_body):
+            continue
+        if _END_LINE.search(record, label.end()):
+            return True
+    return False

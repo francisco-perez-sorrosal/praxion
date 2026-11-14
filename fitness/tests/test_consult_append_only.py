@@ -63,8 +63,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-
-from .test_discipline_registry_invariants import (
+from test_discipline_registry_invariants import (
     CLASSIFICATION_ROW_FIELDS,
     PRIOR_ROW_FIELDS,
     _split_escaped_row,

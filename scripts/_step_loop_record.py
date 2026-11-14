@@ -104,6 +104,7 @@ from _step_loop_state import (  # noqa: E402
     VERIFIED,
     LoopInputs,
     bare_id,
+    request_kind,
     series_work,
     step_cap,
 )
@@ -188,7 +189,10 @@ def record_return(
         marker = _MARKER_OF_STOP.get(done.stop_reason, "none")
         step_id = bare_id(done.step)
         settle_replan(task.dir / WIP_FILE, task.inputs, _plan_step(task.inputs, step_id), request)
-        return Taken(recorded_object(done, marker, None, replayed=True), step_id)
+        reviewed = request_kind(done) == "review"
+        verdict = file_verdict(task.inputs.reviews.get(step_id)) if reviewed else None
+        taken = recorded_object(done, marker, None, replayed=True, review_verdict=verdict)
+        return Taken(taken, step_id)
     spawn = _pending(task.inputs, request)
     step, key = spawn.step, spawn.key
     if key.kind == "review":  # a review's return is read from its verdict file, never gated

@@ -281,6 +281,9 @@ _PARALLEL_GROUP_RE = re.compile(r"\[parallel-group:([^\]]*)\]", re.IGNORECASE)
 # bracketed word in a title is part of the title.
 HEADING_TAG_RE = re.compile(r"\[\s*(?:phase\s*:[^\]]*|architecture|deployment)\s*\]", re.IGNORECASE)
 _REFACTORING_TAG_RE = re.compile(r"\[\s*phase\s*:\s*refactoring\s*\]", re.IGNORECASE)
+# Public for the delegation classifier in hooks/_skill_delivery.py, which matches the marker
+# with this object and holds no copy of the grammar.
+REFACTORING_TAG_PATTERN = _REFACTORING_TAG_RE
 
 
 def _clean_title(heading_title: str) -> str:

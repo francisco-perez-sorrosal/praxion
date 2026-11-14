@@ -20,6 +20,11 @@ under the sandbox's config directory (`CLAUDE_CONFIG_DIR`). A role's preloaded s
 `skills:` list of its definition's frontmatter; the harness puts each one's body in the spawn, so
 a preload counts as one copy of that skill's text.
 
+The skill's links are reachable when what a hook adds around the skill's text names, as an
+absolute path, a directory inside the installation (the skill's own, or the installation's root)
+against which every relative link of the body reaches an existing file and section: the same
+directory a preload gives the agent, so the body needs no rewriting.
+
 Bound here, because the specification or the base commit fixes them: the marker, the two roles,
 the skill's text (its `SKILL.md` after the metadata header), the 10,000-character limit one
 context string may carry, the two events and their payload fields as the base's own drivers
@@ -496,11 +501,90 @@ def copies_held(s: Spawn) -> Copies:
     return Copies(whole=preload + min(ratios), most=preload + max(ratios))
 
 
-def delivered_in_order(s: Spawn) -> bool:
-    """Every line of the skill's text appears, unaltered and in order, in what the hooks added."""
-    wanted = [ln.rstrip() for ln in s.skill_text.splitlines() if ln.strip()]
-    lines = iter(ln.rstrip() for ln in s.delivered.splitlines())
-    return all(any(have == want for have in lines) for want in wanted)
+def delivered_as_one_passage(s: Spawn) -> bool:
+    """The skill's text sits, unbroken and unaltered, inside one piece a hook added.
+
+    A piece is one context string or one addition around the prompt; text the delivery adds
+    around the passage is allowed, text inside it is not.
+    """
+    passage = s.skill_text.strip("\n")
+    return bool(passage) and any(passage in piece for piece in (*s.context, *s.prompt_additions))
+
+
+# -- What the skill's body links to ----------------------------------------------------------------
+
+_LINK = re.compile(r"\]\(([^)\s]+)\)")
+_ABSOLUTE_PATH = re.compile(r"(?<![\w.~])(/[^\s`'\"()<>\[\]]+)")
+
+
+@dataclass(frozen=True)
+class Link:
+    path: str
+    anchor: str | None
+
+
+def body_links(body: str) -> tuple[Link, ...]:
+    """The body's relative links to files, with the section anchor each names."""
+    links = []
+    for match in _LINK.finditer(body):
+        target = match.group(1)
+        if re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", target) or target.startswith("#"):
+            continue
+        path, _, anchor = target.partition("#")
+        links.append(Link(path, anchor or None))
+    return tuple(links)
+
+
+def _slug(heading: str) -> str:
+    text = re.sub(r"[^\w\s-]", "", heading.strip().lower())
+    return re.sub(r"\s", "-", text)
+
+
+def _anchors(text: str) -> set[str]:
+    headings = {_slug(m.group(1)) for m in re.finditer(r"^#{1,6}\s+(.*?)\s*#*\s*$", text, re.M)}
+    ids = set(re.findall(r"""id=["']([^"']+)["']""", text))
+    return headings | ids
+
+
+def link_failures(base: Path, body: str) -> list[str]:
+    """The links of `body` that do not reach an existing file, or section, from `base`."""
+    failures = []
+    for link in body_links(body):
+        target = base / link.path
+        if not target.is_file():
+            failures.append(f"{link.path}: no such file under {base}")
+        elif link.anchor and link.anchor not in _anchors(target.read_text(encoding="utf-8")):
+            failures.append(f"{link.path}#{link.anchor}: no such section")
+    return failures
+
+
+def _within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def link_base_named(s: Spawn, installation: Installation) -> Path | None:
+    """A directory inside the installation, named by what a hook added around the passage,
+    against which every link of the skill's body resolves; None when the delivery names none.
+
+    A named file stands for its own directory; a named installation root stands for the skill's
+    directory under it.
+    """
+    around = s.delivered.replace(s.skill_text.strip("\n"), "")
+    for match in _ABSOLUTE_PATH.finditer(around):
+        named = Path(match.group(1).rstrip(".,;:"))
+        directory = named.parent if named.is_file() else named
+        for base in (directory, directory / Path(SKILL).parent):
+            if _resolves_every_link(base, installation, s.skill_text):
+                return base
+    return None
+
+
+def _resolves_every_link(base: Path, installation: Installation, body: str) -> bool:
+    return base.is_dir() and _within(base, installation.root) and not link_failures(base, body)
 
 
 def longest_context_string(s: Spawn) -> int:

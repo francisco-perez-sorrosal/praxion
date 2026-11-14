@@ -98,13 +98,13 @@ def test_a_marked_spawn_holds_one_whole_copy_of_the_skill_from_its_start(
 
 
 @pytest.mark.parametrize("role", ROLES)
-def test_the_delivered_skill_is_every_line_of_the_installed_body_unaltered_and_in_order(
+def test_the_delivered_skill_is_the_installed_body_as_one_unbroken_passage(
     end_state: Installation, project: Path, role: str
 ) -> None:
     spawned = rd.spawn(end_state, project, _agent(role), MARKED)
 
-    assert rd.delivered_in_order(spawned), (
-        "what the marked spawn received is not the skill's body line for line, in order"
+    assert rd.delivered_as_one_passage(spawned), (
+        "the marked spawn did not receive the skill's body as one unbroken, unaltered passage"
     )
 
 
@@ -140,7 +140,7 @@ def test_an_edit_to_the_installed_skill_reaches_the_next_marked_spawn(
     spawned = rd.spawn(end_state, project, "praxion:implementer", MARKED)
 
     assert added in spawned.delivered, "the marked spawn received a stale copy of the skill"
-    assert rd.copies_held(spawned).whole == 1
+    assert rd.delivered_as_one_passage(spawned), "the edited body did not arrive as one passage"
 
 
 def test_no_single_context_string_of_a_marked_spawn_passes_the_channel_limit(
@@ -148,10 +148,45 @@ def test_no_single_context_string_of_a_marked_spawn_passes_the_channel_limit(
 ) -> None:
     spawned = rd.spawn(end_state, project, "praxion:implementer", MARKED)
 
-    assert rd.copies_held(spawned).whole == 1, "the skill did not arrive at all"
+    assert rd.delivered_as_one_passage(spawned), "the skill did not arrive as one passage"
     assert rd.longest_context_string(spawned) <= rd.CHANNEL_LIMIT, (
         f"a context string of {rd.longest_context_string(spawned)} characters passes the "
         f"{rd.CHANNEL_LIMIT}-character limit the channel places on one string"
+    )
+
+
+# -- Everything the skill links to stays reachable ---------------------------------------------
+
+
+def test_every_link_in_the_installed_skill_reaches_a_file_and_section_of_its_installation(
+    installation: Installation,
+) -> None:
+    skill_directory = installation.path(rd.SKILL).parent
+
+    failures = rd.link_failures(skill_directory, rd.skill_body(installation.root))
+
+    assert rd.body_links(rd.skill_body(installation.root)), "the skill's body links to nothing"
+    assert failures == []
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["checkout/praxion", "home/.claude/plugins/cache/praxion/praxion/0.0.0"],
+    ids=["repository-checkout", "installed-plugin-copy"],
+)
+@pytest.mark.parametrize("role", ROLES)
+def test_a_marked_spawn_can_resolve_every_link_of_the_skill_against_its_installation(
+    tmp_path: Path, project: Path, role: str, location: str
+) -> None:
+    installed = rd.new_installation(tmp_path / location)
+    rd.without_preload(installed, role)
+
+    spawned = rd.spawn(installed, project, _agent(role), MARKED)
+
+    assert rd.delivered_as_one_passage(spawned), "the skill did not arrive as one passage"
+    assert rd.link_base_named(spawned, installed) is not None, (
+        "nothing the delivery added names a directory of the installation against which the "
+        "skill's links resolve"
     )
 
 

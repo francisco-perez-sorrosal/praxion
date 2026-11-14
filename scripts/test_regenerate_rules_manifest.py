@@ -10,8 +10,8 @@ Tests are designed from the manifest generator's behavioral contract:
      and exits 1 with the prescribed ERROR message.
   6. rules/CLAUDE.md is a directory guide, never a manifest rule, even when it
      still carries core frontmatter.
-  7. rules/swe/memory-protocol.md with merged codex: + core: frontmatter
-     produces core: false, install: hook-deliver in the output.
+  7. A hook-delivered rule with merged codex: + core: frontmatter produces
+     core: false, install: hook-deliver in the output.
 
 Each test is self-contained via tmp_path. No test touches the real rules/ dir.
 
@@ -40,6 +40,9 @@ import yaml
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 GENERATOR_SCRIPT = SCRIPTS_DIR / "regenerate_rules_manifest.py"
+
+# The one hook-delivered rule outside the managed pin: the stand-in for an ordinary delivered rule.
+GIT_CONVENTIONS = "swe/vcs/git-conventions"
 
 # Minimal always-on frontmatter for a core rule.
 _CORE_FRONTMATTER = """\
@@ -79,7 +82,7 @@ project_scope: managed
 ---
 """
 
-# Mixed codex: + core: frontmatter (as memory-protocol.md carries post-Step-2).
+# Mixed codex: + core: frontmatter, as a hook-delivered rule may carry.
 _MERGED_FRONTMATTER = """\
 ---
 codex:
@@ -134,7 +137,6 @@ def _seed_rules(tmp_path: Path, swe_overrides: dict[str, str] | None = None) -> 
         "swe-agent-coordination-protocol.md": _MANAGED_CORE_FRONTMATTER
         + "## Coordination Protocol\n",
         # Hook-delivered blacklistable rules
-        "memory-protocol.md": _HOOK_DELIVER_FRONTMATTER + "## Memory Protocol\n",
         "agent-model-routing-resident.md": _MANAGED_HOOK_FRONTMATTER + "## Model Routing\n",
         "vcs": {"git-conventions.md": _HOOK_DELIVER_FRONTMATTER + "## Git Conventions\n"},
         **(swe_overrides or {}),
@@ -379,7 +381,7 @@ def test_the_rules_directory_guide_is_not_a_manifest_rule(
 
 
 # ---------------------------------------------------------------------------
-# Test 7: memory-protocol.md with merged codex: + core: frontmatter
+# Test 7: a hook-delivered rule with merged codex: + core: frontmatter
 #         → core: false, install: hook-deliver
 # ---------------------------------------------------------------------------
 
@@ -388,10 +390,9 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Merged codex: + core: frontmatter in memory-protocol.md produces core: false, install: hook-deliver."""  # noqa: E501
-    # The merged frontmatter that mirrors the real memory-protocol.md post-Step-2.
+    """Merged codex: + core: frontmatter produces core: false, install: hook-deliver."""
     rules_dir, manifest_path = _seed_rules(
-        tmp_path, {"memory-protocol.md": _MERGED_FRONTMATTER + "## Memory Protocol\n"}
+        tmp_path, {"vcs": {"git-conventions.md": _MERGED_FRONTMATTER + "## Git Conventions\n"}}
     )
 
     mod = _patched_module(monkeypatch, rules_dir, manifest_path)
@@ -399,13 +400,11 @@ def test_merged_frontmatter_codex_and_core_produces_hook_deliver(
     assert exit_code == 0, "Generator failed"
 
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    memory_rule = next((r for r in manifest["rules"] if r["id"] == "swe/memory-protocol"), None)
-    assert memory_rule is not None, "swe/memory-protocol rule not found in manifest"
-    assert memory_rule["core"] is False, (
-        f"Expected core: false for memory-protocol, got {memory_rule['core']!r}"
-    )
-    assert memory_rule["install"] == "hook-deliver", (
-        f"Expected install: hook-deliver for memory-protocol, got {memory_rule['install']!r}"
+    rule = next((r for r in manifest["rules"] if r["id"] == GIT_CONVENTIONS), None)
+    assert rule is not None, f"{GIT_CONVENTIONS} rule not found in manifest"
+    assert rule["core"] is False, f"Expected core: false, got {rule['core']!r}"
+    assert rule["install"] == "hook-deliver", (
+        f"Expected install: hook-deliver, got {rule['install']!r}"
     )
 
 
@@ -481,7 +480,6 @@ def _frontmatter(**fields: Any) -> str:
 
 
 ROUTING_RESIDENT = "swe/agent-model-routing-resident"
-MEMORY_PROTOCOL = "swe/memory-protocol"
 
 
 def _generate_with(
@@ -489,7 +487,7 @@ def _generate_with(
     minimal_rules_tree: tuple[Path, Path],
     frontmatter: str,
     capsys: pytest.CaptureFixture[str],
-    rule_id: str = MEMORY_PROTOCOL,
+    rule_id: str = GIT_CONVENTIONS,
 ) -> tuple[int, dict[str, Any], str]:
     """Rewrite one hook-delivered rule's frontmatter, regenerate, and return
     (exit code, that rule's record, stderr)."""
@@ -548,7 +546,7 @@ def test_unknown_project_scope_is_refused_by_name(monkeypatch, minimal_rules_tre
     fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="some")
     exit_code, _, stderr = _generate_with(monkeypatch, minimal_rules_tree, fm, capsys)
     assert exit_code == 1
-    assert MEMORY_PROTOCOL in stderr
+    assert GIT_CONVENTIONS in stderr
     assert "some" in stderr
 
 
@@ -584,11 +582,15 @@ def test_the_constitution_is_never_in_the_managed_pin() -> None:
 
 
 def test_a_rule_marked_managed_outside_the_pin_is_refused(monkeypatch, minimal_rules_tree, capsys):
+    rules_dir, manifest_path = minimal_rules_tree
     fm = _frontmatter(core=False, load="always_on", install="hook-deliver", project_scope="managed")
-    exit_code, _, stderr = _generate_with(monkeypatch, minimal_rules_tree, fm, capsys)
+    (rules_dir / "swe" / "extra-rule.md").write_text(fm + "## Extra\n")
+    mod = _patched_module(monkeypatch, rules_dir, manifest_path)
+    monkeypatch.setattr(mod, "HOOK_DELIVER_ORDER", [*mod.HOOK_DELIVER_ORDER, "swe/extra-rule"])
 
-    assert exit_code == 1
-    assert MEMORY_PROTOCOL in stderr
+    assert mod.run_generate() == 1
+    stderr = capsys.readouterr().err
+    assert "swe/extra-rule" in stderr
     assert "EXPECTED_MANAGED_IDS" in stderr
 
 
@@ -628,6 +630,17 @@ def test_the_order_list_lists_every_managed_unit_and_the_git_conventions_once() 
 
     assert len(mod.HOOK_DELIVER_ORDER) == len(set(mod.HOOK_DELIVER_ORDER))
     assert mod.EXPECTED_MANAGED_IDS | {"swe/vcs/git-conventions"} <= set(mod.HOOK_DELIVER_ORDER)
+
+
+def test_every_rule_in_the_order_list_exists_in_the_real_rules_tree() -> None:
+    mod = _load_module()
+    root = next(r for r in SCRIPTS_DIR.parents if (r / "rules" / "_manifest.yaml").is_file())
+
+    missing = [
+        rid for rid in mod.HOOK_DELIVER_ORDER if not (root / "rules" / f"{rid}.md").is_file()
+    ]
+
+    assert missing == []
 
 
 def test_a_core_hook_delivered_rule_appears_once_in_injection_order(

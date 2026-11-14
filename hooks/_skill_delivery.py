@@ -15,6 +15,7 @@ import hashlib
 import os
 import re
 import sys
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -412,3 +413,70 @@ def shows_arrival(record: str, installed_body: Optional[str] = None) -> bool:  #
         if _END_LINE.search(record, label.end()):
             return True
     return False
+
+
+# --- The reading edge: the skill's body, whole or not at all -------------------------------------
+
+SKILL_FILE = "SKILL.md"
+# The skill's one reference file. Its presence stands for the whole directory being the installed
+# skill, so every relative link of the body resolves against the base directory the block names.
+REFERENCE_FILE = Path("references") / "patterns.md"
+# The body is delivered whole, so a file over the limit is refused, never cut.
+MAX_SKILL_BYTES = 64 * 1024
+# A FIFO nobody writes or a hung mount must end the read, not the hook.
+READ_TIMEOUT_SECONDS = 1.0
+_HEADER_OPENING = "---\n"
+_HEADER_CLOSING = "\n---\n"
+
+BodyUnreadableReason = Literal["skill-unreadable", "skill-read-timeout"]
+
+
+@dataclass(frozen=True)
+class BodyUnreadable:
+    """The skill's body cannot be delivered whole, so none of it is."""
+
+    reason: BodyUnreadableReason
+
+
+BodyRead = Union[str, BodyUnreadable]  # noqa: UP007
+_UNREADABLE = BodyUnreadable("skill-unreadable")
+
+
+def read_body(skill_dir: Path) -> BodyRead:
+    """The text of `<skill_dir>/SKILL.md` after its metadata header, or why it cannot be read.
+
+    The read runs in a daemon thread that is given `READ_TIMEOUT_SECONDS`: a thread stuck opening
+    a FIFO is abandoned and cannot keep the process from exiting, which a bounded `open` could not
+    promise for every kind of hung file.
+    """
+    outcome: list[BodyRead] = []
+    reader = threading.Thread(
+        target=lambda: outcome.append(_read_body_unbounded(skill_dir)), daemon=True
+    )
+    reader.start()
+    reader.join(READ_TIMEOUT_SECONDS)
+    return outcome[0] if outcome else BodyUnreadable("skill-read-timeout")
+
+
+def _read_body_unbounded(skill_dir: Path) -> BodyRead:
+    try:
+        if not (skill_dir / REFERENCE_FILE).is_file():
+            return _UNREADABLE
+        with open(skill_dir / SKILL_FILE, "rb") as skill_file:
+            raw = skill_file.read(MAX_SKILL_BYTES + 1)
+        if len(raw) > MAX_SKILL_BYTES:
+            return _UNREADABLE
+        text = raw.decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return _UNREADABLE
+    return _after_header(text)
+
+
+def _after_header(text: str) -> BodyRead:
+    """Everything after the first closing line of the metadata header; unreadable without one."""
+    if not text.startswith(_HEADER_OPENING):
+        return _UNREADABLE
+    closing = text.find(_HEADER_CLOSING)
+    if closing == -1:
+        return _UNREADABLE
+    return text[closing + len(_HEADER_CLOSING) :]

@@ -7,6 +7,7 @@ into one every Codex session pays for.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PARSING_PATH = REPO_ROOT / "codex" / "config" / "rules_bridge_parsing.py"
+FUNCTION_LENGTH_CEILING = 50
 
 
 def _load_parsing():
@@ -50,6 +52,46 @@ def test_inline_array_keeps_commas_inside_quoted_globs():
 def test_inline_value_that_is_not_a_sequence_is_refused():
     with pytest.raises(parsing.RuleParseError, match="unsupported paths value"):
         _paths("paths: rules/**")
+
+
+def _frontmatter(frontmatter: str) -> dict[str, object]:
+    return parsing.parse_rule_frontmatter(frontmatter.splitlines(), Path("rule.md"))
+
+
+def test_scalar_values_are_unquoted_and_comments_and_indented_lines_are_skipped():
+    metadata = _frontmatter("# note\nname: 'it''s'\n  stray: x\n\ntitle: \"Quoted\"\nplain: v")
+    assert metadata == {"name": "it's", "title": "Quoted", "plain": "v"}
+
+
+def test_codex_block_keys_are_read_as_a_mapping():
+    assert _frontmatter("codex:\n  portability: shared\n  # c\n  load: always\npaths: [a]") == {
+        "codex": {"portability": "shared", "load": "always"},
+        "paths": ["a"],
+    }
+
+
+def test_codex_inline_value_is_the_portability():
+    assert _frontmatter("codex: claude-only") == {"codex": {"portability": "claude-only"}}
+
+
+def test_an_unparseable_top_level_line_is_refused():
+    with pytest.raises(parsing.RuleParseError, match="unsupported frontmatter line"):
+        _frontmatter("not a key")
+
+
+def test_an_unparseable_codex_line_is_refused():
+    with pytest.raises(parsing.RuleParseError, match="unsupported codex frontmatter line"):
+        _frontmatter("codex:\n  not a key")
+
+
+def test_no_parser_function_exceeds_the_function_length_ceiling():
+    tree = ast.parse(PARSING_PATH.read_text(encoding="utf-8"))
+    longest = {
+        node.name: node.end_lineno - node.lineno + 1
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+    }
+    assert {name: n for name, n in longest.items() if n > FUNCTION_LENGTH_CEILING} == {}
 
 
 @pytest.mark.parametrize(

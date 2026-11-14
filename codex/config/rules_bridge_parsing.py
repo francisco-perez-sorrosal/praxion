@@ -13,6 +13,7 @@ SKIP_RULE_FILES = {"CLAUDE.md", "README.md"}
 # move instrument's narrowed checkouts do); tests/test_codex_rules_bridge_parsing.py holds this
 # check equal to scripts/_resident_of.py, the reader the kernel tooling uses.
 RESIDENT_OF = re.compile(r"""^["']?resident_of["']?\s*:\s*(.*?)\s*$""")
+FRONTMATTER_KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(?:\s*(.*))?$")
 
 STOPWORDS = {
     "a",
@@ -135,73 +136,65 @@ def parse_rule(path: Path, repo_root: Path) -> dict[str, object]:
 def parse_rule_frontmatter(lines: list[str], path: Path) -> dict[str, object]:
     metadata: dict[str, object] = {}
     index = 0
-    key_pattern = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(?:\s*(.*))?$")
 
     while index < len(lines):
         line = lines[index]
         stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            index += 1
-            continue
-        if line.startswith((" ", "\t")):
+        if not stripped or stripped.startswith("#") or line.startswith((" ", "\t")):
             index += 1
             continue
 
-        match = key_pattern.match(line)
+        match = FRONTMATTER_KEY.match(line)
         if not match:
             raise RuleParseError(f"{path}: unsupported frontmatter line: {line!r}")
 
         key, raw_value = match.group(1), (match.group(2) or "").strip()
+        index += 1
         if key == "paths" and raw_value:
             metadata["paths"] = parse_flow_sequence(raw_value, path)
-            index += 1
-            continue
-        if key == "paths":
-            paths: list[str] = []
-            index += 1
-            while index < len(lines):
-                next_line = lines[index]
-                if next_line and not next_line.startswith((" ", "\t", "-")):
-                    break
-                stripped_next = next_line.strip()
-                if stripped_next.startswith("- "):
-                    value = stripped_next[2:].strip()
-                    paths.append(strip_yaml_string(value))
-                index += 1
-            metadata["paths"] = paths
-            continue
-
-        if key == "codex":
-            codex_metadata: dict[str, str] = {}
-            if raw_value:
-                codex_metadata["portability"] = strip_yaml_string(raw_value)
-                metadata["codex"] = codex_metadata
-                index += 1
-                continue
-            index += 1
-            while index < len(lines):
-                next_line = lines[index]
-                if next_line and not next_line.startswith((" ", "\t")):
-                    break
-                stripped_next = next_line.strip()
-                if not stripped_next or stripped_next.startswith("#"):
-                    index += 1
-                    continue
-                submatch = key_pattern.match(stripped_next)
-                if not submatch:
-                    raise RuleParseError(
-                        f"{path}: unsupported codex frontmatter line: {next_line!r}"
-                    )
-                subkey, subvalue = submatch.group(1), (submatch.group(2) or "").strip()
-                codex_metadata[subkey] = strip_yaml_string(subvalue)
-                index += 1
-            metadata["codex"] = codex_metadata
-            continue
-
-        metadata[key] = strip_yaml_string(raw_value)
-        index += 1
+        elif key == "paths":
+            metadata["paths"], index = read_block_sequence(lines, index)
+        elif key == "codex":
+            metadata["codex"], index = read_codex_metadata(lines, index, raw_value, path)
+        else:
+            metadata[key] = strip_yaml_string(raw_value)
 
     return metadata
+
+
+def read_block_sequence(lines: list[str], index: int) -> tuple[list[str], int]:
+    """The ``- item`` lines from ``index`` on, and the index of the first line past them."""
+    items: list[str] = []
+    while index < len(lines):
+        line = lines[index]
+        if line and not line.startswith((" ", "\t", "-")):
+            break
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            items.append(strip_yaml_string(stripped[2:].strip()))
+        index += 1
+    return items, index
+
+
+def read_codex_metadata(
+    lines: list[str], index: int, raw_value: str, path: Path
+) -> tuple[dict[str, str], int]:
+    """The ``codex:`` mapping: an inline value is the portability, else indented ``key: value`` lines."""
+    if raw_value:
+        return {"portability": strip_yaml_string(raw_value)}, index
+    codex_metadata: dict[str, str] = {}
+    while index < len(lines):
+        line = lines[index]
+        if line and not line.startswith((" ", "\t")):
+            break
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            submatch = FRONTMATTER_KEY.match(stripped)
+            if not submatch:
+                raise RuleParseError(f"{path}: unsupported codex frontmatter line: {line!r}")
+            codex_metadata[submatch.group(1)] = strip_yaml_string((submatch.group(2) or "").strip())
+        index += 1
+    return codex_metadata, index
 
 
 def parse_flow_sequence(raw_value: str, path: Path) -> list[str]:

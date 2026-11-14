@@ -16,6 +16,12 @@ v1 accepts only a **flat** layout: every `--targets`/`--tests` path must
 resolve to a file directly inside one single directory (that directory is the
 "target directory" throughout this module). No package/nested layout support.
 
+A second reach limit: a target whose tests run it as a subprocess from another
+working directory (a hook script driven with `cwd=tmp_path`) refuses
+`run-failed`. mutmut reads its config from the process cwd and its trampolines
+live in the `mutants/` copy, so the first such test fails while mutmut collects
+stats. Point the sensor at the in-process logic the hook calls, not at the hook.
+
 Exit codes: `0` ran (any survivor count), `2` refused with a reason on stderr
 and a matching `Mutation: unavailable ...` line on stdout. Tests + fixtures:
 `scripts/test_mutation_sensor.py`.

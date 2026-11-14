@@ -64,7 +64,6 @@ class Assessment:
         return self.tier is not None
 
 
-CHECK_ID = "TD07"
 _TD07_BOUND = (
     "TD07 clean means no active tech-debt row carries evidence that the project state "
     "moved past its premise since it was filed or last triaged; WARN per strong-tier "
@@ -83,13 +82,15 @@ SHORT_SHA_LENGTH = 12
 # -- TD07: the sentinel family envelope ------------------------------------------------
 
 
-def render_td07(snapshot: StateSnapshot, assessments: list[Assessment]) -> dict:
-    """One finding per candidate row; a withheld oracle is a finding, never silence."""
+def render_td07(snapshot: StateSnapshot, assessments: list[Assessment], check_id: str) -> dict:
+    """One finding per candidate row; a withheld oracle is a finding, never silence.
+
+    `check_id` is the caller's: the probe script declares the check it registers under."""
     candidates = [item for item in assessments if item.tier is not None]
-    findings = [_td07_finding(item) for item in candidates]
+    findings = [_td07_finding(item, check_id) for item in candidates]
     findings += [
         {
-            "check": CHECK_ID,
+            "check": check_id,
             "severity": "warn",
             "entity": entry.class_name,
             "kind": "triage-withheld",
@@ -99,7 +100,7 @@ def render_td07(snapshot: StateSnapshot, assessments: list[Assessment]) -> dict:
     ]
     findings += [
         {
-            "check": CHECK_ID,
+            "check": check_id,
             "severity": "warn",
             "entity": recurred["id"],
             "kind": "discard-recurred",
@@ -108,7 +109,7 @@ def render_td07(snapshot: StateSnapshot, assessments: list[Assessment]) -> dict:
         for recurred in _discard_recurred(snapshot)
     ]
     return {
-        "check": CHECK_ID,
+        "check": check_id,
         "skipped": None,
         "examined": {
             "active": len(assessments),
@@ -123,10 +124,10 @@ def render_td07(snapshot: StateSnapshot, assessments: list[Assessment]) -> dict:
     }
 
 
-def _td07_finding(item: Assessment) -> dict:
+def _td07_finding(item: Assessment, check_id: str) -> dict:
     first = _evidence(item.delta.signals[0])
     return {
-        "check": CHECK_ID,
+        "check": check_id,
         "severity": _TD07_SEVERITY[item.tier or "medium"],
         "entity": item.row.id,
         "kind": item.classes[0],

@@ -85,6 +85,10 @@ from state_ledger_schema import normalize_location
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
+# The sentinel check this probe registers under. A literal on purpose: the registration
+# test reads it off the parse tree, so it stays in the script that is registered.
+CHECK_ID = "TD07"
+
 
 # Evidence class -> tier. Only classes the reader emits appear here; a signal
 # the table does not name is a programming error, not a silent medium.
@@ -137,7 +141,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     selected = select(assessments, ids=ids, every_row=args.all, only_class=args.only)
 
     if args.json:
-        print(json.dumps(render_td07(snapshot, assessments), indent=2))
+        print(json.dumps(render_td07(snapshot, assessments, CHECK_ID), indent=2))
     elif args.digest:
         print(json.dumps(render_digest(snapshot, assessments, selected, _utc_now()), indent=2))
     elif args.index:

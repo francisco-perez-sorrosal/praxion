@@ -25,10 +25,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 from _plan_steps import PlanStep
-from iteration_ledger import IterationRecord
+
+if TYPE_CHECKING:
+    from iteration_ledger import IterationRecord
 
 REVIEW_FORCED = "force"
 REVIEW_OFF = "off"

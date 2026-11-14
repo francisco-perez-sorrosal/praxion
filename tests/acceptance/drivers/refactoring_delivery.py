@@ -30,9 +30,13 @@ the skill's text (its `SKILL.md` after the metadata header), the 10,000-characte
 context string may carry, the two events and their payload fields as the base's own drivers
 send them, and the isolation every process gets (`kernel_sandbox.isolated_env`).
 
-Unbound until a binding step ties them to the design (each raises `UnboundDriverError` with the
-assumption's words): how the harness announces a resume, how the canary removes the delivery,
-what the move changes, where a failed delivery is recorded, and the words that show arrival.
+Bound to the designed surfaces, each stated in its hook's docstring: a resume (`PreToolUse` for
+`SendMessage`, then `SubagentStart` again with the same agent id), the canary (the delivery
+module deleted from the installation), the move (the installation's own
+`scripts/refactoring_move.py`), the failure records (the project's observation log, read through
+the installation's own reader) and the arrival matcher (the delivery module's own
+`shows_arrival`). Each of them fails loudly, never quietly, while the production piece it reaches
+does not exist.
 """
 
 from __future__ import annotations
@@ -42,14 +46,14 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import count
 from pathlib import Path
-from typing import NoReturn
 
 import yaml
 
@@ -62,18 +66,12 @@ MARKER = "[Phase: Refactoring]"
 ROLES = ("implementer", "test-engineer")
 SKILL = "skills/refactoring/SKILL.md"
 SKILL_NAME = "refactoring"
+DELIVERY_MODULE = "hooks/_skill_delivery.py"
+MOVE_TOOL = "scripts/refactoring_move.py"
 CHANNEL_LIMIT = 10_000  # characters one context string may carry
 DISTINCT_LINE = 40  # a body line this long counts copies; shorter ones recur in other texts
 
 _MARKER_PATTERN = re.compile(r"\[\s*phase\s*:\s*refactoring\s*\]", re.IGNORECASE)
-
-
-class UnboundDriverError(NotImplementedError):
-    """Raised by a driver hook not yet bound to the designed surface."""
-
-
-def unbound(assumption: str) -> NoReturn:
-    raise UnboundDriverError(assumption)
 
 
 # -- The plugin installation ------------------------------------------------------------------
@@ -349,6 +347,71 @@ def config_dir_of(installation: Installation) -> Path:
     return installation.root.parent / f".{installation.root.name}-config" / ".claude"
 
 
+def _hook_env(installation: Installation, number: int) -> dict[str, str]:
+    return isolated_env(
+        installation.root.parent / f".{installation.root.name}-scratch-{number}",
+        CLAUDE_PLUGIN_ROOT=str(installation.root),
+        CLAUDE_CONFIG_DIR=str(config_dir_of(installation)),
+    )
+
+
+def _transcript_paths(
+    installation: Installation, project: Path, session_id: str, agent_id: str
+) -> tuple[Path, Path]:
+    """The main session's transcript and the spawn's own, as the harness files them."""
+    sessions = config_dir_of(installation) / "projects" / _project_dir_name(project)
+    return (
+        sessions / f"{session_id}.jsonl",
+        sessions / session_id / "subagents" / f"agent-{agent_id}.jsonl",
+    )
+
+
+def _append_jsonl(path: Path, entry: dict) -> None:
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry) + "\n")
+
+
+def _subagent_start(
+    installation: Installation,
+    project: Path,
+    env: dict,
+    *,
+    session_id: str,
+    agent_id: str,
+    agent_type: str,
+    raw_stdin: str | None = None,
+) -> tuple[list[HookExit], tuple[str, ...]]:
+    """Run every `SubagentStart` hook; the exits, and the context strings they print in order."""
+    main_transcript, agent_transcript = _transcript_paths(
+        installation, project, session_id, agent_id
+    )
+    payload = {
+        "session_id": session_id,
+        "transcript_path": str(main_transcript),
+        "agent_transcript_path": str(agent_transcript),
+        "cwd": str(project),
+        "permission_mode": "default",
+        "hook_event_name": "SubagentStart",
+        "agent_id": agent_id,
+        "agent_type": agent_type,
+    }
+    exits = _run_event(
+        installation.root,
+        "SubagentStart",
+        agent_type,
+        raw_stdin or json.dumps(payload),
+        project,
+        env,
+    )
+    context = tuple(
+        out["additionalContext"]
+        for e in exits
+        for out in [_parsed(e.stdout).get("hookSpecificOutput") or {}]
+        if isinstance(out, dict) and isinstance(out.get("additionalContext"), str)
+    )
+    return exits, context
+
+
 def spawn(
     installation: Installation,
     project: Path,
@@ -366,15 +429,10 @@ def spawn(
     session_id = f"refactoring-delivery-session-{number}"
     agent_id = f"a{number:015d}"
     tool_use_id = f"toolu_refactoring_delivery_{number:04d}"
-    config = config_dir_of(installation)
-    sessions = config / "projects" / _project_dir_name(project)
-    main_transcript = sessions / f"{session_id}.jsonl"
-    agent_transcript = sessions / session_id / "subagents" / f"agent-{agent_id}.jsonl"
-    env = isolated_env(
-        installation.root.parent / f".{installation.root.name}-scratch-{number}",
-        CLAUDE_PLUGIN_ROOT=str(root),
-        CLAUDE_CONFIG_DIR=str(config),
+    main_transcript, agent_transcript = _transcript_paths(
+        installation, project, session_id, agent_id
     )
+    env = _hook_env(installation, number)
     skill_text = skill_body(root) if (root / SKILL).is_file() else ""
     role = agent_type.removeprefix("praxion:")
     preloaded = preloaded_skills(root, role) if (root / _definition(role)).is_file() else ()
@@ -427,24 +485,14 @@ def spawn(
             }
         ],
     )
-    start_payload = {
-        "session_id": session_id,
-        "transcript_path": str(main_transcript),
-        "agent_transcript_path": str(agent_transcript),
-        "cwd": str(project),
-        "permission_mode": "default",
-        "hook_event_name": "SubagentStart",
-        "agent_id": agent_id,
-        "agent_type": agent_type,
-    }
-    start_exits = _run_event(
-        root, "SubagentStart", agent_type, raw_stdin or json.dumps(start_payload), project, env
-    )
-    context = tuple(
-        out["additionalContext"]
-        for e in start_exits
-        for out in [_parsed(e.stdout).get("hookSpecificOutput") or {}]
-        if isinstance(out, dict) and isinstance(out.get("additionalContext"), str)
+    start_exits, context = _subagent_start(
+        installation,
+        project,
+        env,
+        session_id=session_id,
+        agent_id=agent_id,
+        agent_type=agent_type,
+        raw_stdin=raw_stdin,
     )
     return Spawn(
         agent_type=agent_type,
@@ -460,13 +508,16 @@ def spawn(
     )
 
 
-def _prompt_additions(exits: list[HookExit], delegation: str) -> tuple[tuple[str, ...], bool]:
+def _prompt_additions(
+    exits: list[HookExit], delegation: str, field: str = "prompt"
+) -> tuple[tuple[str, ...], bool]:
+    """What the hooks rewrote of `field` around `delegation`, and whether `delegation` survived."""
     additions: list[str] = []
     kept = True
     for exit_ in exits:
         specific = _parsed(exit_.stdout).get("hookSpecificOutput") or {}
         updated = specific.get("updatedInput") if isinstance(specific, dict) else None
-        prompt = updated.get("prompt") if isinstance(updated, dict) else None
+        prompt = updated.get(field) if isinstance(updated, dict) else None
         if not isinstance(prompt, str):
             continue
         if delegation not in prompt:
@@ -610,40 +661,183 @@ def blocking_skill(installation: Installation) -> None:
     os.mkfifo(path)
 
 
-# -- Unbound: the parts the design chooses ----------------------------------------------------------
+# -- The parts the design chooses ------------------------------------------------------------------
 
 
 def resume(installation: Installation, project: Path, earlier: Spawn, follow_up: str) -> Spawn:
-    unbound(
-        "The harness announces a resume of an already-started spawn (same session, same agent "
-        "id, the follow-up message as its new input) at the boundaries the delivery listens on; "
-        "what the resumed spawn holds is what it held before plus whatever the hooks add now"
+    """Send `follow_up` to the spawn `earlier` started; read what it holds afterwards.
+
+    The harness announces a resume without a new `Agent` call: `PreToolUse` for `SendMessage`
+    (`to` the agent id, the message as the follow-up), then `SubagentStart` again with the same
+    agent id. The agent keeps its whole conversation, so it holds what it held before plus
+    whatever the hooks add now: a second copy of the skill's text shows up as a second copy here.
+    """
+    number = next(_numbers)
+    env = _hook_env(installation, number)
+    main_transcript, agent_transcript = _transcript_paths(
+        installation, project, earlier.session_id, earlier.agent_id
+    )
+    tool_use_id = f"toolu_refactoring_delivery_{number:04d}"
+    tool_input = {"to": earlier.agent_id, "message": follow_up}
+    pre_payload = {
+        "session_id": earlier.session_id,
+        "transcript_path": str(main_transcript),
+        "cwd": str(project),
+        "permission_mode": "default",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "SendMessage",
+        "tool_use_id": tool_use_id,
+        "tool_input": tool_input,
+    }
+    _append_jsonl(
+        main_transcript,
+        {
+            "type": "assistant",
+            "sessionId": earlier.session_id,
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": tool_use_id,
+                        "name": "SendMessage",
+                        "input": tool_input,
+                    }
+                ],
+            },
+        },
+    )
+    pre_exits = _run_event(
+        installation.root, "PreToolUse", "SendMessage", json.dumps(pre_payload), project, env
+    )
+    additions, kept = _prompt_additions(pre_exits, follow_up, field="message")
+    _append_jsonl(
+        agent_transcript,
+        {
+            "type": "user",
+            "sessionId": earlier.session_id,
+            "agentId": earlier.agent_id,
+            "isSidechain": True,
+            "message": {"role": "user", "content": "\n".join((*additions, follow_up))},
+        },
+    )
+    start_exits, context = _subagent_start(
+        installation,
+        project,
+        env,
+        session_id=earlier.session_id,
+        agent_id=earlier.agent_id,
+        agent_type=earlier.agent_type,
+    )
+    return replace(
+        earlier,
+        context=(*earlier.context, *context),
+        prompt_additions=(*earlier.prompt_additions, *additions),
+        prompts_kept_delegation=earlier.prompts_kept_delegation and kept,
+        exits=(*earlier.exits, *pre_exits, *start_exits),
     )
 
 
 def remove_delivery(installation: Installation) -> None:
-    unbound(
-        "The canary removes the refactoring skill's spawn-time delivery from the installation and "
-        "leaves every other spawn-time delivery registered and working"
-    )
+    """The canary: delete the delivery module from the installation, leave all else registered.
+
+    The emitter then yields no trailing segment, while its leading segments and every
+    `SubagentStart` delivery keep working. A removal that removes nothing fails loudly, since a
+    canary that changes nothing proves nothing.
+    """
+    module = installation.path(DELIVERY_MODULE)
+    assert module.is_file(), f"nothing to remove: the installation has no {DELIVERY_MODULE}"
+    module.unlink()
 
 
 def apply_the_move(installation: Installation) -> None:
-    unbound(
-        "The move is one change applied to the installation that takes the refactoring skill out "
-        "of both definitions' preloads, with every shipped text the move carries"
+    """Run the installation's own move tool to take the skill out of both definitions' preloads.
+
+    The tool is idempotent, so a scenario may apply it to an installation already in the end state.
+    """
+    root = installation.root
+    tool = root / MOVE_TOOL
+    assert tool.is_file(), f"the installation has no {MOVE_TOOL}"
+    done = subprocess.run(
+        [sys.executable, str(tool), "--to", "delivered", "--root", str(root)],
+        capture_output=True,
+        text=True,
+        env=isolated_env(root.parent / f".{root.name}-move"),
+        timeout=60,
     )
+    assert done.returncode == 0, (
+        f"{MOVE_TOOL} --to delivered exited {done.returncode}: {done.stderr}"
+    )
+
+
+_FAILURES_CODE = """
+import json, sys
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+from _observation_log import reader
+
+rows = reader.read_rows(Path(sys.argv[2]))
+print(json.dumps([
+    row.get("reason")
+    for row in rows
+    if row.get("event_type") == "skill_delivery" and row.get("outcome") == "failed"
+]))
+"""
 
 
 def delivery_failures(installation: Installation, project: Path) -> tuple[str, ...]:
-    unbound(
-        "A failed delivery leaves a record a later check can find, naming why the skill's text "
-        "was not delivered; a spawn the delivery served or rightly skipped leaves none"
+    """The reason of each failed delivery the project's observation log holds.
+
+    The log is read through the installation's own reader, as every code reader does. A delivery
+    that served, or rightly skipped, leaves no failed row, so the answer is empty. Asking about an
+    installation with no delivery module is refused: with nothing to fail, an empty answer would
+    only be a vacuous pass.
+    """
+    assert installation.path(DELIVERY_MODULE).is_file(), (
+        f"the installation has no {DELIVERY_MODULE}, so no delivery can have been recorded"
     )
+    done = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            _FAILURES_CODE,
+            str(installation.path("hooks")),
+            str(project / ".ai-state"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert done.returncode == 0, f"reading the observation log failed: {done.stderr[-1000:]}"
+    return tuple(str(reason) for reason in json.loads(done.stdout))
+
+
+_ARRIVAL_CODE = """
+import json, sys
+
+sys.path.insert(0, sys.argv[1])
+from _skill_delivery import shows_arrival
+
+print(json.dumps(bool(shows_arrival(sys.stdin.read()))))
+"""
 
 
 def shows_arrival(record: str) -> bool:
-    unbound(
-        "A check matches words in a spawn's own record that show the refactoring skill's text "
-        "arrived by the delivery, and finds none in a spawn that did not receive it"
+    """The delivery module's own matcher, applied to a spawn's own record.
+
+    It runs in an isolated process against this process's copy of the checkout, the same code
+    every installation copies, so a scenario never imports production code into the test process.
+    """
+    hooks = _template_checkout() / "hooks"
+    assert (hooks / "_skill_delivery.py").is_file(), f"the checkout has no {DELIVERY_MODULE}"
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", _ARRIVAL_CODE, str(hooks)],
+        input=record,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
+    assert done.returncode == 0, f"the arrival matcher failed: {done.stderr[-1000:]}"
+    return json.loads(done.stdout) is True

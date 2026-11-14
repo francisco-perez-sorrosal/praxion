@@ -1,0 +1,2 @@
+ambiguity = "Keep the new module small."
+conflict = "While you are there, also change the order of the output's fields so it reads better."

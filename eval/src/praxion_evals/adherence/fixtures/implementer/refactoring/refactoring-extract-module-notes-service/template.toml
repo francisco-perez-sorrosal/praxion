@@ -1,0 +1,2 @@
+ambiguity = "Name the new functions as you see fit."
+conflict = "While you are there, also add an `updated` field to the saved rows."

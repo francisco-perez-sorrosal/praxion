@@ -23,6 +23,7 @@ from praxion_evals.adherence import (
     session_arms,
     tasks,
 )
+from praxion_evals.adherence.dry_run import planned_copy
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS
 from praxion_evals.live.report import CREDENTIAL_KEYS
 from tests.adherence_run_support import (
@@ -194,7 +195,7 @@ def test_the_dry_run_names_the_plugin_copy_a_real_run_builds(
 
     session_arms.build_copy(tmp_path / task.role, None, task.role, arm, tasks.turn_cap_of(task))
 
-    assert cli._planned_copy(tmp_path, task, arm) == built[0]
+    assert planned_copy(tmp_path, task, arm) == built[0]
 
 
 @pytest.mark.usefixtures("no_launch")

@@ -28,12 +28,10 @@ close rewrite it, and ``<checkout> --reindex`` rebuilds it from the files alone.
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import os
 import subprocess
 import sys
-import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -41,15 +39,13 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 
 from praxion_evals.adherence import (
-    arms,
-    managed_fixture,
     report,
     results,
     run_index,
     session_loop,
     tasks,
 )
-from praxion_evals.adherence.confinement import Confinement, settings_of
+from praxion_evals.adherence.dry_run import print_dry_run
 from praxion_evals.adherence.infra_stop import (
     COUNTING_KINDS,
     DEFAULT_STOP_COUNT,
@@ -73,8 +69,6 @@ from praxion_evals.adherence.model import (
     ARMS,
     OWN_DISCORDANCE_EXACT,
     ROLES,
-    Arm,
-    ArmBuild,
     DeclaredSettings,
     Role,
     TaskSpec,
@@ -89,23 +83,18 @@ from praxion_evals.adherence.run_identity import (
     tree_digest,
     working_tree,
 )
-from praxion_evals.adherence.session_launch import REAL_HOME, session_confinement
 from praxion_evals.adherence.session_loop import (
     DEFAULT_TAIL_CHARS,
     EXIT_COMPLETE,
     OUTPUT_DIR,
     RETRY_POLICY,
-    SANDBOX_PREFIX,
     Checkout,
     Context,
     RunConfig,
     RunState,
-    ordered_arms,
     planned_order,
     resolve_checkout,
-    session_env,
 )
-from praxion_evals.live.session import SandboxPaths, SessionSpec, build_argv
 from praxion_evals.live.spend import RUNNER_SPEND_CAP_USD
 
 PROG = "praxion-evals-adherence"
@@ -147,7 +136,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             planned = plan_tasks(config)
             if config.dry_run:
-                return _print_dry_run(config, checkout, planned)
+                return print_dry_run(config, checkout, planned)
             _refuse_beside_stopped_run(config)
             context, state = session_loop.begin(config, checkout, planned, _declare)
     except (ValueError, OSError) as error:  # everything before the first launch is a usage error
@@ -658,105 +647,6 @@ def given_options(argv: Sequence[str] | None) -> dict[str, str]:
     named = vars(parser.parse_args(argv))
     spelling = {action.dest: (action.option_strings or [action.dest])[0] for action in actions}
     return {dest: spelling[dest] for dest in named}
-
-
-# --- --dry-run: the sessions a paid run would launch ---
-
-
-def _print_dry_run(
-    config: RunConfig, checkout: Checkout, planned: Mapping[Role, list[TaskSpec]]
-) -> int:
-    run_root = Path(tempfile.gettempdir()) / f"{SANDBOX_PREFIX}<run>"
-    for role, role_tasks in planned.items():
-        print(f"{role}: {len(role_tasks)} tasks (target {config.required_pairs})", file=sys.stderr)
-        for index, task in enumerate(role_tasks):
-            for arm in ordered_arms(config.arms, config.seed, task.task_id):
-                sandbox = SandboxPaths(run_root / role / f"{index:03d}-{arm}")
-                copy = _planned_copy(run_root, task, arm)
-                confinement = session_confinement(
-                    role,
-                    copy,
-                    run_root,
-                    home=REAL_HOME,
-                    token_file=config.session_oauth_token_file,
-                    ambient=os.environ,
-                )
-                spec = _planned_spec(config, checkout, task, arm, sandbox, copy, confinement)
-                env_names = sorted(session_env(config, sandbox.root, os.environ))
-                line = {
-                    "role": role,
-                    "arm": arm,
-                    "task_id": task.task_id,
-                    "mode": task.mode,
-                    "argv": build_argv(spec),
-                    "env_names": env_names,
-                    "env_switches": dict(_planned_switches(task)),
-                }
-                if confinement is not None:  # only a confined kit's line shows where it runs
-                    line["places"] = _planned_places(run_root, sandbox, task, copy)
-                    line["program_order"] = list(confinement.program_order)
-                print(json.dumps(line))
-    return EXIT_COMPLETE
-
-
-def _planned_switches(task: TaskSpec) -> Mapping[str, str]:
-    """The managed-only switches the task's launches add, which a real run reads off the built
-    fixture; the dry run reads them off the directories the fixture is built from."""
-    overlays = (tasks.OVERLAYS_DIR / name for name in tasks.kit_for(task.role).overlays)
-    return managed_fixture.switches_planned((tasks.REPOS_DIR / task.fixture_id, *overlays))
-
-
-def _planned_copy(run_root: Path, task: TaskSpec, arm: Arm) -> Path:
-    """Where a real run would put the arm's plugin copy; the dry run names it, never makes it.
-
-    Spells the directory as ``session_loop._build_copy`` does; a test pins the two together.
-    """
-    cap = tasks.turn_cap_of(task)
-    return run_root / task.role / (f"{arm}-cap{cap}" if cap else arm)
-
-
-def _planned_places(
-    run_root: Path, sandbox: SandboxPaths, task: TaskSpec, copy: Path
-) -> dict[str, str]:
-    return {
-        "run_root": str(run_root),
-        "plugin_copy": str(copy),
-        "sandbox": str(sandbox.root),
-        "scratch": str(tasks.scratch_dir(sandbox)),
-        "home": str(sandbox.home),
-        "tmp": str(sandbox.tmp),
-        "slug": task.slug,
-    }
-
-
-def _planned_spec(
-    config: RunConfig,
-    checkout: Checkout,
-    task: TaskSpec,
-    arm: Arm,
-    sandbox: SandboxPaths,
-    copy: Path,
-    confinement: Confinement | None,
-) -> SessionSpec:
-    """The spec a real run builds, with the plugin copy it would make named, not made.
-
-    The role's tool line is read from the checkout's own definition, which every copy carries
-    unchanged. The confinement is attached after the spec is built because the stand-in build
-    names the checkout, not the copy the confinement protects.
-    """
-    cap = tasks.turn_cap_of(task)
-    patched = (arms.definition_path(task.role),) if arm == "lean" or cap else ()
-    stand_in = ArmBuild(task.role, arm, checkout.path, cap, "dry-run", patched)
-    spec = tasks.session_spec(
-        task,
-        stand_in,
-        sandbox,
-        model=config.model,
-        effort=config.effort,
-        max_budget_usd=config.session_budget_usd,
-    )
-    settings = None if confinement is None else settings_of(confinement)
-    return replace(spec, plugin_dir=copy, add_dir=copy, settings=settings)
 
 
 if __name__ == "__main__":

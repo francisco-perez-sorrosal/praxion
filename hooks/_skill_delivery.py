@@ -11,20 +11,23 @@ plugin, or one level up from a mutation sensor's copy.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
 import sys
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Any, Literal, NoReturn, Optional, TypeVar, Union
 
 from _rule_delivery import FRONTMATTER_RE
 
 SCRIPTS_DIR = "scripts"
 AGENTS_DIR = "agents"
+SKILLS_DIR = "skills"
 REFACTORING_SKILL = "refactoring"
 
 # The only agent types a delegation can be served the skill for; every other role, the verifier
@@ -443,19 +446,25 @@ _UNREADABLE = BodyUnreadable("skill-unreadable")
 
 
 def read_body(skill_dir: Path) -> BodyRead:
-    """The text of `<skill_dir>/SKILL.md` after its metadata header, or why it cannot be read.
+    """The text of `<skill_dir>/SKILL.md` after its metadata header, or why it cannot be read."""
+    timed_out: BodyRead = BodyUnreadable("skill-read-timeout")
+    return _within_timeout(lambda: _read_body_unbounded(skill_dir), timed_out)
 
-    The read runs in a daemon thread that is given `READ_TIMEOUT_SECONDS`: a thread stuck opening
-    a FIFO is abandoned and cannot keep the process from exiting, which a bounded `open` could not
-    promise for every kind of hung file.
+
+_Read = TypeVar("_Read")
+
+
+def _within_timeout(read: Callable[[], _Read], on_timeout: _Read) -> _Read:
+    """What `read` returns within `READ_TIMEOUT_SECONDS`, else `on_timeout`.
+
+    The read runs in a daemon thread: one stuck opening a FIFO is abandoned and cannot keep the
+    process from exiting, which a bounded `open` could not promise for every kind of hung file.
     """
-    outcome: list[BodyRead] = []
-    reader = threading.Thread(
-        target=lambda: outcome.append(_read_body_unbounded(skill_dir)), daemon=True
-    )
+    outcome: list[_Read] = []
+    reader = threading.Thread(target=lambda: outcome.append(read()), daemon=True)
     reader.start()
     reader.join(READ_TIMEOUT_SECONDS)
-    return outcome[0] if outcome else BodyUnreadable("skill-read-timeout")
+    return outcome[0] if outcome else on_timeout
 
 
 def _read_body_unbounded(skill_dir: Path) -> BodyRead:
@@ -480,3 +489,226 @@ def _after_header(text: str) -> BodyRead:
     if closing == -1:
         return _UNREADABLE
     return text[closing + len(_HEADER_CLOSING) :]
+
+
+# --- The request edge: the rendered request a step-loop pointer names ----------------------------
+
+# The heading is in the request's first lines, so a larger request is read in part, not refused.
+MAX_REQUEST_BYTES = 64 * 1024
+
+
+def read_request(path: Path) -> Optional[str]:  # noqa: UP045
+    """The request's text, or None when it cannot be read within the second.
+
+    A link on the way to the file is refused: `_request_path` checked the path lexically, which a
+    symlinked `.ai-work` or slug directory would defeat.
+    """
+    return _within_timeout(lambda: _read_request_unbounded(path), None)
+
+
+def _read_request_unbounded(path: Path) -> Optional[str]:  # noqa: UP045
+    if any(link.is_symlink() for link in (path, path.parent, path.parent.parent)):
+        return None
+    try:
+        with open(path, "rb") as request_file:
+            raw = request_file.read(MAX_REQUEST_BYTES)
+    except OSError:
+        return None
+    return raw.decode("utf-8", errors="replace")
+
+
+# --- Outcome: what a delivery is -----------------------------------------------------------------
+
+SkipReason = Literal["not-served", "unmarked", "preloaded"]
+FailureReason = Literal[
+    "skill-unreadable",
+    "skill-read-timeout",
+    "definition-unreadable",
+    "request-unresolvable",
+    "grammar-unavailable",
+    "input-malformed",
+    "internal-error",
+]
+
+
+@dataclass(frozen=True)
+class Skipped:
+    """Nothing is added to the spawn and nothing is recorded."""
+
+    why: SkipReason
+
+
+@dataclass(frozen=True)
+class Served:
+    """The spawn receives `block` after its delegation; one `served` row records it."""
+
+    block: str
+    body_digest: str
+    route: Route
+
+
+@dataclass(frozen=True)
+class Failed:
+    """The skill could not be delivered: one `failed` row and one stderr line record why."""
+
+    reason: FailureReason
+
+
+Outcome = Union[Skipped, Served, Failed]  # noqa: UP007
+Recorded = Union[Served, Failed]  # noqa: UP007
+
+
+def decide(verdict: Verdict, preload: PreloadState, skill_dir: Path) -> Outcome:
+    """The decision table, total over every verdict and preload state.
+
+    Reads the body only for a marked delegation to a definition that does not preload the skill.
+    A preload wins over an unresolvable delegation, so a broken installation changes nothing
+    while the definitions still carry the skill.
+    """
+    if isinstance(verdict, NotServed):
+        return Skipped("not-served")
+    if isinstance(verdict, Unmarked):
+        return Skipped("unmarked")
+    if isinstance(preload, Preloaded):
+        return Skipped("preloaded")
+    if isinstance(verdict, Unresolvable):
+        return Failed(_failure_of(verdict))
+    if isinstance(preload, DefinitionUnreadable):
+        # Not knowing whether a preload carries the skill, add nothing rather than risk two copies.
+        return Failed("definition-unreadable")
+    if isinstance(preload, NotPreloaded):
+        return _serve(verdict.route, skill_dir)
+    _assert_never(preload)
+
+
+def _failure_of(verdict: Unresolvable) -> FailureReason:
+    if verdict.reason == "grammar-unavailable":
+        return "grammar-unavailable"
+    return "request-unresolvable"
+
+
+def _serve(route: Route, skill_dir: Path) -> Outcome:
+    body = read_body(skill_dir)
+    if isinstance(body, BodyUnreadable):
+        return Failed(body.reason)
+    return Served(render_block(body, skill_dir), body_digest(body), route)
+
+
+def _assert_never(unhandled: NoReturn) -> NoReturn:
+    """Marks a cell the table forgot: a type checker rejects the call, a run raises."""
+    raise AssertionError(f"unhandled cell: {unhandled!r}")
+
+
+# --- The delivery edge: every read, and the one row and stderr line a failure leaves -------------
+
+
+@dataclass(frozen=True)
+class _Delegation:
+    agent_type: str
+    prompt: str
+    cwd: Optional[Path]  # noqa: UP045
+
+
+def deliver(payload: Any, plugin_root: Path, environ: Mapping[str, str]) -> Outcome:
+    """Decide one spawn call's delivery, perform every read and leave its record. Never raises.
+
+    `payload` is the hook's stdin object. The order is role, preload state, classification: the
+    marker grammar is consulted only for a served role whose definition does not preload the
+    skill, so a broken installation changes no spawn while the definitions preload.
+    """
+    try:
+        outcome = _outcome(payload, plugin_root)
+    except Exception:
+        outcome = Failed("internal-error")
+    _report(outcome, payload, environ)
+    return outcome
+
+
+def _outcome(payload: Any, plugin_root: Path) -> Outcome:
+    delegation = _delegation(payload)
+    if delegation is None:
+        return Failed("input-malformed")
+    if delegation.agent_type not in SERVED_ROLES:
+        return Skipped("not-served")
+    preload = preload_state(plugin_root, delegation.agent_type.rpartition(":")[2])
+    if isinstance(preload, Preloaded):
+        return Skipped("preloaded")
+    verdict = classify(delegation.agent_type, delegation.prompt, read_request, delegation.cwd)
+    return decide(verdict, preload, (plugin_root / SKILLS_DIR / REFACTORING_SKILL).resolve())
+
+
+def _delegation(payload: Any) -> Optional[_Delegation]:  # noqa: UP045
+    """The Agent call's type, prompt and working directory; None when the input is not that shape.
+
+    An absent `subagent_type` or `prompt` is the empty string, as the emitter reads them.
+    """
+    tool_input = payload.get("tool_input", {}) if isinstance(payload, dict) else None
+    if not isinstance(tool_input, dict):
+        return None
+    agent_type, prompt = tool_input.get("subagent_type", ""), tool_input.get("prompt", "")
+    if not (isinstance(agent_type, str) and isinstance(prompt, str)):
+        return None
+    cwd = _text(payload, "cwd")
+    return _Delegation(agent_type, prompt, Path(cwd) if cwd else None)
+
+
+def _text(mapping: Any, key: str) -> str:
+    value = mapping.get(key) if isinstance(mapping, dict) else None
+    return value if isinstance(value, str) else ""
+
+
+def _report(outcome: Outcome, payload: Any, environ: Mapping[str, str]) -> None:
+    """A served or failed outcome leaves its row; a failure also leaves a stderr line."""
+    if isinstance(outcome, Skipped):
+        return
+    if isinstance(outcome, Failed):
+        with contextlib.suppress(Exception):
+            print(_failure_line(outcome), file=sys.stderr)
+    with contextlib.suppress(Exception):
+        _record(outcome, payload, environ)
+
+
+def _failure_line(failed: Failed) -> str:
+    line = f"skill delivery failed: {REFACTORING_SKILL} ({failed.reason})"
+    if failed.reason == "grammar-unavailable":
+        return f"{line}: {MARKER_IMPORT_ERROR}"
+    return line
+
+
+def _record(outcome: Recorded, payload: Any, environ: Mapping[str, str]) -> None:
+    """Append the row at the log serving the spawn's directory; nowhere where none does.
+
+    Imported here, not at the top: the log is a dependency of the record alone, and a failure to
+    import it must cost the row, never the module.
+    """
+    from _observation_log import writer
+    from _observation_log.location import locate
+    from _observation_log.registry import EventClass
+
+    # Input too malformed to name a directory is recorded where the harness runs handlers.
+    location = locate(_text(payload, "cwd") or os.getcwd())
+    if location is not None:
+        row = delivery_row(outcome, payload, datetime.now(timezone.utc).isoformat())
+        writer.record(location.state_dir, EventClass.SKILL_DELIVERY, row, env=environ)
+
+
+# The route of a failure is not carried by `Failed`, so a failed row names none.
+_UNKNOWN_ROUTE = "unknown"
+_ROUTE_NAMES = {OwnWords: "own-words", StepRequest: "step-request"}
+
+
+def delivery_row(outcome: Recorded, payload: Any, timestamp: str) -> dict:  # noqa: UP007
+    """The `skill_delivery` row of a served or failed outcome. Pure: the timestamp is an argument."""
+    tool_input = payload.get("tool_input") if isinstance(payload, dict) else None
+    row = {
+        "timestamp": timestamp,
+        "session_id": _text(payload, "session_id"),
+        "event_type": "skill_delivery",
+        "agent_type": _text(tool_input, "subagent_type"),
+        "skill": REFACTORING_SKILL,
+        "tool_use_id": _text(payload, "tool_use_id"),
+    }
+    if isinstance(outcome, Served):
+        route = _ROUTE_NAMES[type(outcome.route)]
+        return {**row, "outcome": "served", "route": route, "body_digest": outcome.body_digest}
+    return {**row, "outcome": "failed", "route": _UNKNOWN_ROUTE, "reason": outcome.reason}

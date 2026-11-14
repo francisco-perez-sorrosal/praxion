@@ -123,6 +123,8 @@ requirements:
       - src/auth/session.py::validate()
 ```
 
+**One key per REQ.** Each list key (`tests`, `acceptance`, `implementation`) appears once under a requirement, and a writer adds entries to that list in place. A second `implementation:` key under the same REQ does not merge: YAML keeps the last duplicate, so a seeded `implementation: []` placed after a filled list reads the requirement as unimplemented. Fragment files (`traceability_*.yml`) merge by per-REQ union of every list-valued key, so an empty list never replaces a filled one.
+
 Coverage counts `tests` and `acceptance` together (union semantics: [`SKILL.md`](../SKILL.md#requirement-id-conventions), "Union coverage"). The matrix header is unchanged in every example above; the `Test(s)` cell lists the nodes of both keys, `(none)` only when both are empty.
 
 ## Observable Surface

@@ -22,7 +22,8 @@ sys.path.insert(0, str(SCRIPT_DIR))
 # noqa E402: this import MUST follow the sys.path.insert above — the sibling
 # module is not importable until the script's own directory is on the path.
 # Hoisting it to the top would make the script fail to start.
-from validate import validate_skill  # noqa: E402
+from frontmatter_contract import OPEN_STANDARD_FIELDS  # noqa: E402
+from validate import extract_frontmatter, parse_frontmatter, validate_skill  # noqa: E402
 
 HELP_FLAGS = frozenset({"-h", "--help"})
 HELP_TEXT = """\
@@ -40,6 +41,13 @@ Exit status:
   1  not a skill directory, or validation reported errors (non-zero; nothing is packaged)
      Validation warnings do not change the exit status.
 """
+
+
+def non_portable_fields(skill_md: Path) -> list[str]:
+    """The frontmatter fields of a valid SKILL.md that a claude.ai upload rejects, sorted."""
+    raw, _ = extract_frontmatter(skill_md.read_text(encoding="utf-8"))
+    fields, _ = parse_frontmatter(raw or "")
+    return sorted(set(fields) - OPEN_STANDARD_FIELDS)
 
 
 def package_skill(skill_path: Path, output_dir: Path | None = None) -> int:
@@ -62,6 +70,11 @@ def package_skill(skill_path: Path, output_dir: Path | None = None) -> int:
         print("\nFix validation errors before packaging.")
         return 1
     print("Validation passed.\n")
+    extras = non_portable_fields(skill_md)
+    if extras:
+        print(
+            f"Warning: a claude.ai upload rejects these frontmatter fields: {', '.join(extras)}\n"
+        )
 
     # Determine output location
     skill_name = skill_path.name

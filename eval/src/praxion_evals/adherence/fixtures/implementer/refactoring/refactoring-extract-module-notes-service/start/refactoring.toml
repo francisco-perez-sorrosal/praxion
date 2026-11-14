@@ -1,0 +1,4 @@
+# Where the refactoring moves code. The grader reads this from the starting commit.
+source = "src/notes/repository.py"
+target = "src/notes/serialization.py"
+tests = "tests"

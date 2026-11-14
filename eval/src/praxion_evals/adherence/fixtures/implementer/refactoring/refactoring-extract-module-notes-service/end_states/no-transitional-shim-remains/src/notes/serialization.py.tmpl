@@ -1,0 +1,9 @@
+"""The JSON text of the mirror file."""
+
+import json
+
+MIRROR_INDENT = 2
+
+
+def mirror_text(rows: list[dict]) -> str:
+    return json.dumps(rows, indent=MIRROR_INDENT)

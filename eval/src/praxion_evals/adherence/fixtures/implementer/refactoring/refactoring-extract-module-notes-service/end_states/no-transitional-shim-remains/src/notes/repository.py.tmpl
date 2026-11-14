@@ -1,0 +1,29 @@
+"""Notes held in memory and mirrored to a JSON file."""
+
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from notes import serialization
+
+
+@dataclass(frozen=True)
+class Note:
+    title: str
+    body: str
+
+
+def mirror_text(rows: list[dict]) -> str:
+    return serialization.mirror_text(rows)
+
+
+class NoteRepository:
+    def __init__(self, mirror_path: Path) -> None:
+        self._mirror_path = mirror_path
+        self._notes: list[Note] = []
+
+    def add(self, note: Note) -> None:
+        self._notes.append(note)
+        self._mirror_path.write_text(serialization.mirror_text([asdict(n) for n in self._notes]), encoding="utf-8")
+
+    def titles(self) -> list[str]:
+        return [note.title for note in self._notes]

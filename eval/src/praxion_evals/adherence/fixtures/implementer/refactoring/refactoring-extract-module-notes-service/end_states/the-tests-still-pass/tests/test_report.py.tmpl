@@ -1,0 +1,11 @@
+from notes.report import preview
+
+PREVIEW_TEXT = """[
+  {
+    "title": "plan"
+  }
+]"""
+
+
+def test_the_preview_is_the_mirror_text_of_the_titles():
+    assert preview(["plan"]) == PREVIEW_TEXT

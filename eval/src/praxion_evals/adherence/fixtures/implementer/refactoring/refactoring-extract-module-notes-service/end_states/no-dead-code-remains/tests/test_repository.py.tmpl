@@ -1,0 +1,20 @@
+from notes.repository import Note, NoteRepository
+
+MIRROR_FILE_TEXT = """[
+  {
+    "title": "plan",
+    "body": "ship it"
+  }
+]"""
+
+
+def test_added_notes_are_listed_by_title(tmp_path):
+    repository = NoteRepository(tmp_path / "mirror.json")
+    repository.add(Note("plan", "ship it"))
+    assert repository.titles() == ["plan"]
+
+
+def test_the_mirror_file_holds_indented_json_text(tmp_path):
+    path = tmp_path / "mirror.json"
+    NoteRepository(path).add(Note("plan", "ship it"))
+    assert path.read_text(encoding="utf-8") == MIRROR_FILE_TEXT

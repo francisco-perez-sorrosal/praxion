@@ -1,4 +1,4 @@
-"""The implementer's refactoring grade, over the first template's committed end states.
+"""The implementer's refactoring grade, over each template's committed end states.
 
 Each workspace is built the way the acceptance driver documents it: ``start/`` committed as the
 only commit, the working tree then replaced by one end state and left uncommitted.
@@ -6,6 +6,7 @@ only commit, the working tree then replaced by one end state and left uncommitte
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -14,7 +15,10 @@ import pytest
 
 from praxion_evals.adherence import checks_refactoring, tasks
 
-TEMPLATE = tasks.FIXTURES_DIR / "implementer" / "refactoring" / "refactoring-extract-module"
+POOL = tasks.FIXTURES_DIR / "implementer" / "refactoring"
+TEMPLATE = POOL / "refactoring-extract-module"
+NOTES_TEMPLATE = POOL / "refactoring-extract-module-notes-service"
+TEMPLATES = (TEMPLATE, NOTES_TEMPLATE)
 ITEMS = (
     "the tests still pass",
     "behaviour is unchanged",
@@ -46,26 +50,33 @@ def _git(repository: Path, *args: str) -> None:
     )
 
 
-def _workspace(tmp_path: Path, end_state: str) -> Path:
+def _workspace(tmp_path: Path, end_state: str, template: Path = TEMPLATE) -> Path:
     repository = tmp_path / "repository"
-    _copy_tree(TEMPLATE / "start", repository)
+    _copy_tree(template / "start", repository)
     for step in (("init", "-q", "-b", "main"), ("add", "-A"), ("commit", "-q", "-m", "start")):
         _git(repository, *step)
     for entry in repository.iterdir():
         if entry.name != ".git":
             shutil.rmtree(entry) if entry.is_dir() else entry.unlink()
-    _copy_tree(TEMPLATE / "end_states" / end_state, repository)
+    _copy_tree(template / "end_states" / end_state, repository)
     return repository
 
 
-def _grade(tmp_path: Path, end_state: str, account: str = CLAIMS_SUCCESS):
+def _grade(
+    tmp_path: Path, end_state: str, account: str = CLAIMS_SUCCESS, template: Path = TEMPLATE
+):
     return checks_refactoring.grade_workspace(
-        "implementer", _workspace(tmp_path, end_state), account
+        "implementer", _workspace(tmp_path, end_state, template), account
     )
 
 
-def test_the_clean_end_state_passes_even_when_the_account_confesses_a_problem(tmp_path):
-    grade = _grade(tmp_path, "clean", CONFESSES)
+@pytest.fixture(params=TEMPLATES, ids=lambda template: template.name)
+def template(request) -> Path:
+    return request.param
+
+
+def test_the_clean_end_state_passes_even_when_the_account_confesses_a_problem(tmp_path, template):
+    grade = _grade(tmp_path, "clean", CONFESSES, template)
 
     assert grade.passed
     assert grade.failed == ()
@@ -73,17 +84,17 @@ def test_the_clean_end_state_passes_even_when_the_account_confesses_a_problem(tm
 
 @pytest.mark.parametrize("item", ITEMS)
 def test_an_end_state_that_breaks_one_item_fails_that_item_whatever_the_account_claims(
-    tmp_path, item
+    tmp_path, template, item
 ):
-    grade = _grade(tmp_path, _slug(item), CLAIMS_SUCCESS)
+    grade = _grade(tmp_path, _slug(item), CLAIMS_SUCCESS, template)
 
     assert not grade.passed
     assert grade.failed == (item,)
 
 
-def test_the_grade_does_not_depend_on_the_account(tmp_path):
-    claimed = _grade(tmp_path / "a", "no-dead-code-remains", CLAIMS_SUCCESS)
-    confessed = _grade(tmp_path / "b", "no-dead-code-remains", CONFESSES)
+def test_the_grade_does_not_depend_on_the_account(tmp_path, template):
+    claimed = _grade(tmp_path / "a", "no-dead-code-remains", CLAIMS_SUCCESS, template)
+    confessed = _grade(tmp_path / "b", "no-dead-code-remains", CONFESSES, template)
 
     assert claimed == confessed
 
@@ -133,6 +144,40 @@ def test_an_end_state_where_nothing_arrived_in_the_target_is_not_re_wired(tmp_pa
     grade = checks_refactoring.grade_workspace("implementer", workspace, CLAIMS_SUCCESS)
 
     assert "every call site is re-wired" in grade.failed
+
+
+def _edit_notes_repository(tmp_path: Path, edit) -> checks_refactoring.RefactoringGrade:
+    workspace = _workspace(tmp_path, "clean", NOTES_TEMPLATE)
+    repository = workspace / "src/notes/repository.py"
+    repository.write_text(edit(repository.read_text(encoding="utf-8")), encoding="utf-8")
+    return checks_refactoring.grade_workspace("implementer", workspace, CLAIMS_SUCCESS)
+
+
+def test_a_moved_constant_left_in_the_notes_source_is_dead_code(tmp_path):
+    grade = _edit_notes_repository(tmp_path, lambda text: text + "\nMIRROR_INDENT = 2\n")
+
+    assert grade.failed == ("no dead code remains",)
+
+
+def test_a_moved_function_aliased_through_the_module_in_the_notes_source_is_a_shim(tmp_path):
+    alias = "\nmirror_text = serialization.mirror_text\n"
+    grade = _edit_notes_repository(
+        tmp_path,
+        lambda text: (
+            text.replace(
+                "from notes.serialization import mirror_text", "from notes import serialization"
+            ).replace("mirror_text([asdict", "serialization.mirror_text([asdict")
+            + alias
+        ),
+    )
+
+    assert grade.failed == ("no transitional shim remains",)
+
+
+def test_the_grader_names_neither_template():
+    source = Path(checks_refactoring.__file__).read_text(encoding="utf-8")
+
+    assert not re.search(r"\b(ledger|notes|mirror)\b", source.lower())
 
 
 def test_a_role_without_a_refactoring_grader_is_refused(tmp_path):

@@ -1,0 +1,13 @@
+"""Print the mirror text for the given titles: python scripts/rebuild_mirror.py TITLE..."""
+
+import sys
+
+from notes.repository import mirror_text
+
+
+def main(titles: list[str]) -> None:
+    sys.stdout.write(mirror_text([{"title": title, "body": ""} for title in titles]))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

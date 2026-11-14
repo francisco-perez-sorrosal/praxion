@@ -1,0 +1,7 @@
+"""A preview of the text the mirror file would hold for some titles."""
+
+from notes import serialization
+
+
+def preview(titles: list[str]) -> str:
+    return serialization.mirror_text([{"title": title} for title in titles])

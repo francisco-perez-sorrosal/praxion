@@ -1,0 +1,5 @@
+from notes.serialization import mirror_text
+
+
+def test_an_empty_list_has_a_blank_between_the_brackets():
+    assert mirror_text([]) == "[ ]"

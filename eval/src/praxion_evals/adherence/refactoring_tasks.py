@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from praxion_evals.adherence import tasks
-from praxion_evals.adherence.model import Role, TaskSpec
+from praxion_evals.adherence.model import KitMode, Role, TaskSpec
 from praxion_evals.adherence.tasks import Template
 
 POOL_DIRNAME = "refactoring"
@@ -33,6 +33,9 @@ class RefactoringPool:
     brief: str  # the input file the prompt points the role at
     prompt: str  # with ``{slug}`` and ``{brief}`` slots
     fixture_of: Mapping[str, str]  # template id -> the one ``fixtures/repos`` entry it runs in
+    # A role with modes cannot plan a task without a covered mode, and ``pre-refactor`` is the
+    # pool's label, not one of them: the covered mode the pool's tasks are shaped like.
+    task_mode: KitMode | None = None
 
 
 POOLS: Mapping[Role, RefactoringPool] = MappingProxyType(
@@ -51,6 +54,22 @@ POOLS: Mapping[Role, RefactoringPool] = MappingProxyType(
                     "refactoring-extract-module-notes-service": "notes-service",
                 }
             ),
+        ),
+        "test-engineer": RefactoringPool(
+            brief="WIP.md",
+            prompt=(
+                "Task slug: {slug}. Mode: pre-refactor. Write the characterization tests for "
+                f"the {MARKER} step assigned in .ai-work/{{slug}}/{{brief}}, before any structural "
+                "change; the plan is in the same directory and the tests go in the repository "
+                "you are in."
+            ),
+            fixture_of=MappingProxyType(
+                {
+                    "refactoring-characterize": "ledger-cli",
+                    "refactoring-characterize-notes-service": "notes-service",
+                }
+            ),
+            task_mode="paired",
         ),
     }
 )
@@ -121,4 +140,5 @@ def _make_task(
         main_prompt=pool.prompt.format(slug=slug, brief=pool.brief),
         seed=seed,
         project_convention=tasks.PILOT_CONVENTIONS.get(role),
+        mode=pool.task_mode,
     )

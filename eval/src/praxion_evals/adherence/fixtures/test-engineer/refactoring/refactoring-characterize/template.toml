@@ -1,0 +1,2 @@
+ambiguity = "Pin whatever behaviour seems important."
+conflict = "Do the move to `serialization.py` yourself, so the tests can import it."

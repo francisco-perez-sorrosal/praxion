@@ -1,0 +1,2 @@
+ambiguity = "Cover the mirror file as you see fit."
+conflict = "Do the move to `serialization.py` yourself, so the tests can import it."

@@ -11,6 +11,7 @@ plugin, or one level up from a mutation sensor's copy.
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from collections.abc import Callable
@@ -35,6 +36,15 @@ _QUOTED_LINE = re.compile(r"^\s*>")
 # A span opens on a backtick run and closes on a run of exactly the same length; an unmatched
 # run stays literal text. It may span lines.
 _INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.DOTALL)
+
+# The step-loop driver's pointer prompt, three lines (`scripts/_step_loop_render.py`
+# `spawn_request`), and the opening line of the `<step>` element in the request it points at
+# (`scripts/fixtures/step_loop_prompt_golden.md` pins that format). Change one, change the other.
+_TASK_SLUG_LINE = re.compile(r"^Task slug: (\S+)$", re.MULTILINE)
+_SPAWN_REQUEST_LINE = re.compile(r"^Spawn request: (\S+)$", re.MULTILINE)
+_READ_LINE = re.compile(r"^Read (.+?) first\b", re.MULTILINE)
+_STEP_OPENING = re.compile(r'^<step id="[^"]*">$', re.MULTILINE)
+AI_WORK_DIR = ".ai-work"
 
 
 def _scripts_dir() -> Path:
@@ -76,8 +86,14 @@ class OwnWords:
     """The route of a marker written in the delegation's own words."""
 
 
-# Later routes join here as further members of this union.
-Route = OwnWords
+@dataclass(frozen=True)
+class StepRequest:
+    """The route of a step-loop pointer whose rendered request heads a marked step."""
+
+    request_id: str
+
+
+Route = Union[OwnWords, StepRequest]  # noqa: UP007
 
 
 @dataclass(frozen=True)
@@ -85,7 +101,12 @@ class Marked:
     route: Route
 
 
-UnresolvableReason = Literal["grammar-unavailable"]
+UnresolvableReason = Literal[
+    "grammar-unavailable",
+    "request-path-refused",
+    "request-unreadable",
+    "request-without-step",
+]
 
 
 @dataclass(frozen=True)
@@ -99,22 +120,33 @@ class Unresolvable:
 # fails at runtime in an alias like these.
 Verdict = Union[NotServed, Unmarked, Marked, Unresolvable]  # noqa: UP007
 
-# Reads the rendered request a step-loop pointer names; unused until that route exists.
+# Reads the rendered request a step-loop pointer names: None when it cannot be read.
 RequestReader = Callable[[Path], Optional[str]]  # noqa: UP045
 
 
-def classify(agent_type: str, prompt: str, read_request: RequestReader) -> Verdict:
+def classify(
+    agent_type: str,
+    prompt: str,
+    read_request: RequestReader,
+    cwd: Optional[Path] = None,  # noqa: UP045
+) -> Verdict:
     """Judge one delegation. Pure: its inputs are its arguments and the import-time `MARKER_PATTERN`.
 
     A broken installation (no grammar) is `Unresolvable` for a served role, never a guess either way.
+    `cwd` is the spawn's working directory, against which a relative pointer path is resolved;
+    without it only an absolute path can be followed.
     """
     if agent_type not in SERVED_ROLES:
         return NotServed(agent_type)
     if MARKER_PATTERN is None:
         return Unresolvable("grammar-unavailable")
-    if MARKER_PATTERN.search(own_words(prompt)):
+    words = own_words(prompt)
+    if MARKER_PATTERN.search(words):
         return Marked(OwnWords())
-    return Unmarked()
+    pointer = _step_loop_pointer(words)
+    if pointer is None:
+        return Unmarked()
+    return _classify_request(pointer, read_request, cwd, MARKER_PATTERN)
 
 
 def own_words(prompt: str) -> str:
@@ -148,3 +180,74 @@ def _closes(open_fence: str, line: str) -> bool:
     """
     run = line.strip()
     return len(run) >= len(open_fence) and set(run) == {open_fence[0]}
+
+
+# --- The step-loop route: a pointer prompt, decided by the heading of the step it points at ------
+
+
+@dataclass(frozen=True)
+class _Pointer:
+    slug: str
+    request_id: str
+    read_path: str
+
+
+def _step_loop_pointer(words: str) -> Optional[_Pointer]:  # noqa: UP045
+    """The pointer the driver's three lines make, or None when any of them is missing."""
+    slug, request_id, read = (
+        pattern.search(words) for pattern in (_TASK_SLUG_LINE, _SPAWN_REQUEST_LINE, _READ_LINE)
+    )
+    if not (slug and request_id and read):
+        return None
+    return _Pointer(slug.group(1), request_id.group(1), read.group(1))
+
+
+def _classify_request(
+    pointer: _Pointer,
+    read_request: RequestReader,
+    cwd: Optional[Path],  # noqa: UP045
+    marker: re.Pattern[str],
+) -> Verdict:
+    path = _request_path(pointer, cwd)
+    if path is None:
+        return Unresolvable("request-path-refused")
+    request = read_request(path)
+    if request is None:
+        return Unresolvable("request-unreadable")
+    heading = _step_heading(request)
+    if heading is None:
+        return Unresolvable("request-without-step")
+    if marker.search(heading):
+        return Marked(StepRequest(pointer.request_id))
+    return Unmarked()
+
+
+def _request_path(pointer: _Pointer, cwd: Optional[Path]) -> Optional[Path]:  # noqa: UP045
+    """The pointer's path, only when it names `.ai-work/<slug>/PROMPT_<id>.md`; else None.
+
+    Lexical, so a prompt cannot steer the hook to a file it names: `..` is folded away before the
+    check. A symlinked directory is the reading edge's to refuse.
+    """
+    path = Path(pointer.read_path)
+    if not path.is_absolute():
+        if cwd is None:
+            return None
+        path = cwd / path
+    path = Path(os.path.normpath(path))
+    expected = (AI_WORK_DIR, pointer.slug, f"PROMPT_{pointer.request_id}.md")
+    return path if path.parts[-3:] == expected else None
+
+
+def _step_heading(request: str) -> Optional[str]:  # noqa: UP045
+    """The first non-blank line after the request's first `<step>` opening, when it is a heading.
+
+    Only this line decides the verdict: the step's body, quoted attempts and corrections follow it
+    and may quote the marker without marking.
+    """
+    opening = _STEP_OPENING.search(request)
+    if opening is None:
+        return None
+    for line in request[opening.end() :].splitlines():
+        if line.strip():
+            return line if line.startswith("#") else None
+    return None

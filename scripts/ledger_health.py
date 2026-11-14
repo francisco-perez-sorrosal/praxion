@@ -354,13 +354,16 @@ def _past_end(repo_root: Path, cite: str, path: str) -> str | None:
 
 
 def _prior_key_refusals(row: ActiveRow, stamp: TriageStamp, location: str | None) -> list[str]:
-    """A realign's `from` is the row's base key, required once a new location moves it."""
+    """A realign's `from <key>` is the row's base key before the write. A new location
+    that changes the normalized path set moves that key, so `from` is then required:
+    without it neither row of the pair would ever carry a duplicate signal."""
     if stamp.outcome != "realigned" or stamp.prior_key == row.key.base:
         return []
     current = normalize_location(", ".join(ref.raw for ref in row.locations))
     if stamp.prior_key is None and (location is None or normalize_location(location) == current):
         return []
-    return [f"a realign must name `from {row.key.base}`, not {stamp.prior_key or 'no key'}"]
+    named = stamp.prior_key or "no key"
+    return [f"a realign must name `from {row.key.base}`, the row's base key, not {named}"]
 
 
 def _cell_refusals(notes: str, stamp: str, parsed: TriageStamp) -> list[str]:
@@ -385,7 +388,9 @@ def _anchor_refusals(
     snapshot: StateSnapshot, git: GitFacts, row_id: str, stamp: TriageStamp
 ) -> list[str]:
     """Every anchor resolved against HEAD: a path tracked in its tree (a file merely on disk
-    may be gitignored scratch), a line inside its file, and the records of the helper below.
+    may be gitignored scratch), a line inside its file, the stamp's own anchor commit, and
+    the records of the helper below.
+
     A `realigned` stamp's text is the premise it replaced -- history, whose citations
     are stale by definition -- so only its own `@anchor` is resolved.
     """
@@ -408,7 +413,9 @@ def _anchor_refusals(
 
 
 def _record_anchor_refusals(snapshot: StateSnapshot, row_id: str, stamp: TriageStamp) -> list[str]:
-    """The stamp's cited decisions, ledger rows and commits, and a merge's survivor."""
+    """The records a stamp cites, resolved against HEAD: a finalized decision, a ledger row
+    other than this one, a commit HEAD reaches (an object on an unmerged branch is not
+    history), and for a merge another active row as its survivor."""
     active = {row.id for row in snapshot.active_rows}
     known_rows = active | {peer.id for peer in snapshot.terminal_peers}
     anchors = stamp_anchors(stamp.text)

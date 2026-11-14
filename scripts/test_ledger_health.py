@@ -479,6 +479,18 @@ def test_a_realign_naming_a_key_other_than_the_rows_own_is_refused(tmp_path: Pat
     assert "37b588259209" in out
 
 
+def test_a_realign_refusal_names_the_rows_base_key_and_the_key_it_gave(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/y.py",))
+    stamp = _stamp_at(_head_sha(repo_root), "realigned from 37b588259209: the check moved")
+
+    _, out = _check(repo_root, "td-902", stamp, "--location", "scripts/y.py")
+
+    assert out.splitlines() == [
+        f"refused: a realign must name `from {_base_key(repo_root)}`, "
+        "the row's base key, not 37b588259209"
+    ]
+
+
 def test_a_realign_that_only_restyles_the_location_needs_no_prior_key(tmp_path: Path) -> None:
     """A line range or a different order leaves the base key where it was."""
     repo_root = one_row_repo(tmp_path, "Premise.", ())

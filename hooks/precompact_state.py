@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Snapshot .ai-work/ pipeline state before context compaction.
 
-Reads the first 30 lines of each pipeline document and writes a condensed
-PIPELINE_STATE.md that the agent can re-read after compaction to restore
-orientation. Exits 0 unconditionally -- must never block compaction.
+Reads the first 30 lines of each pipeline document (the last 30 for documents
+that grow by appending) and writes a condensed PIPELINE_STATE.md that the agent
+can re-read after compaction to restore orientation. Exits 0 unconditionally --
+must never block compaction.
 """
 
 from __future__ import annotations
 
 import sys
+from collections import deque
 from pathlib import Path
 
 # Ordered by pipeline flow so the snapshot reads as a narrative of the run.
@@ -39,6 +41,10 @@ PIPELINE_DOCS = [
 
 HEAD_LINES = 30
 
+# Documents that gain one section per run: the newest section is the one to resume
+# from, so their snapshot keeps the end of the file rather than its start.
+TAIL_DOCS = frozenset({"TEST_RESULTS.md"})
+
 
 def _find_ai_work() -> Path | None:
     """Locate .ai-work/ by walking up from cwd."""
@@ -61,6 +67,15 @@ def _head(path: Path, n: int) -> str:
                     break
                 lines.append(line)
             return "".join(lines)
+    except Exception:
+        return ""
+
+
+def _tail(path: Path, n: int) -> str:
+    """Read last n lines of a file, return empty string on failure."""
+    try:
+        with open(path) as f:
+            return "".join(deque(f, maxlen=n))
     except Exception:
         return ""
 
@@ -89,7 +104,8 @@ def main():
                 doc_path = task_dir / doc_name
                 if not doc_path.exists():
                     continue
-                content = _head(doc_path, HEAD_LINES)
+                read = _tail if doc_name in TAIL_DOCS else _head
+                content = read(doc_path, HEAD_LINES)
                 if content.strip():
                     header = f"{slug}/{doc_name}" if slug != "(root)" else doc_name
                     sections.append(f"## {header}\n\n```\n{content}```\n")
@@ -99,7 +115,8 @@ def main():
 
         state = "# Pipeline State Snapshot\n\n"
         state += "Pre-compaction snapshot of .ai-work/ documents (first "
-        state += f"{HEAD_LINES} lines each).\n\n"
+        state += f"{HEAD_LINES} lines each; last {HEAD_LINES} for "
+        state += f"{', '.join(sorted(TAIL_DOCS))}).\n\n"
         state += "\n".join(sections)
 
         state += (

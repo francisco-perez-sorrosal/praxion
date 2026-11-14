@@ -380,17 +380,23 @@ def test_the_script_fails_open_when_the_work_raises(implementer, monkeypatch):
     """A reminder is due, then claiming its marker raises; the script must still exit 0."""
     cap = hook._max_turns(IMPLEMENTER_DEFINITION.read_text(encoding="utf-8"))
     _transcript(implementer, cap)
+    tmpdir = implementer / "tmp"
+    tmpdir.mkdir()
+    attempts = implementer / "open-attempts.txt"
     runner = implementer / "boom.py"
     runner.write_text(
-        "import os, runpy, sys\n"
+        "import os, runpy, sys, tempfile\n"
         f"sys.path.insert(0, {str(HOOKS_DIR)!r})\n"
-        "def boom(*args, **kwargs):\n"
+        "tempfile.gettempdir()\n"
+        "def boom(path, *args, **kwargs):\n"
+        f"    with open({str(attempts)!r}, 'a') as log:\n"
+        "        log.write(str(path) + '\\n')\n"
         "    raise PermissionError('injected')\n"
         "os.open = boom\n"
         f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')\n"
     )
     parent = implementer / "projects" / "p" / f"{SESSION}.jsonl"
-    monkeypatch.setenv("TMPDIR", str(implementer / "tmp"))
+    monkeypatch.setenv("TMPDIR", str(tmpdir))
     run = subprocess.run(
         [sys.executable, str(runner)],
         input=_payload(transcript_path=str(parent)),
@@ -400,6 +406,8 @@ def test_the_script_fails_open_when_the_work_raises(implementer, monkeypatch):
     )
 
     assert (run.returncode, run.stdout, run.stderr) == (0, "", "")
+    (attempted,) = attempts.read_text(encoding="utf-8").splitlines()
+    assert Path(attempted).parent.parent == tmpdir / hook.MARKER_DIR
 
 
 # --- shipped texts and registration -------------------------------------------------------

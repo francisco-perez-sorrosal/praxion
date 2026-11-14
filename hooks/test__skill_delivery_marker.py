@@ -23,6 +23,10 @@ import _plan_steps as plan_steps  # noqa: E402
 import _skill_delivery as delivery  # noqa: E402
 
 SUBPROCESS_TIMEOUT_SECONDS = 60
+# The delivery module imports the frontmatter pattern from `_rule_delivery`, which imports
+# `_project_scope`: a plugin copy without them fails on those, not on the missing plan reader.
+SKILL_DELIVERY_MODULE = "_skill_delivery.py"
+SKILL_DELIVERY_SIBLINGS = ("_rule_delivery.py", "_project_scope.py")
 
 
 def test_marker_pattern_is_the_plan_readers_one_pattern_object():
@@ -60,7 +64,8 @@ def test_marker_does_not_match_other_text(text):
 def test_delivery_imports_fail_open_when_the_plugin_has_no_plan_reader(tmp_path):
     plugin_hooks = tmp_path / "hooks"
     plugin_hooks.mkdir()
-    shutil.copy(HOOKS_DIR / "_skill_delivery.py", plugin_hooks / "_skill_delivery.py")
+    for module in (SKILL_DELIVERY_MODULE, *SKILL_DELIVERY_SIBLINGS):
+        shutil.copy(HOOKS_DIR / module, plugin_hooks / module)
     probe = (
         "import json, sys; sys.path.insert(0, sys.argv[1]); import _skill_delivery as d; "
         "print(json.dumps([d.MARKER_PATTERN is None, d.MARKER_IMPORT_ERROR]))"

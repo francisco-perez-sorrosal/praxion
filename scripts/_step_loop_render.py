@@ -21,7 +21,7 @@ from typing import Literal, NamedTuple, cast, get_args
 
 from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
-from _plan_steps import CHANGE_TYPES, PlanStep, Routing
+from _plan_steps import CHANGE_TYPES, HEADING_TAG_RE, PlanStep, Routing
 from _step_loop_gate import GateEvidence
 from _step_schema import STEP_ID_RE
 
@@ -37,6 +37,7 @@ SLOT_BOUNDS = {  # characters; a slot named here is cut to its bound
     "protected-paths": 1_500,
     "iteration-patches": 1_000,
 }
+NEWEST_KEPT_SLOTS = frozenset({"previous-attempts"})  # a cut drops the oldest lines, not the newest
 PROGRESS_BOUND = 2_500  # a goal prompt keeps the newest progress lines within this
 GATE_EVIDENCE_BOUND = 1_500  # an implement prompt keeps the newest lines of the last red gate
 
@@ -335,11 +336,13 @@ def _render_slot(slot: _Slot) -> tuple[str, tuple[str, str] | None]:
     bound, warning = SLOT_BOUNDS.get(tag), None
     if bound and len(text) > bound:
         marker, kept = f"[truncated: full text in {path}]", []
-        for line in text.splitlines():
+        newest_kept = tag in NEWEST_KEPT_SLOTS
+        lines = text.splitlines()
+        for line in reversed(lines) if newest_kept else lines:
             if len("\n".join([*kept, line, marker])) > bound:
                 break
             kept.append(line)
-        text = "\n".join([*kept, marker])
+        text = "\n".join([marker, *reversed(kept)] if newest_kept else [*kept, marker])
         warning = ("slot-truncated", f"{tag} cut to {bound} characters: full text in {path}")
     attribute = f' source="{source}"' if source else ""
     return (f"<{tag}{attribute}>\n{text}\n</{tag}>" if text else ""), warning
@@ -421,10 +424,23 @@ _ACTIONS = {  # `{step}` is the stop's step id
 }
 
 
+# The human verdict whose evidence names a plan field the driver cannot read; the two phrases are
+# the wording `_step_loop_state` gives that evidence, and a test reads them back through it.
+_UNREADABLE_PLAN_FIELD_RE = re.compile(r"\b(?:Iterations|Change type): value cannot be read")
+_PLAN_FIELD_ACTION = "correct the plan line the evidence names in IMPLEMENTATION_PLAN.md"
+
+
+def _action(stop: StopView) -> str:
+    """What to do about the stop; a human verdict on an unreadable plan field is a plan fix."""
+    if stop.cause == "human-verdict" and _UNREADABLE_PLAN_FIELD_RE.search(stop.evidence):
+        return _PLAN_FIELD_ACTION
+    return _ACTIONS[stop.cause].format(step=stop.step)
+
+
 def stop_stderr(stop: StopView) -> str:
     """The block a person watching reads: what happened, why, what to do and where."""
     who = f"Step {stop.step}" if stop.step else "the loop"
-    action = _ACTIONS[stop.cause].format(step=stop.step)
+    action = _action(stop)
     what = {
         "iteration-budget": "the iteration budget is used up",
         "not-driven": f"{who} is handed back to you",
@@ -443,7 +459,7 @@ def stop_next_action(stop: StopView) -> str:
     budget = stop.cause == "iteration-budget"
     resume = Invocation.of(stop.invoke).command("next", stop.slug)
     what = "iteration budget used up" if budget else stop.cause
-    action = _ACTIONS[stop.cause].format(step=stop.step)
+    action = _action(stop)
     owed = "Orchestrator action owed" if stop.cause == "not-driven" else "Human decision owed"
     where = f" at `Step {stop.step}`" if stop.step else ""
     return "\n".join([
@@ -477,7 +493,7 @@ def commit_message(
     key = request.key
     if key.kind == "review" or "\n" in result_line:
         raise ValueError("a commit follows an implement or revise request and one Result: line")
-    subject = " ".join(re.sub(r"\[[^\]]*\]", " ", step.title).split()) or f"Step {step.id}"
+    subject = " ".join(HEADING_TAG_RE.sub(" ", step.title).split()) or f"Step {step.id}"
     if step.change_type in CHANGE_TYPES and not earlier_kept:
         subject = f"{step.change_type}: {subject}"
     turn = f"attempt {key.attempt}" if key.kind == "implement" else f"review revision {key.round}"

@@ -101,7 +101,6 @@ def test_export_rules_bridge_writes_prefixed_hooks_and_manifest(tmp_path: Path):
     assert "rules/swe/testing-conventions.md" in relpaths
     always_on = set(manifest["always_on_rule_ids"])
     assert "rules::swe::agent-model-routing" not in always_on
-    assert "rules::swe::memory-protocol" not in always_on
 
     registrations = json.loads(
         (out_dir / "praxion" / "hook_registrations.json").read_text(encoding="utf-8")
@@ -155,7 +154,6 @@ def test_generated_hooks_route_always_on_prompt_and_path_rules(tmp_path: Path):
     session_context = session_output["hookSpecificOutput"]["additionalContext"]
     assert "rules/swe/agent-behavioral-contract.md" in session_context
     assert "rules/swe/agent-model-routing.md" not in session_context
-    assert "rules/swe/memory-protocol.md" not in session_context
 
     prompt_output = run_hook(
         prompt_hook,

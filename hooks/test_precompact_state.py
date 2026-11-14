@@ -51,6 +51,16 @@ def test_test_results_snapshot_keeps_the_newest_lines(
     assert "run line 1\n" not in snapshot
 
 
+@pytest.mark.parametrize("name", ["PROGRESS.md", "RECOVERY_LOG.md"])
+def test_append_only_journals_snapshot_keep_the_newest_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    snapshot = _snapshot(tmp_path, monkeypatch, {name: _numbered("entry", 100)})
+
+    assert "entry 100\n" in snapshot
+    assert "entry 1\n" not in snapshot
+
+
 def test_other_documents_snapshot_keeps_their_opening_lines(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -41,9 +41,10 @@ PIPELINE_DOCS = [
 
 HEAD_LINES = 30
 
-# Documents that gain one section per run: the newest section is the one to resume
-# from, so their snapshot keeps the end of the file rather than its start.
-TAIL_DOCS = frozenset({"TEST_RESULTS.md"})
+# Documents that grow only by appending (a section per run, an entry per event): the
+# newest part is the one to resume from, so their snapshot keeps the end of the file
+# rather than its start.
+TAIL_DOCS = frozenset({"TEST_RESULTS.md", "PROGRESS.md", "RECOVERY_LOG.md"})
 
 
 def _find_ai_work() -> Path | None:

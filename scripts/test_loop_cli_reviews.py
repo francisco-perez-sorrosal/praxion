@@ -340,6 +340,15 @@ def test_recording_the_same_review_twice_appends_nothing_the_second_time(tmp_pat
     assert (again.doc["recorded"]["replayed"], ledger(root).records) == (True, before)
 
 
+def test_replaying_a_review_return_reports_the_verdict_its_file_reads(tmp_path, monkeypatch):
+    root = verified_and_reviewed(tmp_path, monkeypatch, "verdict: revise\n")
+    record_return(root, REVIEW_REQUEST)
+
+    again = record_return(root, REVIEW_REQUEST)
+
+    assert again.doc["recorded"]["review_verdict"] == REVISE
+
+
 def test_a_review_request_that_reviews_no_verified_work_is_refused_and_records_nothing(tmp_path):
     waiting = f"  - Attempts: {STEP}1 count=1 request={REVIEW_REQUEST}\n"
     root = build(tmp_path, wip=WIP + waiting)

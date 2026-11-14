@@ -37,6 +37,11 @@ else none. A value outside the set, or lines of one level that disagree, are kep
 unreadable type quoting what was written (and which level), never defaulted; an unreadable
 step field is the step's own, so it outranks the tag and the plan-level line.
 
+Heading tags. Besides `[depends-on: ...]` and `[parallel-group: ...]`, a heading may carry the
+planner's annotations `[Phase: <name>]`, `[Architecture]` and `[Deployment]`, matched
+case-insensitively. They stay in the step's title as written and are dropped from the subject
+of its commit; any other bracketed word is part of the title and is kept.
+
 Normative grammar of the `Files:` field -- one logical line under a step
 heading (or checklist step line), the label optionally bold, case-insensitive:
 
@@ -272,6 +277,9 @@ def _close_section(lines: list[str]) -> tuple[str, list[str]]:
 _TITLE_PREFIX_RE = re.compile(r"^Step\s+\d+[a-z]?\b\s*:?\s*")
 _DEPENDS_ON_RE = re.compile(r"\[depends-on:([^\]]*)\]", re.IGNORECASE)
 _PARALLEL_GROUP_RE = re.compile(r"\[parallel-group:([^\]]*)\]", re.IGNORECASE)
+# The bracketed heading tags the planner writes beyond depends-on and parallel-group; any other
+# bracketed word in a title is part of the title.
+HEADING_TAG_RE = re.compile(r"\[\s*(?:phase\s*:[^\]]*|architecture|deployment)\s*\]", re.IGNORECASE)
 _REFACTORING_TAG_RE = re.compile(r"\[\s*phase\s*:\s*refactoring\s*\]", re.IGNORECASE)
 
 

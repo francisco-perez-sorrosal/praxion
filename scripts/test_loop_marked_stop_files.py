@@ -121,6 +121,32 @@ def test_the_pipelines_own_and_hook_maintained_state_is_not_named(repo):
     assert found == {"1": ("scripts/a.py",)}
 
 
+def test_a_marked_steps_own_files_come_before_other_paths_and_committed_state_comes_last(repo):
+    state = repo / ".ai-state" / "TECH_DEBT_LEDGER.md"
+    state.parent.mkdir()
+    state.write_text("| td-1 |\n")
+    (repo / "scripts" / "a.py").write_text("x = 2\n")
+    (repo / "scripts" / "other.py").write_text("x = 4\n")
+    step = one(IMPL, "**Files**: `scripts/other.py`")
+    inputs = read([step], records=[rec(step, 1, stop="conflict")])
+
+    found = uncommitted_files(repo, inputs)
+
+    assert found == {"1": ("scripts/other.py", "scripts/a.py", ".ai-state/TECH_DEBT_LEDGER.md")}
+
+
+def test_a_directory_a_step_names_leads_the_paths_under_it(repo):
+    (repo / "scripts" / "sub").mkdir()
+    (repo / "scripts" / "sub" / "guide.py").write_text("g = 1\n")
+    (repo / "scripts" / "a.py").write_text("x = 2\n")
+    step = one(IMPL, "**Files**: `scripts/sub`")
+    inputs = read([step], records=[rec(step, 1, stop="blocked")])
+
+    found = uncommitted_files(repo, inputs)
+
+    assert found == {"1": ("scripts/sub/guide.py", "scripts/a.py")}
+
+
 def test_a_marked_step_with_a_clean_tree_has_no_entry(repo):
     assert uncommitted_files(repo, two_steps("blocked")) == {}
 

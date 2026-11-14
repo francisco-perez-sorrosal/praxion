@@ -26,6 +26,7 @@ from _step_loop_render import (  # noqa: E402
     RequestKey,
     SpawnRequest,
     StopView,
+    attempt_columns,
     commit_message,
     parse_request_id,
     render_prompt,
@@ -546,14 +547,12 @@ CUT_CASES = [
     ("implement", {"wip_text": long_section("Corrections in force")}, "corrections", 1500),
     ("review", {"brief_text": long_section("Key Signals")}, "key-signals", 2000),
     ("revise", {"findings_text": long_text()}, "review-findings", 3000),
-    ("implement", {"previous": long_attempts()}, "previous-attempts", 1000),
 ]
 SOURCE_FILES = {
     "health-guards": "TASK_BRIEF.md",
     "corrections": "WIP.md",
     "key-signals": "TASK_BRIEF.md",
     "review-findings": "LIGHT_REVIEW_step-7.md",
-    "previous-attempts": "ITERATION_LEDGER.jsonl",
 }
 
 
@@ -566,6 +565,17 @@ def test_a_slot_over_its_bound_is_cut_at_a_line_and_points_at_its_source(kind, g
     assert inner[-1] == pointer
     assert [code for code, _ in warnings] == ["slot-truncated"]
     assert all(line.startswith(("- line", "attempt")) for line in inner[:-1])
+
+
+def test_a_previous_attempts_slot_over_its_bound_keeps_the_newest_attempts_whole():
+    attempts = long_attempts()
+    text, warnings = prompt_for(previous=attempts)
+    inner = element(text, "previous-attempts").splitlines()
+    newest = " · ".join(attempt_columns(attempts[-1], "agent "))
+    assert len("\n".join(inner)) <= 1000
+    assert inner[0] == f"[truncated: full text in {WORK}/ITERATION_LEDGER.jsonl]"
+    assert inner[-1] == newest
+    assert [code for code, _ in warnings] == ["slot-truncated"]
 
 
 def test_a_cut_keeps_whole_leading_lines_of_the_source():

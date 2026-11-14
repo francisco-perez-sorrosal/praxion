@@ -309,6 +309,18 @@ def test_a_stop_repeats_byte_for_byte_and_rewrites_the_handoff_only_when_it_chan
     assert f"step_loop.py next {SLUG}" in handoff.read_text(encoding="utf-8")
 
 
+def test_a_stop_over_a_handoff_the_composer_did_not_write_stays_a_stop_with_a_warning(tmp_path):
+    root = build(tmp_path, STUCK_PLAN)
+    handoff = root / ".ai-work" / SLUG / "HANDOFF.md"
+    handoff.write_text("hand-written intake notes\n", encoding="utf-8")
+
+    reply = call(root, "next")
+
+    assert (reply.exit, reply.doc["outcome"]) == (2, "needs-human")
+    assert [w["code"] for w in reply.doc["warnings"]] == ["handoff-not-written"]
+    assert handoff.read_text(encoding="utf-8") == "hand-written intake notes\n"
+
+
 def test_a_stop_composes_its_handoff_against_the_tasks_base_ref(tmp_path):
     root = build(tmp_path, STUCK_PLAN)
     fork = git_head(root)

@@ -21,7 +21,7 @@ from typing import Literal, NamedTuple, cast, get_args
 
 from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
-from _plan_steps import CHANGE_TYPES, PlanStep, Routing
+from _plan_steps import CHANGE_TYPES, HEADING_TAG_RE, PlanStep, Routing
 from _step_loop_gate import GateEvidence
 from _step_schema import STEP_ID_RE
 
@@ -477,7 +477,7 @@ def commit_message(
     key = request.key
     if key.kind == "review" or "\n" in result_line:
         raise ValueError("a commit follows an implement or revise request and one Result: line")
-    subject = " ".join(re.sub(r"\[[^\]]*\]", " ", step.title).split()) or f"Step {step.id}"
+    subject = " ".join(HEADING_TAG_RE.sub(" ", step.title).split()) or f"Step {step.id}"
     if step.change_type in CHANGE_TYPES and not earlier_kept:
         subject = f"{step.change_type}: {subject}"
     turn = f"attempt {key.attempt}" if key.kind == "implement" else f"review revision {key.round}"

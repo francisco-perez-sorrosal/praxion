@@ -136,6 +136,16 @@ def test_a_typed_subject_drops_the_bracket_tags_before_the_type():
     assert message.splitlines()[0] == "refactor: Extract the parser"
 
 
+def test_a_subject_keeps_the_bracketed_words_that_are_not_plan_annotations():
+    step = typed_step(
+        "fix", title="[Phase: Review] A [CONFLICT] or [BLOCKED] return commits nothing"
+    )
+
+    message = commit_message(step, SLUG, request_for(step), RESULT)
+
+    assert message.splitlines()[0] == "fix: A [CONFLICT] or [BLOCKED] return commits nothing"
+
+
 def test_a_later_kept_commit_of_the_same_step_keeps_the_bare_subject():
     step = typed_step("feat")
 

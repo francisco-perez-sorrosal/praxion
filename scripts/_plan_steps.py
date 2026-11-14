@@ -272,6 +272,9 @@ def _close_section(lines: list[str]) -> tuple[str, list[str]]:
 _TITLE_PREFIX_RE = re.compile(r"^Step\s+\d+[a-z]?\b\s*:?\s*")
 _DEPENDS_ON_RE = re.compile(r"\[depends-on:([^\]]*)\]", re.IGNORECASE)
 _PARALLEL_GROUP_RE = re.compile(r"\[parallel-group:([^\]]*)\]", re.IGNORECASE)
+# The bracketed heading tags the planner writes beyond depends-on and parallel-group; any other
+# bracketed word in a title is part of the title.
+HEADING_TAG_RE = re.compile(r"\[\s*(?:phase\s*:[^\]]*|architecture|deployment)\s*\]", re.IGNORECASE)
 _REFACTORING_TAG_RE = re.compile(r"\[\s*phase\s*:\s*refactoring\s*\]", re.IGNORECASE)
 
 

@@ -487,6 +487,38 @@ def test_a_realign_that_only_restyles_the_location_needs_no_prior_key(tmp_path: 
     assert _check(repo_root, "td-902", stamp, "--location", "scripts/x.py:1") == (0, "ok\n")
 
 
+def test_every_unresolved_anchor_of_a_discard_is_reported_in_a_fixed_order(
+    tmp_path: Path,
+) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    text = "discarded: gone scripts/gone.py:1 scripts/x.py:99 dec-999 td-901 td-902 deadbeef1234"
+
+    code, out = _check(repo_root, "td-902", _stamp_at(_head_sha(repo_root), text))
+
+    assert code == 1
+    assert out.splitlines() == [
+        "refused: scripts/gone.py is not tracked at HEAD",
+        "refused: scripts/x.py:99 is past the end of scripts/x.py (1 lines at HEAD)",
+        "refused: dec-999 is not a finalized decision",
+        "refused: td-901 is not a ledger row",
+        "refused: td-902 cannot anchor its own stamp",
+        "refused: deadbeef1234 is not a commit HEAD reaches",
+    ]
+
+
+def test_a_merge_into_a_row_that_is_not_active_is_refused_as_a_survivor(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "merged into td-901")
+
+    code, out = _check(repo_root, "td-902", stamp)
+
+    assert code == 1
+    assert out.splitlines() == [
+        "refused: td-901 is not a ledger row",
+        "refused: a merge must name another active row as its survivor",
+    ]
+
+
 def test_a_discard_still_resolves_every_anchor_it_cites(tmp_path: Path) -> None:
     repo_root = one_row_repo(tmp_path, "Premise.", ())
     stamp = _stamp_at(_head_sha(repo_root), "discarded: moot, see scripts/old.py:4")

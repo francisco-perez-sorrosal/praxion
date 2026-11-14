@@ -1,3 +1,71 @@
+## v0.64.0 (2026-11-14)
+
+### Feat
+
+- Cap routing-check spend, bill subscription
+- Warn when a memory index write passes its budget
+- Explain a clean-tree run and a wrong-command finding
+- Warn when a memory index passes its budget
+- Record the decision-record gates' verdicts
+- Print each launch's managed-only switches in a dry run
+- Name the checkout of each left-out agent
+
+### Fix
+
+- Finalize a batch under its planned names
+- Let the prior-art principle stand alone
+- Scope the small-debt sentence to a task
+- Let the verifier accept a follow-up as a disposition
+- Add Balanced Coupling to the Codex baseline
+- Keep commit-gate stdout, hint and verdict whole
+- Show commit-gate findings and the way out
+- Say how a blocked stop and a refused record clear
+- Treat a draft's re_affirms as pending finalize
+- Make the interrupt test independent of launcher
+- Accept a bare directory in goal --protect
+- Name the counter ahead of its clipped error
+- Refuse a transcript directory with no session
+- Resolve a skill's own scripts in the GL05 scan
+- Anchor quoted rule links to the rule's directory
+- Share one git-listed source scan
+- Type the kernel hook's slot argument
+- Read the plugin registry the same way twice
+- Pick the render slot by resolved paths
+- Stop a watchdog whose launcher is gone
+- Word a commit refusal by where git failed
+- Harden the loop's restore and iteration patch
+- Keep a bracketed hook command whole in a refusal
+- Match --amend as a command token in the trigger reader
+- Split the tail read on newlines only
+- Skip log-health checks as unreachable on a failed listing
+- Size P10's last append from the last physical line
+- Read the iteration ledger from every checkout
+- Keep an escaped pipe that ends a table cell
+- never present stale coverage as current
+- list cost-report checkouts through git
+- Follow this version from an older cached link
+- Report instructions behind in install --check
+- Spare a person's own entries when linking scripts
+- Scope spawns by the session start directory
+- Read omitClaudeMd comments as YAML does
+- Rank decisions by the session's real work
+- Remove eval run trees with unreadable parts
+- Derive the clone installer's identity defaults
+
+### Refactor
+
+- Split the kernel generator's tests by subject
+- Read open follow-ups through their reader
+- Delete the unused Tabs and chrome barrel
+- Drop the unread sentinel digest timestamp
+- Share one sentinel grading rule
+- Split the pty runner's main into seams
+- Split the ADR reference classifier
+- Drop the unused read_run_files
+- Split the supersession reciprocity check
+- Drop the unused acceptance-design mode
+- move cost dataclasses below the report module
+
 ## v0.63.0 (2026-11-12)
 
 ### Feat

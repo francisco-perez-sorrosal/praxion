@@ -21,10 +21,12 @@ from typing import TYPE_CHECKING, Any, Literal, assert_never, get_args
 
 from praxion_evals.adherence.axis import (
     DEFAULT_AXIS,
+    SESSION_ARMS,
     Axis,
     InheritedContextArm,
     SessionArm,
     check_axis_arm,
+    check_patched,
 )
 from praxion_evals.adherence.transcript import RoleEnding
 from praxion_evals.live.results import ErrorKind as LiveErrorKind
@@ -479,14 +481,13 @@ CheckDef = MechanicalCheck | JudgedCheck
 class ArmBuild:
     """A role's runner-owned plugin copy for one arm.
 
-    ``patched`` lists the files that differ from the checkout. The lean arm
-    differs only at the role's agent definition (``omitClaudeMd``), and an
-    early-stop copy only there too (``maxTurns``); a full arm with no cap is
-    byte-identical to the checkout.
+    ``patched`` lists the files that differ from the checkout, which ``patched_paths``
+    derives from the arm and the cap: the lean arm and an early-stop copy differ at the
+    role's definition; a full or preloaded arm with no cap is byte-identical.
     """
 
     role: Role
-    arm: Arm
+    arm: SessionArm
     copy_root: Path
     turn_cap: int | None
     tree_digest: str
@@ -494,15 +495,10 @@ class ArmBuild:
 
     def __post_init__(self) -> None:
         _one_of(self.role, ROLES, "an arm build's role")
-        _one_of(self.arm, ARMS, "an arm build's arm")
+        _one_of(self.arm, SESSION_ARMS, "an arm build's arm")
         _non_empty(self.tree_digest, "an arm build's tree digest")
         _require(self.turn_cap is None or self.turn_cap >= 1, "a turn cap must be at least 1")
-        definition = f"agents/{self.role}.md"
-        needs_patch = self.arm == "lean" or self.turn_cap is not None
-        _require(
-            self.patched == ((definition,) if needs_patch else ()),
-            f"an arm build patches {definition} exactly when it is lean or capped",
-        )
+        check_patched(self.role, self.arm, self.turn_cap, self.patched)
 
 
 @dataclass(frozen=True)
@@ -719,7 +715,7 @@ def allowance_key(check: str, role: str | None = None) -> str:
 
 @dataclass(frozen=True)
 class Pair:
-    """One task's two sessions, complete iff both were measured."""
+    """One task's two sessions, complete iff both were measured; ``full`` holds the axis's baseline arm, ``lean`` its treatment."""
 
     task_id: str
     template_id: str

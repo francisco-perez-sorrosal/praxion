@@ -28,8 +28,8 @@ from pathlib import Path
 from typing import Any, Literal, assert_never
 
 from praxion_evals.adherence import verdict
+from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, SESSION_ARMS
 from praxion_evals.adherence.model import (
-    ARMS,
     ROLES,
     Assessed,
     CheckDef,
@@ -268,7 +268,7 @@ class RunResults:
         for role, per_arm in self.arms.items():
             _require(role in ROLES, f"arms name an unknown role {role!r}")
             for arm, record in per_arm.items():
-                _require(arm in ARMS, f"{role}'s arms name an unknown arm {arm!r}")
+                _require(arm in SESSION_ARMS, f"{role}'s arms name an unknown arm {arm!r}")
                 _require(isinstance(record.get("built"), bool), f"{role}/{arm} lacks 'built'")
         for role in self.standing or {}:
             _require(role in self.catalog, f"the standing names {role}, which has no catalog")
@@ -345,16 +345,23 @@ def load(path: Path) -> RunResults:
 
 
 def pairs_of(results: RunResults, role: str) -> list[Pair]:
-    """The role's tasks that ran in both arms; a later record of a task and arm replaces an earlier."""
+    """The role's tasks that ran in both arms of the run's axis, baseline in ``full`` and treatment
+    in ``lean``; a later record of a task and arm replaces an earlier."""
+    positions = POSITIONS[results.run.extra.get("axis", DEFAULT_AXIS)]
     latest: dict[tuple[str, str], dict[str, SessionRecord]] = {}
     for record in results.sessions:
         if record.setup.role == role:
             task = (record.setup.task_id, record.setup.template_id)
             latest.setdefault(task, {})[record.setup.arm] = record
     return [
-        Pair(task_id, template_id, arms["full"].status, arms["lean"].status)
+        Pair(
+            task_id,
+            template_id,
+            arms[positions.baseline].status,
+            arms[positions.treatment].status,
+        )
         for (task_id, template_id), arms in latest.items()
-        if set(arms) == set(ARMS)
+        if set(arms) == {positions.baseline, positions.treatment}
     ]
 
 

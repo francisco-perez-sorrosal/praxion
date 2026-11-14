@@ -34,9 +34,10 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, assert_never
+from typing import Any, assert_never, overload
 
 from praxion_evals.adherence import arms, report, results, run_index, tasks
+from praxion_evals.adherence.axis import ARMS_BY_AXIS, DEFAULT_AXIS, Axis, SessionArm, arm_on
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
 from praxion_evals.adherence.infra_stop import (
@@ -95,7 +96,6 @@ SANDBOX_PREFIX = "praxion-evals-adherence-"
 PROBE_TIMEOUT_S = 15
 HTTP_OK = 200
 
-LAUNCH_ARMS: tuple[Arm, Arm] = ("full", "lean")
 CALIBRATION_ORDER: tuple[Arm, Arm] = ("full", "lean")  # its slots, in the order they run
 
 # Infrastructure errors a second try may not repeat. Never an isolation breach (the sandbox
@@ -569,19 +569,30 @@ def _fold_proof(state: RunState, proof: ProofRun) -> RunState:
     return state
 
 
-def launch_order(seed: int, task_id: str) -> tuple[Arm, Arm]:
+@overload
+def launch_order(seed: int, task_id: str) -> tuple[Arm, Arm]: ...
+@overload
+def launch_order(seed: int, task_id: str, axis: Axis) -> tuple[SessionArm, SessionArm]: ...
+def launch_order(
+    seed: int, task_id: str, axis: Axis = DEFAULT_AXIS
+) -> tuple[SessionArm, SessionArm]:
     """Which arm a task launches first, drawn from the run's seed and the task alone.
 
     Drawing per task spreads both orders over the list, so a drift in the account over the run
     falls on both arms alike; the seed and task fix it, so a rerun or a continuation repeats it.
+    Another axis takes the default draw mapped onto its arms, so the default draw is unchanged.
     """
-    first, second = random.Random(f"{seed}:{task_id}").sample(LAUNCH_ARMS, 2)
-    return first, second
+    first, second = random.Random(f"{seed}:{task_id}").sample(ARMS_BY_AXIS[DEFAULT_AXIS], 2)
+    return arm_on(axis, first), arm_on(axis, second)
 
 
-def ordered_arms(arms_named: Sequence[Arm], seed: int, task_id: str) -> list[Arm]:
+def ordered_arms[A: SessionArm](
+    arms_named: Sequence[A], seed: int, task_id: str, axis: Axis = DEFAULT_AXIS
+) -> list[A]:
     """The named arms in the task's launch order."""
-    return [arm for arm in launch_order(seed, task_id) if arm in arms_named]
+    # The default draw is taken through ``launch_order`` so the seam tests fix stays the one seam.
+    drawn = [arm_on(axis, arm) for arm in launch_order(seed, task_id)]
+    return [arm for first in drawn for arm in arms_named if arm == first]
 
 
 def _record_launch_order(context: Context, state: RunState, role: Role, task: TaskSpec) -> RunState:

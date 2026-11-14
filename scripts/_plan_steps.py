@@ -37,6 +37,11 @@ else none. A value outside the set, or lines of one level that disagree, are kep
 unreadable type quoting what was written (and which level), never defaulted; an unreadable
 step field is the step's own, so it outranks the tag and the plan-level line.
 
+Heading tags. Besides `[depends-on: ...]` and `[parallel-group: ...]`, a heading may carry the
+planner's annotations `[Phase: <name>]`, `[Architecture]` and `[Deployment]`, matched
+case-insensitively. They stay in the step's title as written and are dropped from the subject
+of its commit; any other bracketed word is part of the title and is kept.
+
 Normative grammar of the `Files:` field -- one logical line under a step
 heading (or checklist step line), the label optionally bold, case-insensitive:
 

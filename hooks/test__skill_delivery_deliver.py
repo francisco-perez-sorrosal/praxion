@@ -7,7 +7,6 @@ never raises, and leaves exactly one row for a served or failed spawn and none f
 from __future__ import annotations
 
 import itertools
-import os
 import sys
 import typing
 from pathlib import Path
@@ -55,7 +54,9 @@ VERDICTS = [
     Unresolvable("request-unreadable"),
     Unresolvable("request-without-step"),
 ]
-PRELOADS = [Preloaded(), NotPreloaded(), DefinitionUnreadable("definition-unreadable")]
+UNREADABLE_DEFINITION = DefinitionUnreadable("definition-unreadable")
+PRELOADS = [Preloaded(), NotPreloaded(), UNREADABLE_DEFINITION]
+ROUTES = [OwnWords(), StepRequest(REQUEST_ID)]
 
 
 # --- the decision table ------------------------------------------------------------------------
@@ -70,37 +71,39 @@ def skill_dir(tmp_path):
     return directory
 
 
-@pytest.mark.parametrize(
-    ("verdict", "preload", "expected"),
-    [
-        (NotServed("praxion:verifier"), Preloaded(), Skipped("not-served")),
-        (NotServed("praxion:verifier"), NotPreloaded(), Skipped("not-served")),
-        (Unmarked(), NotPreloaded(), Skipped("unmarked")),
-        (Unmarked(), DefinitionUnreadable("frontmatter-missing"), Skipped("unmarked")),
-        (Marked(OwnWords()), Preloaded(), Skipped("preloaded")),
-        (Marked(StepRequest(REQUEST_ID)), Preloaded(), Skipped("preloaded")),
-        (
-            Marked(OwnWords()),
-            DefinitionUnreadable("skills-unparseable"),
-            Failed("definition-unreadable"),
-        ),
-        (Unresolvable("request-unreadable"), NotPreloaded(), Failed("request-unresolvable")),
-        (Unresolvable("request-without-step"), NotPreloaded(), Failed("request-unresolvable")),
-        (Unresolvable("request-path-refused"), NotPreloaded(), Failed("request-unresolvable")),
-        (Unresolvable("grammar-unavailable"), NotPreloaded(), Failed("grammar-unavailable")),
-        (
-            Unresolvable("request-unreadable"),
-            DefinitionUnreadable("definition-unreadable"),
-            Failed("request-unresolvable"),
-        ),
-        (Unresolvable("grammar-unavailable"), Preloaded(), Skipped("preloaded")),
-    ],
-)
+# Every cell of the table but the two that serve a body (`Marked` with `NotPreloaded`).
+NO_BODY_CELLS = [
+    (NotServed("praxion:verifier"), Preloaded(), Skipped("not-served")),
+    (NotServed("praxion:verifier"), NotPreloaded(), Skipped("not-served")),
+    (NotServed("praxion:verifier"), UNREADABLE_DEFINITION, Skipped("not-served")),
+    (Unmarked(), Preloaded(), Skipped("unmarked")),
+    (Unmarked(), NotPreloaded(), Skipped("unmarked")),
+    (Unmarked(), UNREADABLE_DEFINITION, Skipped("unmarked")),
+    (Marked(OwnWords()), Preloaded(), Skipped("preloaded")),
+    (Marked(OwnWords()), UNREADABLE_DEFINITION, Failed("definition-unreadable")),
+    (Marked(StepRequest(REQUEST_ID)), Preloaded(), Skipped("preloaded")),
+    (Marked(StepRequest(REQUEST_ID)), UNREADABLE_DEFINITION, Failed("definition-unreadable")),
+    (Unresolvable("grammar-unavailable"), Preloaded(), Skipped("preloaded")),
+    (Unresolvable("grammar-unavailable"), NotPreloaded(), Failed("grammar-unavailable")),
+    (Unresolvable("grammar-unavailable"), UNREADABLE_DEFINITION, Failed("grammar-unavailable")),
+    (Unresolvable("request-path-refused"), Preloaded(), Skipped("preloaded")),
+    (Unresolvable("request-path-refused"), NotPreloaded(), Failed("request-unresolvable")),
+    (Unresolvable("request-path-refused"), UNREADABLE_DEFINITION, Failed("request-unresolvable")),
+    (Unresolvable("request-unreadable"), Preloaded(), Skipped("preloaded")),
+    (Unresolvable("request-unreadable"), NotPreloaded(), Failed("request-unresolvable")),
+    (Unresolvable("request-unreadable"), UNREADABLE_DEFINITION, Failed("request-unresolvable")),
+    (Unresolvable("request-without-step"), Preloaded(), Skipped("preloaded")),
+    (Unresolvable("request-without-step"), NotPreloaded(), Failed("request-unresolvable")),
+    (Unresolvable("request-without-step"), UNREADABLE_DEFINITION, Failed("request-unresolvable")),
+]
+
+
+@pytest.mark.parametrize(("verdict", "preload", "expected"), NO_BODY_CELLS)
 def test_a_cell_that_reads_no_body_decides_without_one(verdict, preload, expected):
     assert delivery.decide(verdict, preload, SKILL_DIR) == expected
 
 
-@pytest.mark.parametrize("route", [OwnWords(), StepRequest(REQUEST_ID)], ids=["own", "request"])
+@pytest.mark.parametrize("route", ROUTES, ids=["own", "request"])
 def test_a_marked_delegation_to_a_definition_without_the_preload_is_served_the_body(
     route, skill_dir
 ):
@@ -135,14 +138,13 @@ def test_a_body_that_times_out_is_a_failure_of_its_own(skill_dir, monkeypatch):
     )
 
 
-def test_every_verdict_and_preload_state_the_module_defines_is_decided(skill_dir):
-    verdict_kinds = set(typing.get_args(delivery.Verdict))
-    preload_kinds = set(typing.get_args(delivery.PreloadState))
-    assert {type(verdict) for verdict in VERDICTS} == verdict_kinds
-    assert {type(preload) for preload in PRELOADS} == preload_kinds
-
-    for verdict, preload in itertools.product(VERDICTS, PRELOADS):
-        assert isinstance(delivery.decide(verdict, preload, skill_dir), (Skipped, Served, Failed))
+def test_the_table_covers_every_verdict_and_preload_state_the_module_defines():
+    assert {type(verdict) for verdict in VERDICTS} == set(typing.get_args(delivery.Verdict))
+    assert {type(preload) for preload in PRELOADS} == set(typing.get_args(delivery.PreloadState))
+    decided = {(verdict, preload) for verdict, preload, _ in NO_BODY_CELLS}
+    served = {(Marked(route), NotPreloaded()) for route in ROUTES}
+    assert decided | served == set(itertools.product(VERDICTS, PRELOADS))
+    assert not decided & served
 
 
 # --- the edge: a fake installation and a project the log serves --------------------------------
@@ -214,15 +216,11 @@ def test_a_marked_spawn_is_served_and_leaves_one_row(plugin, project):
     }
 
 
-def test_the_same_spawn_call_repeated_carries_one_dedup_key(plugin, project):
-    deliver(spawn_payload(project), plugin)
-    deliver(spawn_payload(project), plugin)
+def test_the_row_carries_the_dedup_key_of_its_spawn_call(plugin, project):
+    deliver(spawn_payload(project, tool_use_id="toolu_01"), plugin)
 
-    first, second = rows_of(project)
-    assert (first["tool_use_id"], first["event_type"]) == (
-        second["tool_use_id"],
-        second["event_type"],
-    )
+    (row,) = rows_of(project)
+    assert (row["tool_use_id"], row["event_type"]) == ("toolu_01", "skill_delivery")
 
 
 @pytest.mark.parametrize(
@@ -320,14 +318,59 @@ def test_a_step_loop_pointer_whose_request_is_missing_fails_as_unresolvable(plug
     assert [row["reason"] for row in rows_of(project)] == ["request-unresolvable"]
 
 
-def test_a_request_behind_a_symlinked_directory_is_not_read(tmp_path):
+def request_in(root):
+    return root / ".ai-work" / SLUG / f"PROMPT_{REQUEST_ID}.md"
+
+
+def test_a_request_file_that_is_a_symlink_is_not_read(tmp_path):
+    secret = tmp_path / "secret.md"
+    secret.write_text("secret\n")
+    path = request_in(tmp_path)
+    path.parent.mkdir(parents=True)
+    path.symlink_to(secret)
+
+    assert delivery.read_request(path) is None
+
+
+def test_a_request_behind_a_symlinked_slug_directory_is_not_read(tmp_path):
     real = tmp_path / "elsewhere"
     real.mkdir()
     (real / f"PROMPT_{REQUEST_ID}.md").write_text("secret\n")
     (tmp_path / ".ai-work").mkdir()
     (tmp_path / ".ai-work" / SLUG).symlink_to(real)
 
-    assert delivery.read_request(tmp_path / ".ai-work" / SLUG / f"PROMPT_{REQUEST_ID}.md") is None
+    assert delivery.read_request(request_in(tmp_path)) is None
+
+
+def test_a_request_behind_a_symlinked_ai_work_directory_is_not_read(tmp_path):
+    real = tmp_path / "elsewhere"
+    (real / SLUG).mkdir(parents=True)
+    (real / SLUG / f"PROMPT_{REQUEST_ID}.md").write_text("secret\n")
+    (tmp_path / "project").mkdir()
+    (tmp_path / "project" / ".ai-work").symlink_to(real)
+
+    assert delivery.read_request(request_in(tmp_path / "project")) is None
+
+
+def test_a_request_larger_than_the_cap_is_read_in_part_with_its_heading(tmp_path):
+    path = request_in(tmp_path)
+    path.parent.mkdir(parents=True)
+    heading = f"### {MARKER} Move\n"
+    path.write_text(heading + "x" * (2 * delivery.MAX_REQUEST_BYTES))
+
+    text = delivery.read_request(path)
+
+    assert text is not None
+    assert text.startswith(heading)
+    assert len(text) == delivery.MAX_REQUEST_BYTES
+
+
+def test_a_request_that_is_not_valid_utf8_is_read_with_replacement_characters(tmp_path):
+    path = request_in(tmp_path)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"### \xff Move\n")
+
+    assert delivery.read_request(path) == "### \ufffd Move\n"
 
 
 @pytest.mark.parametrize("failing", ["preload_state", "classify", "read_body", "render_block"])
@@ -341,7 +384,7 @@ def test_a_dependency_that_raises_becomes_an_internal_error(
 
     assert deliver(spawn_payload(project), plugin) == Failed("internal-error")
     assert [row["reason"] for row in rows_of(project)] == ["internal-error"]
-    assert "internal-error" in capsys.readouterr().err
+    assert capsys.readouterr().err.strip().endswith("(internal-error): RuntimeError")
 
 
 @pytest.mark.parametrize(
@@ -378,11 +421,13 @@ def test_where_no_log_serves_the_project_nothing_is_written_and_nothing_raises(
     assert "skill-unreadable" in capsys.readouterr().err
 
 
-def test_a_log_that_cannot_be_written_never_stops_the_delivery(plugin, project, monkeypatch):
+def test_a_log_that_cannot_be_written_never_stops_the_delivery(
+    plugin, project, monkeypatch, capsys
+):
     def refuse(*_args, **_kwargs):
         raise OSError("read-only")
 
-    monkeypatch.setattr(os, "getcwd", refuse)
     monkeypatch.setattr("_observation_log.writer.record", refuse)
 
     assert isinstance(deliver(spawn_payload(project), plugin), Served)
+    assert "row not recorded: refactoring (OSError)" in capsys.readouterr().err

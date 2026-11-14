@@ -18,7 +18,7 @@ import re
 import sys
 import threading
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, NoReturn, Optional, TypeVar, Union
@@ -549,9 +549,14 @@ class Served:
 
 @dataclass(frozen=True)
 class Failed:
-    """The skill could not be delivered: one `failed` row and one stderr line record why."""
+    """The skill could not be delivered: one `failed` row and one stderr line record why.
+
+    `cause` names the exception behind an `internal-error` on the stderr line only: the row's
+    reasons are a closed set, and two failures of one reason are the same failure.
+    """
 
     reason: FailureReason
+    cause: str = field(default="", compare=False)
 
 
 Outcome = Union[Skipped, Served, Failed]  # noqa: UP007
@@ -618,8 +623,8 @@ def deliver(payload: Any, plugin_root: Path, environ: Mapping[str, str]) -> Outc
     """
     try:
         outcome = _outcome(payload, plugin_root)
-    except Exception:
-        outcome = Failed("internal-error")
+    except Exception as error:
+        outcome = Failed("internal-error", type(error).__name__)
     _report(outcome, payload, environ)
     return outcome
 
@@ -662,16 +667,25 @@ def _report(outcome: Outcome, payload: Any, environ: Mapping[str, str]) -> None:
     if isinstance(outcome, Skipped):
         return
     if isinstance(outcome, Failed):
-        with contextlib.suppress(Exception):
-            print(_failure_line(outcome), file=sys.stderr)
-    with contextlib.suppress(Exception):
+        _say(_failure_line(outcome))
+    try:
         _record(outcome, payload, environ)
+    except Exception as error:
+        _say(f"skill delivery row not recorded: {REFACTORING_SKILL} ({type(error).__name__})")
+
+
+def _say(line: str) -> None:
+    # A closed or broken stderr leaves nowhere to say it; the delivery goes on without it.
+    with contextlib.suppress(OSError, ValueError):
+        print(line, file=sys.stderr)
 
 
 def _failure_line(failed: Failed) -> str:
     line = f"skill delivery failed: {REFACTORING_SKILL} ({failed.reason})"
     if failed.reason == "grammar-unavailable":
         return f"{line}: {MARKER_IMPORT_ERROR}"
+    if failed.cause:
+        return f"{line}: {failed.cause}"
     return line
 
 

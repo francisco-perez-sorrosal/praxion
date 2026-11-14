@@ -22,6 +22,7 @@ from _step_loop_render import (  # noqa: E402
     stop_next_action,
     stop_stderr,
 )
+from _step_loop_state import LoopInputs, step_series  # noqa: E402
 from test_goal_record import (  # noqa: E402
     SLUG,
     STEP_LABEL,
@@ -192,6 +193,38 @@ def test_the_handoff_paragraph_gives_the_same_order():
     paragraph = stop_next_action(stop)
 
     assert paragraph.index("record the return first") < paragraph.index("Files:")
+
+
+def next_line_of_human_verdict(evidence):
+    stop = StopView("human-verdict", "1", evidence, (), SLUG, INVOKE)
+    (line,) = [row for row in stop_stderr(stop).splitlines() if row.startswith("  Next:")]
+    return line
+
+
+def evidence_of_unreadable(step):
+    return step_series(step, LoopInputs.read([step], {}, (), ())).evidence
+
+
+def test_a_human_verdict_on_an_unreadable_iterations_value_says_to_correct_the_plan_line():
+    step = step_of(plan_text().replace(ITERATIONS_LINE, "**Iterations**: many\n"))
+
+    line = next_line_of_human_verdict(evidence_of_unreadable(step))
+
+    assert "correct the plan line the evidence names" in line
+    assert "mutation sensor" not in line
+
+
+def test_a_human_verdict_on_an_unreadable_change_type_says_to_correct_the_plan_line():
+    line = next_line_of_human_verdict(evidence_of_unreadable(typed_step("feature")))
+
+    assert "correct the plan line the evidence names" in line
+    assert "WIP.md" not in line
+
+
+def test_any_other_human_verdict_keeps_the_hand_verification_hint():
+    line = next_line_of_human_verdict("the mutation sensor line is unreadable")
+
+    assert "verify the step by hand and correct WIP.md" in line
 
 
 BLOCKED_STOP_STATEMENTS = (

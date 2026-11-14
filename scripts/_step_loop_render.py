@@ -424,10 +424,23 @@ _ACTIONS = {  # `{step}` is the stop's step id
 }
 
 
+# The human verdict whose evidence names a plan field the driver cannot read; the two phrases are
+# the wording `_step_loop_state` gives that evidence, and a test reads them back through it.
+_UNREADABLE_PLAN_FIELD_RE = re.compile(r"\b(?:Iterations|Change type): value cannot be read")
+_PLAN_FIELD_ACTION = "correct the plan line the evidence names in IMPLEMENTATION_PLAN.md"
+
+
+def _action(stop: StopView) -> str:
+    """What to do about the stop; a human verdict on an unreadable plan field is a plan fix."""
+    if stop.cause == "human-verdict" and _UNREADABLE_PLAN_FIELD_RE.search(stop.evidence):
+        return _PLAN_FIELD_ACTION
+    return _ACTIONS[stop.cause].format(step=stop.step)
+
+
 def stop_stderr(stop: StopView) -> str:
     """The block a person watching reads: what happened, why, what to do and where."""
     who = f"Step {stop.step}" if stop.step else "the loop"
-    action = _ACTIONS[stop.cause].format(step=stop.step)
+    action = _action(stop)
     what = {
         "iteration-budget": "the iteration budget is used up",
         "not-driven": f"{who} is handed back to you",
@@ -446,7 +459,7 @@ def stop_next_action(stop: StopView) -> str:
     budget = stop.cause == "iteration-budget"
     resume = Invocation.of(stop.invoke).command("next", stop.slug)
     what = "iteration budget used up" if budget else stop.cause
-    action = _ACTIONS[stop.cause].format(step=stop.step)
+    action = _action(stop)
     owed = "Orchestrator action owed" if stop.cause == "not-driven" else "Human decision owed"
     where = f" at `Step {stop.step}`" if stop.step else ""
     return "\n".join([

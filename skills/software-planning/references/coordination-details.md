@@ -35,9 +35,11 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Write the step's unit and internal-integration tests; run the outer-loop tests named in its `**Read-only**:` field and edit none — on a mismatch with the spec, stop `[BLOCKED]` with a Spec Question; a `contract:` entry there is used as pinned, never edited"
 - Size the prompt at two steps or fewer and forbid exploratory reads beyond the named files: a step of typical size (edit, scoped tests, registration) costs 30–45 turns, so derive the spawn count in a plan from steps ÷ 2, not from role count
 - Order the work author → mechanical registration → ONE targeted test run → report, so a turn-cap stop leaves a committable state; on a cap stop re-derive completion from git and the working tree before resuming or re-spawning
+- For a tagged step (its heading carries `[Phase: Refactoring]`), put the step's heading verbatim in the prompt's own words, outside code spans, fenced blocks and quotes: that marker is what delivers the refactoring skill to the implementer or the test-engineer
 
 **test-engineer** — always include in prompt:
 - Paired mode (optional test step or driver-binding step): "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`; design tests from the acceptance criteria in `SYSTEMS_PLAN.md`; report RED; a driver-binding step edits driver files only"
+- A tagged step: carry its heading as the implementer's tagged-step bullet above
 - `Mode: acceptance-design` (Standard/Full): the prompt carries **only** the task slug, the Base commit sha and the path of `SPEC_EXTRACT.md` — never `SYSTEMS_PLAN.md`, the brief or any design path. "Produce `ACCEPTANCE_TESTS.md` at `.ai-work/<task-slug>/` and RED tests under `tests/acceptance/` and `tests/e2e/`; read only the allowed input classes; do not commit". Spawn with `model: opus`; a Spec-Question resume names the regenerated extract and the open question ids ([procedure](#acceptance-design-stage))
 
 **verifier** — always include in prompt:
@@ -551,6 +553,7 @@ When the orchestrator dispatches the mini-pipeline:
 - Steps reuse the existing `[Phase: Refactoring]` tag — **no new tag invented**. The planner-driven `[Phase: Refactoring]` and architect-driven `emit-PRE_REFACTOR_PLAN` are two entry points to the same tag and the same `skills/refactoring/SKILL.md` workflow.
 - The first non-trivial step is a `test-engineer`-assigned characterization-tests-first step, sourced from `PRE_REFACTOR_PLAN.md § Behavior Preservation Contract`. Characterization-first is a hard contract — refactoring without first capturing the pre-refactor behavior is forbidden.
 - Subsequent steps follow the standard paired BDD/TDD execution pattern.
+- Every dispatch, the characterization-tests-first step included, carries its step's heading with the marker; the presence of `PRE_REFACTOR_PLAN.md` alone does not mark a delegation.
 
 ### Tech-Debt Ledger Lifecycle
 

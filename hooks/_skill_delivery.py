@@ -19,7 +19,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional, Union
 
+from _rule_delivery import FRONTMATTER_RE
+
 SCRIPTS_DIR = "scripts"
+AGENTS_DIR = "agents"
+REFACTORING_SKILL = "refactoring"
 
 # The only agent types a delegation can be served the skill for; every other role, the verifier
 # the step loop spawns included, is never judged for the marker.
@@ -251,3 +255,105 @@ def _step_heading(request: str) -> Optional[str]:  # noqa: UP045
         if line.strip():
             return line if line.startswith("#") else None
     return None
+
+
+# --- The preload state: whether the installed definition already carries the skill ---------------
+
+# The first `skills:` key at column 0 of a definition's frontmatter, and what the keyless forms
+# of a value look like: a block-list item, a comment, and the YAML scalars no list can start with.
+_SKILLS_KEY = re.compile(r"^skills:[ \t]*(.*)$", re.MULTILINE)
+_BLOCK_ITEM = re.compile(r"^-\s+(.*)$")
+_COMMENT = re.compile(r"(^|\s)#.*$")
+_NOT_A_LIST = re.compile(r"^[|>{&*!]")
+
+
+@dataclass(frozen=True)
+class Preloaded:
+    """The definition lists the skill, so the harness preloads it and a delivery would double it."""
+
+
+@dataclass(frozen=True)
+class NotPreloaded:
+    """The definition is readable and does not list the skill: the delivery must serve it."""
+
+
+PreloadUnreadableReason = Literal[
+    "definition-unreadable",
+    "frontmatter-missing",
+    "skills-unparseable",
+]
+
+
+@dataclass(frozen=True)
+class DefinitionUnreadable:
+    """The state cannot be told, so the delivery must neither serve on a guess nor skip on one."""
+
+    reason: PreloadUnreadableReason
+
+
+PreloadState = Union[Preloaded, NotPreloaded, DefinitionUnreadable]  # noqa: UP007
+
+
+def preload_state(plugin_root: Path, role: str) -> PreloadState:
+    """Whether `<plugin_root>/agents/<role>.md` preloads the refactoring skill.
+
+    The installed plugin's definition is the one the harness takes the preload from, so it is the
+    only source: never the project's files, never a flag. `role` is the definition's file stem.
+    """
+    try:
+        definition = (plugin_root / AGENTS_DIR / f"{role}.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return DefinitionUnreadable("definition-unreadable")
+    frontmatter = FRONTMATTER_RE.match(definition)
+    if frontmatter is None:
+        return DefinitionUnreadable("frontmatter-missing")
+    skills = _listed_skills(frontmatter.group())
+    if skills is None:
+        return DefinitionUnreadable("skills-unparseable")
+    return Preloaded() if REFACTORING_SKILL in skills else NotPreloaded()
+
+
+def _listed_skills(frontmatter: str) -> Optional[list[str]]:  # noqa: UP045
+    """The names the first `skills:` key lists: none without the key; None when it is unparseable.
+
+    Reads the forms a definition uses: `[a, b]`, a bare `a, b`, and a block list of `- a` lines.
+    Anything else, a multi-line inline list included, is unparseable and never guessed at.
+    """
+    key = _SKILLS_KEY.search(frontmatter)
+    if key is None:
+        return []
+    value = _without_comment(key.group(1))
+    if not value:
+        return _block_items(frontmatter[key.end() :].splitlines())
+    if _NOT_A_LIST.match(value):
+        return None
+    if value.startswith("["):
+        if not value.endswith("]"):
+            return None
+        value = value[1:-1]
+    return _names(value.split(","))
+
+
+def _block_items(lines: list[str]) -> Optional[list[str]]:  # noqa: UP045
+    """The `- name` items under a bare `skills:` key, which ends at the next unindented line."""
+    items = []
+    for line in lines:
+        content = _without_comment(line)
+        if not content:
+            continue
+        item = _BLOCK_ITEM.match(content)
+        if item:
+            items.append(item.group(1))
+        elif line[0].isspace():
+            return None
+        else:
+            break
+    return _names(items)
+
+
+def _without_comment(text: str) -> str:
+    return _COMMENT.sub("", text).strip()
+
+
+def _names(raw: list[str]) -> list[str]:
+    return [name for name in (item.strip().strip("'\"") for item in raw) if name]

@@ -1,0 +1,5 @@
+from notes.repository import mirror_text
+
+
+def test_rows_become_indented_json_text():
+    assert mirror_text([{"title": "plan"}]) == '[\n  {\n    "title": "plan"\n  }\n]'

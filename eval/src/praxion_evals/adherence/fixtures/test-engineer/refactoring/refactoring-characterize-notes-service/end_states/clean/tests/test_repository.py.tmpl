@@ -1,0 +1,7 @@
+from notes.repository import Note, NoteRepository
+
+
+def test_added_notes_are_listed_by_title(tmp_path):
+    repository = NoteRepository(tmp_path / "mirror.json")
+    repository.add(Note("plan", "ship it"))
+    assert repository.titles() == ["plan"]

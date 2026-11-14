@@ -37,6 +37,7 @@ SLOT_BOUNDS = {  # characters; a slot named here is cut to its bound
     "protected-paths": 1_500,
     "iteration-patches": 1_000,
 }
+NEWEST_KEPT_SLOTS = frozenset({"previous-attempts"})  # a cut drops the oldest lines, not the newest
 PROGRESS_BOUND = 2_500  # a goal prompt keeps the newest progress lines within this
 GATE_EVIDENCE_BOUND = 1_500  # an implement prompt keeps the newest lines of the last red gate
 
@@ -335,11 +336,13 @@ def _render_slot(slot: _Slot) -> tuple[str, tuple[str, str] | None]:
     bound, warning = SLOT_BOUNDS.get(tag), None
     if bound and len(text) > bound:
         marker, kept = f"[truncated: full text in {path}]", []
-        for line in text.splitlines():
+        newest_kept = tag in NEWEST_KEPT_SLOTS
+        lines = text.splitlines()
+        for line in reversed(lines) if newest_kept else lines:
             if len("\n".join([*kept, line, marker])) > bound:
                 break
             kept.append(line)
-        text = "\n".join([*kept, marker])
+        text = "\n".join([marker, *reversed(kept)] if newest_kept else [*kept, marker])
         warning = ("slot-truncated", f"{tag} cut to {bound} characters: full text in {path}")
     attribute = f' source="{source}"' if source else ""
     return (f"<{tag}{attribute}>\n{text}\n</{tag}>" if text else ""), warning

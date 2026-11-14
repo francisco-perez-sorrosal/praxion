@@ -123,7 +123,7 @@ def _seed(directory: Path, tree: dict[str, Any]) -> None:
 
 
 def _seed_rules(tmp_path: Path, swe_overrides: dict[str, str] | None = None) -> tuple[Path, Path]:
-    """Seed tmp_path/rules with the six core rules and the hook-delivered rules a
+    """Seed tmp_path/rules with the five core rules and the hook-delivered rules a
     valid tree needs; ``swe_overrides`` replaces or adds files under swe/.
 
     Returns (rules_dir, manifest_path).
@@ -176,13 +176,13 @@ def _patched_module(monkeypatch, rules_dir: Path, manifest_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# Fixture: minimal valid rules tree with all 6 core rules present
+# Fixture: minimal valid rules tree with all 5 core rules present
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
 def minimal_rules_tree(tmp_path: Path) -> tuple[Path, Path]:
-    """Build a synthetic rules/ tree with the 6 required core rules.
+    """Build a synthetic rules/ tree with the 5 required core rules.
 
     Returns (rules_dir, manifest_path).
     """

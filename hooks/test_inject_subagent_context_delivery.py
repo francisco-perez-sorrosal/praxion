@@ -113,6 +113,19 @@ def test_a_failed_delivery_appends_the_notice_and_still_allows_the_spawn(tmp_pat
     assert str((plugin / "skills" / "refactoring" / "SKILL.md").resolve()) in notice
 
 
+def test_a_cwd_the_leading_segments_cannot_use_still_delivers_the_served_block(tmp_path):
+    plugin = _plugin(tmp_path / "plugin")
+    payload = json.loads(_payload(MARKED, tmp_path))
+    payload["cwd"] = 42
+
+    result = _run(json.dumps(payload), plugin, tmp_path)
+
+    assert result.returncode == 0
+    delegation, block = _prompt_of(result).split("\n\n", 1)
+    assert delegation == MARKED
+    assert block.startswith(BLOCK_LABEL)
+
+
 def test_a_definition_that_preloads_the_skill_adds_nothing(tmp_path):
     plugin = _plugin(tmp_path / "plugin", preloads=True)
 

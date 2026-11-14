@@ -1,8 +1,9 @@
 """PreToolUse(Agent) hook: the single updatedInput emitter for subagent spawns.
 
 Fires at PreToolUse for any Agent tool invocation and composes up to three
-prompt additions ahead of the original prompt, emitting at most ONE
-updatedInput per spawn (dec-266, resolving td-049 and td-051):
+leading prompt additions ahead of the original prompt and at most one trailing
+addition after it, emitting at most ONE updatedInput per spawn (dec-266,
+resolving td-049 and td-051). The leading additions:
 
   1. Praxion preamble -- prepended for host-native agents (Explore, Plan,
      general-purpose) launched from a Praxion-managed project; praxion:* agents
@@ -18,31 +19,35 @@ updatedInput per spawn (dec-266, resolving td-049 and td-051):
      Detected by a conservative regex on the prompt text only -- no
      filesystem walk, no git call for this specific check.
 
-After the original prompt it appends at most one trailing segment, the skill
-delivery's (`_skill_delivery.deliver`): the refactoring skill's block for a
-marked implementer or test-engineer delegation, or a failure notice when the
-skill could not be delivered. The module is imported behind a guard, so a
-missing or broken delivery costs the trailing segment only.
+Previously these leading concerns were split across two separate
+PreToolUse(Agent) hooks that could each emit updatedInput for the same spawn --
+whether the harness chains multiple updatedInput emissions across matching
+hooks (vs. dropping all but one) was an unverified assumption (td-049).
+Consolidating into a single emitter makes that question structurally moot.
 
-Previously this concern was split across two separate PreToolUse(Agent) hooks
-that could each emit updatedInput for the same spawn -- whether the harness
-chains multiple updatedInput emissions across matching hooks (vs. dropping
-all but one) was an unverified assumption (td-049). Consolidating into a
-single emitter makes that question structurally moot.
+The trailing addition is the skill delivery's (`_skill_delivery.deliver`):
+the refactoring skill's block for a marked implementer or test-engineer
+delegation, or a failure notice when a marked delegation's skill could not be
+delivered. The delivery module is imported behind a guard, so a missing or
+broken delivery costs the trailing addition only; the delivery records its
+outcome first, so a leading addition that fails costs itself only.
 
-When none of the three conditions hold (e.g. a praxion agent with no worktree
-context, a canonical session with no worktree-naming prompt), the hook emits
-nothing -- preserving the original gate contract of each concern.
+When no leading condition holds and the delivery adds nothing (e.g. an
+unmarked praxion agent with no worktree context), the hook emits nothing --
+preserving the original gate contract of each concern.
 
 Fast-skip conditions (exit 0, no stdout, strictly empty):
   (a) tool_name is not "Agent"
-  (b) tool_input is not a JSON object
+  (b) tool_input is not a JSON object (the delivery still records the failure)
   (c) [preamble only] cwd is not in a managed project (no .ai-state/ serves it)
   (d) [preamble only] subagent_type matches praxion:* AND
       PRAXION_INJECT_NATIVE_SUBAGENTS is not set
   (e) [preamble only] PRAXION_DISABLE_SUBAGENT_INJECT=1 is set
   (f) [worktree lines only] PRAXION_DISABLE_WORKTREE_PATH_BRIEFING=1 is set
   (g) [worktree lines only] cwd is empty
+  (h) [trailing only] the delegation is unmarked, its role is neither
+      implementer nor test-engineer, its definition already preloads the
+      skill, or CLAUDE_PLUGIN_ROOT is unset
 
 Caching: the managed answer is cached per session_id to avoid per-spawn
 filesystem stats on dense fan-out pipelines.
@@ -227,6 +232,24 @@ def _worktree_segments(cwd: str, prompt: str) -> list[str]:
     return segments
 
 
+def _leading_segments(payload: dict, tool_input: dict) -> list[str]:
+    """Return the preamble and worktree lines, or none when the spawn's fields defeat them.
+
+    By now the delivery has recorded its outcome, so a raise here (a non-string cwd, a NUL
+    byte in it) costs these segments alone and never strands a block already recorded served.
+    """
+    cwd = payload.get("cwd", "")
+    try:
+        preamble = _preamble_segment(
+            tool_input.get("subagent_type", ""), cwd, payload.get("session_id", "")
+        )
+        worktree_lines = _worktree_segments(cwd, tool_input.get("prompt", ""))
+    except Exception as error:
+        _say(f"leading segments dropped: {type(error).__name__}: {error}")
+        return []
+    return [preamble, *worktree_lines] if preamble else worktree_lines
+
+
 # -- Trailing segment: the skill delivery -----------------------------------------
 
 
@@ -329,17 +352,8 @@ def _process(payload: object) -> None:
     if not isinstance(tool_input, dict):
         return
 
-    subagent_type = tool_input.get("subagent_type", "")
     prompt = tool_input.get("prompt", "")
-    cwd = payload.get("cwd", "")
-    session_id = payload.get("session_id", "")
-
-    leading: list[str] = []
-    preamble = _preamble_segment(subagent_type, cwd, session_id)
-    if preamble:
-        leading.append(preamble)
-    leading.extend(_worktree_segments(cwd, prompt))
-
+    leading = _leading_segments(payload, tool_input)
     if not leading and not trailing:
         return
 

@@ -14,6 +14,7 @@ label optionally bold and case-insensitive; a line in a code fence is no field:
     **Assignee**: implementer
     **Read-only**: `tests/a.py`, `tests/b.py::test_x`
     **Iterations**: 5
+    **Change type**: feat
 
 Any assignee but `implementer` (or none) is another assignee: the loop never runs
 the step. A `tier: H` line routes to `opus`, a `tier: L` line to `haiku`, else `sonnet`; a
@@ -25,6 +26,16 @@ that breaks the grammar is kept as an unreadable bound, never defaulted. `Read-o
 are the backticked spans (a path, `path::function` or a node id) or, with no
 backtick, the comma-separated words; each holds a `/` or `::`. A `contract:`
 clause names a contract the step uses and never turns green, so it is no entry.
+
+Normative grammar of the change type -- the conventional commit type a step's commit carries.
+Its value is one of `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, lowercase. A
+step's type is the first that applies of: its own `Change type:` field; a `[Phase: Refactoring]`
+tag in its heading (the phase name matched case-insensitively), which means `refactor` and no
+other phase name maps to a type; a plan-level `Change type:` line, the same field outside every
+step block and outside code fences, so adding it to a plan changes no step's block or digest;
+else none. A value outside the set, or lines of one level that disagree, are kept as an
+unreadable type quoting what was written (and which level), never defaulted; an unreadable
+step field is the step's own, so it outranks the tag and the plan-level line.
 
 Normative grammar of the `Files:` field -- one logical line under a step
 heading (or checklist step line), the label optionally bold, case-insensitive:
@@ -44,7 +55,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Literal, Union
+from typing import Literal, Union, cast, get_args
 
 from _loop_fields import (
     AttemptCap,
@@ -68,6 +79,8 @@ UNASSIGNED = "unassigned"
 
 Routing = Literal["opus", "sonnet", "haiku"]
 ReviewOverride = Literal["force", "off", "absent"]
+ChangeType = Literal["feat", "fix", "refactor", "perf", "docs", "test", "chore"]
+CHANGE_TYPES: tuple[ChangeType, ...] = get_args(ChangeType)
 
 
 @dataclass(frozen=True)
@@ -83,6 +96,21 @@ class OtherAssignee:
 
 
 Assignee = Union[Implementer, OtherAssignee]  # noqa: UP007 -- runtime value, 3.9 floor
+
+
+@dataclass(frozen=True)
+class UnreadableChangeType:
+    """A `Change type:` value outside the set, or lines that disagree, as written.
+
+    `where` is the level whose line must be fixed: the step's own field or the plan-level line.
+    """
+
+    text: str
+    where: Literal["step", "plan"]
+
+
+# None: the step declares no type.
+ChangeTypeReading = Union[ChangeType, UnreadableChangeType, None]  # noqa: UP007 -- ditto
 
 
 @dataclass(frozen=True)
@@ -106,6 +134,7 @@ class PlanStep:
     read_only: tuple[str, ...]
     check: CheckLine | None
     bound: BoundReading = AttemptCap()
+    change_type: ChangeTypeReading = None
 
     def __post_init__(self) -> None:
         if STEP_ID_RE.match(self.id) is None:
@@ -121,14 +150,15 @@ def step_digest(block: str) -> str:
 
 def parse_plan_steps(plan_text: str) -> tuple[PlanStep, ...]:
     """Every step of a plan in document order (steps sharing an id are all kept)."""
+    plan_level = parse_plan_change_type(plan_text)
     return tuple(
-        _read_step(opening, opening.step)
+        _read_step(opening, opening.step, plan_level)
         for opening in split_step_blocks(plan_text)
         if opening.step is not None
     )
 
 
-def _read_step(opening: StepBlock, label: str) -> PlanStep:
+def _read_step(opening: StepBlock, label: str, plan_level: ChangeTypeReading) -> PlanStep:
     block, lines = _close_section(opening.text.splitlines())
     fields = _read_fields(lines)
     return PlanStep(
@@ -147,6 +177,7 @@ def _read_step(opening: StepBlock, label: str) -> PlanStep:
         ),
         check=parse_step_checks(block).get(label),
         bound=_read_bound(block, label),
+        change_type=_resolve_change_type(fields, opening.title, plan_level),
     )
 
 
@@ -156,6 +187,63 @@ def _read_bound(block: str, label: str) -> BoundReading:
     if declared is None:
         return AttemptCap()
     return declared if isinstance(declared, UnreadableIterations) else GoalBudget(declared)
+
+
+def parse_plan_change_type(plan_text: str) -> ChangeTypeReading:
+    """The plan-level `Change type:` line: outside every step block and every code fence."""
+    lines = plan_text.splitlines()
+    inside = {
+        index
+        for opening in split_step_blocks(plan_text)
+        if opening.step is not None
+        for index in _block_line_indexes(opening)
+    }
+    fenced = _fenced_lines(lines)
+    outside = [line for index, line in enumerate(lines) if index not in inside | fenced]
+    return _read_change_type(_read_fields(outside).get("change type", []), "plan")
+
+
+def _block_line_indexes(opening: StepBlock) -> range:
+    """The 0-based lines of `plan_text` the step's block (as `PlanStep.block` holds it) spans."""
+    block, _ = _close_section(opening.text.splitlines())
+    start = opening.first_line - 1
+    return range(start, start + len(block.splitlines()))
+
+
+def _fenced_lines(lines: list[str]) -> set[int]:
+    """The 0-based lines that open, close or sit inside a code fence."""
+    fenced: set[int] = set()
+    fence: str | None = None
+    for index, line in enumerate(lines):
+        marker = _CODE_FENCE_RE.match(line)
+        if marker:
+            fence = None if fence == marker.group(1) else (fence or marker.group(1))
+            fenced.add(index)
+        elif fence is not None:
+            fenced.add(index)
+    return fenced
+
+
+def _resolve_change_type(
+    fields: dict[str, list[str]], heading_title: str, plan_level: ChangeTypeReading
+) -> ChangeTypeReading:
+    """The step's own field, else its refactoring tag, else the plan-level line, else none."""
+    own = _read_change_type(fields.get("change type", []), "step")
+    if own is not None:
+        return own
+    if _REFACTORING_TAG_RE.search(heading_title):
+        return "refactor"
+    return plan_level
+
+
+def _read_change_type(values: list[str], where: Literal["step", "plan"]) -> ChangeTypeReading:
+    """The one type the lines state, none for no line, else an unreadable reading quoting them."""
+    written = list(dict.fromkeys(value.strip().rstrip("*").strip() for value in values))
+    if not written:
+        return None
+    if len(written) == 1 and written[0] in CHANGE_TYPES:
+        return cast(ChangeType, written[0])
+    return UnreadableChangeType("; ".join(written), where)
 
 
 _HEADING_RE = re.compile(r"^(#{1,6})[ \t]")
@@ -184,6 +272,7 @@ def _close_section(lines: list[str]) -> tuple[str, list[str]]:
 _TITLE_PREFIX_RE = re.compile(r"^Step\s+\d+[a-z]?\b\s*:?\s*")
 _DEPENDS_ON_RE = re.compile(r"\[depends-on:([^\]]*)\]", re.IGNORECASE)
 _PARALLEL_GROUP_RE = re.compile(r"\[parallel-group:([^\]]*)\]", re.IGNORECASE)
+_REFACTORING_TAG_RE = re.compile(r"\[\s*phase\s*:\s*refactoring\s*\]", re.IGNORECASE)
 
 
 def _clean_title(heading_title: str) -> str:
@@ -208,7 +297,7 @@ def _read_parallel_group(heading_title: str) -> str | None:
 
 # A one-line field, optionally a list item, its label optionally bold.
 _FIELD_RE = re.compile(
-    r"^\s*(?:[-*+]\s+)?\*{0,2}(?P<label>assignee|tier|review|read-only)\*{0,2}"
+    r"^\s*(?:[-*+]\s+)?\*{0,2}(?P<label>assignee|tier|review|read-only|change type)\*{0,2}"
     r"\s*:\s*\*{0,2}\s*(?P<value>.*)$",
     re.IGNORECASE,
 )

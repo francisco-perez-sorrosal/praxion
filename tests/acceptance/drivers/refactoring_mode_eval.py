@@ -15,10 +15,10 @@ reached only through `adherence_eval.run_in_eval`; the account is handed over an
 
 The committed task data a task is graded from
 ------------------------------------------------
-The two tasks are the templates `refactoring-extract-module` (implementer) and
-`refactoring-characterize` (test-engineer), each a directory under
-`eval/src/praxion_evals/adherence/fixtures/<role>/templates/<template id>/`. Besides the files
-the other templates carry, each holds plain-file trees, one per end state:
+Each role's tasks are the templates of its refactoring pool, the directories under
+`eval/src/praxion_evals/adherence/fixtures/<role>/refactoring/`; a task is graded in every
+template found there. Besides the files the other templates carry, each holds plain-file trees,
+one per end state:
 
     start/                      the repository the session starts in: its tracked files
     end_states/clean/           the whole repository a session leaves when every checklist item holds
@@ -69,11 +69,7 @@ CHECKLIST = {
     ),
 }
 
-TEMPLATE_IDS = {
-    "implementer": "refactoring-extract-module",
-    "test-engineer": "refactoring-characterize",
-}
-TEMPLATES_DIR = adherence_eval.EVAL_SRC / "praxion_evals" / "adherence" / "fixtures"
+FIXTURES_DIR = adherence_eval.EVAL_SRC / "praxion_evals" / "adherence" / "fixtures"
 AXIS = "refactoring-delivery"
 TEMPLATE_SUFFIX = ".tmpl"
 
@@ -125,13 +121,32 @@ def grade_refactoring_task(
 ) -> Grade:
     """Grade the role's refactoring task from an end state, never from the session's own account.
 
-    The end state is the template's clean one, or the one violating exactly the checklist item
-    `broken` names; `account` stands in for the session's final message and is only handed over.
+    The end state is each pool template's clean one, or the one violating exactly the checklist
+    item `broken` names; `account` stands in for the session's final message and is only handed
+    over. The task passes only if every template of the pool passes, so a violation must fail in
+    every template and the clean end state must pass in every template.
     """
-    repository = _repository_with_end_state(role, workspace, broken)
+    templates = refactoring_templates(role)
+    grades = [_grade_template(role, template, workspace, broken, account) for template in templates]
+    return Grade(passed=all(grades))
+
+
+def refactoring_templates(role: str) -> tuple[Path, ...]:
+    """The templates of the role's refactoring pool, by name."""
+    pool = FIXTURES_DIR / role / "refactoring"
+    assert pool.is_dir(), f"the committed task data is missing: {pool}"
+    templates = tuple(sorted(entry for entry in pool.iterdir() if entry.is_dir()))
+    assert templates, f"the committed task data is missing: no template in {pool}"
+    return templates
+
+
+def _grade_template(
+    role: str, template: Path, workspace: Path, broken: str | None, account: str
+) -> bool:
+    repository = _repository_with_end_state(role, template, workspace / template.name, broken)
     payload = {"role": role, "workspace": str(repository), "account": account}
     graded = adherence_eval.run_in_eval(_GRADE_CODE, payload)
-    return Grade(passed=graded["passed"] is True)
+    return graded["passed"] is True
 
 
 def item_slug(item: str) -> str:
@@ -139,9 +154,10 @@ def item_slug(item: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", item.lower()).strip("-")
 
 
-def _repository_with_end_state(role: str, workspace: Path, broken: str | None) -> Path:
+def _repository_with_end_state(
+    role: str, template: Path, workspace: Path, broken: str | None
+) -> Path:
     assert broken is None or broken in CHECKLIST[role], f"not a {role} checklist item: {broken!r}"
-    template = TEMPLATES_DIR / role / "templates" / TEMPLATE_IDS[role]
     start = template / "start"
     end_state = template / "end_states" / ("clean" if broken is None else item_slug(broken))
     for tree in (start, end_state):

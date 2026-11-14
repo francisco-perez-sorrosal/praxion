@@ -51,6 +51,7 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from _hook_utils import is_disabled
@@ -214,18 +215,24 @@ def _worktree_segments(cwd: str, prompt: str) -> list[str]:
 # -- Emission ---------------------------------------------------------------------
 
 
-def _emit_updated_input(tool_input: dict, prompt: str, segments: list[str]) -> None:
+def _emit_updated_input(
+    tool_input: dict,
+    prompt: str,
+    leading: Sequence[str],
+    trailing: Sequence[str] = (),
+) -> None:
     """Emit the updatedInput JSON response to stdout.
 
     Preserves every field of the original tool_input (subagent_type,
     description, model, run_in_background, isolation, …) and overrides only
-    the prompt: each composed segment on its own paragraph, ahead of the
-    original prompt. Reconstructing tool_input from scratch would drop the
-    Agent tool's required `description` field, causing host-native spawns
+    the prompt: each `leading` segment on its own paragraph ahead of the
+    delegation, the delegation verbatim, then each `trailing` segment on its
+    own paragraph after it. Reconstructing tool_input from scratch would drop
+    the Agent tool's required `description` field, causing host-native spawns
     (Explore/Plan/general-purpose) to fail schema validation.
     """
     updated = dict(tool_input)
-    updated["prompt"] = "\n\n".join([*segments, prompt])
+    updated["prompt"] = "\n\n".join([*leading, prompt, *trailing])
     # Harness contract: updatedInput's value IS the replacement tool-input params
     # object — never wrap it in an envelope key. The harness validates it directly
     # against the tool's schema; a wrapper makes every required param "missing".

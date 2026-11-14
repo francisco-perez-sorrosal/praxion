@@ -1,9 +1,10 @@
 """Grade a session's refactoring end state by what it leaves in the repository, never by what it says.
 
 The workspace is a git repository whose only commit is the template's ``start/`` and whose working
-tree is the end state. Each implementer check is one clause of the refactoring skill's verification
-checklist. The account a session gives of its own work is accepted and never read: a session that
-confesses a shim it did not leave, or claims a success it did not reach, is graded the same.
+tree is the end state. Each check is one clause of the refactoring skill's verification checklist
+(the implementer's) or of the pre-refactor contract (the test-engineer's). The account a session
+gives of its own work is accepted and never read: a session that confesses a shim it did not leave,
+or claims a success it did not reach, is graded the same.
 
 The checks name no template. The one thing a template says is where the code moves, in the
 ``refactoring.toml`` it commits in ``start/``; it is read from the starting commit, which a session
@@ -50,7 +51,9 @@ def grade_workspace(role: Role, workspace: Path, account: str) -> RefactoringGra
     checks = CHECKLISTS.get(role)
     if checks is None:
         raise ValueError(f"no refactoring grader is written for {role} yet")
-    evidence = Evidence(workspace, _read_move(workspace), _parse_python(workspace))
+    evidence = Evidence(
+        workspace, _read_move(workspace), _parse_python(workspace), _changed_paths(workspace)
+    )
     return RefactoringGrade(tuple(item for item, holds in checks if not holds(evidence)))
 
 
@@ -64,6 +67,9 @@ class Move:
     source: str
     target: str
     tests: str
+    # Names the move relocates. Only the test-engineer's grade needs them, because its end state
+    # is read before the target exists, so what moves cannot yet be derived from it.
+    moving: tuple[str, ...] = ()
 
     @classmethod
     def parse(cls, text: str) -> Move:
@@ -73,7 +79,10 @@ class Move:
         ]
         if missing:
             raise ValueError(f"{MANIFEST} lacks a string for {', '.join(missing)}")
-        return cls(raw["source"], raw["target"], raw["tests"])
+        moving = raw.get("moving", [])
+        if not (isinstance(moving, list) and all(isinstance(name, str) for name in moving)):
+            raise ValueError(f"{MANIFEST} lacks a list of strings for moving")
+        return cls(raw["source"], raw["target"], raw["tests"], tuple(moving))
 
 
 @dataclass(frozen=True)
@@ -81,6 +90,7 @@ class Evidence:
     workspace: Path
     move: Move
     trees: Mapping[str, ast.Module]  # every parsable Python file of the working tree, by path
+    changed: tuple[str, ...]  # paths that differ from the starting commit, sorted
 
     @property
     def source(self) -> ast.Module | None:
@@ -95,6 +105,19 @@ class Evidence:
         """The names the target defines: what the move put there."""
         return _defined_names(self.target) if self.target else frozenset()
 
+    @property
+    def authored_tests(self) -> Mapping[str, frozenset[str]]:
+        """The test functions the session added, by changed file under the tests directory."""
+        authored: dict[str, frozenset[str]] = {}
+        for path in self.changed:
+            tree = self.trees.get(path)
+            if tree is None or not PurePosixPath(path).is_relative_to(self.move.tests):
+                continue
+            added = _test_names(tree) - _test_names(_committed_tree(self.workspace, path))
+            if added:
+                authored[path] = added
+        return MappingProxyType(authored)
+
 
 def _read_move(workspace: Path) -> Move:
     try:
@@ -107,13 +130,33 @@ def _parse_python(workspace: Path) -> dict[str, ast.Module]:
     trees: dict[str, ast.Module] = {}
     for path in sorted(workspace.rglob("*.py")):
         relative = path.relative_to(workspace)
-        if any(part.startswith(".") or part == "__pycache__" for part in relative.parts[:-1]):
+        if _is_scratch(relative.parts):
             continue
         try:
             trees[relative.as_posix()] = ast.parse(path.read_text(encoding="utf-8"))
         except (SyntaxError, ValueError):
             continue  # a file that does not parse is the tests' finding, not this module's
     return trees
+
+
+def _changed_paths(workspace: Path) -> tuple[str, ...]:
+    """Paths that differ from the starting commit, staged or not, new files included."""
+    tracked = _git(workspace, "diff", "HEAD", "--name-only", "--no-renames", "-z")
+    untracked = _git(workspace, "ls-files", "--others", "--exclude-standard", "-z")
+    paths = {path for path in (tracked + untracked).decode("utf-8").split("\0") if path}
+    return tuple(sorted(path for path in paths if not _is_scratch(PurePosixPath(path).parts)))
+
+
+def _is_scratch(parts: tuple[str, ...]) -> bool:
+    """Whether a path lives in a hidden or bytecode-cache directory: tooling's, not the session's."""
+    return any(part.startswith(".") or part == "__pycache__" for part in parts[:-1])
+
+
+def _committed_tree(workspace: Path, path: str) -> ast.Module | None:
+    try:
+        return ast.parse(_git(workspace, "show", f"HEAD:{path}").decode("utf-8"))
+    except (subprocess.CalledProcessError, SyntaxError, ValueError):
+        return None  # the starting commit has no such file, or none that parses
 
 
 # -- The implementer's checklist ------------------------------------------------------------------
@@ -179,6 +222,33 @@ def _no_transitional_shim_remains(evidence: Evidence) -> bool:
     return not (evidence.source and _shims(evidence.source, evidence.arrived))
 
 
+# -- The test-engineer's checklist ----------------------------------------------------------------
+
+
+def _characterization_tests_come_first(evidence: Evidence) -> bool:
+    """Tests were added and nothing outside the tests directory differs from the starting commit.
+
+    The workspace shows the end state only, so "before any structural change" is read as "no
+    structural change at all": the session's whole diff is tests.
+    """
+    outside = [
+        path
+        for path in evidence.changed
+        if not PurePosixPath(path).is_relative_to(evidence.move.tests)
+    ]
+    return bool(evidence.authored_tests) and not outside
+
+
+def _characterization_tests_pin_the_public_surface(evidence: Evidence) -> bool:
+    """The added tests never name what the move relocates: they would break when it moves."""
+    if not evidence.move.moving:
+        raise ValueError(f"{MANIFEST} names no moving code to keep the tests off")
+    moving = frozenset(evidence.move.moving)
+    return bool(evidence.authored_tests) and not any(
+        _mentions(evidence.trees[path], moving) for path in evidence.authored_tests
+    )
+
+
 CHECKLISTS: Mapping[Role, tuple[tuple[str, Callable[[Evidence], bool]], ...]] = MappingProxyType(
     {
         "implementer": (
@@ -187,6 +257,16 @@ CHECKLISTS: Mapping[Role, tuple[tuple[str, Callable[[Evidence], bool]], ...]] = 
             ("every call site is re-wired", _every_call_site_is_re_wired),
             ("no dead code remains", _no_dead_code_remains),
             ("no transitional shim remains", _no_transitional_shim_remains),
+        ),
+        "test-engineer": (
+            (
+                "characterization tests exist before any structural change",
+                _characterization_tests_come_first,
+            ),
+            (
+                "characterization tests pin behaviour through the public surface",
+                _characterization_tests_pin_the_public_surface,
+            ),
         ),
     }
 )
@@ -218,6 +298,32 @@ def _defined_names(tree: ast.Module | None) -> frozenset[str]:
 def _assigned_names(node: ast.Assign | ast.AnnAssign) -> set[str]:
     targets = node.targets if isinstance(node, ast.Assign) else [node.target]
     return {target.id for target in targets if isinstance(target, ast.Name)}
+
+
+def _test_names(tree: ast.Module | None) -> frozenset[str]:
+    """Every function, method included, that pytest would collect by its name."""
+    if tree is None:
+        return frozenset()
+    return frozenset(
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith("test")
+    )
+
+
+def _mentions(tree: ast.Module, names: frozenset[str]) -> bool:
+    """Whether any import, name, attribute or string literal of the tree names one of ``names``."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and any(a.name in names for a in node.names):
+            return True
+        if isinstance(node, ast.Name) and node.id in names:
+            return True
+        if isinstance(node, ast.Attribute) and node.attr in names:
+            return True
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if names & set(node.value.split(".")):  # a dotted target of a patch names it too
+                return True
+    return False
 
 
 def _imported_names(tree: ast.Module | None) -> frozenset[str]:

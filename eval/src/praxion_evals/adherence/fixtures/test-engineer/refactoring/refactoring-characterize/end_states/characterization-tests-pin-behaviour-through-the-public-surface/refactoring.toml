@@ -1,0 +1,6 @@
+# Where the refactoring moves code. The grader reads this from the starting commit.
+source = "src/ledger/store.py"
+target = "src/ledger/serialization.py"
+tests = "tests"
+# The names the move relocates: characterization tests that reach for them break when it happens.
+moving = ["rows_to_text", "text_to_rows"]

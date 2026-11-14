@@ -1,0 +1,9 @@
+from ledger.store import rows_to_text, text_to_rows
+
+
+def test_rows_become_indented_json_text():
+    assert rows_to_text([{"day": "2026-01-02"}]) == '[\n  {\n    "day": "2026-01-02"\n  }\n]'
+
+
+def test_text_reads_back_to_rows():
+    assert text_to_rows('[{"day": "2026-01-02"}]') == [{"day": "2026-01-02"}]

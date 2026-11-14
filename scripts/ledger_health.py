@@ -100,6 +100,7 @@ from ledger_snapshot import (
     stamp_state,
     with_stamp,
 )
+from state_ledger_schema import normalize_location
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -290,6 +291,7 @@ def stamp_refusals(
     )
     return (
         rewrite
+        + _prior_key_refusals(rows[row_id], parsed, location)
         + _cell_refusals(base_notes, stamp, parsed)
         + _anchor_refusals(snapshot, snapshot.git, row_id, parsed)
     )
@@ -349,6 +351,19 @@ def _past_end(repo_root: Path, cite: str, path: str) -> str | None:
     length = len(shown.stdout.splitlines())
     last = int(found[2] or found[1])
     return None if last <= length else f"{cite} is past the end of {path} ({length} lines at HEAD)"
+
+
+def _prior_key_refusals(row: ActiveRow, stamp: TriageStamp, location: str | None) -> list[str]:
+    """A realign's `from <key>` is the row's base key before the write. A new location
+    that changes the normalized path set moves that key, so `from` is then required:
+    without it neither row of the pair would ever carry a duplicate signal."""
+    if stamp.outcome != "realigned" or stamp.prior_key == row.key.base:
+        return []
+    current = normalize_location(", ".join(ref.raw for ref in row.locations))
+    if stamp.prior_key is None and (location is None or normalize_location(location) == current):
+        return []
+    named = stamp.prior_key or "no key"
+    return [f"a realign must name `from {row.key.base}`, the row's base key, not {named}"]
 
 
 def _cell_refusals(notes: str, stamp: str, parsed: TriageStamp) -> list[str]:

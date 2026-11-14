@@ -433,10 +433,58 @@ def test_a_realign_premise_is_history_so_its_stale_anchors_are_not_resolved(
     """A realign keeps the premise it replaced: the path it quoted is gone by definition,
     and a dedup key in it is shaped like a sha. Only the stamp's own anchor must resolve."""
     repo_root = one_row_repo(tmp_path, "Premise.", ())
-    premise = "realigned from 37b588259209: cited scripts/old.py:4 under key 37b588259209"
+    key = _base_key(repo_root)
+    premise = f"realigned from {key}: cited scripts/old.py:4 under key {key}"
 
     assert _check(repo_root, "td-902", _stamp_at(_head_sha(repo_root), premise)) == (0, "ok\n")
     assert _check(repo_root, "td-902", _stamp_at("deadbeef1234", premise))[0] == 1
+
+
+def _base_key(repo_root: Path) -> str:
+    (row,) = [r for r in ledger_snapshot.gather(repo_root).active_rows if r.id == "td-902"]
+    return row.key.base
+
+
+def test_a_realign_that_moves_the_location_without_naming_the_prior_key_is_refused(
+    tmp_path: Path,
+) -> None:
+    """Without `from`, neither row of the pair would carry a duplicate signal afterwards."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/y.py",))
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the check moved to scripts/y.py")
+
+    code, out = _check(repo_root, "td-902", stamp, "--location", "scripts/y.py")
+
+    assert code == 1
+    assert _base_key(repo_root) in out
+
+
+def test_a_realign_that_moves_the_location_and_names_the_prior_key_is_accepted(
+    tmp_path: Path,
+) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/y.py",))
+    premise = f"realigned from {_base_key(repo_root)}: the check moved to scripts/y.py"
+
+    stamp = _stamp_at(_head_sha(repo_root), premise)
+
+    assert _check(repo_root, "td-902", stamp, "--location", "scripts/y.py") == (0, "ok\n")
+
+
+def test_a_realign_naming_a_key_other_than_the_rows_own_is_refused(tmp_path: Path) -> None:
+    repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/y.py",))
+    stamp = _stamp_at(_head_sha(repo_root), "realigned from 37b588259209: the check moved")
+
+    code, out = _check(repo_root, "td-902", stamp, "--location", "scripts/y.py")
+
+    assert code == 1
+    assert "37b588259209" in out
+
+
+def test_a_realign_that_only_restyles_the_location_needs_no_prior_key(tmp_path: Path) -> None:
+    """A line range or a different order leaves the base key where it was."""
+    repo_root = one_row_repo(tmp_path, "Premise.", ())
+    stamp = _stamp_at(_head_sha(repo_root), "realigned: the cite moved lines")
+
+    assert _check(repo_root, "td-902", stamp, "--location", "scripts/x.py:1") == (0, "ok\n")
 
 
 def test_a_discard_still_resolves_every_anchor_it_cites(tmp_path: Path) -> None:
@@ -453,7 +501,8 @@ def test_a_realign_onto_a_location_head_does_not_track_is_refused(tmp_path: Path
     """A mistyped new location is absent from every later anchor tree, so no run would ever
     flag it: the check is the only place it can be caught."""
     repo_root = one_row_repo(tmp_path, "Premise.", ("scripts/y.py",))
-    stamp = _stamp_at(_head_sha(repo_root), "realigned: the premise named scripts/x.py")
+    premise = f"realigned from {_base_key(repo_root)}: the premise named scripts/x.py"
+    stamp = _stamp_at(_head_sha(repo_root), premise)
 
     code, out = _check(repo_root, "td-902", stamp, "--location", "scripts/y.py, scripts/typo.py")
 

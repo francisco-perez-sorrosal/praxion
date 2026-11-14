@@ -44,7 +44,7 @@ from _loop_fields import (
     is_spent,
     request_cap,
 )
-from _plan_steps import Implementer, PlanStep
+from _plan_steps import CHANGE_TYPES, Implementer, PlanStep, UnreadableChangeType
 from _step_loop_review import (
     Accepted,
     Due,
@@ -336,12 +336,28 @@ def step_series(step: PlanStep, inputs: LoopInputs) -> Series:
         return HumanVerdict(
             "unknown", f"the step's Iterations: value cannot be read: {step.bound.text}"
         )
+    if isinstance(step.change_type, UnreadableChangeType):
+        return _unreadable_change_type(step.change_type)
     attempt, own = inputs.attempts.get(step.id), inputs.driver_records(step.id)
     if isinstance(attempt, OutstandingAttempt):
         return Running(attempt.count, attempt.request, _series_index(own, step.digest))
     if not own:
         return _without_driver_record(word, claimed, verdict)
     return _series_of_records(step, own, inputs.reviews.get(step.id))
+
+
+def _unreadable_change_type(reading: UnreadableChangeType) -> HumanVerdict:
+    """The stop for a change type the driver cannot read: the value, the legal ones, the line."""
+    fix = (
+        "in the step's block in IMPLEMENTATION_PLAN.md"
+        if reading.where == "step"
+        else "(the plan-level line, outside every step block) in IMPLEMENTATION_PLAN.md"
+    )
+    return HumanVerdict(
+        "unknown",
+        f"the {reading.where}'s Change type: value cannot be read: {reading.text}; "
+        f"legal values: {', '.join(CHANGE_TYPES)}; fix the Change type: line {fix}",
+    )
 
 
 def _without_driver_record(word: str | None, claimed: bool, verdict: Mapping[str, Any]) -> Series:

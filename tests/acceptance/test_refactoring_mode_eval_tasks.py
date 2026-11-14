@@ -35,12 +35,22 @@ def dry_run(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
 # -- Refactoring-mode tasks in the dry run ---------------------------------------------------------
 
 
-def test_a_dry_run_lists_refactoring_mode_tasks_delegated_with_the_marker(dry_run) -> None:
+def test_the_ordinary_dry_run_lists_no_refactoring_mode_task(dry_run) -> None:
     role, run = dry_run
 
     assert run.exit_code == 0, f"the dry run failed: {run.stderr[-2000:]}"
     marked = [s.task_id for s in run.sessions if s.role == role and rd.mentions_marker(s.prompt)]
-    assert marked, f"the {role} dry run lists no task delegated with {MARKER}"
+    assert marked == [], f"the {role} ordinary dry run gained refactoring-mode tasks: {marked}"
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_a_paired_move_dry_run_lists_at_least_two_marked_refactoring_tasks_of_the_role(
+    tmp_path: Path, role: str
+) -> None:
+    run = ev.dry_run_paired_move(role, tmp_path)
+
+    marked = {s.task_id for s in run.sessions if rd.mentions_marker(s.prompt)}
+    assert len(marked) >= 2, f"the paired dry run lists {len(marked)} marked {role} tasks"
 
 
 def test_a_dry_run_for_the_role_launches_no_session(dry_run) -> None:

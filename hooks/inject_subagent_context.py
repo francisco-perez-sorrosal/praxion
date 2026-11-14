@@ -18,6 +18,12 @@ updatedInput per spawn (dec-266, resolving td-049 and td-051):
      Detected by a conservative regex on the prompt text only -- no
      filesystem walk, no git call for this specific check.
 
+After the original prompt it appends at most one trailing segment, the skill
+delivery's (`_skill_delivery.deliver`): the refactoring skill's block for a
+marked implementer or test-engineer delegation, or a failure notice when the
+skill could not be delivered. The module is imported behind a guard, so a
+missing or broken delivery costs the trailing segment only.
+
 Previously this concern was split across two separate PreToolUse(Agent) hooks
 that could each emit updatedInput for the same spawn -- whether the harness
 chains multiple updatedInput emissions across matching hooks (vs. dropping
@@ -46,6 +52,7 @@ Synchronous hook. Exit 0 unconditionally — must never block subagent creation.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -58,11 +65,19 @@ from _hook_utils import is_disabled
 from _kernel_preamble import _PREAMBLE
 from _project_scope import Managed, scope_of
 
+_DELIVERY_IMPORT_ERROR = ""
+try:
+    import _skill_delivery as skill_delivery
+except Exception as error:  # fail-open: the leading segments never depend on the delivery
+    skill_delivery = None
+    _DELIVERY_IMPORT_ERROR = f"{type(error).__name__}: {error}"
+
 # -- Constants -----------------------------------------------------------------
 
 _DISABLE_PREAMBLE_FLAG = "PRAXION_DISABLE_SUBAGENT_INJECT"
 _INJECT_NATIVE_FLAG = "PRAXION_INJECT_NATIVE_SUBAGENTS"
 _DISABLE_WORKTREE_FLAG = "PRAXION_DISABLE_WORKTREE_PATH_BRIEFING"
+_PLUGIN_ROOT_VARIABLE = "CLAUDE_PLUGIN_ROOT"
 _SUBPROCESS_TIMEOUT_SECONDS = 3
 
 # `_PREAMBLE` (imported above) is generated into `_kernel_preamble.py` from the behavioral
@@ -212,6 +227,40 @@ def _worktree_segments(cwd: str, prompt: str) -> list[str]:
     return segments
 
 
+# -- Trailing segment: the skill delivery -----------------------------------------
+
+
+def _delivery_segments(payload: object) -> list[str]:
+    """Return 0-1 trailing segments: the skill block when served, the notice when failed.
+
+    `deliver` decides, reads and records, and never raises; anything else that fails here
+    costs this segment alone, never the leading ones.
+    """
+    plugin_root = os.environ.get(_PLUGIN_ROOT_VARIABLE, "")
+    if not plugin_root:
+        return []  # the harness always sets it for a plugin hook: no installation to read
+    if skill_delivery is None:
+        _say(f"skill delivery unavailable: {_DELIVERY_IMPORT_ERROR}")
+        return []
+    try:
+        outcome = skill_delivery.deliver(payload, Path(plugin_root), os.environ)
+        if isinstance(outcome, skill_delivery.Served):
+            return [outcome.block]
+        if isinstance(outcome, skill_delivery.Failed):
+            skill_file = skill_delivery.skill_dir(Path(plugin_root)) / skill_delivery.SKILL_FILE
+            return [skill_delivery.render_notice(outcome.reason, skill_file)]
+        return []
+    except Exception as error:
+        _say(f"skill delivery segment dropped: {type(error).__name__}: {error}")
+        return []
+
+
+def _say(line: str) -> None:
+    # stdout carries the one JSON object; a closed stderr must not cost the leading segments.
+    with contextlib.suppress(OSError, ValueError):
+        print(line, file=sys.stderr)
+
+
 # -- Emission ---------------------------------------------------------------------
 
 
@@ -252,11 +301,10 @@ def _emit_updated_input(
 def main() -> None:
     """Read stdin, apply skip gates, and inject composed segments when warranted."""
     try:
-        raw = sys.stdin.read()
-        payload = json.loads(raw)
+        payload = json.loads(sys.stdin.read())
     except Exception:
-        # Malformed or empty stdin — exit 0 silently
-        return
+        # Malformed or empty stdin: nothing to rewrite, but the delivery records the failure.
+        payload = None
 
     try:
         _process(payload)
@@ -265,13 +313,18 @@ def main() -> None:
         return
 
 
-def _process(payload: dict) -> None:
-    """Compose the preamble and worktree segments and emit updatedInput when
+def _process(payload: object) -> None:
+    """Compose the leading and trailing segments and emit updatedInput when
     at least one applies."""
+    if not isinstance(payload, dict):
+        _delivery_segments(payload)
+        return
     tool_name = payload.get("tool_name", "")
     if tool_name != "Agent":
         return
 
+    # Ahead of the shape check: a malformed tool_input is a recorded delivery failure.
+    trailing = _delivery_segments(payload)
     tool_input = payload.get("tool_input", {})
     if not isinstance(tool_input, dict):
         return
@@ -281,16 +334,16 @@ def _process(payload: dict) -> None:
     cwd = payload.get("cwd", "")
     session_id = payload.get("session_id", "")
 
-    segments: list[str] = []
+    leading: list[str] = []
     preamble = _preamble_segment(subagent_type, cwd, session_id)
     if preamble:
-        segments.append(preamble)
-    segments.extend(_worktree_segments(cwd, prompt))
+        leading.append(preamble)
+    leading.extend(_worktree_segments(cwd, prompt))
 
-    if not segments:
+    if not leading and not trailing:
         return
 
-    _emit_updated_input(tool_input, prompt, segments)
+    _emit_updated_input(tool_input, prompt, leading, trailing)
 
 
 if __name__ == "__main__":

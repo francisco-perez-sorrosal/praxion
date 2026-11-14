@@ -639,7 +639,12 @@ def _outcome(payload: Any, plugin_root: Path) -> Outcome:
     if isinstance(preload, Preloaded):
         return Skipped("preloaded")
     verdict = classify(delegation.agent_type, delegation.prompt, read_request, delegation.cwd)
-    return decide(verdict, preload, (plugin_root / SKILLS_DIR / REFACTORING_SKILL).resolve())
+    return decide(verdict, preload, skill_dir(plugin_root))
+
+
+def skill_dir(plugin_root: Path) -> Path:
+    """The installed skill's real directory: the block's base directory and the notice's pointer."""
+    return (plugin_root / SKILLS_DIR / REFACTORING_SKILL).resolve()
 
 
 def _delegation(payload: Any) -> Optional[_Delegation]:  # noqa: UP045

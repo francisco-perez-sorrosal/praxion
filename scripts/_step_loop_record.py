@@ -526,7 +526,8 @@ def commit_attempt(
     sha = head_commit_for(task.repo, asked.key.id)
     if sha is not None:
         return Committing(sha, None)
-    message = commit_message(step, task.slug, asked, deciding)
+    earlier_kept = any(r.commit for r in task.inputs.driver_records(step.id))
+    message = commit_message(step, task.slug, asked, deciding, earlier_kept)
     read_only = tuple(entry for s in task.inputs.steps for entry in s.read_only)
     try:
         outcome = commit_paths(task.repo, step.files, message, read_only)

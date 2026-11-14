@@ -26,6 +26,8 @@ from _step_loop_io import (  # noqa: E402
     TreeSnapshot,
 )
 from _step_loop_render import RequestKey, spawn_request  # noqa: E402
+from _step_loop_state import LoopInputs  # noqa: E402
+from iteration_ledger import IterationRecord  # noqa: E402
 
 STEP = "Step "
 SLUG = "demo"
@@ -97,14 +99,68 @@ def test_a_commit_that_could_not_run_leaves_a_snapshot_naming_why_and_no_sha(
         raise error
 
     monkeypatch.setattr(rec, "commit_paths", raising)
-    task = SimpleNamespace(dir=repo, repo=repo, slug=SLUG, inputs=SimpleNamespace(steps=()))
     step = parse_plan_steps(PLAN)[0]
+    task = SimpleNamespace(
+        dir=repo, repo=repo, slug=SLUG, inputs=LoopInputs.read((step,), {}, (), ())
+    )
     asked = spawn_request(SLUG, step, RequestKey("1", 2, "implement", 1), ATTEMPT_CAP, str(repo))
 
     taken = rec.commit_attempt(task, step, asked, GREEN_LINE)
 
     saved = (repo / "TREE_SNAPSHOT_s1-a2-implement.patch").read_text()
     assert (taken.sha, taken.failure in saved, str(error) in saved) == (None, True, True)
+
+
+TYPED_PLAN = PLAN + "**Change type**: feat\n"
+KEPT_SHA = "c" * 40
+
+
+def kept_record(commit, kind="implement", attempt=1):
+    return IterationRecord(
+        step=f"{STEP}1",
+        attempt=attempt,
+        agent_id=f"agent-{attempt}",
+        verdict="verified",
+        decided_by="check",
+        test_result=GREEN_LINE,
+        commit=commit,
+        stop_reason="completed",
+        request=f"s1-a{attempt}-{kind}" + ("-r1" if kind != "implement" else ""),
+        step_digest=parse_plan_steps(TYPED_PLAN)[0].digest,
+    )
+
+
+def subject_committed(repo, monkeypatch, records):
+    """The subject `commit_attempt` hands to git for step 1's next attempt, given its ledger."""
+    sent = []
+
+    def capturing(_repo, _paths, message, _read_only):
+        sent.append(message)
+        return NothingToCommit(())
+
+    monkeypatch.setattr(rec, "commit_paths", capturing)
+    step = parse_plan_steps(TYPED_PLAN)[0]
+    inputs = LoopInputs.read((step,), {}, records, ())
+    task = SimpleNamespace(dir=repo, repo=repo, slug=SLUG, inputs=inputs)
+    asked = spawn_request(SLUG, step, RequestKey("1", 2, "implement", 1), ATTEMPT_CAP, str(repo))
+    rec.commit_attempt(task, step, asked, GREEN_LINE)
+    return sent[0].splitlines()[0]
+
+
+@pytest.mark.parametrize(
+    ("records", "subject"),
+    [
+        ((), "feat: Do it"),
+        ((kept_record(None, attempt=1),), "feat: Do it"),
+        ((kept_record(KEPT_SHA, attempt=1),), "Do it"),
+        ((kept_record(None, attempt=1), kept_record(KEPT_SHA, "revise", 1)), "Do it"),
+    ],
+    ids=["no-record", "earlier-kept-nothing", "earlier-kept-a-commit", "earlier-revision-kept"],
+)
+def test_only_the_first_commit_the_driver_keeps_for_a_step_is_typed(
+    repo, monkeypatch, records, subject
+):
+    assert subject_committed(repo, monkeypatch, records) == subject
 
 
 def git(repo, *args):

@@ -703,12 +703,14 @@ def test_a_stop_renders_the_same_bytes_every_time():
     ("title", "subject"),
     [
         ("Add the widget", "Add the widget"),
-        ("[Phase: Refactoring] Add the widget", "Add the widget"),
+        ("[Phase: Refactoring] Add the widget", "refactor: Add the widget"),
         ("Add the widget [Architecture]", "Add the widget"),
         ("Add the render module: ids and prompts", "Add the render module: ids and prompts"),
     ],
 )
-def test_the_subject_is_the_step_title_without_bracketed_tags_or_a_type_prefix(title, subject):
+def test_the_subject_is_the_step_title_without_bracketed_tags_and_a_refactoring_tag_types_it(
+    title, subject
+):
     step = make_step(title=title)
     message = commit_message(step, SLUG, request_for(step), "Result: pass=5 fail=0")
     assert message.splitlines()[0] == subject
@@ -718,7 +720,7 @@ def test_the_body_names_the_step_the_task_the_attempt_the_driver_and_the_decidin
     result = "Result: pass=5 fail=0 skip=0 by=step-loop"
     message = commit_message(STEP_SEVEN, SLUG, request_for(attempt=2), result)
     assert message.splitlines() == [
-        "Add the widget",
+        "refactor: Add the widget",
         "",
         f"{STEP}7 of {SLUG}, attempt 2: verified by the step-loop driver.",
         result,

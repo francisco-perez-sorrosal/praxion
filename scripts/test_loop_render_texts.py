@@ -97,6 +97,79 @@ def test_an_ordinary_steps_message_keeps_its_form():
     ]
 
 
+def typed_step(change_type="feat", title="Make every widget test pass"):
+    plan = (
+        plan_text()
+        .replace(ITERATIONS_LINE, "")
+        .replace(
+            "**Assignee**: implementer\n",
+            f"**Assignee**: implementer\n**Change type**: {change_type}\n",
+        )
+    )
+    return step_of(
+        plan.replace("Make every widget test pass\n\n**Assignee", f"{title}\n\n**Assignee")
+    )
+
+
+def test_the_first_kept_commit_of_a_typed_step_has_a_typed_subject():
+    step = typed_step("fix")
+
+    message = commit_message(step, SLUG, request_for(step, attempt=2), RESULT)
+
+    assert message.splitlines() == [
+        "fix: Make every widget test pass",
+        "",
+        f"{STEP_LABEL} of {SLUG}, attempt 2: {ORDINARY_SENTENCE}",
+        RESULT,
+        "",
+        "Step-Loop-Request: s1-a2-implement",
+    ]
+
+
+def test_a_typed_subject_drops_the_bracket_tags_before_the_type():
+    step = typed_step(
+        "refactor", title="[Phase: Refactoring] Extract the parser [parallel-group: A]"
+    )
+
+    message = commit_message(step, SLUG, request_for(step), RESULT)
+
+    assert message.splitlines()[0] == "refactor: Extract the parser"
+
+
+def test_a_later_kept_commit_of_the_same_step_keeps_the_bare_subject():
+    step = typed_step("feat")
+
+    message = commit_message(step, SLUG, request_for(step), RESULT, earlier_kept=True)
+
+    assert message.splitlines()[0] == "Make every widget test pass"
+
+
+def test_the_first_kept_iteration_of_a_typed_goal_step_has_a_typed_subject():
+    step = step_of(plan_text().replace("**Iterations**", "**Change type**: feat\n**Iterations**"))
+
+    message = commit_message(step, SLUG, request_for(step, attempt=3), RESULT)
+
+    assert message.splitlines()[0] == "feat: Make every widget test pass"
+
+
+def test_a_step_that_declares_no_type_has_the_same_message_whether_or_not_one_was_kept():
+    step = ordinary_step()
+
+    first = commit_message(step, SLUG, request_for(step), RESULT)
+    later = commit_message(step, SLUG, request_for(step), RESULT, earlier_kept=True)
+
+    assert first == later
+    assert first.splitlines()[0] == "Make every widget test pass"
+
+
+def test_an_unreadable_type_never_reaches_a_subject():
+    step = typed_step("feature")
+
+    message = commit_message(step, SLUG, request_for(step), RESULT)
+
+    assert message.splitlines()[0] == "Make every widget test pass"
+
+
 def test_the_conflict_remedy_names_recording_the_return_before_the_files_line():
     remedy = conflict_remedy()
 

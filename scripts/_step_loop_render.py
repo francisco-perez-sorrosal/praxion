@@ -21,7 +21,7 @@ from typing import Literal, NamedTuple, cast, get_args
 
 from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
-from _plan_steps import PlanStep, Routing
+from _plan_steps import CHANGE_TYPES, PlanStep, Routing
 from _step_loop_gate import GateEvidence
 from _step_schema import STEP_ID_RE
 
@@ -461,12 +461,25 @@ _KEPT_AS_PROGRESS = "kept by the step-loop driver as progress toward the goal."
 _KEPT_AS_VERIFIED = "verified by the step-loop driver."
 
 
-def commit_message(step: PlanStep, slug: str, request: SpawnRequest, result_line: str) -> str:
-    """The message of a kept step's commit: subject, one sentence, deciding line, trailer."""
+def commit_message(
+    step: PlanStep,
+    slug: str,
+    request: SpawnRequest,
+    result_line: str,
+    earlier_kept: bool = False,
+) -> str:
+    """The message of a kept step's commit: subject, one sentence, deciding line, trailer.
+
+    The first commit kept for a step whose plan declares a readable change type has the subject
+    `<type>: <title>`, so a changelog built from typed subjects lists the step once; any later
+    commit of the step (`earlier_kept`), and every commit of a step with no readable type, keeps
+    the bare title."""
     key = request.key
     if key.kind == "review" or "\n" in result_line:
         raise ValueError("a commit follows an implement or revise request and one Result: line")
     subject = " ".join(re.sub(r"\[[^\]]*\]", " ", step.title).split()) or f"Step {step.id}"
+    if step.change_type in CHANGE_TYPES and not earlier_kept:
+        subject = f"{step.change_type}: {subject}"
     turn = f"attempt {key.attempt}" if key.kind == "implement" else f"review revision {key.round}"
     kept = _KEPT_AS_VERIFIED
     if isinstance(step.bound, GoalBudget):

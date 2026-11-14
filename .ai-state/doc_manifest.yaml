@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-13T08:23:34Z'
+generated_at: '2026-11-14T02:06:36Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-12'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -150,7 +150,7 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-10-11'
+  last_modified: '2026-11-12'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -511,7 +511,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-11-07'
+  last_modified: '2026-11-12'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -568,7 +568,7 @@ surfaces:
   path: docs/observability.md
   type: markdown
   title: Observability
-  last_modified: '2026-09-26'
+  last_modified: '2026-11-12'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -597,7 +597,7 @@ surfaces:
   path: docs/rework-dispatch.md
   type: markdown
   title: Dispatching Reworks
-  last_modified: '2026-10-10'
+  last_modified: '2026-11-12'
   renderer: default_markdown
   surfaces_referenced:
   - claude
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-13'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-13'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -676,13 +676,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-13'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-13'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3771,11 +3771,17 @@ surfaces:
   title: Small debt is fixed after the feature through a follow-up record the cleanup gate blocks on
   last_modified: '2026-11-13'
   renderer: adr_card
+- id: ai-state-decisions-512-memory-index-budget
+  path: .ai-state/decisions/512-memory-index-budget.md
+  type: markdown
+  title: 'Memory index budget: one declared ceiling owned by the audit'
+  last_modified: '2026-11-13'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-13'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4133,7 +4139,7 @@ surfaces:
   path: .ai-state/specs/SPEC_process-principles_2026-11-12.md
   type: markdown
   title: 'Spec: process-principles (a ninth principle, and small debt fixed after the feature instead of filed)'
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-13'
   renderer: default_markdown
 - id: ai-state-specs-spec-production-gate-cohort-2026-06-26
   path: .ai-state/specs/SPEC_production-gate-cohort_2026-06-26.md
@@ -4766,6 +4772,7 @@ groups:
   - ai-state-decisions-509-loop-budget-counts-the-review-cycle
   - ai-state-decisions-510-generated-principle-names-and-prior-art-module
   - ai-state-decisions-511-small-debt-follow-up-record
+  - ai-state-decisions-512-memory-index-budget
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

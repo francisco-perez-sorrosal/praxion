@@ -1,7 +1,8 @@
 ---
-id: dec-draft-5a8b73b0
+id: dec-512
+draft_id: dec-draft-5a8b73b0
 title: "Memory index budget: one declared ceiling owned by the audit"
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-12
 summary: "The memory index audit and its write-time guard warn above 5,000 bytes or 40 lines, one value owned by the audit module, replacing the four-fifths-of-load-limit warning"

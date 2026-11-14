@@ -188,6 +188,8 @@ Only proceed with commit after explicit approval.
 ```markdown
 # Plan: [Feature Name]
 
+**Change type**: [feat, fix, refactor, perf, docs, test or chore]
+
 ## Goal
 
 [One sentence describing the outcome]
@@ -223,6 +225,8 @@ Only proceed with commit after explicit approval.
 **`Tests:` field** (optional, override-only): canonical schema in [`document-templates.md`](references/document-templates.md). Absence means the implementer derives the selection from the step's changed files.
 
 **`Check:` field** (implementer steps only): canonical paragraph in [`document-templates.md`](references/document-templates.md).
+
+**`Change type:` line** (one per plan, under its title; a step may carry its own): canonical paragraph in [`document-templates.md`](references/document-templates.md).
 
 **Acceptance criteria source**: In the agent pipeline, copy criteria verbatim from `SYSTEMS_PLAN.md` — the architect's criteria are authoritative and drive test design downstream. In manual planning (no `SYSTEMS_PLAN.md`), define criteria directly in the plan as concrete, testable conditions for "done."
 

@@ -35,7 +35,7 @@ This is the **authoritative source of truth** for per-agent delegation deliverab
 - "Write the step's unit and internal-integration tests; run the outer-loop tests named in its `**Read-only**:` field and edit none — on a mismatch with the spec, stop `[BLOCKED]` with a Spec Question; a `contract:` entry there is used as pinned, never edited"
 - Size the prompt at two steps or fewer and forbid exploratory reads beyond the named files: a step of typical size (edit, scoped tests, registration) costs 30–45 turns, so derive the spawn count in a plan from steps ÷ 2, not from role count
 - Order the work author → mechanical registration → ONE targeted test run → report, so a turn-cap stop leaves a committable state; on a cap stop re-derive completion from git and the working tree before resuming or re-spawning
-- For a tagged step (its heading carries `[Phase: Refactoring]`), put the step's heading verbatim in the prompt's own words, outside code spans, fenced blocks and quotes: that marker is what delivers the refactoring skill to the implementer or the test-engineer
+- For a tagged step (its heading carries `[Phase: Refactoring]`), put the step's heading verbatim in the prompt's own words, outside code spans, fenced blocks and quotes: the delivery of the refactoring skill to the implementer or the test-engineer keys on that marker
 
 **test-engineer** — always include in prompt:
 - Paired mode (optional test step or driver-binding step): "Execute step N from `WIP.md` at `.ai-work/<task-slug>/`; design tests from the acceptance criteria in `SYSTEMS_PLAN.md`; report RED; a driver-binding step edits driver files only"

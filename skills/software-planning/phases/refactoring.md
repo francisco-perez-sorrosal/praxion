@@ -18,7 +18,7 @@ If none of these signals are present, skip the refactoring phase and proceed dir
 
 A refactoring phase is a **group of consecutive plan steps** marked with `[Phase: Refactoring]`. Each step within the phase follows the refactoring skill's safe refactoring workflow (green bar → small change → run tests → commit).
 
-Keep the tag verbatim in each step's heading: the heading is what a delegation carries, and the tag in it is what delivers the refactoring skill.
+Keep the tag verbatim in each step's heading: the heading is what a delegation carries, and the delivery of the refactoring skill keys on the tag in it.
 
 ```markdown
 ## Steps

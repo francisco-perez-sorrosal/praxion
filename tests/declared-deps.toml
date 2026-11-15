@@ -838,6 +838,11 @@ tests = ["scripts/test_export_codex_rules_bridge.py"]
 why = "the codex rules-bridge exporter test loads the exporter by path, and the exporter reads the hook sources"
 
 [[dep]]
+paths = ["hooks/*.py"]
+tests = ["hooks/test_observation_log_writer_truth.py"]
+why = "the writer-truth guard finds every hook module that imports the observation-log writer by scanning the hook sources, so a module that starts importing the writer changes the guard's result without any import edge from the guard to it"
+
+[[dep]]
 paths = ["**"]
 tests = [
   "scripts/test_check_behavioral_contract.py",

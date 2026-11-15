@@ -77,6 +77,10 @@ tmp/
 # User-specific local settings
 **/.claude/settings.local.json
 
+# Personal, uncommitted project instructions (Claude Code loads the file at
+# launch beside CLAUDE.md). It exists only in the checkout it was written in.
+CLAUDE.local.md
+
 # Environment files (secrets)
 .env
 .env.*

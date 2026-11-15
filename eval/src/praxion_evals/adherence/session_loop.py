@@ -45,6 +45,7 @@ from praxion_evals.adherence.axis import (
     arm_on,
     check_axis_arm,
 )
+from praxion_evals.adherence.axis_runs import axis_run
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
 from praxion_evals.adherence.infra_stop import (
@@ -252,6 +253,7 @@ def _launch_of(context: Context) -> Launch:
         tail_chars=config.tail_chars,
         token_file=config.session_oauth_token_file,
         ambient=ambient,
+        axis_run=axis_run(config.axis),
     )
 
 
@@ -377,10 +379,7 @@ def _provisional(
         **(continuation.extra(run_id) if continuation else {}),
     }
     run = results.RunInfo(run_id, config.model, version, False, (), {}, extra)
-    catalog = {
-        role: tuple(results.catalog_entry(check) for check in check_catalog(role))
-        for role in config.roles
-    }
+    catalog = {role: axis_run(config.axis).catalog(role) for role in config.roles}
     provisional = results.RunResults(run, settings, started.isoformat(), catalog, {}, (), None)
     return _with_earlier_runs(provisional, output, checkout.path)
 
@@ -521,13 +520,14 @@ def _measure_role(
     context: Context, state: RunState, role: Role, role_tasks: list[TaskSpec]
 ) -> RunState:
     config, role_dir = context.config, context.run_root / role
+    record = axis_run(config.axis)
     try:
         original = materialize_path(context.checkout.path, role_dir / "original")
     except Exception as error:  # a checkout that cannot be copied leaves every arm unbuilt
         unbuilt = NotBuilt(f"the checkout could not be copied: {type(error).__name__}: {error}")
         return _record_arms(context, state, role, {}, dict.fromkeys(config.arms, unbuilt))
     copies: dict[Arm, ArmBuild | NotBuilt] = {
-        arm: build_copy(role_dir, original, role, arm) for arm in config.arms
+        arm: build_copy(role_dir, original, role, arm, record=record) for arm in config.arms
     }
     builds: Builds = {(a, None): c for a, c in copies.items() if isinstance(c, ArmBuild)}
     verdicts: dict[Arm, arms.ArmVerdict] = {
@@ -540,7 +540,7 @@ def _measure_role(
     proven: list[Arm] = [a for a, v in verdicts.items() if isinstance(v, arms.ArmProven)]
     for arm in proven:
         for cap in caps:  # the early-stop twins of a proven arm; a twin that fails demotes the arm
-            twin = build_copy(role_dir, original, role, arm, cap)
+            twin = build_copy(role_dir, original, role, arm, cap, record)
             if isinstance(twin, NotBuilt):
                 verdicts[arm] = twin
             else:

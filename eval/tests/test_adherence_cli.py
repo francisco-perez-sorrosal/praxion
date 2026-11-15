@@ -11,18 +11,19 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from praxion_evals.adherence import (
-    arms,
     cli,
     managed_fixture,
     model,
     session_arms,
     tasks,
 )
+from praxion_evals.adherence.axis_runs import DEFAULT_RUN
 from praxion_evals.adherence.dry_run import planned_copy
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS
 from praxion_evals.live.report import CREDENTIAL_KEYS
@@ -186,14 +187,21 @@ def test_a_dry_run_shows_a_confined_kits_confinement_places_and_program_order(ca
 @pytest.mark.parametrize("arm", ["full", "lean"])
 @pytest.mark.parametrize("variant", ["injection", "early-stop"])
 def test_the_dry_run_names_the_plugin_copy_a_real_run_builds(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, arm: model.Arm, variant: str
+    tmp_path: Path, arm: model.Arm, variant: str
 ) -> None:
     built: list[Path] = []
-    monkeypatch.setattr(arms, "build_arm", lambda original, dest, *_, **__: built.append(dest))
+    record = replace(DEFAULT_RUN, build=lambda original, dest, *_, **__: built.append(dest))
     every_task = tasks.generate(ROLE, cli.DEFAULT_SEED, tasks.producible_task_count(ROLE, 7))
     task = next(t for t in every_task if t.task_id.endswith(f".{variant}"))
 
-    session_arms.build_copy(tmp_path / task.role, None, task.role, arm, tasks.turn_cap_of(task))
+    session_arms.build_copy(
+        tmp_path / task.role,
+        None,
+        task.role,
+        arm,
+        tasks.turn_cap_of(task),
+        record,  # type: ignore[arg-type]
+    )
 
     assert planned_copy(tmp_path, task, arm) == built[0]
 

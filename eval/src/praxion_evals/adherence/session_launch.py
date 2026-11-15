@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from praxion_evals.adherence import grade, managed_fixture, tasks
-from praxion_evals.adherence.catalog import check_catalog
+from praxion_evals.adherence.axis_runs import DEFAULT_RUN, AxisRun
 from praxion_evals.adherence.confinement import (
     Confinement,
     Operator,
@@ -89,6 +89,7 @@ class Launch:
     real_home: Path = REAL_HOME
     token_file: Path | None = None
     ambient: Mapping[str, str] = field(default_factory=lambda: os.environ)
+    axis_run: AxisRun = DEFAULT_RUN  # what differs between axes: staging, grading
 
 
 # --- one task session ---
@@ -123,7 +124,9 @@ def task_session(
         build,
         populate,
         page_url,
-        lambda evidence: _grade(launch, evidence, task, setup),
+        lambda evidence: launch.axis_run.assess(
+            evidence, task, setup, launch.judge, launch.real_home
+        ),
     )
     status: SessionStatus = done.result
     if isinstance(status, Errored):
@@ -135,18 +138,6 @@ def task_session(
         f"{task.role} {slot} {task.task_id}: {type(status).__name__}", file=sys.stderr, flush=True
     )
     return ledger, record, done.model
-
-
-def _grade(
-    launch: Launch, evidence: SessionEvidence, task: TaskSpec, setup: SessionSetup
-) -> SessionStatus:
-    """C3 is named only for a task that planted a gap or a conflict: without one it passes vacuously."""
-    names = [
-        check.name
-        for check in check_catalog(task.role)
-        if not (check.name == "C3" and isinstance(task.variant, EarlyStop))
-    ]
-    return grade.grade(evidence, names, launch.judge, setup, real_home=launch.real_home)
 
 
 def injection_of(task: TaskSpec) -> tasks.Injection | None:
@@ -300,7 +291,7 @@ def _prepare(
     """
     sandbox = SandboxPaths(root)
     populate(root)
-    commit = tasks.build_scratch_repo(task, tasks.scratch_dir(sandbox), page_url)
+    commit = launch.axis_run.stage(task, tasks.scratch_dir(sandbox), page_url)
     # marked after the fixture commit, so the marker is no part of what the session authors
     managed_fixture.mark_managed(tasks.scratch_dir(sandbox))
     confinement = session_confinement(

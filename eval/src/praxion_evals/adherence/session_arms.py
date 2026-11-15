@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from praxion_evals.adherence import arms
+from praxion_evals.adherence.axis_runs import DEFAULT_RUN, AxisRun
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
@@ -32,11 +33,16 @@ Builds = dict[tuple[Arm, int | None], ArmBuild]  # (the arm whose copy, its earl
 
 
 def build_copy(
-    role_dir: Path, original: Materialization, role: Role, arm: Arm, cap: int | None = None
+    role_dir: Path,
+    original: Materialization,
+    role: Role,
+    arm: Arm,
+    cap: int | None = None,
+    record: AxisRun = DEFAULT_RUN,
 ) -> ArmBuild | NotBuilt:
     try:
-        return arms.build_arm(
-            original, role_dir / (f"{arm}-cap{cap}" if cap else arm), role, arm, turn_cap=cap
+        return record.build(
+            original, role_dir / (f"{arm}-cap{cap}" if cap else arm), role, arm, cap
         )
     except (arms.ArmCopyError, OSError) as error:
         return NotBuilt(f"the {arm} copy could not be built: {error}")
@@ -83,9 +89,10 @@ def prove(
     first_task: TaskSpec,
 ) -> ProofRun:
     """One proof session per built arm, all under one planted nonce, then one decision."""
+    proof = launch.axis_run.proof
     template = launch.run_root / role / "proof-home"
-    nonce = arms.prepare_proof_home(original, template)
-    proof_task = replace(first_task, variant=Standard(), main_prompt=arms.proof_prompt())
+    nonce = proof.prepare(original, template)
+    proof_task = replace(first_task, variant=Standard(), main_prompt=proof.prompt)
 
     def copy_home(root: Path) -> None:
         shutil.copytree(template, root, symlinks=True, dirs_exist_ok=True)
@@ -102,7 +109,7 @@ def prove(
             build,
             copy_home,
             None,
-            lambda evidence: arms.observe_proof(evidence, REAL_HOME),
+            lambda evidence: proof.observe(evidence, REAL_HOME),
         )
         models.append(done.model)
         match done.result:
@@ -115,5 +122,5 @@ def prove(
                 verdicts[arm] = unobserved
             case arms.ProofObservation() as seen:
                 observed[arm] = seen
-    verdicts = {**verdicts, **arms.decide_proof(nonce, observed)}
+    verdicts = {**verdicts, **proof.decide(nonce, observed)}
     return ProofRun(ledger, verdicts, tuple(models), tuple(refusals))

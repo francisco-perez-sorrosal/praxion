@@ -86,7 +86,7 @@ def test_the_default_assessment_names_c3_only_for_a_task_that_can_plant_a_gap(mo
     assert "C3" not in named[1]
 
 
-def test_the_new_axis_differs_from_the_default_in_its_name_and_positions_only():
+def test_the_new_axis_differs_from_the_default_in_its_name_positions_plan_and_refusals_only():
     other = axis_runs.axis_run("refactoring-delivery")
 
     changed = {
@@ -95,7 +95,7 @@ def test_the_new_axis_differs_from_the_default_in_its_name_and_positions_only():
         if getattr(other, field.name) != getattr(DEFAULT, field.name)
     }
 
-    assert changed == {"axis", "positions"}
+    assert changed == {"axis", "positions", "plan", "refusals"}
     assert other.positions == axis.POSITIONS["refactoring-delivery"]
 
 

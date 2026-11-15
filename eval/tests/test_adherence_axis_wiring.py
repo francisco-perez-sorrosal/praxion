@@ -115,10 +115,13 @@ def test_the_loop_launches_with_the_record_of_the_runs_axis(tmp_path):
 
 def test_a_session_is_staged_by_the_records_stage_in_its_scratch_directory(tmp_path):
     calls: Calls = []
-    record = replace(
-        _record(calls), stage=lambda task, dest, url: calls.append(("stage", (task, dest, url)))
-        or dest.mkdir(parents=True) or STARTING_COMMIT,
-    )  # fmt: skip
+
+    def stage(task, dest, url):
+        calls.append(("stage", (task, dest, url)))
+        dest.mkdir(parents=True)
+        return STARTING_COMMIT
+
+    record = replace(_record(calls), stage=stage)
     task, sandbox = _task(), tmp_path / "sandbox"
 
     _, commit, _ = session_launch._prepare(
@@ -274,4 +277,6 @@ def test_the_plan_is_made_by_the_records_plan(monkeypatch):
     planned = cli.plan_tasks(config)
 
     assert planned == {ROLE: []}
-    assert _called(calls, "plan") == [(ROLE, config.seed, tasks.SMOKE_TASKS)]
+    assert _called(calls, "plan") == [
+        (ROLE, config.seed, config.required_pairs + config.pair_slack)
+    ]

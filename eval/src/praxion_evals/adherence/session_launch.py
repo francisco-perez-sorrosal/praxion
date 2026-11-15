@@ -89,7 +89,7 @@ class Launch:
     real_home: Path = REAL_HOME
     token_file: Path | None = None
     ambient: Mapping[str, str] = field(default_factory=lambda: os.environ)
-    axis_run: AxisRun = DEFAULT_RUN  # what differs between axes: staging, grading
+    axis_run: AxisRun = DEFAULT_RUN  # what differs between axes: staging, grading, the proof
 
 
 # --- one task session ---

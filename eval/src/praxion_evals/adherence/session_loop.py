@@ -379,7 +379,8 @@ def _provisional(
         **(continuation.extra(run_id) if continuation else {}),
     }
     run = results.RunInfo(run_id, config.model, version, False, (), {}, extra)
-    catalog = {role: axis_run(config.axis).catalog(role) for role in config.roles}
+    record = axis_run(config.axis)
+    catalog = {role: record.catalog(role) for role in config.roles}
     provisional = results.RunResults(run, settings, started.isoformat(), catalog, {}, (), None)
     return _with_earlier_runs(provisional, output, checkout.path)
 
@@ -520,7 +521,8 @@ def _measure_role(
     context: Context, state: RunState, role: Role, role_tasks: list[TaskSpec]
 ) -> RunState:
     config, role_dir = context.config, context.run_root / role
-    record = axis_run(config.axis)
+    launch = _launch_of(context)
+    record = launch.axis_run
     try:
         original = materialize_path(context.checkout.path, role_dir / "original")
     except Exception as error:  # a checkout that cannot be copied leaves every arm unbuilt
@@ -533,7 +535,7 @@ def _measure_role(
     verdicts: dict[Arm, arms.ArmVerdict] = {
         a: c for a, c in copies.items() if isinstance(c, NotBuilt)
     }
-    proof = prove(_launch_of(context), state.ledger, role, original, builds, role_tasks[0])
+    proof = prove(launch, state.ledger, role, original, builds, role_tasks[0])
     state = _fold_proof(state, proof)
     verdicts.update(proof.verdicts)
     caps = sorted({cap for t in role_tasks if (cap := tasks.turn_cap_of(t)) is not None})

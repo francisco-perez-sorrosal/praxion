@@ -38,6 +38,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, assert_never, get_args
 
+from praxion_evals.adherence.axis import SESSION_ARMS
 from praxion_evals.adherence.infra_stop import (
     Failure,
     FoldState,
@@ -224,7 +225,7 @@ def _stop_from_json(data: _Json) -> StopReason:
         kind=_field(data, "error_kind", what),
         masked_tail=_field(data, "masked_tail", what),
         role=_choice(_field(data, "role", what), ROLES, "role"),
-        arm=_choice(_field(data, "arm", what), ARMS, "arm"),
+        arm=_choice(_field(data, "arm", what), SESSION_ARMS, "arm"),
         sessions=tuple(_launched_from_json(s) for s in _field(data, "sessions", what)),
         scope=_choice(_field(data, "scope", what), _SCOPES, "scope"),
     )
@@ -234,7 +235,7 @@ def _launched_from_json(data: _Json) -> Launched:
     what = "a session of a stop"
     return Launched(
         task_id=_field(data, "task_id", what),
-        arm=_choice(_field(data, "arm", what), ARMS, "arm"),
+        arm=_choice(_field(data, "arm", what), SESSION_ARMS, "arm"),
         attempt=int(_field(data, "attempt", what)),
     )
 
@@ -386,7 +387,7 @@ def relaunch_tasks(
 
 def _unfinished(latest: Mapping[str, SessionStatus]) -> bool:
     """``latest`` is a task's last status per arm: unfinished when every one was measured and
-    they do not make a pair."""
+    they do not make a pair (a pair of the default axis: another axis's run is never continued)."""
     measured = all(isinstance(status, Measured) for status in latest.values())
     return measured and set(latest) != set(ARMS)
 

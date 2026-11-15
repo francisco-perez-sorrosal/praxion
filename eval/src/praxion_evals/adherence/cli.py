@@ -469,6 +469,11 @@ def _begin_continuation(
     tip, files, parts = _read_tip(session_loop.results_dir(config), run_id, repo)
     if isinstance(tip, UnreadableTip):
         raise _refused(run_id, continuation_refusals(tip, identity_now(config, {}, repo), ()))
+    if (axis := results.run_axis(tip.results.run)) != DEFAULT_AXIS:
+        raise ValueError(
+            f"run {run_id} cannot be continued: a run of the {axis} axis is not continued;"
+            f" close it (--close {run_id} --reason TEXT) and start a fresh run"
+        )
     declared = _with_recorded_limits(recorded_config(config, parts[0]), given, tip.results)
     planned = _replanned(declared, parts[0])
     now = identity_now(declared, planned, repo)

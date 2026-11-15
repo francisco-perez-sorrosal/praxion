@@ -34,7 +34,8 @@ from dataclasses import dataclass
 from itertools import takewhile
 from typing import Literal
 
-from praxion_evals.adherence.model import Arm, Errored, Role, SessionRecord
+from praxion_evals.adherence.axis import SessionArm
+from praxion_evals.adherence.model import Errored, Role, SessionRecord
 
 # ---------------------------------------------------------------------------
 # The declared rule
@@ -178,7 +179,7 @@ class Launched:
     its retry attempt 2."""
 
     task_id: str
-    arm: Arm
+    arm: SessionArm
     attempt: int
 
 
@@ -215,7 +216,7 @@ class StopReason:
     kind: str
     masked_tail: str
     role: Role
-    arm: Arm
+    arm: SessionArm
     sessions: tuple[Launched, ...]
     scope: Scope
 
@@ -307,7 +308,7 @@ def _failure(rule: StopRule, record: SessionRecord, tails: EvidenceTail | None) 
 
 
 def _streak(
-    state: FoldState, role: Role, arm: Arm, failure: Failure
+    state: FoldState, role: Role, arm: SessionArm, failure: Failure
 ) -> tuple[tuple[int, Seen], ...]:
     """The trailing run of ``failure`` among ``arm``'s sessions, as (position, session)."""
     mine = [(i, s) for i, s in enumerate(state.seen) if s.role == role and s.session.arm == arm]
@@ -321,7 +322,11 @@ def trailing_streak(failures: Sequence[Failure | None], failure: Failure) -> int
 
 
 def _stop_reason(
-    state: FoldState, role: Role, arm: Arm, failure: Failure, streak: tuple[tuple[int, Seen], ...]
+    state: FoldState,
+    role: Role,
+    arm: SessionArm,
+    failure: Failure,
+    streak: tuple[tuple[int, Seen], ...],
 ) -> StopReason:
     first, last = streak[0][0], streak[-1][0]
     other_arm_failed_alike = any(

@@ -741,6 +741,7 @@ def _role_standing_from_json(role: str, entry: Mapping[str, Any]) -> RoleStandin
 
 
 def _run_from_json(run: Mapping[str, Any]) -> RunInfo:
+    _require(isinstance(run, Mapping), "the run is a JSON object")
     known = ("id", "model", "claude_code_version", "complete", "refused_launches", "earlier_runs")
     check_axis(run.get("axis", DEFAULT_AXIS))  # a run with no session has no setup to check it by
     return RunInfo(

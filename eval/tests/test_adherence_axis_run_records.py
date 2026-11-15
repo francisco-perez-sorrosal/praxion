@@ -274,6 +274,17 @@ def test_the_report_of_a_file_naming_an_unknown_axis_ends_with_the_usage_error(t
     assert (code, capsys.readouterr().err.count("Traceback")) == (cli.EXIT_USAGE, 0)
 
 
+@pytest.mark.parametrize("run", [[], "run", None, 7])
+def test_a_file_whose_run_is_not_an_object_is_refused_on_load_with_a_value_error(tmp_path, run):
+    document = results.to_json(run_results([], roles=(ROLE,)))
+    document["run"] = run
+    path = tmp_path / "shaped.json"
+    path.write_text(json.dumps(document))
+
+    with pytest.raises(ValueError, match="the run is a JSON object"):
+        results.load(path)
+
+
 def test_a_default_file_with_no_axis_key_and_a_paired_file_still_load(tmp_path):
     for run in (
         _run_of("inherited-context", "default-1", ("full", "lean")),

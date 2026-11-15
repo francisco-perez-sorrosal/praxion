@@ -188,7 +188,8 @@ def _git(repo: Path, *args: str) -> str:
             ["git", "-C", str(repo), *args], capture_output=True, text=True, check=True
         )
     except (subprocess.CalledProcessError, FileNotFoundError) as error:
-        raise ValueError(f"`git {' '.join(args)}` failed in {repo}: not a git checkout?") from error
+        why = getattr(error, "stderr", "").strip() or "not a git checkout?"
+        raise ValueError(f"`git {' '.join(args)}` failed in {repo}: {why}") from error
     return done.stdout
 
 

@@ -31,6 +31,7 @@ from praxion_evals.adherence.arms import (
     ArmCopyError,
     DeliveryObservation,
     definition_path,
+    require_regular_definition,
     set_frontmatter_key,
     unobserved_proof,
     verify_copy_diff,
@@ -57,7 +58,7 @@ MARKED_PROMPT = f"Extract the pricing rules into their own module. {MARKER}"
 
 # A marked delegation in prose, outside any code span; no nonce is planted.
 PROOF_PROMPT = (
-    "Task slug: arm-proof. This is a [Phase: Refactoring] proof step: "
+    f"Task slug: arm-proof. This is a {MARKER} proof step: "
     "reply with exactly ARM-PROOF-DONE and use no tool."
 )
 # A harness preload is its own user message: wrapper lines naming the skill, the line naming its
@@ -74,14 +75,24 @@ _IMPORT_DELIVERY = (
 )
 _ASK_PROGRAM = _IMPORT_DELIVERY + "text = sys.stdin.read(); print({question})"
 _PRELOADS = "isinstance(d.preload_state(Path(sys.argv[1]), text), d.Preloaded)"
-_ARRIVES = "d.shows_arrival(text)"
-# Reads a JSON list of messages on stdin; prints how many blocks (each closed by an end line) the
-# matcher accepts for the body the copy installs, and how many labelled ones it does not.
+# A rewritten prompt ends in the block: the delegation first, the skill after it.
+_ARRIVES = "d.shows_arrival(text) and text.endswith(d.END_LINE)"
+# Reads a JSON list of messages on stdin and prints one JSON object. Each message is cut, as it
+# stands, at its label lines; the matcher judges each cut for the body the copy installs, so a
+# block counts only when the matcher accepts it where it lies, and every other label line is a
+# stray. The label pattern is the copy's own private one, so the cuts cannot drift from it.
 _COUNT_PROGRAM = _IMPORT_DELIVERY + (
-    "import json; body = d.read_body(d.skill_dir(Path(sys.argv[1]))); assert isinstance(body, str)\n"
-    "blocks = [p + d.END_LINE for t in json.load(sys.stdin) for p in t.split(d.END_LINE)[:-1]]\n"
-    "matching = sum(d.shows_arrival(b, body) for b in blocks)\n"
-    "print(matching, sum(d.shows_arrival(b) for b in blocks) - matching)"
+    "import json\n"
+    "body = d.read_body(d.skill_dir(Path(sys.argv[1])))\n"
+    "if not isinstance(body, str):\n"
+    "    print(json.dumps({'unreadable': body.reason})); sys.exit()\n"
+    "labels = matching = 0\n"
+    "for text in json.load(sys.stdin):\n"
+    "    starts = [m.start() for m in d._LABEL_LINE.finditer(text)]\n"
+    "    labels += len(starts)\n"
+    "    cuts = zip(starts, starts[1:] + [len(text)])\n"
+    "    matching += sum(d.shows_arrival(text[a:b], body) for a, b in cuts)\n"
+    "print(json.dumps({'blocks': matching, 'strays': labels - matching}))"
 )
 
 
@@ -93,7 +104,7 @@ def build_refactoring_copy(
         raise ArmCopyError(f"{arm!r} is not an arm of the refactoring move")
     if turn_cap is not None and turn_cap < 1:
         raise ArmCopyError(f"a turn cap must be at least 1, not {turn_cap}")
-    definition = definition_path(role)
+    require_regular_definition(original.root, role)
     if dest.exists() or dest.is_symlink():
         raise ArmCopyError(f"{dest} already exists; a copy is built into a fresh directory")
     _move_tool(original.root, "--to", "preloaded", "--check")
@@ -103,7 +114,7 @@ def build_refactoring_copy(
         if arm == "delivered":
             _move_tool(dest, "--to", "delivered")
         if turn_cap is not None:
-            _cap_turns(dest / definition, turn_cap)
+            _cap_turns(dest / definition_path(role), turn_cap)
         patched = verify_copy_diff(original.root, dest, expected=patched_paths(role, arm, turn_cap))
         digest = digest_entries(tree_entries(dest))
         make_read_only(dest)
@@ -139,19 +150,36 @@ def observe_delivery(evidence: SessionEvidence, real_home: Path) -> DeliveryObse
     record = grade.role_user_messages(evidence)
     if isinstance(record, TranscriptUnread):
         return NotBuilt(f"the proof spawn's own record cannot be read: {record.reason}")
+    if not record.all_whole:
+        return NotBuilt(
+            "the proof spawn's own record lost a line, so what it does not hold proves nothing"
+        )
+    counted = _count_blocks(record.messages, evidence.plugin_copy)
+    if isinstance(counted, NotBuilt):
+        return counted
+    preloads = sum(_is_preload(message) for message in record.messages)
+    return DeliveryObservation(*counted, preloads, grade.first_request_tokens(evidence))
+
+
+def _count_blocks(messages: tuple[str, ...], plugin_copy: Path) -> tuple[int, int] | NotBuilt:
+    """(matching blocks, stray labels) by the copy's own matcher, or why they were not counted."""
     try:
-        counts = _run(
+        out = _run(
             "the copy's delivery module",
             "-c",
             _COUNT_PROGRAM,
-            str(evidence.plugin_copy),
-            input=json.dumps(record.messages),
+            str(plugin_copy),
+            input=json.dumps(messages),
         )
     except ArmCopyError as error:
         return NotBuilt(f"the copy's delivery module could not read the record: {error}")
-    blocks, strays = map(int, counts.split())
-    preloads = sum(_is_preload(message) for message in record.messages)
-    return DeliveryObservation(blocks, strays, preloads, grade.first_request_tokens(evidence))
+    try:
+        reply = json.loads(out)
+        if "unreadable" in reply:
+            return NotBuilt(f"the copy's installed skill cannot be read ({reply['unreadable']})")
+        return int(reply["blocks"]), int(reply["strays"])
+    except (ValueError, KeyError, TypeError):
+        return NotBuilt(f"the copy's delivery module printed {out[:200]!r}, not its counts")
 
 
 def _is_preload(message: str) -> bool:

@@ -115,10 +115,12 @@ def _stream(cwd: Path, plugin_copy: Path, *, spawned: bool = True) -> str:
     return "\n".join(json.dumps(event) for event in events) + "\n"
 
 
-def _evidence(tmp_path: Path, records: list[dict] | None, *, spawned: bool = True):
+def _evidence(
+    tmp_path: Path, records: list[dict] | None, *, spawned: bool = True, copy: Path = REPO_ROOT
+):
     """A proof session whose role transcript (when ``records`` is not None) holds ``records``."""
     cwd, sandbox = tmp_path / "scratch", tmp_path / "sandbox"
-    envelope = parse_stream(_stream(cwd, REPO_ROOT, spawned=spawned))
+    envelope = parse_stream(_stream(cwd, copy, spawned=spawned))
     if records is not None:
         path = transcript.transcript_path(
             SandboxPaths(sandbox).config_dir, str(cwd), SESSION, AGENT
@@ -132,7 +134,7 @@ def _evidence(tmp_path: Path, records: list[dict] | None, *, spawned: bool = Tru
         exit_code=0,
         timed_out=False,
         sandbox=sandbox,
-        plugin_copy=REPO_ROOT,
+        plugin_copy=copy,
         spawn_id=SPAWN if spawned else None,
         role_tool_uses=(),
         role_return="ARM-PROOF-DONE",
@@ -294,10 +296,12 @@ def test_a_role_never_spawned_is_not_built(tmp_path):
 
 
 def test_a_copy_whose_delivery_module_cannot_run_is_not_built(tmp_path, block):
-    evidence = replace(_evidence(tmp_path, [_user(block)]), plugin_copy=tmp_path / "no-copy")
-    seen = observe_delivery(evidence, REAL_HOME)
+    seen = observe_delivery(
+        _evidence(tmp_path, [_user(block)], copy=tmp_path / "no-copy"), REAL_HOME
+    )
 
     assert isinstance(seen, NotBuilt)
+    assert "delivery module could not read the record" in seen.reason
 
 
 def test_the_proof_prompt_is_a_marked_delegation_to_the_copys_own_hook():

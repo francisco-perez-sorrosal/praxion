@@ -1,5 +1,8 @@
 """The two arms of a role, and the proof that the lean one really is lean.
 
+The refactoring move's arms are proven differently, by what the role's own record holds
+(``decide_delivery_proof``); the nonce below belongs to the ordinary proof alone.
+
 An arm is a runner-owned copy of the checkout under test. ``full`` is that copy
 untouched; ``lean`` differs from it at one place only, the measured role's agent
 definition, whose frontmatter gains ``omitClaudeMd: true`` (the switch a Phase 2
@@ -86,10 +89,7 @@ def build_arm(
     """
     if turn_cap is not None and turn_cap < 1:
         raise ArmCopyError(f"a turn cap must be at least 1, not {turn_cap}")
-    definition = definition_path(role)
-    source = original.root / definition
-    if source.is_symlink() or not source.is_file():
-        raise ArmCopyError(f"the checkout has no regular file {definition}")
+    require_regular_definition(original.root, role)
     if dest.exists() or dest.is_symlink():
         raise ArmCopyError(f"{dest} already exists; a copy is built into a fresh directory")
     try:
@@ -164,6 +164,15 @@ def definition_path(role: str) -> str:
     if role not in ROLES:
         raise ArmCopyError(f"unknown role {role!r}")
     return f"agents/{role}.md"
+
+
+def require_regular_definition(root: Path, role: str) -> None:
+    """Refuse a checkout whose ``role`` definition is not a regular file: a patch written through
+    a link would reach the file it points to, which may be the checkout under test."""
+    definition = definition_path(role)
+    source = root / definition
+    if source.is_symlink() or not source.is_file():
+        raise ArmCopyError(f"the checkout has no regular file {definition}")
 
 
 def _settings_for(arm: Arm, turn_cap: int | None) -> dict[str, str]:
@@ -338,7 +347,7 @@ class ArmProven:
 
     ``first_request_tokens`` is the figure recorded for the arm; ``cross_checked``
     says whether the other arm was in the run, so that the token comparison held
-    as well as the nonce.
+    as well as the nonce. The refactoring move's arms are never cross-checked.
     """
 
     arm: SessionArm

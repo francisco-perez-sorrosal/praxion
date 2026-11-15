@@ -77,6 +77,7 @@ RoleTranscript = TranscriptRead | TranscriptUnread
 class UserMessagesRead:
     path: Path
     messages: tuple[str, ...]  # the text of each user message, in transcript order
+    all_whole: bool  # every line was a record; if not, what the messages lack proves nothing
 
 
 RoleUserMessages = UserMessagesRead | TranscriptUnread
@@ -165,7 +166,8 @@ def read_role_user_messages(
     found = _read_records(config_dir, cwd, session_id, agent_id)
     if isinstance(found, TranscriptUnread):
         return found
-    return UserMessagesRead(found[0], _user_messages(found[1]))
+    path, records, all_whole = found
+    return UserMessagesRead(path, _user_messages(records), all_whole)
 
 
 def _read_records(

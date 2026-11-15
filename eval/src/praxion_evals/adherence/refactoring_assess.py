@@ -106,12 +106,16 @@ def _end_state(evidence: SessionEvidence, task: TaskSpec) -> dict[str, CheckOutc
     except Exception as error:  # a crashed grader is that session's infrastructure, not the run's
         return dict.fromkeys(names, CheckErrored(f"{type(error).__name__}: {error}"))
     failed = {item_name(item) for item in grade.failed}
-    return {
-        name: Failed("the repository the session left does not hold this item")
-        if name in failed
-        else Passed()
-        for name in names
-    }
+    errored = {item_name(item): why for item, why in grade.errored.items()}
+    return {name: _outcome(name, failed, errored) for name in names}
+
+
+def _outcome(name: str, failed: set[str], errored: Mapping[str, str]) -> CheckOutcome:
+    if name in errored:
+        return CheckErrored(f"the repository's tests reached no verdict: {errored[name]}")
+    if name in failed:
+        return Failed("the repository the session left does not hold this item")
+    return Passed()
 
 
 def _arrival(

@@ -31,18 +31,26 @@ from praxion_evals.adherence.model import Role
 MANIFEST = "refactoring.toml"
 SOURCE_ROOT = "src"  # a leading directory that is not part of a module's dotted name
 TEST_TIMEOUT_SECONDS = 120
+PYTEST_TESTS_FAILED = 1  # pytest's exit code for "the tests ran and some failed"; 0 is all passed
+ERROR_DETAIL_LINES = 8
 GIT_TIMEOUT_SECONDS = 60
 # Environment that would leak the eval's own pytest and coverage settings into the graded one.
 _FOREIGN_ENV_PREFIXES = ("PYTEST_", "COV_CORE", "COVERAGE")
 
 
+class PytestRunError(Exception):
+    """The task repository's tests reached no verdict: a timeout, or an exit code that says the
+    run itself broke. Such an item is errored, never failed: it is no finding about the session."""
+
+
 @dataclass(frozen=True)
 class RefactoringGrade:
     failed: tuple[str, ...]  # checklist items that do not hold, in checklist order
+    errored: Mapping[str, str] = MappingProxyType({})  # items that could not be judged, and why
 
     @property
     def passed(self) -> bool:
-        return not self.failed
+        return not self.failed and not self.errored
 
 
 def grade_workspace(
@@ -64,7 +72,15 @@ def grade_workspace(
         _parse_python(workspace),
         _changed_paths(workspace, base),
     )
-    return RefactoringGrade(tuple(item for item, holds in checks if not holds(evidence)))
+    failed: list[str] = []
+    errored: dict[str, str] = {}
+    for item, holds in checks:
+        try:
+            if not holds(evidence):
+                failed.append(item)
+        except PytestRunError as error:
+            errored[item] = str(error)
+    return RefactoringGrade(tuple(failed), MappingProxyType(errored))
 
 
 # -- What the workspace holds ---------------------------------------------------------------------
@@ -265,12 +281,18 @@ def _characterization_tests_come_first(evidence: Evidence) -> bool:
 
 
 def _characterization_tests_pin_the_public_surface(evidence: Evidence) -> bool:
-    """The added tests never name what the move relocates: they would break when it moves."""
+    """The tests the session added never name what the move relocates: they would break when it moves.
+
+    A test that was already there is not the session's, whatever it names.
+    """
     if not evidence.move.moving:
         raise ValueError(f"{MANIFEST} names no moving code to keep the tests off")
     moving = frozenset(evidence.move.moving)
     return bool(evidence.authored_tests) and not any(
-        _mentions(evidence.trees[path], moving) for path in evidence.authored_tests
+        _mentions(function, moving)
+        for path, added in evidence.authored_tests.items()
+        for function in _test_functions(evidence.trees[path])
+        if function.name in added
     )
 
 
@@ -325,18 +347,20 @@ def _assigned_names(node: ast.Assign | ast.AnnAssign) -> set[str]:
     return {target.id for target in targets if isinstance(target, ast.Name)}
 
 
-def _test_names(tree: ast.Module | None) -> frozenset[str]:
+def _test_functions(tree: ast.Module | None) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Every function, method included, that pytest would collect by its name."""
-    if tree is None:
-        return frozenset()
-    return frozenset(
-        node.name
-        for node in ast.walk(tree)
+    return [
+        node
+        for node in ast.walk(tree or ast.Module([], []))
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith("test")
-    )
+    ]
 
 
-def _mentions(tree: ast.Module, names: frozenset[str]) -> bool:
+def _test_names(tree: ast.Module | None) -> frozenset[str]:
+    return frozenset(function.name for function in _test_functions(tree))
+
+
+def _mentions(tree: ast.AST, names: frozenset[str]) -> bool:
     """Whether any import, name, attribute or string literal of the tree names one of ``names``."""
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and any(a.name in names for a in node.names):
@@ -475,19 +499,35 @@ def _dotted(node: ast.expr) -> str:
 
 
 def _pytest_passes(root: Path) -> bool:
+    """Whether the repository's tests pass; ``PytestRunError`` when the run reached no verdict.
+
+    The run gets a base temporary directory of its own. Pytest numbers one under the user's
+    temporary directory for every session, and cleans up old numbers as it starts: graded sessions
+    at the same time would share that root, and one could remove a directory of another in the
+    instant before the other locks it. A clean end state then reads as failing.
+    """
     env = {k: v for k, v in os.environ.items() if not k.startswith(_FOREIGN_ENV_PREFIXES)}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    try:
-        run = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"],
-            cwd=root,
-            env=env,
-            capture_output=True,
-            timeout=TEST_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired:
-        return False
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as scratch:
+        command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
+        command += ["--basetemp", str(Path(scratch) / "basetemp")]
+        try:
+            run = subprocess.run(
+                command, cwd=root, env=env, capture_output=True, timeout=TEST_TIMEOUT_SECONDS
+            )
+        except subprocess.TimeoutExpired as error:
+            ran = f"pytest did not finish within {TEST_TIMEOUT_SECONDS} s"
+            raise PytestRunError(f"{ran}\n{_tail(error.output)}") from error
+    if run.returncode not in (0, PYTEST_TESTS_FAILED):
+        ran = f"pytest exited {run.returncode}"
+        raise PytestRunError(f"{ran}\n{_tail(run.stdout + run.stderr)}")
     return run.returncode == 0
+
+
+def _tail(output: bytes | None) -> str:
+    """The last lines of a subprocess's output."""
+    lines = (output or b"").decode("utf-8", errors="replace").strip().splitlines()
+    return "\n".join(lines[-ERROR_DETAIL_LINES:])
 
 
 def _git(workspace: Path, *args: str) -> bytes:

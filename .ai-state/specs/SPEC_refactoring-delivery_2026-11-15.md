@@ -157,6 +157,21 @@ The move of the refactoring skill out of the two definitions is built, proven on
 
 - **U1a. The run card is re-cut (ruling of 2026-11-14, `RULING_paid-path.md` section 7).** The figure in U1.2 is the price of one 24-pair implementer run; the refactoring pool holds 6 pairs per role. As the pool stands, a smoke run of both roles is about $18 to $20 (`--required-pairs 6`): it can show a regression and the arrival rate, and it cannot clear most checks. A powered run is about $68 and needs about 8 more templates per role, which is fixture work for another pipeline. Yours to decide: the pass criterion's numbers (proposed: both arms proven; zero delivered sessions failing the arrival check; at least N complete pairs per role; no regression and no inferior verdict on any check, with the checks not covered named as unproven), the run's size, whether the judge runs, and the pool prompt's "Mode: pre-refactor." wording.
 
+### Decisions taken on 2026-11-15
+
+The user delegated the open decisions of this section to the orchestrator on 2026-11-15, in these words: "take the best decisions". What was decided, each as the orchestrator had recommended it in that day's decision list unless a line says otherwise:
+
+- **D1, the pass criterion:** as proposed, with N = 6. Per role: both arms proven; zero delivered sessions failing the arrival check; at least 6 complete pairs; no `Regression` on any check and no `Inferior` on a judged one; the checks the report lists as not covered named as unproven.
+- **D2, the run's size:** (a), the smoke run as the pool stands. The powered run (c) is not bought: by the free pricing taken the same day (5,100 to 7,500 spawns of the two roles a year on this machine, about 2 in 100 marked, about $155 to $295 a year at list prices), it does not repay itself in a year once the pipeline that builds its templates is counted.
+- **The size probe is not run as a separate session** (a change from that day's recommendation). The paired run opens with its arm proofs, and the delivered arm is proven only by exactly one block matching the skill's text in the proof spawn's own record, so a cut or refused delivery shows there. The run does not stop by itself when one arm is unproven: it goes on with the proven arm alone, and those sessions would have no pair. So the orchestrator reads the arms record the run writes after its proofs, and stops the run by hand when the delivered arm is not proven. The loss is then the proofs and at most the session in flight, about what the probe would have cost; when the proof holds, nothing extra is spent.
+- **D3, the judge:** off (`--no-judge`).
+- **D4, the pool prompt's "Mode: pre-refactor.":** kept; both arms read the same line.
+- **The fallback sentence** in the two definitions: kept, scoped to the two cases it covers (Codex, which has no hook, and a failed delivery).
+- **The two residuals:** accepted. A hand delegation that forgets the marker gets no skill; below the hooks' Python floor the delivery is unavailable, as every hook delivery already is.
+- **The move:** applied once the criterion is met, after the run's result has been shown to the user.
+
+Not delegated: each spend. Each role's paired run and each live startup reading still waits for the user's go on a run card at that moment.
+
 ## Requirements
 
 Requirements are pipeline-local; never cite their ids in code, tests or docstrings. The text below is the behavioural specification as it stood at the end: 23 requirements, REQ-20 reworded and REQ-22 and REQ-23 added by the paid-path ruling of 2026-11-14 (Spec Question SQ-04 below); the spec extract's digest at the end is `sha256:1b7c9bfde7e1`. Each requirement is verified by outer-loop scenarios, by unit tests, or, where the text is markdown guidance a model follows, by the verifier's judgment (listed after the requirements).

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-15T20:17:21Z'
+generated_at: '2026-11-15T23:18:28Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -31,7 +31,7 @@ surfaces:
   path: README_DEV.md
   type: markdown
   title: Developer Guide
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-15'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-decisions-040-eval-framework-out-of-band
@@ -150,7 +150,7 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-15'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -597,7 +597,7 @@ surfaces:
   path: docs/rework-dispatch.md
   type: markdown
   title: Dispatching Reworks
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-15'
   renderer: default_markdown
   surfaces_referenced:
   - claude
@@ -3789,6 +3789,12 @@ surfaces:
   title: The refactoring skill reaches a marked spawn through the single prompt-rewrite emitter, not a preload
   last_modified: '2026-11-15'
   renderer: adr_card
+- id: ai-state-decisions-515-pipeline-branch-takes-target-in-by-merge
+  path: .ai-state/decisions/515-pipeline-branch-takes-target-in-by-merge.md
+  type: markdown
+  title: A pipeline branch may take the target in by a merge commit just before its fast-forward merge
+  last_modified: '2026-11-15'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
@@ -4799,6 +4805,7 @@ groups:
   - ai-state-decisions-512-memory-index-budget
   - ai-state-decisions-513-refactoring-delivery-eval-arm-axis
   - ai-state-decisions-514-refactoring-skill-delivery-at-spawn
+  - ai-state-decisions-515-pipeline-branch-takes-target-in-by-merge
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

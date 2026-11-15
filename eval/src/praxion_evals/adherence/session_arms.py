@@ -14,20 +14,18 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from praxion_evals.adherence import arms, grade
+from praxion_evals.adherence import arms
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
     Errored,
     NotBuilt,
     Role,
-    SessionEvidence,
     Standard,
     TaskSpec,
 )
 from praxion_evals.adherence.session_launch import REAL_HOME, Launch, attempt
-from praxion_evals.live.materialize import Materialization, install_user_scope
-from praxion_evals.live.session import SandboxPaths, SessionRun, session_error
+from praxion_evals.live.materialize import Materialization
 from praxion_evals.live.spend import SpendLedger
 
 Builds = dict[tuple[Arm, int | None], ArmBuild]  # (the arm whose copy, its early-stop cap)
@@ -86,8 +84,7 @@ def prove(
 ) -> ProofRun:
     """One proof session per built arm, all under one planted nonce, then one decision."""
     template = launch.run_root / role / "proof-home"
-    install_user_scope(original.root, template)
-    nonce = arms.plant_proof_marker(SandboxPaths(template))
+    nonce = arms.prepare_proof_home(original, template)
     proof_task = replace(first_task, variant=Standard(), main_prompt=arms.proof_prompt())
 
     def copy_home(root: Path) -> None:
@@ -98,7 +95,15 @@ def prove(
     models: list[str | None] = []
     refusals: list[str] = []
     for (arm, _), build in builds.items():
-        ledger, done = attempt(launch, ledger, proof_task, build, copy_home, None, _observe)
+        ledger, done = attempt(
+            launch,
+            ledger,
+            proof_task,
+            build,
+            copy_home,
+            None,
+            lambda evidence: arms.observe_proof(evidence, REAL_HOME),
+        )
         models.append(done.model)
         match done.result:
             case Errored(kind="launch_refused", detail=detail):
@@ -112,17 +117,3 @@ def prove(
                 observed[arm] = seen
     verdicts = {**verdicts, **arms.decide_proof(nonce, observed)}
     return ProofRun(ledger, verdicts, tuple(models), tuple(refusals))
-
-
-def _observe(evidence: SessionEvidence) -> arms.ProofObservation | NotBuilt:
-    """What the proof session's role answered, or why nothing was observed."""
-    run = SessionRun("", "", None if evidence.timed_out else evidence.exit_code)
-    error = session_error(evidence.envelope, run, evidence.plugin_copy, real_home=REAL_HOME)
-    if error is not None:
-        return NotBuilt(f"the proof session ended in {error.kind}: {error.detail}")
-    if evidence.spawn_id is None:
-        return NotBuilt("the role was never spawned in the proof session")
-    return arms.ProofObservation(
-        answer=evidence.role_return or "",
-        first_request_tokens=grade.first_request_tokens(evidence),
-    )

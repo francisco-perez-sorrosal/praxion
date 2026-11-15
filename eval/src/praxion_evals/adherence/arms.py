@@ -27,17 +27,27 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from praxion_evals.adherence.model import ARMS, ROLES, Arm, ArmBuild, NotBuilt, Role
+from praxion_evals.adherence import grade
+from praxion_evals.adherence.model import (
+    ARMS,
+    ROLES,
+    Arm,
+    ArmBuild,
+    NotBuilt,
+    Role,
+    SessionEvidence,
+)
 from praxion_evals.live.materialize import (
     Materialization,
     digest_entries,
     frontmatter_closing,
+    install_user_scope,
     make_read_only,
     make_writable,
     remove_tree,
     tree_entries,
 )
-from praxion_evals.live.session import SandboxPaths
+from praxion_evals.live.session import SandboxPaths, SessionRun, session_error
 
 OMIT_CLAUDE_MD_KEY = "omitClaudeMd"
 MAX_TURNS_KEY = "maxTurns"
@@ -63,7 +73,6 @@ def build_arm(
     dest: Path,
     role: Role,
     arm: Arm,
-    *,
     turn_cap: int | None = None,
 ) -> ArmBuild:
     """Copy ``original`` to ``dest`` as ``role``'s ``arm``, verified and read-only.
@@ -234,6 +243,12 @@ def plant_proof_marker(sandbox: SandboxPaths) -> str:
     return nonce
 
 
+def prepare_proof_home(original: Materialization, template: Path) -> str:
+    """Install the original's user scope at ``template`` and plant the nonce there; return it."""
+    install_user_scope(original.root, template)
+    return plant_proof_marker(SandboxPaths(template))
+
+
 def proof_prompt() -> str:
     """The task text the spawned role receives; it never carries the nonce.
 
@@ -254,6 +269,20 @@ class ProofObservation:
 
     answer: str
     first_request_tokens: int | None
+
+
+def observe_proof(evidence: SessionEvidence, real_home: Path) -> ProofObservation | NotBuilt:
+    """What the proof session's role answered, or why nothing was observed."""
+    run = SessionRun("", "", None if evidence.timed_out else evidence.exit_code)
+    error = session_error(evidence.envelope, run, evidence.plugin_copy, real_home=real_home)
+    if error is not None:
+        return NotBuilt(f"the proof session ended in {error.kind}: {error.detail}")
+    if evidence.spawn_id is None:
+        return NotBuilt("the role was never spawned in the proof session")
+    return ProofObservation(
+        answer=evidence.role_return or "",
+        first_request_tokens=grade.first_request_tokens(evidence),
+    )
 
 
 @dataclass(frozen=True)

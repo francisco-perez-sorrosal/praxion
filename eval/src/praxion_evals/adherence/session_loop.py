@@ -37,7 +37,14 @@ from pathlib import Path, PurePosixPath
 from typing import Any, assert_never, overload
 
 from praxion_evals.adherence import arms, report, results, run_index, tasks
-from praxion_evals.adherence.axis import ARMS_BY_AXIS, DEFAULT_AXIS, Axis, SessionArm, arm_on
+from praxion_evals.adherence.axis import (
+    ARMS_BY_AXIS,
+    DEFAULT_AXIS,
+    Axis,
+    SessionArm,
+    arm_on,
+    check_axis_arm,
+)
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.checks_common import GoldenVerdicts, judge_golden_cases
 from praxion_evals.adherence.infra_stop import (
@@ -150,6 +157,11 @@ class RunConfig:
     continue_run: str | None = None
     # Rebuild the run index of the results directory; launches nothing.
     reindex: bool = False
+    axis: Axis = DEFAULT_AXIS
+
+    def __post_init__(self) -> None:
+        for arm in self.arms:
+            check_axis_arm(self.axis, arm)
 
 
 @dataclass(frozen=True)

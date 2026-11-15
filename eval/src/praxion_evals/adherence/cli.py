@@ -45,6 +45,7 @@ from praxion_evals.adherence import (
     session_loop,
     tasks,
 )
+from praxion_evals.adherence.axis_runs import axis_run
 from praxion_evals.adherence.dry_run import print_dry_run
 from praxion_evals.adherence.infra_stop import (
     COUNTING_KINDS,
@@ -350,13 +351,13 @@ def plan_tasks(config: RunConfig) -> dict[Role, list[TaskSpec]]:
     its target cannot reach it and is reported underpowered.
     """
     plan = {}
+    run = axis_run(config.axis)
     for role in config.roles:
         wanted = config.required_pairs + config.pair_slack
         wanted = wanted if role in tasks.FULL_SET_ROLES else tasks.SMOKE_TASKS
         if config.max_tasks is not None:
             wanted = min(wanted, config.max_tasks)
-        count = min(wanted, tasks.producible_task_count(role, config.seed))
-        plan[role] = tasks.generate(role, config.seed, count)
+        plan[role] = run.plan(role, config.seed, wanted)
     return plan
 
 

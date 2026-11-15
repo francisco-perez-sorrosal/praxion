@@ -7,9 +7,7 @@ pinned by the paid-loop and arm tests that run through it unedited.
 
 from __future__ import annotations
 
-import shutil
 from dataclasses import replace
-from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -17,14 +15,19 @@ import pytest
 
 from praxion_evals.adherence import cli, session_arms, session_launch, session_loop, tasks
 from praxion_evals.adherence.axis_runs import DEFAULT_RUN, ArmProof, AxisRun
-from praxion_evals.adherence.model import ArmBuild, Errored, NotBuilt, Role
-from praxion_evals.adherence.session_launch import Launch
+from praxion_evals.adherence.model import Errored, NotBuilt, Role
 from praxion_evals.live.spend import SpendLedger
-from tests.adherence_run_support import ROLE, Script, run_small, sessions_of
+from tests.adherence_run_support import (
+    ROLE,
+    Script,
+    copy_with_definition,
+    launch_in,
+    run_small,
+    sessions_of,
+)
 
 pytestmark = pytest.mark.usefixtures("unswitched_checkout")
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED = 7
 STARTING_COMMIT = "starting-commit"
 SETTLED = Errored("evaluation_exception", "the record's assessment")
@@ -61,40 +64,15 @@ def _called(calls: Calls, name: str) -> list[tuple[Any, ...]]:
     return [args for noted, args in calls if noted == name]
 
 
-def _launch(tmp_path: Path, **overrides: Any) -> Launch:
-    fields: dict[str, Any] = {
-        "run_root": tmp_path / "run",
-        "checkout_commit": "abc",
-        "page_url": "",
-        "judge": None,
-        "seed": SEED,
-        "model": "m",
-        "effort": "low",
-        "session_budget_usd": 1.0,
-        "keep_sandbox": True,
-        "env_for": lambda root, path_first: {},
-        "real_home": tmp_path / "home",
-        "ambient": {"PATH": "/usr/bin"},
-    }
-    return Launch(**{**fields, **overrides})
-
-
 def _task(role: Role = ROLE):
     return tasks.generate(role, SEED, 1)[0]
-
-
-def _build(root: Path, role: Role = ROLE) -> ArmBuild:
-    """A copy holding the role's definition, which is all the session's spec reads of it."""
-    (root / "agents").mkdir(parents=True)
-    shutil.copy(REPO_ROOT / "agents" / f"{role}.md", root / "agents" / f"{role}.md")
-    return ArmBuild(role, "full", root, None, "digest", ())
 
 
 # --- the launch ---
 
 
 def test_a_launch_carries_the_default_record_unless_given_another(tmp_path):
-    assert _launch(tmp_path).axis_run is DEFAULT_RUN
+    assert launch_in(tmp_path).axis_run is DEFAULT_RUN
 
 
 def test_the_loop_launches_with_the_record_of_the_runs_axis(tmp_path):
@@ -125,9 +103,9 @@ def test_a_session_is_staged_by_the_records_stage_in_its_scratch_directory(tmp_p
     task, sandbox = _task(), tmp_path / "sandbox"
 
     _, commit, _ = session_launch._prepare(
-        _launch(tmp_path, axis_run=record),
+        launch_in(tmp_path, axis_run=record),
         task,
-        _build(tmp_path / "copy"),
+        copy_with_definition(ROLE, tmp_path / "copy"),
         lambda root: None,
         "http://page",
         sandbox,
@@ -152,11 +130,16 @@ def test_a_session_is_assessed_by_the_records_assess(tmp_path, monkeypatch):
         )  # fmt: skip
 
     monkeypatch.setattr(session_launch, "attempt", attempt)
-    launch = _launch(tmp_path, axis_run=_record(calls), judge=judge)
+    launch = launch_in(tmp_path, axis_run=_record(calls), judge=judge)
     task = _task()
 
     session_launch.task_session(
-        launch, SpendLedger(cap_usd=10.0), task, "full", _build(tmp_path / "copy"), None
+        launch,
+        SpendLedger(cap_usd=10.0),
+        task,
+        "full",
+        copy_with_definition(ROLE, tmp_path / "copy"),
+        None,
     )
 
     assert seen["assessed"] is SETTLED
@@ -183,7 +166,7 @@ def test_a_copy_is_built_by_the_records_build(tmp_path):
         ROLE,
         "lean",
         3,
-        _record(calls),  # type: ignore[arg-type]
+        _record(calls),
     )
 
     assert built == NotBuilt("noted")
@@ -200,9 +183,9 @@ def test_the_proof_runs_the_records_prompt_preparation_observer_and_decision(tmp
         return ledger, SimpleNamespace(result=observed, model="m-1")
 
     monkeypatch.setattr(session_arms, "attempt", attempt)
-    launch = _launch(tmp_path, axis_run=_record(calls))
+    launch = launch_in(tmp_path, axis_run=_record(calls))
     original = SimpleNamespace(name="the-original")
-    builds = {("full", None): _build(tmp_path / "copy")}
+    builds = {("full", None): copy_with_definition(ROLE, tmp_path / "copy")}
 
     proof = session_arms.prove(
         launch,
@@ -210,7 +193,7 @@ def test_the_proof_runs_the_records_prompt_preparation_observer_and_decision(tmp
         ROLE,
         original,
         builds,
-        _task(),  # type: ignore[arg-type]
+        _task(),
     )
 
     assert _called(calls, "prepare") == [(original, tmp_path / "run" / ROLE / "proof-home")]
@@ -272,11 +255,32 @@ def test_a_run_reaches_every_function_of_the_record(tmp_path, monkeypatch, paid,
 def test_the_plan_is_made_by_the_records_plan(monkeypatch):
     calls: Calls = []
     monkeypatch.setattr(cli, "axis_run", lambda axis: _record(calls))
-    config = cli.parse_config(["--role", ROLE, "--required-pairs", "2", "--pair-slack", "1"])
+    # 3 plus 1 is not the smoke count (3), so the count asked for says which branch planned it
+    config = cli.parse_config(["--role", ROLE, "--required-pairs", "3", "--pair-slack", "1"])
 
     planned = cli.plan_tasks(config)
 
     assert planned == {ROLE: []}
-    assert _called(calls, "plan") == [
-        (ROLE, config.seed, config.required_pairs + config.pair_slack)
-    ]
+    assert _called(calls, "plan") == [(ROLE, config.seed, 4)]
+
+
+def test_the_early_stop_twin_of_an_arm_is_built_by_the_records_build(
+    tmp_path, monkeypatch, paid, full_first
+):
+    early_stop = next(t for t in tasks.generate(ROLE, SEED, 2) if tasks.turn_cap_of(t))
+    calls: Calls = []
+
+    def noting_build(*args: Any) -> Any:
+        calls.append(("build", args))
+        return DEFAULT_RUN.build(*args)
+
+    record = replace(DEFAULT_RUN, plan=lambda role, seed, wanted: [early_stop], build=noting_build)
+    monkeypatch.setattr(cli, "axis_run", lambda axis: record)
+    monkeypatch.setattr(session_loop, "axis_run", lambda axis: record)
+    paid(Script())
+
+    code, _ = run_small(tmp_path)
+
+    caps = {cap for *_, cap in _called(calls, "build")}
+    assert code == 0
+    assert caps == {None, tasks.turn_cap_of(early_stop)}

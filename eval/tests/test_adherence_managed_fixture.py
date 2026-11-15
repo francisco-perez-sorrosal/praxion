@@ -3,17 +3,15 @@ managed-only behaviours off, unless the fixture's overlay already carried state.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
 from praxion_evals.adherence import managed_fixture, session_launch, tasks
-from praxion_evals.adherence.model import ArmBuild, Role
-from praxion_evals.adherence.session_launch import Launch
+from praxion_evals.adherence.model import Role
+from tests.adherence_run_support import copy_with_definition, launch_in, stop_run
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED = 7
 STATE = managed_fixture.STATE_DIRNAME
 SWITCHES = managed_fixture.UNMANAGED_BEHAVIOUR_SWITCHES
@@ -66,45 +64,21 @@ def test_an_empty_state_directory_is_invisible_to_git_status(tmp_path):
 # -- the launch -----------------------------------------------------------------------------
 
 
-def _build(role: Role, tmp_path: Path) -> ArmBuild:
-    root = tmp_path / "copy"
-    (root / "agents").mkdir(parents=True)
-    shutil.copy(REPO_ROOT / "agents" / f"{role}.md", root / "agents" / f"{role}.md")
-    return ArmBuild(role, "full", root, None, "digest", ())
-
-
-def _launch(tmp_path: Path) -> Launch:
-    return Launch(
-        run_root=tmp_path / "run",
-        checkout_commit="abc",
-        page_url="",
-        judge=None,
-        seed=SEED,
-        model="m",
-        effort="low",
-        session_budget_usd=1.0,
-        keep_sandbox=True,
-        env_for=lambda root, path_first: {"BASE": "kept"},
-        real_home=tmp_path / "home",
-        ambient={"PATH": "/usr/bin"},
-    )
-
-
 def _launched(role: Role, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """The spec and environment the session is started with, and its scratch repository."""
     seen: dict[str, object] = {}
 
     def stop(spec, env):
         seen.update(spec=spec, env=env)
-        raise RuntimeError("stop here: only the launch's inputs are under test")
+        return stop_run(spec, env)
 
     monkeypatch.setattr(session_launch, "run_session", stop)
     task = next(t for t in tasks.generate(role, SEED, 8) if tasks.turn_cap_of(t) is None)
     session_launch.attempt(
-        _launch(tmp_path),
+        launch_in(tmp_path, env_for=lambda root, path_first: {"BASE": "kept"}),
         session_launch.SpendLedger(cap_usd=10.0),
         task,
-        _build(role, tmp_path),
+        copy_with_definition(role, tmp_path / "copy"),
         lambda root: None,
         None,
         lambda evidence: None,

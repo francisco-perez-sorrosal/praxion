@@ -482,8 +482,8 @@ class ArmBuild:
     """A role's runner-owned plugin copy for one arm.
 
     ``patched`` lists the files that differ from the checkout, which ``patched_paths``
-    derives from the arm and the cap: the lean arm and an early-stop copy differ at the
-    role's definition; a full or preloaded arm with no cap is byte-identical.
+    derives from the arm and the cap: lean or an early stop differ at the role's definition,
+    delivered adds the move's two sites; a full or preloaded arm with no cap is byte-identical.
     """
 
     role: Role

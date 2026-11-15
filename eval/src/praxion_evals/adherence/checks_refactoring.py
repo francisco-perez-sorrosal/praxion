@@ -532,7 +532,7 @@ def _pytest_passes(root: Path) -> bool:
 
 
 def _tail(*streams: bytes | None) -> str:
-    text = b"".join(s or b"" for s in streams).decode("utf-8", errors="replace")
+    text = b"\n".join(s or b"" for s in streams).decode("utf-8", errors="replace")
     return "\n".join(text.strip().splitlines()[-ERROR_DETAIL_LINES:])
 
 

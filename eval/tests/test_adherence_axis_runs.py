@@ -86,7 +86,27 @@ def test_the_default_assessment_names_c3_only_for_a_task_that_can_plant_a_gap(mo
     assert "C3" not in named[1]
 
 
-def test_the_new_axis_differs_from_the_default_in_its_name_positions_plan_staging_build_proof_assessment_catalog_and_refusals_only():
+def test_the_default_assessment_hands_the_evidence_judge_setup_and_real_home_to_the_grader(
+    monkeypatch, tmp_path
+):
+    handed: list[tuple] = []
+
+    def grade(evidence, names, judge, setup, *, real_home):
+        handed.append((evidence, judge, setup, real_home))
+        return "the grade"
+
+    monkeypatch.setattr(axis_runs.grade, "grade", grade)
+    task = tasks.generate("implementer", 11, 1)[0]
+    setup = SessionSetup("full", "abc1234", "implementer", task.task_id, task.template_id, 11)
+    evidence, judge = object(), object()
+
+    graded = DEFAULT.assess(evidence, task, setup, judge, tmp_path)  # type: ignore[arg-type]
+
+    assert graded == "the grade"
+    assert handed == [(evidence, judge, setup, tmp_path)]
+
+
+def test_the_new_axis_overrides_only_the_fields_that_differ_between_axes():
     other = axis_runs.axis_run("refactoring-delivery")
 
     changed = {

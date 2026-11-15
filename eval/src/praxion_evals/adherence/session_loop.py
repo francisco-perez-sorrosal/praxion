@@ -610,6 +610,7 @@ def ordered_arms[A: SessionArm](
     """The named arms in the task's launch order."""
     # The default draw is taken through ``launch_order`` so the seam tests fix stays the one seam.
     drawn = [arm_on(axis, arm) for arm in launch_order(seed, task_id)]
+    # Selects from ``arms_named``, not ``drawn``, so the result keeps the caller's arm type A.
     return [arm for first in drawn for arm in arms_named if arm == first]
 
 

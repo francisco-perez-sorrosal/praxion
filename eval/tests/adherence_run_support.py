@@ -19,6 +19,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -31,8 +32,18 @@ from praxion_evals.adherence.lineage import (
     SpendRefused,
     ending_to_json,
 )
-from praxion_evals.adherence.model import ROLES
+from praxion_evals.adherence.model import (
+    ROLES,
+    ArmBuild,
+    Errored,
+    Role,
+    SessionRecord,
+    SessionSetup,
+)
+from praxion_evals.adherence.session_launch import Launch
+from praxion_evals.adherence.session_loop import OUTPUT_DIR
 from praxion_evals.live.session import SessionRun, SessionSpec
+from tests.test_adherence_results import run_results
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROLE = "researcher"
@@ -228,3 +239,95 @@ def ended_as(tmp_path: Path, ending: RunEnding, name: str = "stopped.json") -> r
 def close_run(tmp_path: Path, run_id: str, *options: str) -> int:
     where = ["--output", str(tmp_path / "closing.json")]  # its directory is where the runs are
     return cli.main([str(scripted_checkout()), "--close", run_id, *options, *where])
+
+
+# -- one session's launch, under a stand-in for the function that starts ``claude`` -------------
+
+
+def copy_with_definition(
+    role: Role, root: Path, cap: int | None = None, patched: tuple[str, ...] = ()
+) -> ArmBuild:
+    """An arm copy holding the role's definition, which is all a session's spec reads of it."""
+    (root / "agents").mkdir(parents=True)
+    shutil.copy(REPO_ROOT / "agents" / f"{role}.md", root / "agents" / f"{role}.md")
+    return ArmBuild(role, "full", root, cap, "digest", patched)
+
+
+def launch_in(tmp_path: Path, **overrides: Any) -> Launch:
+    """A launch of seed 7 whose environment adds nothing and whose home is ``tmp_path / "home"``."""
+    fields: dict[str, Any] = {
+        "run_root": tmp_path / "run",
+        "checkout_commit": "abc",
+        "page_url": "",
+        "judge": None,
+        "seed": 7,
+        "model": "m",
+        "effort": "low",
+        "session_budget_usd": 1.0,
+        "keep_sandbox": True,
+        "env_for": lambda root, path_first: {},
+        "real_home": tmp_path / "home",
+        "ambient": {"PATH": "/usr/bin"},
+    }
+    return Launch(**{**fields, **overrides})
+
+
+def stop_run(spec: SessionSpec, env: dict[str, str]) -> SessionRun:
+    """In place of ``run_session``: ends the attempt where the launch's inputs have been built."""
+    raise RuntimeError("stop here: only the launch's inputs are under test")
+
+
+# -- a stopped run of the paired axis, planted in a results directory ----------------------------
+
+PAIRED = "refactoring-delivery"
+PAIRED_ROLE = "implementer"
+PAIRED_ARMS = ("preloaded", "delivered")
+STARTED_AT = "2026-10-12T09:00:00Z"
+TASKS = ("task-0", "task-1", "task-2")
+
+
+def _failed(task: str, arm: str, axis: str) -> SessionRecord:
+    setup = SessionSetup(
+        arm,  # type: ignore[arg-type]
+        "c" * 40,
+        PAIRED_ROLE,
+        task,
+        "template",
+        7,
+        axis,
+    )
+    return SessionRecord(
+        setup, Errored("result_error", "the session failed"), 0.01, 1000, STARTED_AT
+    )
+
+
+def _stopped_run(run_id: str, axis: str, ending: Any) -> results.RunResults:
+    arms = PAIRED_ARMS if axis == PAIRED else ("full", "lean")
+    extra: dict[str, Any] = {
+        "ending": ending_to_json(ending),
+        "roles": [PAIRED_ROLE],
+        "tasks": {PAIRED_ROLE: list(TASKS)},
+        "identity": {"tree": "a" * 64, "model": "claude-opus-5-5", "roles": {}},
+    }
+    if axis == PAIRED:
+        extra["axis"] = axis
+    sessions = [_failed(task, arms[0], axis) for task in TASKS]
+    run = run_results(sessions, run_id=run_id, roles=(PAIRED_ROLE,), extra=extra)
+    return replace(run, arms={PAIRED_ROLE: {arm: {"built": True} for arm in arms}})
+
+
+def planted(tmp_path: Path, run_id: str, axis: str, ending: Any) -> Path:
+    """``tmp_path``'s results directory, holding one run of ``axis`` that ended as ``ending``."""
+    directory = tmp_path / OUTPUT_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    results.write_atomic(directory / f"{run_id}.json", _stopped_run(run_id, axis, ending))
+    return directory
+
+
+def snapshot(directory: Path) -> dict[str, bytes]:
+    return {path.name: path.read_bytes() for path in directory.iterdir()}
+
+
+def cli_in(directory: Path, *options: str) -> int:
+    where = ["--output", str(directory / "new.json")]  # its directory is where the runs are
+    return cli.main([str(scripted_checkout()), *options, *where])

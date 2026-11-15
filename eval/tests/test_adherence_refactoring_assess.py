@@ -255,7 +255,7 @@ def test_the_arrival_reads_check_errored_when_no_real_home_was_given(tmp_path, m
     "default",
     [Errored("timeout", "exit_code=None"), NotMeasured("the main session never spawned it")],
 )
-def test_a_result_that_was_not_measured_is_returned_unchanged(tmp_path, default):
+def test_a_result_that_was_not_measured_is_returned_unchanged(default):
     task = _task("implementer", "refactoring-extract-module")
 
     extended = refactoring_assess.extend(default, None, task, _setup(task), HOME)  # type: ignore[arg-type]

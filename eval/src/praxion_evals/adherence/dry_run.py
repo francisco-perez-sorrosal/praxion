@@ -77,7 +77,7 @@ def _planned_switches(task: TaskSpec) -> Mapping[str, str]:
 def planned_copy(run_root: Path, task: TaskSpec, arm: SessionArm) -> Path:
     """Where a real run would put the arm's plugin copy; the dry run names it, never makes it.
 
-    Spells the directory as ``session_loop._build_copy`` does; a test pins the two together.
+    Spells the directory as ``session_arms.build_copy`` does; a test pins the two together.
     """
     cap = tasks.turn_cap_of(task)
     return run_root / task.role / (f"{arm}-cap{cap}" if cap else arm)

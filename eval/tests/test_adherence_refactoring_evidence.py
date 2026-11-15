@@ -342,7 +342,7 @@ def test_a_session_that_breaks_the_passing_tests_fails_the_item_that_runs_them(
 
 
 def test_a_grade_over_passing_tests_passes_the_items_that_run_them(tmp_path):
-    workspace = _graded_workspace(tmp_path, {"tests/test_old.py": "def test_ok():\n    pass\n"})
+    workspace = _graded_workspace(tmp_path, _PASSING_TESTS)
 
     result = checks_refactoring.grade_workspace("implementer", workspace, "")
 
@@ -395,6 +395,12 @@ def test_a_grade_over_a_run_that_timed_out_errors_the_items_with_the_stderr(tmp_
     assert "did not finish within 1 s" in result.errored["the tests still pass"]
     assert _STDERR_LINE in result.errored["the tests still pass"]
     assert not _RUN_ITEMS & set(result.failed)
+
+
+def test_the_detail_of_an_errored_item_keeps_the_two_streams_on_separate_lines():
+    detail = checks_refactoring._tail(b"standard output ends mid-line", b"error output begins")
+
+    assert detail == "standard output ends mid-line\nerror output begins"
 
 
 def test_an_errored_item_is_an_errored_outcome_with_the_output_and_never_a_failed_one():

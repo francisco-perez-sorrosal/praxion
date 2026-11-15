@@ -11,18 +11,19 @@ import pytest
 from praxion_evals.adherence import cli
 from praxion_evals.adherence.axis import DEFAULT_AXIS
 from praxion_evals.adherence.lineage import SpendRefused, pending_stop
-from tests.adherence_run_support import scripted_checkout
-from tests.test_adherence_paired_run_lifecycle import (
+from tests.adherence_run_support import (
     PAIRED,
-    ROLE,
+    PAIRED_ROLE,
     TASKS,
-    _cli,
-    _planted,
-    _snapshot,
+    cli_in,
+    planted,
+    scripted_checkout,
+    snapshot,
 )
 
 pytestmark = pytest.mark.usefixtures("unswitched_checkout")
 
+ROLE = PAIRED_ROLE
 USAGE = "usage: "
 AXIS_OPTIONS = ("--role", ROLE, "--axis", PAIRED)
 
@@ -71,21 +72,22 @@ def test_a_refusal_unrelated_to_the_axis_still_prints_argparses_usage(capsys, tm
 def test_continuing_a_stopped_paired_run_names_the_option_and_says_to_close_and_start_afresh(
     tmp_path, capsys
 ):
-    directory = _planted(tmp_path, "paired-1", PAIRED, SpendRefused(TASKS))
-    before = _snapshot(directory)
+    directory = planted(tmp_path, "paired-1", PAIRED, SpendRefused(TASKS))
+    before = snapshot(directory)
 
-    code = _cli(directory, "--continue", "paired-1")
+    code = cli_in(directory, "--continue", "paired-1")
 
     err = capsys.readouterr().err
     assert code == cli.EXIT_USAGE
     assert "--continue" in err
     assert "close it (--close paired-1 --reason TEXT) and start a fresh run" in err
     assert USAGE not in err
-    assert _snapshot(directory) == before
+    assert snapshot(directory) == before
 
 
 STOPPED = f"run stopped-1 of {ROLE} stopped and was neither continued nor closed; "
 CLOSE_IT = "close it (--close stopped-1 --reason TEXT)"
+BEFORE_FRESH_RUN = "before starting a fresh run"
 
 
 @pytest.mark.parametrize(
@@ -93,13 +95,13 @@ CLOSE_IT = "close it (--close stopped-1 --reason TEXT)"
     [
         (
             DEFAULT_AXIS,
-            f"{STOPPED}continue it (--continue stopped-1) or {CLOSE_IT} before starting a fresh run",
+            f"{STOPPED}continue it (--continue stopped-1) or {CLOSE_IT} {BEFORE_FRESH_RUN}",
         ),
-        (PAIRED, f"{STOPPED}{CLOSE_IT} before starting a fresh run"),
+        (PAIRED, f"{STOPPED}{CLOSE_IT} {BEFORE_FRESH_RUN}"),
     ],
 )
 def test_a_stopped_run_blocks_a_fresh_run_of_its_own_axis_in_full_words(tmp_path, axis, refusal):
-    directory = _planted(tmp_path, "stopped-1", axis, SpendRefused(TASKS))
+    directory = planted(tmp_path, "stopped-1", axis, SpendRefused(TASKS))
     config = cli.parse_config(_fresh(directory, axis))
 
     with pytest.raises(ValueError, match="stopped and was neither") as raised:
@@ -114,7 +116,7 @@ def test_a_stopped_run_blocks_a_fresh_run_of_its_own_axis_in_full_words(tmp_path
 def test_a_stopped_run_does_not_block_a_fresh_run_of_the_other_axis(
     tmp_path, stopped_axis, fresh_axis
 ):
-    directory = _planted(tmp_path, "stopped-1", stopped_axis, SpendRefused(TASKS))
+    directory = planted(tmp_path, "stopped-1", stopped_axis, SpendRefused(TASKS))
     config = cli.parse_config(_fresh(directory, fresh_axis))
 
     cli._refuse_beside_stopped_run(config)

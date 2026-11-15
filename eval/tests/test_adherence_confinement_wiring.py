@@ -4,7 +4,6 @@ plugin copy first; every other kit's session is built exactly as before."""
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -12,28 +11,24 @@ from types import SimpleNamespace
 
 import pytest
 
-from praxion_evals.adherence import session_launch, tasks
-from praxion_evals.adherence.axis import DEFAULT_AXIS
+from praxion_evals.adherence import cli, session_launch, tasks
 from praxion_evals.adherence.confinement import CONFINED_ROLES, Confinement
 from praxion_evals.adherence.model import ArmBuild, Role
 from praxion_evals.adherence.session_launch import Launch, session_confinement
 from praxion_evals.adherence.session_loop import RunConfig, _launch_of, session_env
 from praxion_evals.live.session import SandboxPaths, build_argv
+from tests.adherence_run_support import copy_with_definition, launch_in, stop_run
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 OTHER_ROLES: list[Role] = ["researcher", "doc-engineer"]
 SEED = 7
 AMBIENT = {"PATH": "/usr/local/bin:relative::/usr/bin"}
 
 
 def _build(role: Role, tmp_path: Path) -> ArmBuild:
-    root = tmp_path / "copy"
-    (root / "agents").mkdir(parents=True)
-    shutil.copy(REPO_ROOT / "agents" / f"{role}.md", root / "agents" / f"{role}.md")
     # The first task of a role can be an early stop, whose copy is capped at the definition.
     cap = tasks.turn_cap_of(_task(role))
     patched = () if cap is None else (f"agents/{role}.md",)
-    return ArmBuild(role, "full", root, cap, "digest", patched)
+    return copy_with_definition(role, tmp_path / "copy", cap, patched)
 
 
 def _task(role: Role):
@@ -54,21 +49,7 @@ def _confinement(role: Role, tmp_path: Path, token: Path | None = None) -> Confi
 
 
 def _launch(tmp_path: Path, **overrides) -> Launch:
-    fields = {
-        "run_root": tmp_path / "run",
-        "checkout_commit": "abc",
-        "page_url": "",
-        "judge": None,
-        "seed": SEED,
-        "model": "m",
-        "effort": "low",
-        "session_budget_usd": 1.0,
-        "keep_sandbox": True,
-        "env_for": lambda root, path_first: {},
-        "real_home": tmp_path / "home",
-        "ambient": AMBIENT,
-    }
-    return Launch(**{**fields, **overrides})
+    return launch_in(tmp_path, **{"ambient": AMBIENT, **overrides})
 
 
 # -- the spec ----------------------------------------------------------------------------------
@@ -206,7 +187,7 @@ def test_a_launched_sessions_environment_is_built_with_the_confinements_program_
         seen["path_first"] = path_first
         return {}
 
-    monkeypatch.setattr(session_launch, "run_session", lambda spec, env: _stop())
+    monkeypatch.setattr(session_launch, "run_session", stop_run)
     session_launch.attempt(
         _launch(tmp_path, env_for=env_for),
         session_launch.SpendLedger(cap_usd=10.0),
@@ -219,10 +200,6 @@ def test_a_launched_sessions_environment_is_built_with_the_confinements_program_
 
     expected = [build.copy_root / "scripts"] if confined else []
     assert seen["path_first"][:1] == expected  # type: ignore[index]
-
-
-def _stop():
-    raise RuntimeError("stop here: only the launch's inputs are under test")
 
 
 def test_a_session_environment_resolves_the_given_directories_first(tmp_path):
@@ -270,7 +247,4 @@ def test_the_run_launches_sessions_with_the_operators_token_file(tmp_path):
 
 
 def _config() -> RunConfig:
-    fields = dict.fromkeys(RunConfig.__dataclass_fields__)
-    return RunConfig(
-        **{**fields, "arms": (), "axis": DEFAULT_AXIS, "session_oauth_token_file": None}
-    )  # type: ignore[arg-type]
+    return cli.parse_config(["--role", "researcher"])

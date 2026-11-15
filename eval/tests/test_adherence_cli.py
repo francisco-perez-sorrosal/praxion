@@ -200,7 +200,7 @@ def test_the_dry_run_names_the_plugin_copy_a_real_run_builds(
         task.role,
         arm,
         tasks.turn_cap_of(task),
-        record,  # type: ignore[arg-type]
+        record,
     )
 
     assert planned_copy(tmp_path, task, arm) == built[0]

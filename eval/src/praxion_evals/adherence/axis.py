@@ -99,9 +99,14 @@ def check_patched(
     raise ValueError(f"an arm build patches exactly {list(expected)}, got {list(patched)}")
 
 
+def check_axis(axis: object) -> None:
+    """Refuse an axis that is not one of the known ones, naming it and them."""
+    if axis not in AXES:
+        raise ValueError(f"an axis must be one of {list(AXES)}, got {axis!r}")
+
+
 def check_axis_arm(axis: str, arm: str) -> None:
     """Refuse an unknown axis, and an arm that is not one of that axis's."""
-    if axis not in ARMS_BY_AXIS:
-        raise ValueError(f"an axis must be one of {list(AXES)}, got {axis!r}")
+    check_axis(axis)
     if arm not in ARMS_BY_AXIS[axis]:
         raise ValueError(f"the {axis} axis has arms {list(ARMS_BY_AXIS[axis])}, got {arm!r}")

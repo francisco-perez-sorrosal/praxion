@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Literal, assert_never
 
 from praxion_evals.adherence import verdict
-from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, SESSION_ARMS
+from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, SESSION_ARMS, check_axis
 from praxion_evals.adherence.model import (
     ROLES,
     Assessed,
@@ -742,6 +742,7 @@ def _role_standing_from_json(role: str, entry: Mapping[str, Any]) -> RoleStandin
 
 def _run_from_json(run: Mapping[str, Any]) -> RunInfo:
     known = ("id", "model", "claude_code_version", "complete", "refused_launches", "earlier_runs")
+    check_axis(run.get("axis", DEFAULT_AXIS))  # a run with no session has no setup to check it by
     return RunInfo(
         id=_need(run, "id", "the run"),
         model=_need(run, "model", "the run"),

@@ -255,6 +255,34 @@ def test_a_file_whose_session_names_another_axis_than_its_run_is_refused_on_deco
         results.from_json(document)
 
 
+def _unknown_axis_file(tmp_path: Path) -> Path:
+    path = tmp_path / "unknown.json"
+    document = results.to_json(run_results([], roles=(ROLE,)))
+    document["run"]["axis"] = "no-such-axis"  # the writer cannot make this file; a hand edit can
+    path.write_text(json.dumps(document))
+    return path
+
+
+def test_a_file_with_no_session_and_an_unknown_axis_is_refused_on_load_naming_the_axis(tmp_path):
+    with pytest.raises(ValueError, match="inherited-context.*refactoring-delivery.*'no-such-axis'"):
+        results.load(_unknown_axis_file(tmp_path))
+
+
+def test_the_report_of_a_file_naming_an_unknown_axis_ends_with_the_usage_error(tmp_path, capsys):
+    code = cli.main(["--report", str(_unknown_axis_file(tmp_path))])
+
+    assert (code, capsys.readouterr().err.count("Traceback")) == (cli.EXIT_USAGE, 0)
+
+
+def test_a_default_file_with_no_axis_key_and_a_paired_file_still_load(tmp_path):
+    for run in (
+        _run_of("inherited-context", "default-1", ("full", "lean")),
+        _run_of(PAIRED, "paired-1", PAIRED_ARMS),
+    ):
+        _write(tmp_path, run)
+        assert results.load(tmp_path / f"{run.run.id}.json") == run
+
+
 def test_a_run_and_its_sessions_of_one_axis_round_trip(tmp_path):
     run = _run_of(PAIRED, "paired", PAIRED_ARMS)
     results.write_atomic(tmp_path / "paired.json", run)

@@ -16,7 +16,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, assert_never
 
-from praxion_evals.adherence import arms, grade, refactoring_tasks, results, tasks
+from praxion_evals.adherence import arms, grade, refactoring_arms, refactoring_tasks, results, tasks
 from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, Axis, Positions
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.model import (
@@ -132,6 +132,7 @@ def axis_run(axis: Axis) -> AxisRun:
                 positions=POSITIONS[axis],
                 plan=refactoring_tasks.planned_pool,
                 stage=refactoring_tasks.stage_pool_task,
+                build=refactoring_arms.build_refactoring_copy,
                 refusals=refuse_calibration,
             )
         case _:

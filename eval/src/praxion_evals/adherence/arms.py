@@ -23,11 +23,13 @@ from __future__ import annotations
 
 import secrets
 import shutil
+import tempfile
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from praxion_evals.adherence import grade
+from praxion_evals.adherence.axis import SessionArm
 from praxion_evals.adherence.model import (
     ARMS,
     ROLES,
@@ -44,6 +46,7 @@ from praxion_evals.live.materialize import (
     install_user_scope,
     make_read_only,
     make_writable,
+    materialize_path,
     remove_tree,
     tree_entries,
 )
@@ -129,6 +132,32 @@ def _patch_and_seal(
         tree_digest=digest_entries(after),
         patched=patched,
     )
+
+
+def build_refactoring_arm(checkout: Path, arm: SessionArm, dest: Path) -> Path:
+    """The refactoring move's ``arm`` built from ``checkout`` at ``dest``, shown for every pooled role.
+
+    The checkout is materialized as the eval does (its tracked and unignored files, never its
+    environments), so the checkout is only read. The move changes both roles' definitions, so an
+    uncapped copy does not depend on the role it is built for. Returns the copy's root.
+    """
+    # Imported here: refactoring_arms imports this module for its error and helpers.
+    from praxion_evals.adherence import refactoring_arms, refactoring_tasks
+
+    scratch = Path(tempfile.mkdtemp(prefix="refactoring-arm-"))
+    try:
+        original = materialize_path(checkout, scratch / "original")
+        roles = tuple(refactoring_tasks.POOLS)
+        built = refactoring_arms.build_refactoring_copy(original, dest, roles[0], arm, None)
+        try:
+            for role in roles:
+                refactoring_arms.verify_arm(built.copy_root, arm, role)
+        except BaseException:
+            remove_tree(dest)
+            raise
+        return built.copy_root
+    finally:
+        remove_tree(scratch)
 
 
 def definition_path(role: str) -> str:

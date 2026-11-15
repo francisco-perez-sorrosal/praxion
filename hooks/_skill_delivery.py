@@ -1,4 +1,11 @@
-"""The one owner of the skill-delivery decision: whether a delegation is served the refactoring skill.
+"""The one owner of the refactoring skill's delivery: whether a delegation is served it, and how.
+
+In reading order, the module owns: the verdict on a delegation (a served role, a marker in its own
+words or behind a step-loop pointer); whether the installed definition already preloads the skill;
+what a served spawn receives (the block, the failure notice) and the matcher that tells an arrival;
+the two reads at the edge (the skill's body, the step-loop request); the decision table over verdict
+and preload state; and `deliver`, which performs every read and leaves the observation row and the
+stderr line of a failure.
 
 The marker grammar is not defined here. It is the plan reader's `REFACTORING_TAG_PATTERN` in
 `scripts/_plan_steps.py`, re-exported below as `MARKER_PATTERN`, so a plan step and a delegation
@@ -49,10 +56,12 @@ _INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.DOTALL)
 # The step-loop driver's pointer prompt, three lines (`scripts/_step_loop_render.py`
 # `spawn_request`), and the opening line of the `<step>` element in the request it points at
 # (`scripts/fixtures/step_loop_prompt_golden.md` pins that format). Change one, change the other.
-_TASK_SLUG_LINE = re.compile(r"^Task slug: (\S+)$", re.MULTILINE)
-_SPAWN_REQUEST_LINE = re.compile(r"^Spawn request: (\S+)$", re.MULTILINE)
+# A line may end in spaces, tabs or a carriage return: a pointer must not be lost to them.
+_LINE_END = r"[^\S\n]*$"
+_TASK_SLUG_LINE = re.compile(rf"^Task slug: (\S+){_LINE_END}", re.MULTILINE)
+_SPAWN_REQUEST_LINE = re.compile(rf"^Spawn request: (\S+){_LINE_END}", re.MULTILINE)
 _READ_LINE = re.compile(r"^Read (.+?) first\b", re.MULTILINE)
-_STEP_OPENING = re.compile(r'^<step id="[^"]*">$', re.MULTILINE)
+_STEP_OPENING = re.compile(rf'^<step id="[^"]*">{_LINE_END}', re.MULTILINE)
 AI_WORK_DIR = ".ai-work"
 
 
@@ -69,7 +78,9 @@ MARKER_IMPORT_ERROR: str | None = None
 try:
     # Appended, never inserted first: the script modules must not shadow the standard library.
     sys.path.append(str(_scripts_dir()))
-    from _plan_steps import REFACTORING_TAG_PATTERN as MARKER_PATTERN
+    import _plan_steps
+
+    MARKER_PATTERN = _plan_steps.REFACTORING_TAG_PATTERN
 except Exception as error:  # fail-open: a broken installation degrades the delivery, never a spawn
     MARKER_PATTERN = None
     MARKER_IMPORT_ERROR = f"{type(error).__name__}: {error}"
@@ -382,11 +393,6 @@ _LABEL_LINE = re.compile(
 _END_LINE = re.compile(rf"^{re.escape(END_LINE)}$", re.MULTILINE)
 
 
-def body_digest(body: str) -> str:
-    """The first eight hex digits of the body's SHA-256: the label's proof of which text arrived."""
-    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:_DIGEST_LENGTH]
-
-
 def render_block(body: str, base_dir: Path) -> str:
     """The skill text, delivered whole: the body appears in the block as one unaltered substring.
 
@@ -416,6 +422,11 @@ def shows_arrival(record: str, installed_body: Optional[str] = None) -> bool:  #
         if _END_LINE.search(record, label.end()):
             return True
     return False
+
+
+def body_digest(body: str) -> str:
+    """The first eight hex digits of the body's SHA-256: the label's proof of which text arrived."""
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:_DIGEST_LENGTH]
 
 
 # --- The reading edge: the skill's body, whole or not at all -------------------------------------
@@ -558,6 +569,10 @@ class Failed:
     reason: FailureReason
     cause: str = field(default="", compare=False)
 
+    def __post_init__(self) -> None:
+        if self.cause and self.reason != "internal-error":
+            raise ValueError(f"a cause means something only for an internal error: {self.reason}")
+
 
 Outcome = Union[Skipped, Served, Failed]  # noqa: UP007
 Recorded = Union[Served, Failed]  # noqa: UP007
@@ -671,17 +686,21 @@ def _report(outcome: Outcome, payload: Any, environ: Mapping[str, str]) -> None:
     """A served or failed outcome leaves its row; a failure also leaves a stderr line."""
     if isinstance(outcome, Skipped):
         return
-    if isinstance(outcome, Failed):
-        _say(_failure_line(outcome))
+    line = _failure_line(outcome) if isinstance(outcome, Failed) else ""
     try:
         _record(outcome, payload, environ)
     except Exception as error:
-        _say(f"skill delivery row not recorded: {REFACTORING_SKILL} ({type(error).__name__})")
+        unrecorded = (
+            f"skill delivery row not recorded: {REFACTORING_SKILL} ({type(error).__name__})"
+        )
+        line = f"{line}; {unrecorded}" if line else unrecorded
+    if line:
+        _say(line)
 
 
 def _say(line: str) -> None:
-    # A closed or broken stderr leaves nowhere to say it; the delivery goes on without it.
-    with contextlib.suppress(OSError, ValueError):
+    # Whatever stderr does (closed, broken, a stream that raises), the delivery goes on without it.
+    with contextlib.suppress(Exception):
         print(line, file=sys.stderr)
 
 

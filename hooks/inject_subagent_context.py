@@ -27,8 +27,9 @@ Consolidating into a single emitter makes that question structurally moot.
 
 The trailing addition is the skill delivery's (`_skill_delivery.deliver`):
 the refactoring skill's block for a marked implementer or test-engineer
-delegation, or a failure notice when a marked delegation's skill could not be
-delivered. The delivery module is imported behind a guard, so a missing or
+delegation, or a failure notice when the skill could not be delivered to a
+delegation to one of those roles (a marked one, or one that cannot be
+classified at all). The delivery module is imported behind a guard, so a missing or
 broken delivery costs the trailing addition only; the delivery records its
 outcome first, so a leading addition that fails costs itself only.
 

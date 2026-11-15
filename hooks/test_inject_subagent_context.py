@@ -114,9 +114,10 @@ def _run_hook(
 ) -> subprocess.CompletedProcess:
     """Run inject_subagent_context.py as a subprocess with the given payload."""
     env = {**os.environ}
-    # Strip all PRAXION_* keys so tests start from a clean slate
+    # Strip all PRAXION_* keys so tests start from a clean slate, and the plugin root a session
+    # sets: with it the skill delivery runs and logs a row at this checkout on every call.
     for key in list(env):
-        if key.startswith("PRAXION_"):
+        if key.startswith("PRAXION_") or key == "CLAUDE_PLUGIN_ROOT":
             del env[key]
     if env_extra:
         env.update(env_extra)

@@ -1,7 +1,8 @@
 ---
-id: dec-draft-33f2d19b
+id: dec-513
+draft_id: dec-draft-33f2d19b
 title: "The role eval gains a refactoring-delivery arm axis and refactoring-mode tasks graded from the end state"
-status: proposed
+status: accepted
 category: implementation
 date: 2026-11-14
 summary: "The adherence role eval keeps its inherited-context axis (full, lean) as the default and gains a second axis, refactoring-delivery, whose arms (preloaded, delivered) are checkout copies set by the shared move tool and proven before scoring; the implementer and the test-engineer gain refactoring-mode tasks delegated with the marker and graded on the refactoring skill's verification checklist from what the session left behind."

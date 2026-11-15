@@ -18,7 +18,7 @@ affected_files:
   - rules/_audience.yaml
   - rules/ml/
 affected_reqs: []
-superseded_in_part_by: [dec-draft-e1541d69]
+superseded_in_part_by: [dec-514]
 ---
 
 ## Context

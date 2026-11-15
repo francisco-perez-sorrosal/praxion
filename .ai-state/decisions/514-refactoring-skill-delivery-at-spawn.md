@@ -1,7 +1,8 @@
 ---
-id: dec-draft-e1541d69
+id: dec-514
+draft_id: dec-draft-e1541d69
 title: "The refactoring skill reaches a marked spawn through the single prompt-rewrite emitter, not a preload"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-14
 summary: "A new hook-side delivery module decides per Agent call whether a delegation to the implementer or test-engineer carries the refactoring phase marker in its own words (or is a step-loop request for a tagged step) and, when the role's definition no longer preloads the skill, the single PreToolUse emitter appends the skill body as one labelled block; the marker grammar stays in the plan reader, which the module re-exports; the preload's removal is a held, reversible move."

@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-14T02:06:36Z'
+generated_at: '2026-11-15T18:27:57Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-14'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-12'
+  last_modified: '2026-11-15'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-13'
+  last_modified: '2026-11-15'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-13'
+  last_modified: '2026-11-15'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -3727,7 +3727,7 @@ surfaces:
   path: .ai-state/decisions/504-diet-closes-catalogue-and-manifest-items.md
   type: markdown
   title: The startup-context diet closes its preload, catalogue and manifest-axis items by recorded decision
-  last_modified: '2026-11-11'
+  last_modified: '2026-11-13'
   renderer: adr_card
 - id: ai-state-decisions-505-hand-path-instructions-step-beside-the-update-path
   path: .ai-state/decisions/505-hand-path-instructions-step-beside-the-update-path.md
@@ -3776,6 +3776,18 @@ surfaces:
   type: markdown
   title: 'Memory index budget: one declared ceiling owned by the audit'
   last_modified: '2026-11-13'
+  renderer: adr_card
+- id: ai-state-decisions-513-refactoring-delivery-eval-arm-axis
+  path: .ai-state/decisions/513-refactoring-delivery-eval-arm-axis.md
+  type: markdown
+  title: The role eval gains a refactoring-delivery arm axis and refactoring-mode tasks graded from the end state
+  last_modified: '2026-11-15'
+  renderer: adr_card
+- id: ai-state-decisions-514-refactoring-skill-delivery-at-spawn
+  path: .ai-state/decisions/514-refactoring-skill-delivery-at-spawn.md
+  type: markdown
+  title: The refactoring skill reaches a marked spawn through the single prompt-rewrite emitter, not a preload
+  last_modified: '2026-11-15'
   renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
@@ -4773,6 +4785,8 @@ groups:
   - ai-state-decisions-510-generated-principle-names-and-prior-art-module
   - ai-state-decisions-511-small-debt-follow-up-record
   - ai-state-decisions-512-memory-index-budget
+  - ai-state-decisions-513-refactoring-delivery-eval-arm-axis
+  - ai-state-decisions-514-refactoring-skill-delivery-at-spawn
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

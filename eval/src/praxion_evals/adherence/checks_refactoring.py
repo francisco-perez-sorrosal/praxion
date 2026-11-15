@@ -31,7 +31,7 @@ from praxion_evals.adherence.model import Role
 MANIFEST = "refactoring.toml"
 SOURCE_ROOT = "src"  # a leading directory that is not part of a module's dotted name
 TEST_TIMEOUT_SECONDS = 120
-PYTEST_TESTS_FAILED = 1  # pytest's exit code for "the tests ran and some failed"; 0 is all passed
+PYTEST_SESSION_FAULTS = (1, 2, 5)  # tests failed, stopped at collection, none collected; 0 passed
 ERROR_DETAIL_LINES = 8
 GIT_TIMEOUT_SECONDS = 60
 # Environment that would leak the eval's own pytest and coverage settings into the graded one.
@@ -504,7 +504,15 @@ def _dotted(node: ast.expr) -> str:
 
 
 def _pytest_passes(root: Path) -> bool:
-    """Whether the repository's tests pass; ``PytestRunError`` when the run reached no verdict."""
+    """Whether the repository's tests pass; ``PytestRunError`` when the run reached no verdict.
+
+    Mapped by who caused the result. Exit 0 passes. Exits 1 (tests failed, a failing fixture
+    included), 2 (collection stopped on an import or syntax error in the repository) and 5 (no test
+    collected) are the session's own doing, so they fail the item: else a session could break or
+    delete its tests and escape "the tests still pass". Exit 3 (pytest's internal error), 4 (a usage
+    error of this grader's command line, or a conftest that cannot load) and a timeout say nothing
+    about the session: they raise, and an errored item is never counted as passed.
+    """
     env = {k: v for k, v in os.environ.items() if not k.startswith(_FOREIGN_ENV_PREFIXES)}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as scratch:
@@ -518,9 +526,8 @@ def _pytest_passes(root: Path) -> bool:
         except subprocess.TimeoutExpired as error:
             ran = f"pytest did not finish within {TEST_TIMEOUT_SECONDS} s"
             raise PytestRunError(f"{ran}\n{_tail(error.output)}") from error
-    if run.returncode not in (0, PYTEST_TESTS_FAILED):
-        ran = f"pytest exited {run.returncode}"
-        raise PytestRunError(f"{ran}\n{_tail(run.stdout + run.stderr)}")
+    if run.returncode not in (0, *PYTEST_SESSION_FAULTS):
+        raise PytestRunError(f"pytest exited {run.returncode}\n{_tail(run.stdout + run.stderr)}")
     return run.returncode == 0
 
 

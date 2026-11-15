@@ -1,5 +1,5 @@
-"""What decides a paid refactoring run's results: a damaged record proves nothing, and a test run
-that could not run is no failed checklist item.
+"""What decides a paid refactoring run's results: a damaged record proves nothing, a session's own
+broken tests fail the item, and a test run that could not judge them is no failed checklist item.
 
 Nothing here starts a session. The delivery module that counts blocks is this checkout's own; the
 repositories graded are tiny ones built under ``tmp_path``.
@@ -164,7 +164,7 @@ def test_a_rewritten_prompt_must_end_in_the_block(block, rewritten, arrives):
     assert refactoring_arms._ask_copy(REPO_ROOT, refactoring_arms._ARRIVES, prompt) is arrives
 
 
-# --- a test run that could not run is not a failed item ---------------------------------------
+# --- a session's broken tests fail the item; a run that could not judge them is errored ---------------------------------------
 
 
 def _repo_running(tmp_path: Path, test_source: str) -> Path:
@@ -177,14 +177,18 @@ def _repo_running(tmp_path: Path, test_source: str) -> Path:
     [
         ("def test_ok():\n    assert True\n", True),
         ("def test_bad():\n    assert False\n", False),
+        (
+            "import pytest\n\n@pytest.fixture\ndef f():\n    raise ValueError\n\ndef test_x(f):\n    pass\n",
+            False,
+        ),
     ],
 )
 def test_the_exit_codes_pytest_gives_a_verdict_with_decide_the_item(tmp_path, test_source, holds):
     assert checks_refactoring._pytest_passes(_repo_running(tmp_path, test_source)) is holds
 
 
-@pytest.mark.parametrize("returncode", [2, 3, 4])
-def test_a_run_that_was_interrupted_or_broke_is_errored_with_the_output(tmp_path, returncode):
+@pytest.mark.parametrize("returncode", [3, 4])
+def test_a_run_that_broke_is_errored_with_the_output(tmp_path, returncode):
     source = f"import pytest\n\ndef test_stop():\n    pytest.exit('broke here', returncode={returncode})\n"
 
     with pytest.raises(checks_refactoring.PytestRunError, match=f"exited {returncode}") as caught:
@@ -193,9 +197,29 @@ def test_a_run_that_was_interrupted_or_broke_is_errored_with_the_output(tmp_path
     assert "broke here" in str(caught.value)
 
 
-def test_a_run_that_collects_no_test_is_errored_not_failed(tmp_path):
-    with pytest.raises(checks_refactoring.PytestRunError, match="exited 5"):
+@pytest.mark.parametrize(
+    "files",
+    [
+        {"test_run.py": "import module_that_is_not_there\n\ndef test_x():\n    pass\n"},  # exit 2
+        {"test_run.py": "def test_x(:\n"},  # exit 2: a syntax error stops collection too
+        {"note.txt": "no test module\n"},  # exit 5
+    ],
+)
+def test_a_run_the_session_left_unable_to_collect_fails_the_item_not_errors_it(tmp_path, files):
+    for name, text in files.items():
+        (tmp_path / name).write_text(text)
+
+    assert checks_refactoring._pytest_passes(tmp_path) is False
+
+
+def test_a_conftest_that_cannot_be_loaded_is_a_usage_error_and_errored(tmp_path):
+    (tmp_path / "conftest.py").write_text("import module_that_is_not_there\n")
+    (tmp_path / "test_run.py").write_text("def test_ok():\n    pass\n")
+
+    with pytest.raises(checks_refactoring.PytestRunError, match="exited 4") as caught:
         checks_refactoring._pytest_passes(tmp_path)
+
+    assert "conftest" in str(caught.value)
 
 
 def test_a_run_that_outlasts_its_time_is_errored(tmp_path, monkeypatch):
@@ -250,15 +274,88 @@ def _graded_workspace(tmp_path: Path, tests: dict[str, str]) -> Path:
     return tmp_path
 
 
-def test_a_grade_over_tests_that_collect_nothing_errors_the_items_that_run_them(tmp_path):
-    workspace = _graded_workspace(tmp_path, {"tests/note.txt": "no test module\n"})
+_RUN_ITEMS = {"the tests still pass", "behaviour is unchanged"}
+
+
+@pytest.mark.parametrize(
+    "tests",
+    [
+        {"tests/note.txt": "no test module\n"},  # nothing to collect
+        {"tests/test_old.py": "import module_that_is_not_there\n\ndef test_x():\n    pass\n"},
+        {"tests/test_old.py": "def test_x(:\n"},
+        {"tests/test_old.py": "def test_bad():\n    assert False\n"},
+        {
+            "tests/test_old.py": "import pytest\n\n@pytest.fixture\ndef f():\n    raise ValueError\n\ndef test_x(f):\n    pass\n"
+        },
+    ],
+    ids=[
+        "no test left",
+        "a test module that cannot be imported",
+        "a test module with a syntax error",
+        "a failing test",
+        "a failing fixture",
+    ],
+)
+def test_a_grade_over_tests_the_session_broke_fails_the_items_that_run_them(tmp_path, tests):
+    workspace = _graded_workspace(tmp_path, tests)
 
     result = checks_refactoring.grade_workspace("implementer", workspace, "")
 
-    assert set(result.errored) == {"the tests still pass", "behaviour is unchanged"}
-    assert "exited 5" in result.errored["the tests still pass"]
-    assert not set(result.errored) & set(result.failed)
+    assert _RUN_ITEMS <= set(result.failed)
+    assert not result.errored
     assert not result.passed
+
+
+def test_a_grade_over_passing_tests_passes_the_items_that_run_them(tmp_path):
+    workspace = _graded_workspace(tmp_path, {"tests/test_old.py": "def test_ok():\n    pass\n"})
+
+    result = checks_refactoring.grade_workspace("implementer", workspace, "")
+
+    assert not _RUN_ITEMS & (set(result.failed) | set(result.errored))
+
+
+@pytest.mark.parametrize(
+    ("files", "last_lines"),
+    [
+        (
+            {
+                "tests/test_old.py": "import pytest\n\ndef test_x():\n    pytest.exit('broke here', returncode=3)\n"
+            },
+            "broke here",
+        ),
+        (
+            {
+                "tests/conftest.py": "import module_that_is_not_there\n",
+                "tests/test_old.py": "def test_x():\n    pass\n",
+            },
+            "conftest",
+        ),
+    ],
+    ids=["pytest's internal error", "a conftest that cannot be loaded"],
+)
+def test_a_grade_over_a_run_that_broke_errors_the_items_with_the_last_lines(
+    tmp_path, files, last_lines
+):
+    workspace = _graded_workspace(tmp_path, files)
+
+    result = checks_refactoring.grade_workspace("implementer", workspace, "")
+
+    assert set(result.errored) == _RUN_ITEMS
+    assert last_lines in result.errored["the tests still pass"]
+    assert not _RUN_ITEMS & set(result.failed)
+    assert not result.passed
+
+
+def test_a_grade_over_a_run_that_timed_out_errors_the_items(tmp_path, monkeypatch):
+    monkeypatch.setattr(checks_refactoring, "TEST_TIMEOUT_SECONDS", 1)
+    source = "import time\n\ndef test_slow():\n    time.sleep(30)\n"
+    workspace = _graded_workspace(tmp_path, {"tests/test_old.py": source})
+
+    result = checks_refactoring.grade_workspace("implementer", workspace, "")
+
+    assert set(result.errored) == _RUN_ITEMS
+    assert "did not finish within 1 s" in result.errored["the tests still pass"]
+    assert not _RUN_ITEMS & set(result.failed)
 
 
 def test_an_errored_item_is_an_errored_outcome_with_the_output_and_never_a_failed_one():

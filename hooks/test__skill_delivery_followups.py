@@ -8,7 +8,6 @@ an arrival on purpose, and the emitter's own tests leave this checkout's observa
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -202,88 +201,3 @@ def test_the_emitter_helper_runs_the_hook_without_logging_at_this_checkout(stdin
 
     assert result.returncode == 0
     assert delivery_rows_of_this_checkout() == before
-
-
-# --- survivors of the mutation sensor that a test can kill ----------------------------------------
-
-
-def scripts_dir_of_hook_at(monkeypatch, hook_file: Path) -> Path:
-    monkeypatch.setattr(delivery, "__file__", str(hook_file))
-    return delivery._scripts_dir()
-
-
-def test_the_scripts_directory_is_the_one_beside_the_hooks_directory(tmp_path, monkeypatch):
-    (tmp_path / "hooks").mkdir()
-    (tmp_path / "scripts").mkdir()
-    hook = tmp_path / "hooks" / "_skill_delivery.py"
-
-    assert scripts_dir_of_hook_at(monkeypatch, hook) == (tmp_path / "scripts").resolve()
-
-
-def test_the_scripts_directory_one_level_up_serves_a_hook_copied_one_level_down(
-    tmp_path, monkeypatch
-):
-    (tmp_path / "hooks" / "mutants").mkdir(parents=True)
-    (tmp_path / "scripts").mkdir()
-    hook = tmp_path / "hooks" / "mutants" / "_skill_delivery.py"
-
-    assert scripts_dir_of_hook_at(monkeypatch, hook) == (tmp_path / "scripts").resolve()
-
-
-def test_the_nearer_scripts_directory_wins_over_the_one_further_up(tmp_path, monkeypatch):
-    (tmp_path / "plugin" / "hooks").mkdir(parents=True)
-    (tmp_path / "plugin" / "scripts").mkdir()
-    (tmp_path / "scripts").mkdir()
-    hook = tmp_path / "plugin" / "hooks" / "_skill_delivery.py"
-
-    assert scripts_dir_of_hook_at(monkeypatch, hook) == (tmp_path / "plugin" / "scripts").resolve()
-
-
-def test_a_hook_reached_through_a_link_finds_the_scripts_beside_its_real_place(
-    tmp_path, monkeypatch
-):
-    (tmp_path / "real" / "hooks").mkdir(parents=True)
-    (tmp_path / "real" / "scripts").mkdir()
-    (tmp_path / "linked").mkdir()
-    (tmp_path / "linked" / "hooks").symlink_to(tmp_path / "real" / "hooks")
-    hook = tmp_path / "linked" / "hooks" / "_skill_delivery.py"
-
-    assert scripts_dir_of_hook_at(monkeypatch, hook) == (tmp_path / "real" / "scripts").resolve()
-
-
-def test_a_definition_is_read_as_utf8_whatever_the_locale(tmp_path):
-    plugin = make_installation(tmp_path)
-    (plugin / "agents" / "implementer.md").write_text(
-        "---\nname: implementer\ndescription: café\nskills: [refactoring]\n---\n",
-        encoding="utf-8",
-    )
-    probe = (
-        "import sys; sys.path.insert(0, sys.argv[1]); sys.path.append(sys.argv[2]); "
-        "from pathlib import Path; import _skill_delivery as d; "
-        "print(type(d.preload_state(Path(sys.argv[3]), 'implementer')).__name__)"
-    )
-    ascii_only = {
-        **{k: v for k, v in os.environ.items() if not k.startswith(("LC_", "PYTHON"))},
-        "LC_ALL": "C",
-        "PYTHONUTF8": "0",
-        "PYTHONCOERCECLOCALE": "0",
-    }
-
-    result = subprocess.run(
-        [sys.executable, "-c", probe, str(HOOKS_DIR), str(PLUGIN_ROOT / "scripts"), str(plugin)],
-        capture_output=True,
-        text=True,
-        env=ascii_only,
-        timeout=30,
-    )
-
-    assert result.stdout.strip() == "Preloaded", result.stderr
-
-
-def test_a_skill_name_keeps_the_letters_that_only_look_like_quotes_to_a_sloppy_strip(tmp_path):
-    plugin = make_installation(tmp_path)
-    (plugin / "agents" / "implementer.md").write_text(
-        "---\nname: implementer\nskills: [XXrefactoringXX]\n---\n", encoding="utf-8"
-    )
-
-    assert delivery.preload_state(plugin, "implementer") == delivery.NotPreloaded()

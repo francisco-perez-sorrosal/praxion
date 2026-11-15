@@ -34,7 +34,7 @@ PAIRED_ARMS = ("preloaded", "delivered")
 STARTED_AT = "2026-10-12T09:00:00Z"
 TASKS = ("task-0", "task-1", "task-2")
 RULING = (
-    "run {id} cannot be continued: a run of the refactoring-delivery axis is not continued;"
+    "run {id} cannot be continued: --continue takes no run of the refactoring-delivery axis;"
     " close it (--close {id} --reason TEXT) and start a fresh run"
 )
 
@@ -150,12 +150,12 @@ def test_reindexing_lists_a_stopped_paired_run(tmp_path):
 def test_a_stopped_paired_run_blocks_a_fresh_run_of_its_role_until_it_is_closed(tmp_path):
     directory = _planted(tmp_path, "paired-1", PAIRED, SpendRefused(TASKS))
 
-    blocking = pending_stop(directory, ROLE)
+    blocking = pending_stop(directory, ROLE, PAIRED)
     assert blocking is not None
     assert blocking.run_id == "paired-1"
 
     assert _cli(directory, "--close", "paired-1", "--reason", REASON) == 0
-    assert pending_stop(directory, ROLE) is None
+    assert pending_stop(directory, ROLE, PAIRED) is None
 
 
 def test_continuing_a_stopped_paired_run_is_refused_in_the_rulings_words_and_writes_nothing(
@@ -183,4 +183,4 @@ def test_continuing_a_stopped_default_run_is_not_refused_for_its_axis(tmp_path, 
 
     _cli(directory, "--continue", "default-1")
 
-    assert "axis is not continued" not in capsys.readouterr().err
+    assert "takes no run of the" not in capsys.readouterr().err

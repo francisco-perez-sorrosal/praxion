@@ -115,6 +115,8 @@ cd dashboard_app && pnpm dev
 
 Open the dev server at `http://localhost:<port>`, not `127.0.0.1`: Next's dev-origin check hydrates only the `localhost` origin, so charts stay blank on the IP origin (`next start` serves either). A `next-server` child can keep its port after you kill its parent; free it by port (`lsof -t -iTCP:<port>`) before restarting. Observed 2026-11 on Next 16.2, not re-probed since.
 
+In a git worktree, the step-loop gate's vitest pocket needs a `node_modules` of its own, and pnpm's dependency check reads a `node_modules` that is a link as stale and wants to reinstall. Either give the worktree its own `pnpm install --frozen-lockfile`, or set `pnpm_config_verify_deps_before_run=false` for the `step_loop.py record` call that runs the gate (pnpm does not read the `npm_config_` spelling), and never answer pnpm's purge prompt. Observed 2026-11-12, not re-probed against pnpm's documentation. For a derived-scope run by hand, outside the gate, a temporary symlink from the worktree's `dashboard_app/node_modules` to the main checkout's runs the dashboard pocket when the runner is called directly (`./node_modules/.bin/vitest run`; observed 2026-11-15); remove it afterwards.
+
 React component-render tests are deferred — see `.ai-state/TECH_DEBT_LEDGER.md`.
 
 ## Package layout

@@ -144,6 +144,8 @@ claude logs 1a2b3c4d -f     # follow live (Ctrl-C to stop)
 claude stop 1a2b3c4d        # cancel this rework
 ```
 
+Two things about reading that output (seen 2026-09-27, not re-probed on a later Claude Code): the text after `❯` in an idle session's log is Claude Code's suggested next prompt, not something a user typed; and the rendering can drop letters, so tell that a session has finished by its `✻ <verb> for <N>m` line, not by searching for the word "done".
+
 ### Notifications
 
 A `Stop` hook (`hooks/notify_bg_session_state.py`) fires a macOS-visible notification when a `--bg` rework session completes. The hook uses a marker-file correlation to identify rework sessions (see [How it works](#how-it-works-under-the-hood)) and emits via `osascript -e 'display notification ...'`. You do not have to keep the dashboard open — the notification will reach you.

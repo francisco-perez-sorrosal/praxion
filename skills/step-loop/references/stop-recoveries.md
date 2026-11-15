@@ -41,9 +41,22 @@ A step the loop does not drive, with `Files:` set and no Check, is judged by its
 
 Once such a step is committed and verified, set its plan `**Files**:` to `none (orchestrator note: committed in <sha>, files ..., Done-when confirmed by ...)`. A not-driven step with no files and no Check, ticked in `WIP.md`, reads as done outside whatever later steps record. The same fix fits a step whose files all belong to an earlier step.
 
-## A stop handoff that crashes
+## Revising a step block
 
-On a stop the driver composes `HANDOFF.md` in the task directory. A hand-written `HANDOFF.md` that lacks the required sections or the boundary header makes the composer refuse to overwrite it, and `record` exits 1 after it has already recorded the return. This is a workaround for that crash, not a design.
+A step block is the unit the driver tracks its attempts and its verified record by: editing the block (not only `Files:`) opens a new series for that step. That is how a blocked or exhausted step is cleared: with no request out, edit the step's own block, then run `next`.
 
-- Move the hand-written file aside (rename it, outside the task directory if the name matters) and run `next`: the stop is then written normally.
-- Do not retry the `record`; the return is already recorded.
+Never edit the block of a step the loop has already verified. Its verified record belongs to the old block, so the next `next` issues the step again (observed 2026-11-12).
+
+## Putting a step ahead of the next
+
+To run a step before the one `next` would issue, change the plan before the `record` that would issue that next one. This is a workaround until the driver withdraws and re-issues a request cleanly:
+
+- A withdrawn request (`record --not-started`) is issued again at once.
+- After a plan change the withdrawal is refused, and `next` then issues the inserted step while the other is still marked outstanding. Two outstanding lines stop every call, `record` included.
+- The blocks of later steps can be amended freely while an earlier request is out.
+
+## A warning that a file was left uncommitted
+
+A file the step's agent changed outside the step's `Files:` is left uncommitted, and the driver warns `undeclared-edit`; the warning names the file, not the remedy. The relay never commits, so the orchestrator does it at a step boundary: read `git status` after each `record`, and commit what is left by name at the next stop, or before the step that follows depends on it.
+
+The warning `outer-loop-edit` is different: an outer-loop test file is never committed by the driver, and a change to one goes through a Spec Question and an answered `Resolved in:`, not through a hand commit (see [`coordination-details.md § Spec-Question Routing`](../../software-planning/references/coordination-details.md#spec-question-routing)).

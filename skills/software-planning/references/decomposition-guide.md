@@ -167,6 +167,8 @@ Precedence mirrors `review: force`/`review: off` exactly: the planner field deci
 
 **Don't:** Skip tests for complex logic -- critical and complex components need tests; don't defer testing indefinitely
 
+**Don't:** Build every piece and wire none -- at the planning checkpoint ask of each built piece what calls it on the path the user will run. A plan once built every piece of a paid run and wired none; a second architect found it twenty-two steps in, and it cost a re-tier
+
 ## Claude Code Usage
 
 When using this skill with Claude Code specifically:

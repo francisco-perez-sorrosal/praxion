@@ -100,26 +100,39 @@ FLIP_MEANING = {
     "not clear": "a scored check shows a regression or is inferior, or no check was scored",
 }
 
-READING_NOTES = (
-    "How to read this report",
-    "- Each verdict claims at most non-regression on a mechanical check, and non-inferiority"
-    " within the declared margin on a judged check, over the pairs shown. It says nothing"
-    " about either arm doing more than the other.",
-    "- Judge error attenuates differences between the arms toward zero, so a judged check can"
-    " look equal when the arms differ.",
-    "- A judged check's interval is reported beside its verdict. The interval did not decide"
-    " the verdict, which the margin on the pass rates alone decides.",
-    "- b counts pairs where only the full arm passed; c counts pairs where only the lean arm"
-    " passed; n is the usable pairs after the worst-case recount.",
-    "- Withheld and not-applicable checks enter no rate and no verdict, and are not covered by"
-    " a flip verdict; each is listed with its reason.",
-    "- A token saving appears only as a startup-probe reading: the median of first-request"
-    " tokens beside each arm. No verdict here claims a saving; a verdict bounds non-regression"
-    " within the declared margin and nothing more.",
-    "- Kernel delivery evidence lists, per role, the marker records of the lean sessions the"
-    " verdict relies on. An adherence sandbox writes no observation row, so the marker in the"
-    " spawned role's transcript is the record a flip can cite.",
-)
+
+def reading_notes(positions: Positions, kernel_delivery: bool = True) -> tuple[str, ...]:
+    """The reading notes of a report, naming the run's own arms; the kernel-delivery note only
+    for a run that prints that section."""
+    base, treat = positions.baseline, positions.treatment
+    notes = (
+        "How to read this report",
+        "- Each verdict claims at most non-regression on a mechanical check, and non-inferiority"
+        " within the declared margin on a judged check, over the pairs shown. It says nothing"
+        " about either arm doing more than the other.",
+        "- Judge error attenuates differences between the arms toward zero, so a judged check can"
+        " look equal when the arms differ.",
+        "- A judged check's interval is reported beside its verdict. The interval did not decide"
+        " the verdict, which the margin on the pass rates alone decides.",
+        f"- b counts pairs where only the {base} arm passed; c counts pairs where only the {treat}"
+        " arm passed; n is the usable pairs after the worst-case recount.",
+        "- Withheld and not-applicable checks enter no rate and no verdict, and are not covered by"
+        " a flip verdict; each is listed with its reason.",
+        "- A token saving appears only as a startup-probe reading: the median of first-request"
+        " tokens beside each arm. No verdict here claims a saving; a verdict bounds non-regression"
+        " within the declared margin and nothing more.",
+    )
+    if not kernel_delivery:
+        return notes
+    return (
+        *notes,
+        "- Kernel delivery evidence lists, per role, the marker records of the lean sessions the"
+        " verdict relies on. An adherence sandbox writes no observation row, so the marker in the"
+        " spawned role's transcript is the record a flip can cite.",
+    )
+
+
+READING_NOTES = reading_notes(POSITIONS[DEFAULT_AXIS])
 
 
 def render(results: RunResults, continued_from: Sequence[RunResults] = ()) -> str:
@@ -129,7 +142,8 @@ def render(results: RunResults, continued_from: Sequence[RunResults] = ()) -> st
     whole = merged(parts)
     verdicts = role_verdicts(whole)
     positions = POSITIONS[run_axis(whole.run)]
-    sections = [_run_section(whole, parts), "\n".join(READING_NOTES)]
+    notes = reading_notes(positions, _reports_kernel_delivery(whole))
+    sections = [_run_section(whole, parts), "\n".join(notes)]
     sections += [
         _role_section(whole, role, entries, verdicts[role], positions)
         for role, entries in whole.catalog.items()
@@ -259,8 +273,9 @@ def _role_section(
     lines = [f"Role {role}: {_role_headline(verdict)}"]
     lines.append(
         f"{INDENT}{len(complete)} complete pairs of {len(pairs)} paired tasks;"
-        f" worst-case recount, pairs with a lean-side error and a measured full side counted as"
-        f" lean failures: {_lean_errored(pairs)}."
+        f" worst-case recount, pairs with a {positions.treatment}-side error and a measured"
+        f" {positions.baseline} side counted as {positions.treatment} failures:"
+        f" {_treatment_errored(pairs)}."
     )
     lines += _mode_lines(role, complete)
     lines += _session_lines(results, role, positions)
@@ -269,7 +284,8 @@ def _role_section(
     calibration = bool(results.run.extra.get("calibration"))
     for entry in entries:
         lines += _check_lines(entry, complete, verdict, results.settings, calibration, positions)
-    lines += _kernel_delivery_lines(kernel_deliveries(results, role))
+    if _reports_kernel_delivery(results):
+        lines += _kernel_delivery_lines(kernel_deliveries(results, role))
     lines += _earlier_runs_lines(results, role)
     return "\n".join(lines)
 
@@ -308,7 +324,13 @@ def _mode_lines(role: str, complete: Iterable[Pair]) -> list[str]:
     return lines
 
 
-def _lean_errored(pairs: Iterable[Pair]) -> int:
+def _reports_kernel_delivery(results: RunResults) -> bool:
+    """The kernel-delivery evidence belongs to the default axis's lean arm; a paired run prints
+    none, since its arms differ in how the skill arrives and its checks grade that."""
+    return run_axis(results.run) == DEFAULT_AXIS
+
+
+def _treatment_errored(pairs: Iterable[Pair]) -> int:
     return sum(isinstance(p.full, Measured) and isinstance(p.lean, Errored) for p in pairs)
 
 
@@ -475,7 +497,7 @@ def _check_lines(
     if calibration:
         return [*lines, _slot_order_line(entry.name, complete)]
     lines += _allowance_lines(entry.name, verdict, settings)
-    lines.append(f"{INDENT * 3}verdict: {_check_verdict(entry.name, verdict)}")
+    lines.append(f"{INDENT * 3}verdict: {_check_verdict(entry.name, verdict, positions)}")
     return lines
 
 
@@ -529,7 +551,7 @@ def _arm_outcome_lines(check: str, arm: str, statuses: Iterable[SessionStatus]) 
     return [line] + [f"{INDENT * 4}{shorten(reason, REASON_WIDTH)}" for reason in reasons]
 
 
-def _check_verdict(check: str, verdict: RoleVerdict) -> str:
+def _check_verdict(check: str, verdict: RoleVerdict, positions: Positions) -> str:
     match verdict:
         case Underpowered():
             return "none (the role is underpowered)"
@@ -538,15 +560,16 @@ def _check_verdict(check: str, verdict: RoleVerdict) -> str:
             if isinstance(coverage, NotCovered):
                 return f"not covered by the flip verdict ({coverage.reason})"
             if check in scored:
-                return _scored_verdict(scored[check])
+                return _scored_verdict(scored[check], positions)
             return "not covered by the flip verdict (not scored)"
         case _:
             assert_never(verdict)
 
 
-def _scored_verdict(check_verdict: CheckVerdict) -> str:
+def _scored_verdict(check_verdict: CheckVerdict, positions: Positions) -> str:
     counts = check_verdict.counts
-    tallies = f"b {counts.b}, c {counts.c}, n {counts.n}, lean failures {counts.lean_failures}"
+    base, treat = positions.baseline, positions.treatment
+    tallies = f"b {counts.b}, c {counts.c}, n {counts.n}, {treat} failures {counts.lean_failures}"
     match check_verdict:
         case NoRegression(allowance=allowance) | Regression(allowance=allowance):
             label = "no regression" if isinstance(check_verdict, NoRegression) else "regression"
@@ -555,9 +578,9 @@ def _scored_verdict(check_verdict: CheckVerdict) -> str:
             label = "non-inferior" if isinstance(check_verdict, NonInferior) else "inferior"
             lower, upper = PERCENT * interval.lower, PERCENT * interval.upper
             return (
-                f"{label} (pass rates: lean {counts.passes_lean} of {counts.n},"
-                f" full {counts.passes_full} of {counts.n}; {tallies}); one-sided interval on"
-                f" lean minus full: lower {lower:+.1f} pp, upper {upper:+.1f} pp,"
+                f"{label} (pass rates: {treat} {counts.passes_lean} of {counts.n},"
+                f" {base} {counts.passes_full} of {counts.n}; {tallies}); one-sided interval on"
+                f" {treat} minus {base}: lower {lower:+.1f} pp, upper {upper:+.1f} pp,"
                 f" width {upper - lower:.1f} pp, reported only"
             )
         case _:

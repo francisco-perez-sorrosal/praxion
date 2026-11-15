@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 
 from praxion_evals.adherence import report
 from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS
@@ -268,3 +269,82 @@ Role implementer: underpowered, counts only and no flip verdict (0 complete pair
       verdict: none (the role is underpowered)
   Earlier runs of this role on this checkout: none.
 """
+
+
+# ---------------------------------------------------------------------------
+# The legend and the verdict sentences name the run's arms
+# ---------------------------------------------------------------------------
+
+DEFAULT_ARM_WORDS = re.compile(r"\b(?:lean|full)\b")
+
+
+def with_kernel_rows(run: RunResults) -> RunResults:
+    """The run with its treatment-arm sessions holding delivery markers, as a default run's lean
+    sessions do."""
+    row = {"session_id": "sess-7", "kernel_version": "0a1b2c3d", "slot": 1}
+    treatment = POSITIONS[run.run.extra.get("axis", DEFAULT_AXIS)].treatment
+    sessions = tuple(
+        dataclasses.replace(r, status=dataclasses.replace(r.status, kernel_rows=(row,)))
+        if r.setup.arm == treatment
+        else r
+        for r in run.sessions
+    )
+    return dataclasses.replace(run, sessions=sessions)
+
+
+def test_a_paired_runs_legend_says_which_arm_each_discordant_count_belongs_to():
+    text = report.render(two_role_run(PAIRED))
+
+    assert (
+        "- b counts pairs where only the preloaded arm passed; c counts pairs where only the"
+        " delivered arm passed; n is the usable pairs after the worst-case recount."
+    ) in text
+
+
+def test_a_paired_runs_recount_sentence_names_its_arms():
+    block = role_block(report.render(two_role_run(PAIRED)), "researcher")
+
+    assert (
+        "worst-case recount, pairs with a delivered-side error and a measured preloaded side"
+        " counted as delivered failures: 0."
+    ) in block
+
+
+def test_a_paired_runs_mechanical_verdict_tallies_the_treatment_arms_failures():
+    block = role_block(report.render(two_role_run(PAIRED)), "researcher")
+
+    assert "regression (b 2, c 0, n 3, delivered failures 2; noise allowance 0)" in block
+
+
+def test_a_paired_runs_judged_verdict_names_its_arms_in_pass_rates_and_interval():
+    text = report.render(two_role_run(PAIRED))
+
+    c3 = text.split("C3 (judged)")[1].split("C5 (mechanical)")[0]
+    assert (
+        "pass rates: delivered 3 of 3, preloaded 3 of 3; b 0, c 0, n 3, delivered failures 0" in c3
+    )
+    assert "one-sided interval on delivered minus preloaded: lower" in c3
+
+
+def test_a_paired_report_uses_the_default_arms_names_nowhere():
+    text = report.render(two_role_run(PAIRED))
+
+    assert DEFAULT_ARM_WORDS.findall(text) == []
+
+
+def test_a_paired_report_prints_no_kernel_delivery_section_or_note():
+    text = report.render(with_kernel_rows(two_role_run(PAIRED)))
+
+    assert "Kernel delivery evidence" not in text
+    assert "kernel delivery" not in text.lower()
+
+
+def test_a_default_run_with_delivery_markers_still_prints_its_kernel_delivery_section():
+    text = report.render(with_kernel_rows(two_role_run(DEFAULT_AXIS)))
+
+    assert "Kernel delivery evidence (lean sessions the verdict relies on):" in text
+
+
+def test_the_default_reading_notes_are_the_notes_the_report_printed_before_arms_were_named():
+    assert "\n".join(report.READING_NOTES) in DEFAULT_TEXT
+    assert report.READING_NOTES == report.reading_notes(POSITIONS[DEFAULT_AXIS])

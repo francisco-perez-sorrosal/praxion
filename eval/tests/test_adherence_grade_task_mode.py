@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from praxion_evals.adherence import grade, refactoring_tasks, session_launch, tasks
+from praxion_evals.adherence.axis_runs import DEFAULT_RUN
 from praxion_evals.adherence.model import ROLES
 from tests.test_adherence_grade import SLUG, _evidence, repo  # noqa: F401  (repo is a fixture)
 
@@ -60,7 +61,13 @@ def test_the_launch_hands_the_graders_the_tasks_own_mode(monkeypatch, tmp_path):
     run = SimpleNamespace(stdout="", exit_code=0, timed_out=False)
 
     session_launch._evidence(
-        SimpleNamespace(judge=None), task, build, None, tmp_path / "sandbox", run, "abc"
+        SimpleNamespace(judge=None, axis_run=DEFAULT_RUN),
+        task,
+        build,
+        None,
+        tmp_path / "sandbox",
+        run,
+        "abc",
     )
 
     assert seen["mode"] == "paired"

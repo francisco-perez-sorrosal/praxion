@@ -270,4 +270,4 @@ def test_the_run_launches_sessions_with_the_operators_token_file(tmp_path):
 
 def _config() -> RunConfig:
     fields = dict.fromkeys(RunConfig.__dataclass_fields__)
-    return RunConfig(**{**fields, "session_oauth_token_file": None})  # type: ignore[arg-type]
+    return RunConfig(**{**fields, "arms": (), "session_oauth_token_file": None})  # type: ignore[arg-type]

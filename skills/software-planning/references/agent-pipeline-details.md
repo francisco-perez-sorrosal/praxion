@@ -142,7 +142,18 @@ When running multiple Claude Code sessions concurrently on the same repository:
 
 Never pass `isolation: "worktree"` when spawning subagents. It creates additional git worktrees with opaque names (`agent-<hex-id>`) that nest inside the pipeline worktree, confusing the user and fragmenting work across multiple directories. Known Claude Code issues: nested worktree creation ([#27881](https://github.com/anthropics/claude-code/issues/27881)), silent ignore for team agents ([#33045](https://github.com/anthropics/claude-code/issues/33045)).
 
-Instead, all agents share the pipeline worktree created by `EnterWorktree`. Parallel document safety uses fragment files. Parallel file safety uses planner-enforced disjointness.
+Instead, all agents share the pipeline worktree created by `EnterWorktree`. Parallel document safety uses fragment files. Parallel file safety uses planner-enforced disjointness. The one sanctioned alternative is [lanes](#lanes-one-scratch-worktree-per-parallel-step), worktrees the orchestrator makes itself.
+
+### Lanes: One Scratch Worktree per Parallel Step
+
+An option for a parallel group whose steps have disjoint `Files:` but would disturb each other in one tree (each runs gates, formatters or measurements there). The default stays the shared pipeline worktree; choose lanes when that interference is expected, and say so at the planning checkpoint.
+
+1. **Make the lanes with git, never with `isolation: "worktree"`.** One scratch worktree per step, its branch cut from the pipeline branch: `git worktree add <dir> -b <lane> <pipeline-branch>`, or `git -C <idle scratch worktree> switch -C <lane> <pipeline-branch>`.
+2. **Write one brief file in the pipeline directory** that every lane implementer reads: its step, its worktree, that it commits there, and that it runs only its step's `Check:`. A lane that runs the wider gates or a measurement loads the machine and can turn another run's gate red (seen 2026-11-12).
+3. **Review each lane's commits and cherry-pick them onto the pipeline branch in plan order,** then re-run each step's `Check:` on the branch.
+4. **Run one integration run (the derived scope) on the branch per wave, before the forced reviews.** Cross-step regressions show there, not in the lanes.
+
+Lanes run outside the step-loop driver, so its gate, its commits and its iteration count do not apply: the orchestrator does that bookkeeping itself (the `WIP.md` ticks, the `TEST_RESULTS.md` blocks, the commits by name). `spawn_count.py` charges each lane implementer as a spawn where the driver would have counted an iteration, so the tally reads high: one Full pipeline read 35 of 32 with lanes and 16 as the driver counts (seen 2026-11-13). Record both figures in the calibration row. A plan's "must not run together" notes concern a shared tree and do not bind lanes.
 
 ## Multi-Perspective Analysis
 

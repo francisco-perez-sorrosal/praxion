@@ -84,24 +84,28 @@ def test_continuing_a_stopped_paired_run_names_the_option_and_says_to_close_and_
     assert _snapshot(directory) == before
 
 
+STOPPED = f"run stopped-1 of {ROLE} stopped and was neither continued nor closed; "
+CLOSE_IT = "close it (--close stopped-1 --reason TEXT)"
+
+
 @pytest.mark.parametrize(
-    ("stopped_axis", "fresh_axis", "advice"),
+    ("axis", "refusal"),
     [
-        (DEFAULT_AXIS, DEFAULT_AXIS, "continue it (--continue stopped-1)"),
-        (PAIRED, PAIRED, "close it (--close stopped-1 --reason TEXT)"),
+        (
+            DEFAULT_AXIS,
+            f"{STOPPED}continue it (--continue stopped-1) or {CLOSE_IT} before starting a fresh run",
+        ),
+        (PAIRED, f"{STOPPED}{CLOSE_IT} before starting a fresh run"),
     ],
 )
-def test_a_stopped_run_blocks_a_fresh_run_of_its_own_axis(
-    tmp_path, stopped_axis, fresh_axis, advice
-):
-    directory = _planted(tmp_path, "stopped-1", stopped_axis, SpendRefused(TASKS))
-    config = cli.parse_config(_fresh(directory, fresh_axis))
+def test_a_stopped_run_blocks_a_fresh_run_of_its_own_axis_in_full_words(tmp_path, axis, refusal):
+    directory = _planted(tmp_path, "stopped-1", axis, SpendRefused(TASKS))
+    config = cli.parse_config(_fresh(directory, axis))
 
-    with pytest.raises(ValueError, match="stopped and was neither continued nor closed") as raised:
+    with pytest.raises(ValueError, match="stopped and was neither") as raised:
         cli._refuse_beside_stopped_run(config)
 
-    assert advice in str(raised.value)
-    assert ("--continue" in str(raised.value)) == (fresh_axis == DEFAULT_AXIS)
+    assert str(raised.value) == refusal
 
 
 @pytest.mark.parametrize(

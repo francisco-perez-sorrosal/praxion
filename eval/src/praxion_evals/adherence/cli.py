@@ -409,7 +409,7 @@ def plan_tasks(config: RunConfig) -> dict[Role, list[TaskSpec]]:
 
 def _refuse_beside_stopped_run(config: RunConfig) -> None:
     """A fresh run of a role cannot start while a run of it on the same axis stopped and was
-    neither continued nor closed: a new draw beside it would leave the stopped run to be forgotten."""
+    neither continued nor closed: a new draw beside it would leave the stopped run forgotten."""
     directory = session_loop.results_dir(config)
     for role in config.roles:
         if (stopped := pending_stop(directory, role, config.axis)) is not None:

@@ -22,6 +22,7 @@ from statistics import median
 from textwrap import shorten
 from typing import Any, assert_never, cast
 
+from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, Positions
 from praxion_evals.adherence.lineage import (
     LAUNCH_REFUSED,
     Closed,
@@ -35,7 +36,6 @@ from praxion_evals.adherence.lineage import (
     ending_of,
 )
 from praxion_evals.adherence.model import (
-    ARMS,
     OWN_DISCORDANCE_EXACT,
     ROLE_MODES,
     Assessed,
@@ -73,6 +73,7 @@ from praxion_evals.adherence.results import (
     merged,
     pairs_of,
     role_verdicts,
+    run_axis,
     skipped_files,
 )
 from praxion_evals.adherence.run_ending import stop_summary
@@ -127,9 +128,10 @@ def render(results: RunResults, continued_from: Sequence[RunResults] = ()) -> st
     parts = [*continued_from, results]
     whole = merged(parts)
     verdicts = role_verdicts(whole)
+    positions = POSITIONS[run_axis(whole.run)]
     sections = [_run_section(whole, parts), "\n".join(READING_NOTES)]
     sections += [
-        _role_section(whole, role, entries, verdicts[role])
+        _role_section(whole, role, entries, verdicts[role], positions)
         for role, entries in whole.catalog.items()
     ]
     return "\n\n".join(sections) + "\n"
@@ -246,7 +248,11 @@ def _judge_error_line(results: RunResults) -> str:
 
 
 def _role_section(
-    results: RunResults, role: str, entries: Iterable[CatalogEntry], verdict: RoleVerdict
+    results: RunResults,
+    role: str,
+    entries: Iterable[CatalogEntry],
+    verdict: RoleVerdict,
+    positions: Positions,
 ) -> str:
     pairs = pairs_of(results, role)
     complete = [pair for pair in pairs if pair.complete]
@@ -257,12 +263,12 @@ def _role_section(
         f" lean failures: {_lean_errored(pairs)}."
     )
     lines += _mode_lines(role, complete)
-    lines += _session_lines(results, role)
-    lines += _run_out_lines(results, role)
+    lines += _session_lines(results, role, positions)
+    lines += _run_out_lines(results, role, positions)
     lines += [f"{INDENT}Checks:"]
     calibration = bool(results.run.extra.get("calibration"))
     for entry in entries:
-        lines += _check_lines(entry, complete, verdict, results.settings, calibration)
+        lines += _check_lines(entry, complete, verdict, results.settings, calibration, positions)
     lines += _kernel_delivery_lines(kernel_deliveries(results, role))
     lines += _earlier_runs_lines(results, role)
     return "\n".join(lines)
@@ -306,13 +312,14 @@ def _lean_errored(pairs: Iterable[Pair]) -> int:
     return sum(isinstance(p.full, Measured) and isinstance(p.lean, Errored) for p in pairs)
 
 
-def _session_lines(results: RunResults, role: str) -> list[str]:
+def _session_lines(results: RunResults, role: str, positions: Positions) -> list[str]:
     lines = []
-    for arm in ARMS:
+    for arm in (positions.baseline, positions.treatment):
         statuses = [
             r.status for r in results.sessions if r.setup.role == role and r.setup.arm == arm
         ]
-        built = results.arms.get(role, {}).get(arm, {}).get("built", True)
+        recorded = results.arms.get(role, {}).get(arm, {})
+        built = recorded.get("built", True)
         if not statuses and built:
             continue
         counts = Counter(type(status) for status in statuses)
@@ -321,18 +328,23 @@ def _session_lines(results: RunResults, role: str) -> list[str]:
             f" {counts[Errored]} errored, {counts[NotMeasured]} not measured;"
             f" first-request tokens, median {_token_median(results, role, arm)}."
         )
+        if not built and run_axis(results.run) != DEFAULT_AXIS:
+            lines.append(f"{INDENT}{arm} arm not shown: {_one_line(recorded.get('reason', ''))}")
         lines += _unmeasured_reasons(statuses)
     return lines + _errored_tail_lines(results, role)
 
 
-def _run_out_lines(results: RunResults, role: str) -> list[str]:
+def _run_out_lines(results: RunResults, role: str, positions: Positions) -> list[str]:
     """How the role's forced-stop sessions ended, per arm, and the gap between the arms.
 
     Counted over every measured session that recorded an ending, paired or not; a session whose
     record could not tell is in neither count. Reported and never decisive: nothing here enters
     a verdict. None for a run with no forced-stop session, or one recorded before endings were.
     """
-    counts = {arm: _run_out_counts(measured_sessions(results, role, arm)) for arm in ARMS}
+    counts = {
+        arm: _run_out_counts(measured_sessions(results, role, arm))
+        for arm in (positions.baseline, positions.treatment)
+    }
     if not any(any(arm_counts) for arm_counts in counts.values()):
         return []
     lines = [
@@ -341,7 +353,8 @@ def _run_out_lines(results: RunResults, role: str) -> list[str]:
         for arm, (ran_out, ended_early) in counts.items()
     ]
     lines.append(
-        f"{INDENT}differential run-out rate (lean minus full): {_differential_run_out(counts)}"
+        f"{INDENT}differential run-out rate ({positions.treatment} minus {positions.baseline}):"
+        f" {_differential_run_out(counts, positions)}"
     )
     return lines
 
@@ -351,16 +364,17 @@ def _run_out_counts(sessions: Iterable[Measured]) -> tuple[int, int]:
     return endings[StoppedAtCap], endings[EndedOnItsOwn]
 
 
-def _differential_run_out(counts: dict[str, tuple[int, int]]) -> str:
-    """Lean's share of forced-stop sessions that ran out of turns, minus full's, in points."""
+def _differential_run_out(counts: dict[str, tuple[int, int]], positions: Positions) -> str:
+    """The treatment arm's share of forced-stop sessions that ran out of turns, minus the
+    baseline's, in points."""
     shares = {
         arm: ran_out / (ran_out + ended_early)
         for arm, (ran_out, ended_early) in counts.items()
         if ran_out + ended_early
     }
-    if len(shares) < len(ARMS):
+    if len(shares) < len(counts):
         return "not defined, an arm has no forced-stop session that ended in a known way"
-    return f"{PERCENT * (shares['lean'] - shares['full']):.1f} pp"
+    return f"{PERCENT * (shares[positions.treatment] - shares[positions.baseline]):.1f} pp"
 
 
 def _errored_tail_lines(results: RunResults, role: str) -> list[str]:
@@ -450,13 +464,14 @@ def _check_lines(
     verdict: RoleVerdict,
     settings: DeclaredSettings,
     calibration: bool,
+    positions: Positions,
 ) -> list[str]:
     lines = [
         f"{INDENT * 2}{entry.name} ({entry.kind}) enforces {entry.rule.file}, section"
         f" '{entry.rule.section}'"
     ]
-    for arm in ARMS:
-        lines += _arm_outcome_lines(entry.name, arm, [getattr(pair, arm) for pair in complete])
+    lines += _arm_outcome_lines(entry.name, positions.baseline, [p.full for p in complete])
+    lines += _arm_outcome_lines(entry.name, positions.treatment, [p.lean for p in complete])
     if calibration:
         return [*lines, _slot_order_line(entry.name, complete)]
     lines += _allowance_lines(entry.name, verdict, settings)

@@ -80,6 +80,8 @@ Both producers reference this single table when assigning `owner-role` to a new 
 
 Pipelines in separate worktrees write independently; conflicts reconcile at merge-to-main via `scripts/finalize_tech_debt_ledger.py` (modeled on `scripts/finalize_adrs.py`: idempotent, advisory `fcntl` lock, bounded scope, dry-run flag). On collapse: status precedence `resolved > in-flight > open > wontfix`, tie-break by newer `last-seen`; non-conflicting fields merge (notes concatenated with ` // ` — separator chosen to avoid collision with Markdown table delimiter `|`; locations union-sorted; earliest `first-seen` preserved). Re-open semantics: when a new active row's `dedup_key` matches a row in RESOLVED, the resolved row moves back to LEDGER as `status = open` with a recurrence note, and the new row collapses into it.
 
+A verifier running in a pipeline worktree numbers its ledger rows from the branch's own tail. Tell it the next free id (one past the highest id on main or on any unmerged branch), or the ids collide at the merge and `finalize_tech_debt_ledger.py` exits 1 on the collision. Add `.ai-state/calibration_log.md` rows, and edits to existing ledger rows, on main after the merge, not on the branch.
+
 ## Consumer-contract framing
 
 The ledger's input contract on its five consumer agents is **permission, not obligation** — non-action is a valid outcome. The contract line does not make every consumer process every open item on every run, which would degrade per-agent phase-budget discipline.
@@ -97,6 +99,8 @@ A debt is **small** only when all seven conditions hold:
 7. The fix fits in the current session.
 
 **Filing rule.** File a row only for debt that is not small, or whose fix could not be finished this session; the row's `notes` give that reason. Small debt is fixed in its own commit after the feature. A follow-up that would change the feature's behaviour was never small. The sentinel and the architect-validator find debt with no task at hand and keep filing a row for every finding.
+
+**Before fixing on a long-lived branch.** Look for the fix on main first (`git log main -- <file>`): one fix was written twice and had to be reverted on the branch.
 
 **Follow-up record.** In a pipeline, `.ai-work/<task-slug>/FOLLOW_UPS.md` holds one line per follow-up, in one of four shapes:
 
@@ -260,8 +264,9 @@ One ` // `-separated `notes` segment, matched at its start:
 - `<anchor>` is a commit sha, 7–40 lowercase hex characters — the sha a judge stamps with, taken from the probe digest's `anchor` field.
 - `<outcome>` is one of `kept` / `realigned` / `discarded` / `merged`. `escalated` never produces a stamp.
 - `from <prior-base-key>` (a 12-hex-character `dedup_key` base) is legal only on `realigned`, and only required when the base key actually changed — a realign that keeps the same class/location/direction/goal-ref does not carry it. The stamp gate (`ledger_health.py --stamp-file`) refuses a `from` that is not the row's base key, and a missing one when `--location` changes the path set; a key move by another field is not visible to it.
-- `<text>` is outcome-shaped: `kept` requires a leading `file[:line]` evidence token; `realigned` accepts free text (the prior premise); `merged` requires exactly `td-NNN`; `discarded` requires a **checkable anchor** (below).
+- `<text>` is outcome-shaped: `kept` requires a leading `file[:line]` evidence token (the gate reads the first token as the evidence path); `realigned` accepts free text (the prior premise); `merged` requires exactly `td-NNN`; `discarded` requires a **checkable anchor** (below).
 - The segment must contain no `|` — the ledger's own table delimiter.
+- A note appended to an open row's `notes` without a stamp reads as `self-amended` to the probe. Write notes on open rows as stamps, through `ledger_health.py --row <id> --stamp-file <file>`.
 
 **Paired site** (gate-liveness two-site rule): the regex constant lives in `scripts/ledger_snapshot.py` as `_STAMP`; change both together.
 

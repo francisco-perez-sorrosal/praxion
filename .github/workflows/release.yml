@@ -2,7 +2,7 @@
 #
 # Commitizen computes the proper semver bump from conventional commits since the
 # last stable tag and, in a SINGLE bump commit, updates the version files AND
-# regenerates CHANGELOG.md (update_changelog_on_bump = true in pyproject.toml),
+# adds the new version's section to CHANGELOG.md (update_changelog_on_bump = true in pyproject.toml),
 # then tags that commit -- so the release tag points at a tree that already
 # documents its own version. The workflow then pushes and publishes the GitHub
 # release. cz bump is the only mechanism that changes version strings; this

@@ -147,7 +147,7 @@ def stage_pool_task(task: TaskSpec, dest: Path, page_url: str | None = None) -> 
         raise FileExistsError(f"{dest} already holds files")
     template = next(t for t in pool_templates(task.role) if t.template_id == task.template_id)
     plan_inputs = _plan_inputs(template)
-    start = tasks.FIXTURES_DIR / task.role / POOL_DIRNAME / task.template_id / START_DIRNAME
+    start = _template_dir(task) / START_DIRNAME
     dest.mkdir(parents=True, exist_ok=True)
     tasks._copy_tree(start, dest, skip=frozenset({MANIFEST}))
     for overlay in tasks.kit_for(task.role).overlays:
@@ -161,6 +161,15 @@ def stage_pool_task(task: TaskSpec, dest: Path, page_url: str | None = None) -> 
     if task.role in CONFINED_ROLES:  # as build_scratch_repo: no global ignore file in the sandbox
         tasks._git(dest, "config", "--local", "core.excludesFile", os.devnull)
     return commit
+
+
+def manifest_path(task: TaskSpec) -> Path:
+    """The grader's manifest in the task's template: it stays out of the staged repository."""
+    return _template_dir(task) / START_DIRNAME / MANIFEST
+
+
+def _template_dir(task: TaskSpec) -> Path:
+    return tasks.FIXTURES_DIR / task.role / POOL_DIRNAME / task.template_id
 
 
 def _plan_inputs(template: Template) -> tuple[tuple[str, str], ...]:

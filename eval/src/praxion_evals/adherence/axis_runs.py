@@ -3,7 +3,8 @@
 The run's loop, launch and arm module read an ``AxisRun`` where each used to call the default
 axis's function, so a second axis overrides one field at a time instead of branching in them.
 ``DEFAULT_RUN`` holds in every field the function that runs today for ``inherited-context``;
-``refactoring-delivery`` is that record with its own name, positions, plan, staging and refusals.
+``refactoring-delivery`` is that record with its own name, positions, plan, staging, assessment,
+catalog and refusals.
 
 Imports nothing from ``session_launch``, ``session_arms``, ``session_loop`` or ``cli`` at run
 time: they import this module, and the types it needs from them come in under TYPE_CHECKING.
@@ -16,7 +17,15 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, assert_never
 
-from praxion_evals.adherence import arms, grade, refactoring_arms, refactoring_tasks, results, tasks
+from praxion_evals.adherence import (
+    arms,
+    grade,
+    refactoring_arms,
+    refactoring_assess,
+    refactoring_tasks,
+    results,
+    tasks,
+)
 from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, Axis, Positions
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.model import (
@@ -92,6 +101,21 @@ def catalog_entries(role: Role) -> tuple[results.CatalogEntry, ...]:
     return tuple(results.catalog_entry(check) for check in check_catalog(role))
 
 
+def assess_refactoring_session(
+    evidence: SessionEvidence,
+    task: TaskSpec,
+    setup: SessionSetup,
+    judge: JudgeClient | None,
+    real_home: Path | None,
+) -> SessionStatus:
+    default = assess_session(evidence, task, setup, judge, real_home)
+    return refactoring_assess.extend(default, evidence, task, setup, real_home)
+
+
+def refactoring_catalog_entries(role: Role) -> tuple[results.CatalogEntry, ...]:
+    return (*catalog_entries(role), *refactoring_assess.catalog_entries(role))
+
+
 def no_refusals(config: RunConfig) -> tuple[str, ...]:
     del config
     return ()
@@ -156,6 +180,8 @@ def axis_run(axis: Axis) -> AxisRun:
                     observe=refactoring_arms.observe_delivery,
                     decide=delivery_proof_decision,
                 ),
+                assess=assess_refactoring_session,
+                catalog=refactoring_catalog_entries,
                 refusals=refuse_calibration,
             )
         case _:

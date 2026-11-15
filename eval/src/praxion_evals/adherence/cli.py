@@ -37,6 +37,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from fnmatch import fnmatchcase
 from pathlib import Path
+from typing import NoReturn
 
 from praxion_evals.adherence import (
     report,
@@ -168,7 +169,9 @@ def parse_config(argv: Sequence[str] | None) -> RunConfig:
     axis: Axis = args["axis"]
     for arm in args["arms"] or ():
         if arm not in ARMS_BY_AXIS[axis]:
-            parser.error(_foreign_arm(arm, axis))
+            if axis == DEFAULT_AXIS:  # the ordinary comparison's refusals keep argparse's form
+                parser.error(_foreign_arm(arm, axis))
+            _refuse(_foreign_arm(arm, axis))
     full_against_itself = args["calibration"] and axis == DEFAULT_AXIS
     if full_against_itself and set(args["arms"] or ["full"]) != {"full"}:
         parser.error("a calibration run measures the full arm against itself; use --arm full")
@@ -201,12 +204,18 @@ def parse_config(argv: Sequence[str] | None) -> RunConfig:
         args["pair_slack"] = default_slack(args["required_pairs"])
     config = RunConfig(**args)
     for refusal in axis_run(axis).refusals(config):
-        parser.error(refusal)
+        _refuse(refusal)
     try:
         declared_settings(config)  # the settings' own ranges are the options' ranges
     except ValueError as error:
         parser.error(str(error))
     return config
+
+
+def _refuse(message: str) -> NoReturn:
+    """Refuse the command line in the run's own words: one line, no usage block."""
+    print(f"{PROG}: {message}", file=sys.stderr)
+    raise SystemExit(EXIT_USAGE)
 
 
 def _foreign_arm(arm: SessionArm, axis: Axis) -> str:
@@ -399,15 +408,20 @@ def plan_tasks(config: RunConfig) -> dict[Role, list[TaskSpec]]:
 
 
 def _refuse_beside_stopped_run(config: RunConfig) -> None:
-    """A fresh run of a role cannot start while a run of it stopped and was neither continued
-    nor closed: a new draw beside it would leave the stopped run to be forgotten."""
+    """A fresh run of a role cannot start while a run of it on the same axis stopped and was
+    neither continued nor closed: a new draw beside it would leave the stopped run to be forgotten."""
     directory = session_loop.results_dir(config)
     for role in config.roles:
-        if (stopped := pending_stop(directory, role)) is not None:
+        if (stopped := pending_stop(directory, role, config.axis)) is not None:
+            close_it = f"close it (--close {stopped.run_id} --reason TEXT)"
+            advice = (
+                f"continue it (--continue {stopped.run_id}) or {close_it}"
+                if config.axis == DEFAULT_AXIS
+                else close_it
+            )
             raise ValueError(
                 f"run {stopped.run_id} of {role} stopped and was neither continued nor closed;"
-                f" continue it (--continue {stopped.run_id}) or close it"
-                f" (--close {stopped.run_id} --reason TEXT) before starting a fresh run"
+                f" {advice} before starting a fresh run"
             )
 
 
@@ -471,7 +485,7 @@ def _begin_continuation(
         raise _refused(run_id, continuation_refusals(tip, identity_now(config, {}, repo), ()))
     if (axis := results.run_axis(tip.results.run)) != DEFAULT_AXIS:
         raise ValueError(
-            f"run {run_id} cannot be continued: a run of the {axis} axis is not continued;"
+            f"run {run_id} cannot be continued: --continue takes no run of the {axis} axis;"
             f" close it (--close {run_id} --reason TEXT) and start a fresh run"
         )
     declared = _with_recorded_limits(recorded_config(config, parts[0]), given, tip.results)

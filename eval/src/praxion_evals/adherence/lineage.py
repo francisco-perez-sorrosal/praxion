@@ -22,7 +22,7 @@ here. A continued run is a lineage of parts, each part's results file naming the
 (``Lineage``); a continuation launches again only the tasks nobody finished (``relaunch_tasks``)
 and is refused, naming every reason, unless the stopped run was continuable and still measures
 the same thing (``continuation_refusals``). A stopped run left neither continued nor closed
-blocks a fresh run of its role (``pending_stop``); ``close`` is how the operator resolves it. A
+blocks a fresh run of its role and axis (``pending_stop``); ``close`` is how the operator resolves it. A
 lineage is read as one run by ``results.merged``; ``parts_before`` finds the parts a report needs.
 
 The ending, refusal and relaunch halves are pure: nothing in them touches a process, a file or a
@@ -38,7 +38,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, assert_never, get_args
 
-from praxion_evals.adherence.axis import SESSION_ARMS
+from praxion_evals.adherence.axis import DEFAULT_AXIS, SESSION_ARMS
 from praxion_evals.adherence.infra_stop import (
     Failure,
     FoldState,
@@ -58,7 +58,14 @@ from praxion_evals.adherence.model import (
     SessionRecord,
     SessionStatus,
 )
-from praxion_evals.adherence.results import RunResults, flip_label, instant, load, role_verdicts
+from praxion_evals.adherence.results import (
+    RunResults,
+    flip_label,
+    instant,
+    load,
+    role_verdicts,
+    run_axis,
+)
 from praxion_evals.adherence.run_identity import (  # noqa: F401  (re-exported for session_loop)
     MeasuredIdentity,
     current_identity,
@@ -560,19 +567,20 @@ def _option_refusals(supplied: Collection[str]) -> tuple[str, ...]:
     )
 
 
-def pending_stop(results_dir: Path, role: str) -> PartRef | None:
-    """The oldest stopped run of ``role`` that was continuable when it stopped and has been
-    neither continued nor closed, or ``None``.
+def pending_stop(results_dir: Path, role: str, axis: str = DEFAULT_AXIS) -> PartRef | None:
+    """The oldest stopped run of ``role`` on ``axis`` that was continuable when it stopped and has
+    been neither continued nor closed, or ``None``.
 
-    Keyed on the role alone, not on what the tree holds now: a commit elsewhere makes a stopped
-    run no longer continuable, and would otherwise release the operator from choosing between
-    continuing and closing. Closing is always possible, so this cannot deadlock a role.
+    Keyed on the role and axis alone, not on what the tree holds now: a commit elsewhere makes a
+    stopped run no longer continuable, and would otherwise release the operator from choosing
+    between continuing and closing. A run of another axis measures another comparison and never
+    blocks this one. Closing is always possible, so this cannot deadlock a role.
     """
     runs = _runs_in(results_dir).values()
     continued = {ref.continues for ref, _ in runs}
     for ref, results in runs:
         stopped = continuable(ending_of(results)) and ref.run_id not in continued
-        if stopped and role in results.catalog:
+        if stopped and role in results.catalog and run_axis(results.run) == axis:
             return ref
     return None
 

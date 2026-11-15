@@ -3,7 +3,7 @@
 The run's loop, launch and arm module read an ``AxisRun`` where each used to call the default
 axis's function, so a second axis overrides one field at a time instead of branching in them.
 ``DEFAULT_RUN`` holds in every field the function that runs today for ``inherited-context``;
-``refactoring-delivery`` starts as that record with its own name and positions.
+``refactoring-delivery`` is that record with its own name, positions, plan and refusals.
 
 Imports nothing from ``session_launch``, ``session_arms``, ``session_loop`` or ``cli`` at run
 time: they import this module, and the types it needs from them come in under TYPE_CHECKING.
@@ -16,7 +16,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, assert_never
 
-from praxion_evals.adherence import arms, grade, results, tasks
+from praxion_evals.adherence import arms, grade, refactoring_tasks, results, tasks
 from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, Axis, Positions
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.model import (
@@ -93,6 +93,16 @@ def no_refusals(config: RunConfig) -> tuple[str, ...]:
     return ()
 
 
+def refuse_calibration(config: RunConfig) -> tuple[str, ...]:
+    """A calibration runs the default axis's full arm against itself, so no other axis has one."""
+    if not config.calibration:
+        return ()
+    return (
+        f"--calibration measures the full arm of the {DEFAULT_AXIS} axis against itself;"
+        f" it takes no --axis {config.axis}",
+    )
+
+
 DEFAULT_RUN = AxisRun(
     axis=DEFAULT_AXIS,
     positions=POSITIONS[DEFAULT_AXIS],
@@ -116,6 +126,12 @@ def axis_run(axis: Axis) -> AxisRun:
         case "inherited-context":
             return DEFAULT_RUN
         case "refactoring-delivery":
-            return replace(DEFAULT_RUN, axis=axis, positions=POSITIONS[axis])
+            return replace(
+                DEFAULT_RUN,
+                axis=axis,
+                positions=POSITIONS[axis],
+                plan=refactoring_tasks.planned_pool,
+                refusals=refuse_calibration,
+            )
         case _:
             assert_never(axis)

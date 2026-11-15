@@ -15,9 +15,10 @@ from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 
-from praxion_evals.adherence import arms, managed_fixture, tasks
+from praxion_evals.adherence import managed_fixture, tasks
+from praxion_evals.adherence.axis import SessionArm, patched_paths
 from praxion_evals.adherence.confinement import Confinement, settings_of
-from praxion_evals.adherence.model import Arm, ArmBuild, Role, TaskSpec
+from praxion_evals.adherence.model import ArmBuild, Role, TaskSpec
 from praxion_evals.adherence.session_launch import REAL_HOME, session_confinement
 from praxion_evals.adherence.session_loop import (
     EXIT_COMPLETE,
@@ -37,7 +38,7 @@ def print_dry_run(
     for role, role_tasks in planned.items():
         print(f"{role}: {len(role_tasks)} tasks (target {config.required_pairs})", file=sys.stderr)
         for index, task in enumerate(role_tasks):
-            for arm in ordered_arms(config.arms, config.seed, task.task_id):
+            for arm in ordered_arms(config.arms, config.seed, task.task_id, config.axis):
                 sandbox = SandboxPaths(run_root / role / f"{index:03d}-{arm}")
                 copy = planned_copy(run_root, task, arm)
                 confinement = session_confinement(
@@ -73,7 +74,7 @@ def _planned_switches(task: TaskSpec) -> Mapping[str, str]:
     return managed_fixture.switches_planned((tasks.REPOS_DIR / task.fixture_id, *overlays))
 
 
-def planned_copy(run_root: Path, task: TaskSpec, arm: Arm) -> Path:
+def planned_copy(run_root: Path, task: TaskSpec, arm: SessionArm) -> Path:
     """Where a real run would put the arm's plugin copy; the dry run names it, never makes it.
 
     Spells the directory as ``session_loop._build_copy`` does; a test pins the two together.
@@ -100,7 +101,7 @@ def _planned_spec(
     config: RunConfig,
     checkout: Checkout,
     task: TaskSpec,
-    arm: Arm,
+    arm: SessionArm,
     sandbox: SandboxPaths,
     copy: Path,
     confinement: Confinement | None,
@@ -112,8 +113,9 @@ def _planned_spec(
     names the checkout, not the copy the confinement protects.
     """
     cap = tasks.turn_cap_of(task)
-    patched = (arms.definition_path(task.role),) if arm == "lean" or cap else ()
-    stand_in = ArmBuild(task.role, arm, checkout.path, cap, "dry-run", patched)
+    stand_in = ArmBuild(
+        task.role, arm, checkout.path, cap, "dry-run", patched_paths(task.role, arm, cap)
+    )
     spec = tasks.session_spec(
         task,
         stand_in,

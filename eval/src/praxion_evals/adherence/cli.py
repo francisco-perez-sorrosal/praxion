@@ -45,6 +45,15 @@ from praxion_evals.adherence import (
     session_loop,
     tasks,
 )
+from praxion_evals.adherence.axis import (
+    ARMS_BY_AXIS,
+    AXES,
+    DEFAULT_AXIS,
+    SESSION_ARMS,
+    Axis,
+    SessionArm,
+    axis_of,
+)
 from praxion_evals.adherence.axis_runs import axis_run
 from praxion_evals.adherence.dry_run import print_dry_run
 from praxion_evals.adherence.infra_stop import (
@@ -67,7 +76,6 @@ from praxion_evals.adherence.lineage import (
     relaunch_tasks,
 )
 from praxion_evals.adherence.model import (
-    ARMS,
     OWN_DISCORDANCE_EXACT,
     ROLES,
     DeclaredSettings,
@@ -157,9 +165,14 @@ def _move_named(argv: Sequence[str] | None) -> moves_cli.MoveSubject | None:
 def parse_config(argv: Sequence[str] | None) -> RunConfig:
     parser = _parser()
     args = vars(parser.parse_args(argv))
-    if args["calibration"] and set(args["arms"] or ["full"]) != {"full"}:
+    axis: Axis = args["axis"]
+    for arm in args["arms"] or ():
+        if arm not in ARMS_BY_AXIS[axis]:
+            parser.error(_foreign_arm(arm, axis))
+    full_against_itself = args["calibration"] and axis == DEFAULT_AXIS
+    if full_against_itself and set(args["arms"] or ["full"]) != {"full"}:
         parser.error("a calibration run measures the full arm against itself; use --arm full")
-    named = {"full"} if args["calibration"] else set(args["arms"] or ARMS)
+    named = {"full"} if full_against_itself else set(args["arms"] or ARMS_BY_AXIS[axis])
     names_work = args["roles"] or args["report"] or args["close"] or args["continue_run"]
     if args["reindex"]:
         if names_work or args["output"]:
@@ -183,15 +196,24 @@ def parse_config(argv: Sequence[str] | None) -> RunConfig:
     if args["judge_golden"] and not args["judging"]:
         parser.error("--judge-golden needs a judge; drop --no-judge")
     args["roles"] = tuple(dict.fromkeys(args["roles"] or ()))
-    args["arms"] = tuple(arm for arm in ("full", "lean") if arm in named)
+    args["arms"] = tuple(arm for arm in ARMS_BY_AXIS[axis] if arm in named)
     if args["pair_slack"] is None:
         args["pair_slack"] = default_slack(args["required_pairs"])
     config = RunConfig(**args)
+    for refusal in axis_run(axis).refusals(config):
+        parser.error(refusal)
     try:
         declared_settings(config)  # the settings' own ranges are the options' ranges
     except ValueError as error:
         parser.error(str(error))
     return config
+
+
+def _foreign_arm(arm: SessionArm, axis: Axis) -> str:
+    return (
+        f"--arm {arm} is an arm of the {axis_of(arm)} axis;"
+        f" the {axis} axis has arms {' and '.join(ARMS_BY_AXIS[axis])}"
+    )
 
 
 def default_slack(required_pairs: int) -> int:
@@ -215,7 +237,19 @@ def _parser() -> argparse.ArgumentParser:
         default=argparse.SUPPRESS,
         help="measure a move instead of a role; its options are those of the move entry",
     )
-    add("--arm", dest="arms", action="append", choices=ARMS, help="repeatable; default both")
+    add(
+        "--axis",
+        choices=AXES,
+        default=DEFAULT_AXIS,
+        help="what the run compares: the arms of the axis, and the tasks it plans",
+    )
+    add(
+        "--arm",
+        dest="arms",
+        action="append",
+        choices=SESSION_ARMS,
+        help="repeatable; an arm of the axis, default both",
+    )
     add("--output", type=Path, help=f"default: <repo>/{OUTPUT_DIR}/<run-id>.json")
     add("--seed", type=int, default=DEFAULT_SEED)
     add(

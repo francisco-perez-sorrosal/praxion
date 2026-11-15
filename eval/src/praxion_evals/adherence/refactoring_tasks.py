@@ -85,6 +85,25 @@ def pool_tasks(role: Role, seed: int) -> list[TaskSpec]:
     ]
 
 
+def planned_pool(role: Role, seed: int, count: int) -> list[TaskSpec]:
+    """The role's pool in the seed's order, at most ``count`` tasks, each task once.
+
+    One task of every template comes before any template repeats, so a run capped at two
+    tasks still holds two templates; the pool is never mixed with the role's default tasks.
+    """
+    pool = _pool_of(role)
+    per_template = [
+        [
+            _make_task(role, pool, template, label, seed)
+            for label in tasks._rng(seed, role, template.template_id).sample(
+                VARIANTS, len(VARIANTS)
+            )
+        ]
+        for template in tasks._shuffled(pool_templates(role), seed, role)
+    ]
+    return list(tasks._round_robin(per_template))[:count]
+
+
 def pool_templates(role: Role) -> tuple[Template, ...]:
     """The templates under ``fixtures/<role>/refactoring``, refused at load unless they hold.
 

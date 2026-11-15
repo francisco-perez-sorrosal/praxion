@@ -20,33 +20,32 @@ Bound here, because the specification, the base commit or a bound driver fixes t
 - where results land and how the run names the file it wrote (`adherence_runs`), and the report
   (`adherence_scoring.render`), the earlier-runs listing (`adherence_results_wire.earlier_runs`).
 
-Unbound until a binding step ties them to the designed results file and report (each raises
-`UnboundDriverError` with the assumption's words): `session_records`, `check_comparisons` and
-`unshown_arm_reason`.
+- the results file a paired run writes and the report it renders (`session_records`,
+  `check_comparisons`, `unshown_arm_reason`): the file's per-session check outcomes, and the
+  report's per-check blocks and its line naming an arm that was not shown. A checklist item the
+  task does not put to the role (it stopped the role early) is not failed, so it reads as passed.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from tests.acceptance.drivers import adherence_eval, adherence_runs, adherence_scoring
 from tests.acceptance.drivers import paired_move_stand_in as stand_in
 from tests.acceptance.drivers import refactoring_delivery as rd
 from tests.acceptance.drivers import refactoring_mode_eval as rme
-from tests.acceptance.drivers.kernel_sandbox import UnboundDriverError
 from tests.acceptance.drivers.paired_move_stand_in import Ending, Launch, Script
 
 AXIS = rme.AXIS
 ARMS = rme.ARM_KINDS  # ("preloaded", "delivered"): before the move, after it
 CHECKLIST = rme.CHECKLIST
-
-
-def unbound(assumption: str) -> UnboundDriverError:
-    return UnboundDriverError(f"driver unbound: {assumption}")
 
 
 # -- The checkout a paired run measures ----------------------------------------------------------
@@ -214,7 +213,12 @@ def head(checkout: Path) -> str:
     ).stdout.strip()
 
 
-# -- Readings of what the run wrote (unbound) ----------------------------------------------------
+# -- Readings of what the run wrote --------------------------------------------------------------
+
+CHECKLIST_PREFIX = "refactoring: "  # a session's outcome for a checklist item is named so
+ARRIVAL_PREFIX = "refactoring-delivery:"  # and its outcome for how the skill reached the role so
+SCORED = {"passed": True, "failed": False}
+NOT_FAILED = {"passed", "not applicable"}
 
 
 @dataclass(frozen=True)
@@ -228,10 +232,34 @@ class SessionRecord:
 
 def session_records(results_path: Path, role: str) -> tuple[SessionRecord, ...]:
     """Each task session the paired run scored for `role`, as its results file records it."""
-    raise unbound(
-        "the paired run's results file records, for each scored task session of a role, its arm, "
-        "its task id, the outcome of each refactoring checklist item and of each ordinary check "
-        "of the role, and whether the refactoring skill reached the role by its arm's own way"
+    document = json.loads(results_path.read_text(encoding="utf-8"))
+    return tuple(
+        _record_of(session)
+        for session in document["sessions"]
+        if session["setup"]["role"] == role and session["status"]["kind"] == "measured"
+    )
+
+
+def _record_of(session: Mapping[str, Any]) -> SessionRecord:
+    setup, outcomes = session["setup"], session["status"]["outcomes"]
+    kind = {name: outcome["outcome"] for name, outcome in outcomes.items()}
+    return SessionRecord(
+        arm=setup["arm"],
+        task_id=setup["task_id"],
+        refactoring_checks={
+            name.removeprefix(CHECKLIST_PREFIX): outcome in NOT_FAILED
+            for name, outcome in kind.items()
+            if name.startswith(CHECKLIST_PREFIX)
+        },
+        ordinary_checks={
+            name: SCORED[outcome]
+            for name, outcome in kind.items()
+            if outcome in SCORED and not name.startswith((CHECKLIST_PREFIX, ARRIVAL_PREFIX))
+        },
+        skill_arrived_its_arm_way=any(
+            name.startswith(ARRIVAL_PREFIX) and outcome == "passed"
+            for name, outcome in kind.items()
+        ),
     )
 
 
@@ -243,19 +271,52 @@ class CheckComparison:
     evidence_enough: bool  # the report says the run holds enough evidence to judge the check
 
 
+CHECK_HEADING = re.compile(r"^ {4}(?P<name>\S.*) \((?:mechanical|judged)\) enforces ")
+ARM_COUNT = re.compile(r"^ {6}(?P<arm>\w+): passed (?P<passed>\d+) of (?P<scored>\d+) scored;")
+VERDICT_LINE = re.compile(r"^ {6}verdict: (?P<verdict>.*)$")
+JUDGEABLE = ("no regression", "regression", "non-inferior", "inferior")
+
+
 def check_comparisons(report_text: str, role: str) -> Mapping[str, CheckComparison]:
-    """Each check's comparison of the arm after the move with the arm before it, for `role`."""
-    raise unbound(
-        "the paired run's report states, for each role and each check (each refactoring "
-        "checklist item in the spec's wording, each ordinary check by name), how many of the "
-        "tasks run in both arms each arm passed, and whether the run holds enough evidence to "
-        "judge the check"
+    """Each check's comparison of the arm after the move with the arm before it, for `role`.
+
+    A checklist item is keyed by the spec's wording, any other check by the name the report gives
+    it. The report counts each check over the pairs both arms completed, so a check whose two
+    arms were scored on different numbers of tasks does not compare them over the same tasks.
+    """
+    blocks: dict[str, list[str]] = {}
+    current: list[str] | None = None
+    for line in adherence_scoring.role_section(report_text, role).splitlines():
+        heading = CHECK_HEADING.match(line)
+        if heading:
+            name = heading["name"].removeprefix(CHECKLIST_PREFIX)
+            current = blocks.setdefault(name, [])
+        elif current is not None:
+            current.append(line)
+    return {name: _comparison_of(name, lines) for name, lines in blocks.items()}
+
+
+def _comparison_of(name: str, lines: Sequence[str]) -> CheckComparison:
+    counts = {m["arm"]: m for m in map(ARM_COUNT.match, lines) if m}
+    verdict = next((m["verdict"] for m in map(VERDICT_LINE.match, lines) if m), "")
+    before, after = counts[ARMS[0]], counts[ARMS[1]]
+    assert before["scored"] == after["scored"], (
+        f"{name!r} is scored on {before['scored']} tasks before the move and {after['scored']} "
+        "after it, so the report does not compare the arms over the same tasks"
+    )
+    return CheckComparison(
+        before_passed=int(before["passed"]),
+        after_passed=int(after["passed"]),
+        tasks_in_both=int(before["scored"]),
+        evidence_enough=verdict.startswith(JUDGEABLE),
     )
 
 
 def unshown_arm_reason(report_text: str, role: str, arm: str) -> str | None:
     """Why the report says `arm` could not be shown to receive the skill its own way, if it says so."""
-    raise unbound(
-        "the paired run's report names an arm whose marked spawn could not be shown to hold the "
-        "refactoring skill exactly once by its own way, and says why"
-    )
+    statement = re.compile(rf"^\s*{re.escape(arm)} arm not shown: (?P<reason>.+)$")
+    for line in adherence_scoring.role_section(report_text, role).splitlines():
+        found = statement.match(line)
+        if found:
+            return found["reason"]
+    return None

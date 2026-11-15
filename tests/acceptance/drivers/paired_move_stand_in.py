@@ -14,21 +14,33 @@ answered here. It plays the harness the way a real session presents itself:
   `<CLAUDE_CONFIG_DIR>/projects/<cwd, each non-alphanumeric character a dash>/<session id>/`
   `subagents/agent-<agent id>.jsonl`. Its first line is the user message holding the delegation
   as the hooks rewrote it; one `hook_additional_context` attachment (`hookEvent: SubagentStart`)
-  follows per context string. A preloaded skill is not filed there: it rides the definition.
-- A session that starts in a repository holding a task template's starting state (every file of
-  the template's `start/`, the `.tmpl` suffix dropped, with the same bytes) is a task session of
-  that template. Any other session is an arm proof.
+  follows per context string. Each skill the definition preloads follows the delegation as the
+  harness files a preload: one user message of two text blocks (the wrapper lines, then the
+  `Base directory for this skill:` line, a blank line and the skill's body).
+- A session whose delegation opens with the proof step's task slug is an arm proof. The run
+  stages a proof in the repository of its first task, so the repository cannot tell the two apart.
+  Any other session that starts in a repository holding a task template's starting state (every
+  file of the template's `start/` but the grader's manifest, the `.tmpl` suffix dropped, with the
+  same bytes) is a task session of that template. The manifest is grading material and is not
+  staged, so a session neither holds nor leaves it. A proof's answer is the reply its prompt asks
+  for.
+- A task session in a copy whose role definition carries a lower turn limit than the shipped one
+  is an early stop: the harness ends the role at its limit with the repository as it started, so
+  the session leaves no end state and its script entry is the script's default. The scripted
+  end states are therefore the ordinal'th task sessions that run to their end in the arm.
 - A task session leaves the end state its script names, as a session would: each starting file
   the end state lacks is deleted and every end-state file written, all else left as it was. The
   role then returns the scripted account, a pointer and a terminal marker.
-- Scripted harness failures: `unserved` files the role's record with the bare delegation and
-  nothing the hooks added, as when the delivered text never reached the role; an `error` ends
-  the session in an error result carrying the text (a spent credit balance).
+- Scripted harness failures: `unserved` files the role's record with the bare delegation, as when
+  the spawn hook's rewrite (where the skill's block rides) never reached the role; the context
+  the start hooks add (the kernel) still arrives. An `error` ends the session in an error result
+  carrying the text (a spent credit balance).
 
 The arm of a session is read from its copy: `preloaded` when the role's definition preloads the
 refactoring skill, `delivered` otherwise. Every launch is logged with its arm, its template (empty
-for a proof), its ordinal among the arm's task launches, its ending and the digest of every file
-its repository held when it started (`.git` excluded).
+for a proof), its ordinal among the arm's task launches that run to their end (-1 for a proof or
+an early stop), its ending and the digest of every file its repository held when it started
+(`.git` excluded).
 
 The module runs under the suite's interpreter, never the evaluation package's, and reads the
 plugin copy only as files and hook processes.
@@ -47,9 +59,15 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TEMPLATE_SUFFIX = ".tmpl"
 SKILL_NAME = "refactoring"
+GRADER_MANIFEST = "refactoring.toml"  # the grader's own file in a template's `start/`
+# What the run's arm-proof prompt opens with and asks the role to reply (the form it sends).
+PROOF_SLUG = re.compile(r"^Task slug: arm-proof\b")
+PROOF_REPLY = "ARM-PROOF-DONE"
 TASK_TEXT = re.compile(r"<<<\n(?P<task>.*)\n>>>", re.DOTALL)
 EXIT_FAILED = 1
 CLEAN = "clean"
@@ -61,7 +79,7 @@ class Ending:
 
     work: str = CLEAN  # "clean", or the checklist item (spec wording) the end state violates
     account: str = "Done."  # the role's own account; never evidence
-    served: bool = True  # False: the role's record holds nothing the hooks added
+    served: bool = True  # False: the spawn hook's rewrite of the delegation never reaches the role
     error: str = ""  # non-empty: the session ends in an error result carrying this text
 
 
@@ -70,11 +88,12 @@ class Launch:
     arm: str
     proof: bool
     template: str  # empty for an arm proof
-    ordinal: int  # the session's place among its arm's task launches; -1 for a proof
+    ordinal: int  # the place among its arm's task launches that run to their end; -1 otherwise
     ending: Mapping[str, Any]
     start_files: Mapping[str, str]  # relative path -> sha256 of the repository at the start
     cwd: str
     plugin_dir: str
+    stopped_early: bool = False  # a task session the harness ends at the copy's lowered turn limit
 
 
 @dataclass(frozen=True)
@@ -159,12 +178,17 @@ def serve(config_path: str) -> int:
     plugin_dir = Path(base._option(argv, "--plugin-dir") or "")
     cwd = Path.cwd()
     role = config["role"]
+    prompt = base._option(argv, "-p") or ""
+    found = TASK_TEXT.search(prompt)
+    delegation = found["task"] if found else prompt
     start_files = _digests(cwd)
-    template = _template_of(config["templates"], start_files)
+    proof = PROOF_SLUG.match(delegation) is not None
+    template = None if proof else _template_of(config["templates"], start_files)
     arm = _arm_of(plugin_dir, role)
+    stopped_early = template is not None and _turn_limit_lowered(plugin_dir, role)
     previous = _logged(Path(config["log_dir"]))
-    ordinal = -1 if template is None else _task_launches(previous, arm)
-    ending = Ending() if template is None else _scripted(config, arm, ordinal)
+    ordinal = -1 if template is None or stopped_early else _task_launches(previous, arm)
+    ending = _scripted(config, arm, ordinal) if template is not None else Ending()
     _log(
         config,
         previous,
@@ -177,15 +201,12 @@ def serve(config_path: str) -> int:
             start_files,
             str(cwd),
             str(plugin_dir),
+            stopped_early,
         ),
     )
-    prompt = base._option(argv, "-p") or ""
-    found = TASK_TEXT.search(prompt)
-    delegation = found["task"] if found else prompt
     scratch = Path(config["log_dir"]).parent / "hook-env"
-    return _play(
-        base, role, plugin_dir, cwd, delegation, config["templates"].get(template), ending, scratch
-    )
+    leaves = None if template is None or stopped_early else Path(config["templates"][template])
+    return _play(base, role, plugin_dir, cwd, delegation, leaves, ending, scratch)
 
 
 def _digests(root: Path) -> dict[str, str]:
@@ -200,10 +221,15 @@ def tree_digests(tree: Path) -> dict[str, str]:
     return {rel.removesuffix(TEMPLATE_SUFFIX): sha for rel, sha in _digests(tree).items()}
 
 
+def staged_files(tree: Path) -> dict[str, str]:
+    """`tree_digests` without the grader's manifest, which a staged repository never holds."""
+    return {rel: sha for rel, sha in tree_digests(tree).items() if rel != GRADER_MANIFEST}
+
+
 def _template_of(templates: Mapping[str, str], held: Mapping[str, str]) -> str | None:
     matches = []
     for name, directory in templates.items():
-        start = tree_digests(Path(directory) / "start")
+        start = staged_files(Path(directory) / "start")
         if start and all(held.get(rel) == sha for rel, sha in start.items()):
             matches.append((len(start), name))
     return max(matches)[1] if matches else None
@@ -217,13 +243,24 @@ def _arm_of(plugin_dir: Path, role: str) -> str:
     return "preloaded" if SKILL_NAME in preloads else "delivered"
 
 
+def _turn_limit_lowered(plugin_dir: Path, role: str) -> bool:
+    """Whether the copy's `maxTurns` for the role is below the shipped definition's."""
+    from tests.acceptance.drivers import refactoring_delivery as rd
+
+    def limit(root: Path) -> int:
+        head, _ = rd._frontmatter((root / "agents" / f"{role}.md").read_text(encoding="utf-8"))
+        return int(yaml.safe_load(head)["maxTurns"])
+
+    return limit(plugin_dir) < limit(REPO_ROOT)
+
+
 def _task_launches(previous: Sequence[Mapping[str, Any]], arm: str) -> int:
-    return sum(1 for raw in previous if not raw["proof"] and raw["arm"] == arm)
+    return sum(1 for raw in previous if raw["arm"] == arm and raw["ordinal"] >= 0)
 
 
 def _scripted(config: Mapping[str, Any], arm: str, ordinal: int) -> Ending:
     by_arm = config["by_arm"].get(arm, [])
-    raw = by_arm[ordinal] if ordinal < len(by_arm) else config["default"]
+    raw = by_arm[ordinal] if 0 <= ordinal < len(by_arm) else config["default"]
     return Ending(**raw)
 
 
@@ -240,7 +277,7 @@ def _play(
     plugin_dir: Path,
     cwd: Path,
     delegation: str,
-    template: str | None,
+    leaves_end_state_of: Path | None,
     ending: Ending,
     scratch: Path,
 ) -> int:
@@ -265,9 +302,13 @@ def _play(
     _file_role_record(
         role, plugin_dir, cwd, delegation, sid, agent_id, scratch, served=ending.served
     )
-    if template is not None:
-        _leave_end_state(Path(template), cwd, ending.work)
-    answer = f"{ending.account}\nThe change is in the repository.\n[COMPLETE]"
+    if leaves_end_state_of is not None:
+        _leave_end_state(leaves_end_state_of, cwd, ending.work)
+    answer = (
+        PROOF_REPLY
+        if PROOF_SLUG.match(delegation)
+        else f"{ending.account}\nThe change is in the repository.\n[COMPLETE]"
+    )
     spawn = "toolu_paired_stand_in_spawn"
     base._emit(
         [
@@ -345,7 +386,6 @@ def _file_role_record(
         CLAUDE_PROJECT_DIR=str(cwd),
     )
     additions: tuple[str, ...] = ()
-    context: tuple[str, ...] = ()
     if served:
         pre = {
             "session_id": sid,
@@ -366,25 +406,24 @@ def _file_role_record(
         "isSidechain": True,
         "message": {"role": "user", "content": "\n".join((*additions, delegation))},
     }
-    rd._jsonl(own_record, [first])
-    if served:
-        start = {
-            "session_id": sid,
-            "transcript_path": str(main_record),
-            "agent_transcript_path": str(own_record),
-            "cwd": str(cwd),
-            "permission_mode": "default",
-            "hook_event_name": "SubagentStart",
-            "agent_id": agent_id,
-            "agent_type": agent_type,
-        }
-        exits = rd._run_event(plugin_dir, "SubagentStart", agent_type, json.dumps(start), cwd, env)
-        context = tuple(
-            out["additionalContext"]
-            for e in exits
-            for out in [rd._parsed(e.stdout).get("hookSpecificOutput") or {}]
-            if isinstance(out, dict) and isinstance(out.get("additionalContext"), str)
-        )
+    rd._jsonl(own_record, [first, *_preload_records(role, plugin_dir)])
+    start = {
+        "session_id": sid,
+        "transcript_path": str(main_record),
+        "agent_transcript_path": str(own_record),
+        "cwd": str(cwd),
+        "permission_mode": "default",
+        "hook_event_name": "SubagentStart",
+        "agent_id": agent_id,
+        "agent_type": agent_type,
+    }
+    exits = rd._run_event(plugin_dir, "SubagentStart", agent_type, json.dumps(start), cwd, env)
+    context = tuple(
+        out["additionalContext"]
+        for e in exits
+        for out in [rd._parsed(e.stdout).get("hookSpecificOutput") or {}]
+        if isinstance(out, dict) and isinstance(out.get("additionalContext"), str)
+    )
     for text in context:
         rd._append_jsonl(
             own_record,
@@ -399,17 +438,50 @@ def _file_role_record(
         )
 
 
+def _preload_records(role: str, plugin_dir: Path) -> list[dict[str, Any]]:
+    """One preload message per skill the copy's definition preloads, as the harness records it."""
+    from tests.acceptance.drivers import refactoring_delivery as rd
+
+    records = []
+    for skill in rd.preloaded_skills(plugin_dir, role):
+        page = plugin_dir / "skills" / skill / "SKILL.md"
+        if not page.is_file():
+            continue
+        _, body = rd._frontmatter(page.read_text(encoding="utf-8"))
+        wrapper = (
+            f"<command-message>{skill}</command-message>\n"
+            f"<command-name>{skill}</command-name>\n<skill-format>true</skill-format>"
+        )
+        directory = f"Base directory for this skill: {page.parent}\n\n{body}"
+        records.append(
+            {
+                "type": "user",
+                "isMeta": True,
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": wrapper},
+                        {"type": "text", "text": directory},
+                    ],
+                },
+            }
+        )
+    return records
+
+
 def item_slug(item: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", item.lower()).strip("-")
 
 
 def _leave_end_state(template: Path, repository: Path, work: str) -> None:
     end_state = template / "end_states" / (CLEAN if work == CLEAN else item_slug(work))
-    start = tree_digests(template / "start")
+    start = staged_files(template / "start")
     ending = {
-        p.relative_to(end_state).as_posix().removesuffix(TEMPLATE_SUFFIX): p
+        rel: p
         for p in end_state.rglob("*")
         if p.is_file()
+        for rel in [p.relative_to(end_state).as_posix().removesuffix(TEMPLATE_SUFFIX)]
+        if rel != GRADER_MANIFEST
     }
     for rel in start:
         if rel not in ending and (repository / rel).is_file():

@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from praxion_evals.adherence import session_launch, tasks
+from praxion_evals.adherence.axis import DEFAULT_AXIS
 from praxion_evals.adherence.confinement import CONFINED_ROLES, Confinement
 from praxion_evals.adherence.model import ArmBuild, Role
 from praxion_evals.adherence.session_launch import Launch, session_confinement
@@ -270,4 +271,6 @@ def test_the_run_launches_sessions_with_the_operators_token_file(tmp_path):
 
 def _config() -> RunConfig:
     fields = dict.fromkeys(RunConfig.__dataclass_fields__)
-    return RunConfig(**{**fields, "arms": (), "session_oauth_token_file": None})  # type: ignore[arg-type]
+    return RunConfig(
+        **{**fields, "arms": (), "axis": DEFAULT_AXIS, "session_oauth_token_file": None}
+    )  # type: ignore[arg-type]

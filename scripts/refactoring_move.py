@@ -9,12 +9,13 @@ what changes; the rest of this module finds the state a definition holds and swa
     refactoring_move.py --to {preloaded,delivered} [--root DIR] [--check]
 
 `--root` is the tree whose `agents/` is moved (default: the git toplevel of the working directory).
-Moving is idempotent and runs in either direction. All sites are checked before any file is
-written, so a drifted definition is never left half moved.
+Moving is idempotent and runs in either direction. All sites are checked and both new texts are
+computed before any file is written, and a write that fails restores the definitions already
+written, so the two are never left half moved.
 
 Exit codes: 0 the state was applied or already held; 1 a site has drifted (neither of its texts
-is found exactly once, or a passage it inserted has been reworded) or, under `--check`, the state
-differs; 2 a usage error, including a root with no definitions, no root to default to (the working
+is found exactly once, or a passage it inserted has been reworded; the message says which) or,
+under `--check`, the state differs; 2 a usage error, including a root with no definitions, no root to default to (the working
 directory is not in a git repository), an installed-plugin cache as root, and a definition that
 cannot be read or written. This tool lives in the Praxion checkout only and is not shipped as a command.
 """
@@ -52,12 +53,23 @@ class Site:
     def text(self, state: State) -> str:
         return self.preloaded if state == "preloaded" else self.delivered
 
-    def holds(self, text: str, state: State) -> bool:
-        """True when `text` is in `state` here: its words found once, and no stray insertion."""
+    def unmet(self, text: str, state: State) -> str | None:
+        """Why `text` is not in `state` here: its words not found once, or a stray insertion."""
+        found = text.count(self.text(state))
+        if found != 1:
+            return f"the {state} text is found {found} times"
         stray = (
             state == "preloaded" and self.inserted_trace is not None and self.inserted_trace in text
         )
-        return text.count(self.text(state)) == 1 and not stray
+        return "the preloaded text is followed by a passage that was reworded" if stray else None
+
+    def holds(self, text: str, state: State) -> bool:
+        return self.unmet(text, state) is None
+
+    def drift(self, text: str) -> str:
+        """What was not found at this site, in the words of each state."""
+        reasons = [reason for state in STATES if (reason := self.unmet(text, state))]
+        return "; ".join(reasons) or "the preloaded and the delivered text are both found"
 
     def __str__(self) -> str:
         return f"{self.definition} ({self.name})"
@@ -171,14 +183,31 @@ def _read_definitions(root: Path) -> dict[str, str]:
     return {d: (root / d).read_bytes().decode("utf-8") for d in definitions}
 
 
-def _write_definitions(root: Path, texts: Mapping[str, str], to: State) -> int:
+def _write_definitions(
+    root: Path, texts: Mapping[str, str], originals: Mapping[str, str], to: State
+) -> int:
+    """All or none: a failed write puts back the definitions already written."""
+    written: list[str] = []
     for definition, text in texts.items():
         try:
             (root / definition).write_bytes(text.encode("utf-8"))
         except OSError as exc:
-            return _fail(f"cannot write {definition}: {exc}")
+            return _fail(f"cannot write {definition}: {exc}{_restore(root, written, originals)}")
+        written.append(definition)
+    for definition in written:
         print(f"refactoring-move: moved {definition} to {to}")
     return 0
+
+
+def _restore(root: Path, definitions: list[str], originals: Mapping[str, str]) -> str:
+    """Put the original bytes back; the returned note names a definition that stayed moved."""
+    stuck = []
+    for definition in definitions:
+        try:
+            (root / definition).write_bytes(originals[definition].encode("utf-8"))
+        except OSError:
+            stuck.append(definition)
+    return f" (and could not restore {', '.join(stuck)})" if stuck else ""
 
 
 def _fail(reason: object) -> int:
@@ -209,8 +238,7 @@ def main(argv: list[str] | None = None) -> int:
     moved, drifted = move(texts, args.to)
     for site in drifted:
         print(
-            f"refactoring-move: DRIFT -- {site}: neither the preloaded nor the delivered text "
-            "is found exactly once",
+            f"refactoring-move: DRIFT -- {site}: {site.drift(texts[site.definition])}",
             file=sys.stderr,
         )
     if drifted:
@@ -225,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
     if not differing:
         print(f"refactoring-move: already {args.to}")
         return 0
-    return _write_definitions(root, differing, args.to)
+    return _write_definitions(root, differing, texts, args.to)
 
 
 if __name__ == "__main__":

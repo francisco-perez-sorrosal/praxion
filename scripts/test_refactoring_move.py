@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -183,12 +184,19 @@ SITE_AND_MOVE = [
     for site in move.SITES
     for start, to in MOVES
 ]
+# The inserted passage is what marks a Codex site, so a rename of a site's label cannot empty these.
+CODEX_SITES = [site for site in move.SITES if site.inserted_trace is not None]
 CODEX_SITE_AND_TARGET = [
     pytest.param(site, to, id=f"{site.definition.split('/')[1]}-to-{to}")
-    for site in move.SITES
-    if site.name == "Codex passage"
+    for site in CODEX_SITES
     for to in move.STATES
 ]
+
+
+def test_the_parametrized_site_cases_are_not_empty() -> None:
+    assert {site.definition for site in CODEX_SITES} == {move.IMPLEMENTER, move.TEST_ENGINEER}
+    assert len(CODEX_SITE_AND_TARGET) == len(CODEX_SITES) * len(move.STATES)
+    assert len(SITE_AND_MOVE) == len(move.SITES) * len(MOVES)
 
 
 @pytest.mark.parametrize(("site", "start", "to"), SITE_AND_MOVE)
@@ -203,8 +211,8 @@ def test_a_drifted_site_is_refused_by_name_and_nothing_is_written(
 
     assert _snapshot(preloaded) == before
     assert capsys.readouterr().err.splitlines() == [
-        f"refactoring-move: DRIFT -- {site.definition} ({site.name}): neither the preloaded nor "
-        "the delivered text is found exactly once"
+        f"refactoring-move: DRIFT -- {site.definition} ({site.name}): "
+        "the preloaded text is found 0 times; the delivered text is found 0 times"
     ]
 
 
@@ -219,7 +227,11 @@ def test_a_reworded_codex_passage_is_drift_in_either_direction(
     assert _run(preloaded, to) == 1
 
     assert _snapshot(preloaded) == before
-    assert f"{site.definition} ({site.name})" in capsys.readouterr().err
+    assert capsys.readouterr().err.splitlines() == [
+        f"refactoring-move: DRIFT -- {site.definition} ({site.name}): "
+        "the preloaded text is followed by a passage that was reworded; "
+        "the delivered text is found 0 times"
+    ]
 
 
 def test_a_text_found_twice_is_drift_not_a_guess(
@@ -230,7 +242,16 @@ def test_a_text_found_twice_is_drift_not_a_guess(
 
     assert _run(preloaded, "delivered") == 1
 
-    assert site.name in capsys.readouterr().err
+    assert capsys.readouterr().err.splitlines() == [
+        f"refactoring-move: DRIFT -- {site.definition} ({site.name}): "
+        "the preloaded text is found 2 times; the delivered text is found 0 times"
+    ]
+
+
+def test_a_site_holding_both_states_is_drift_with_a_reason() -> None:
+    site = move.Site("agents/x.md", "same", "one text", "one text")
+
+    assert site.drift("one text") == "the preloaded and the delivered text are both found"
 
 
 def test_every_drifted_site_is_named_in_one_run(
@@ -282,7 +303,10 @@ def test_no_root_and_no_git_repository_is_a_usage_error_not_a_guess(
 
     assert move.main(["--to", "delivered"]) == 2
 
-    assert "not in a git repository" in capsys.readouterr().err
+    assert capsys.readouterr().err.splitlines() == [
+        "refactoring-move: ERROR -- no --root given and the working directory is not in a git "
+        "repository"
+    ]
 
 
 def test_an_installed_plugin_cache_is_never_moved(
@@ -313,6 +337,86 @@ def test_a_definition_that_cannot_be_written_is_a_usage_error_naming_it(
     assert "cannot write agents/test-engineer.md" in capsys.readouterr().err
 
 
+def _fail_the_first_write_of(monkeypatch: pytest.MonkeyPatch, definition: str) -> None:
+    write_bytes = Path.write_bytes
+    failed = []
+
+    def write(self: Path, data: bytes) -> int:
+        if self.name == definition and not failed:
+            failed.append(self.name)
+            raise PermissionError("read-only")
+        return write_bytes(self, data)
+
+    monkeypatch.setattr(Path, "write_bytes", write)
+
+
+def test_a_failed_second_write_puts_the_first_definition_back(
+    preloaded: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    original = _snapshot(preloaded)
+    _fail_the_first_write_of(monkeypatch, "test-engineer.md")
+
+    assert _run(preloaded, "delivered") == 2
+
+    captured = capsys.readouterr()
+    assert _snapshot(preloaded) == original
+    assert captured.out == ""
+    assert captured.err.splitlines() == [
+        "refactoring-move: ERROR -- cannot write agents/test-engineer.md: read-only"
+    ]
+
+
+def test_a_definition_that_cannot_be_put_back_is_named_beside_the_failed_write(
+    preloaded: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    write_bytes = Path.write_bytes
+    writes: list[str] = []
+
+    def write(self: Path, data: bytes) -> int:
+        writes.append(self.name)
+        if self.name == "test-engineer.md" or writes.count("implementer.md") > 1:
+            raise PermissionError("read-only")
+        return write_bytes(self, data)
+
+    monkeypatch.setattr(Path, "write_bytes", write)
+
+    assert _run(preloaded, "delivered") == 2
+
+    assert capsys.readouterr().err.splitlines() == [
+        "refactoring-move: ERROR -- cannot write agents/test-engineer.md: read-only "
+        "(and could not restore agents/implementer.md)"
+    ]
+
+
+def test_every_definition_that_cannot_be_put_back_is_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    names = ["agents/a.md", "agents/b.md"]
+    monkeypatch.setattr(Path, "write_bytes", _always_read_only)
+
+    note = move._restore(tmp_path, names, dict.fromkeys(names, ""))
+
+    assert note == " (and could not restore agents/a.md, agents/b.md)"
+
+
+def _always_read_only(self: Path, data: bytes) -> int:
+    raise PermissionError("read-only")
+
+
+def test_the_move_is_applied_to_the_git_toplevel_found_by_git_itself(
+    preloaded: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
+        monkeypatch.delenv(name, raising=False)
+    subprocess.run(["git", "init", "-q", str(preloaded)], check=True)
+    monkeypatch.chdir(preloaded / "agents")
+
+    assert move.main(["--to", "delivered"]) == 0
+
+    assert delivery.preload_state(preloaded, "implementer") == delivery.NotPreloaded()
+    assert delivery.preload_state(preloaded, "test-engineer") == delivery.NotPreloaded()
+
+
 # -- What the move writes ----------------------------------------------------------------------
 
 # Every registered pipeline artifact, a placeholder name by its fixed prefix.
@@ -324,9 +428,12 @@ _EPHEMERAL = re.compile(
 )
 
 
+@pytest.mark.parametrize("state", move.STATES)
 @pytest.mark.parametrize("site", move.SITES, ids=lambda s: f"{s.definition}-{s.name}")
-def test_the_delivered_texts_cite_no_decision_number_or_pipeline_file(site: move.Site) -> None:
-    assert _EPHEMERAL.search(site.delivered) is None
+def test_the_texts_of_both_states_cite_no_decision_number_or_pipeline_file(
+    site: move.Site, state: str
+) -> None:
+    assert _EPHEMERAL.search(site.text(state)) is None
 
 
 def test_the_phase_tag_sentence_is_state_neutral_wording() -> None:
@@ -354,7 +461,7 @@ def test_the_delivered_state_marks_one_codex_passage_naming_the_marker_and_the_s
     assert "not already in your context" in passage
 
 
-@pytest.mark.parametrize("site", [s for s in move.SITES if s.name == "Codex passage"], ids=str)
+@pytest.mark.parametrize("site", CODEX_SITES, ids=str)
 def test_the_codex_passage_stands_in_its_own_paragraph_after_its_anchor(
     preloaded: Path, site: move.Site
 ) -> None:

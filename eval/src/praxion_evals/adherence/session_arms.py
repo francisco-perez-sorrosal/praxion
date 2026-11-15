@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from praxion_evals.adherence import arms
-from praxion_evals.adherence.axis_runs import DEFAULT_RUN, AxisRun
+from praxion_evals.adherence.axis_runs import DEFAULT_RUN, AxisRun, Observation
 from praxion_evals.adherence.model import (
     Arm,
     ArmBuild,
@@ -97,7 +97,7 @@ def prove(
     def copy_home(root: Path) -> None:
         shutil.copytree(template, root, symlinks=True, dirs_exist_ok=True)
 
-    observed: dict[Arm, arms.ProofObservation | None] = {}
+    observed: dict[Arm, Observation | None] = {}
     verdicts: dict[Arm, arms.ArmVerdict] = {}
     models: list[str | None] = []
     refusals: list[str] = []
@@ -120,7 +120,7 @@ def prove(
                 verdicts[arm] = NotBuilt(f"the proof session failed: {detail}")
             case NotBuilt() as unobserved:
                 verdicts[arm] = unobserved
-            case arms.ProofObservation() as seen:
+            case arms.ProofObservation() | arms.DeliveryObservation() as seen:
                 observed[arm] = seen
     verdicts = {**verdicts, **proof.decide(nonce, observed)}
     return ProofRun(ledger, verdicts, tuple(models), tuple(refusals))

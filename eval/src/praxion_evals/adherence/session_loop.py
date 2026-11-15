@@ -372,6 +372,8 @@ def _provisional(
         "arms": list(config.arms),
         "tasks": {role: [t.task_id for t in role_tasks] for role, role_tasks in planned.items()},
         "calibration": config.calibration,
+        # written only off the default axis, so a default run's file stays as it always was
+        **({} if config.axis == DEFAULT_AXIS else {"axis": config.axis}),
         "judging": config.judging,
         "session_budget_usd": config.session_budget_usd,
         "retries": [],
@@ -395,6 +397,7 @@ def _with_earlier_runs(
         tuple(provisional.catalog),
         _identity_differences(this, repo),
         replaced=_loaded_run_id(output),  # a file this run overwrites is no longer evidence
+        axis=results.run_axis(provisional.run),
     )
     run = replace(
         provisional.run,
@@ -619,9 +622,13 @@ def _record_launch_order(context: Context, state: RunState, role: Role, task: Ta
     return _checkpoint(context, state)
 
 
-def planned_order(config: RunConfig, task_id: str) -> tuple[Arm, Arm]:
-    """The order a task's slots run in: the calibration's fixed one, else the seed's draw."""
-    return CALIBRATION_ORDER if config.calibration else launch_order(config.seed, task_id)
+def planned_order(config: RunConfig, task_id: str) -> tuple[SessionArm, SessionArm]:
+    """The order a task's slots run in: the calibration's fixed one, else the seed's draw on the
+    run's axis (taken through ``launch_order``'s two-argument form, the seam tests fix)."""
+    if config.calibration:
+        return CALIBRATION_ORDER
+    first, second = launch_order(config.seed, task_id)
+    return arm_on(config.axis, first), arm_on(config.axis, second)
 
 
 def _slots(config: RunConfig, runnable: Sequence[Arm], task: TaskSpec) -> list[tuple[Arm, Arm]]:
@@ -632,7 +639,7 @@ def _slots(config: RunConfig, runnable: Sequence[Arm], task: TaskSpec) -> list[t
     """
     if config.calibration:
         return [("full", "full"), ("lean", "full")] if "full" in runnable else []
-    return [(arm, arm) for arm in ordered_arms(runnable, config.seed, task.task_id)]
+    return [(arm, arm) for arm in ordered_arms(runnable, config.seed, task.task_id, config.axis)]
 
 
 def _probe_page(context: Context, state: RunState, runnable: Sequence[Arm]) -> RunState:

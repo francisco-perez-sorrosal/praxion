@@ -167,6 +167,11 @@ class RunInfo:
             _require(bool(getattr(self, name).strip()), f"a run's {name} is not empty")
 
 
+def run_axis(run: RunInfo) -> str:
+    """The axis a run compares along; a file that names none is the default axis's."""
+    return run.extra.get("axis", DEFAULT_AXIS)
+
+
 @dataclass(frozen=True)
 class CatalogEntry:
     """One check as the run scored it: the rule it enforces and, if judged, its golden bad case."""
@@ -255,7 +260,13 @@ class RunResults:
 
     def __post_init__(self) -> None:
         declared = instant(self.declared_at, "the settings' declared_at")
+        axis = run_axis(self.run)
         for record in self.sessions:
+            _require(
+                record.setup.axis == axis,
+                f"the session {record.setup.task_id} is of the {record.setup.axis} axis,"
+                f" but its run compares along the {axis} axis",
+            )
             _require(
                 declared < instant(record.started_at, "a session's started_at"),
                 f"the settings were declared at {self.declared_at}, not before the session"
@@ -347,7 +358,7 @@ def load(path: Path) -> RunResults:
 def pairs_of(results: RunResults, role: str) -> list[Pair]:
     """The role's tasks that ran in both arms of the run's axis, baseline in ``full`` and treatment
     in ``lean``; a later record of a task and arm replaces an earlier."""
-    positions = POSITIONS[results.run.extra.get("axis", DEFAULT_AXIS)]
+    positions = POSITIONS[run_axis(results.run)]
     latest: dict[tuple[str, str], dict[str, SessionRecord]] = {}
     for record in results.sessions:
         if record.setup.role == role:
@@ -435,16 +446,21 @@ Differences = Callable[["RunResults", str], tuple[str, ...]]
 
 
 def earlier_runs(
-    directory: Path, roles: Sequence[str], differences: Differences, replaced: str | None = None
+    directory: Path,
+    roles: Sequence[str],
+    differences: Differences,
+    replaced: str | None = None,
+    axis: str = DEFAULT_AXIS,
 ) -> EarlierListing:
     """Every results file in ``directory``, oldest first, listed by what it measured for each role.
 
     A ``.json`` file that is not an ``adherence/1`` results file is not a run: it is passed over
     and its name returned. ``replaced`` is the id of a run the listing run overwrites, which is
-    no longer evidence.
+    no longer evidence. A run of another ``axis`` than the listing run's is no draw of it: it
+    is left out whole, so neither axis's runs are listed among the other's.
     """
     runs, skipped = read_directory(directory)
-    runs = [earlier for earlier in runs if earlier.run.id != replaced]
+    runs = [r for r in runs if r.run.id != replaced and run_axis(r.run) == axis]
     return EarlierListing(
         {role: _earlier_for(role, runs, differences) for role in roles}, tuple(skipped)
     )

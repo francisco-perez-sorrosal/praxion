@@ -47,6 +47,16 @@ POSITIONS: MappingProxyType[str, Positions] = MappingProxyType(
     }
 )
 
+# The arms whose session is owed the injected kernel. The default axis's full arm keeps its
+# instruction layer, so only lean is; both definitions the refactoring move changes omit that layer,
+# so both of its arms are.
+KERNEL_OWED: MappingProxyType[str, tuple[SessionArm, ...]] = MappingProxyType(
+    {
+        "inherited-context": ("lean",),
+        "refactoring-delivery": ("preloaded", "delivered"),
+    }
+)
+
 # The two definitions the refactoring move changes; scripts/refactoring_move.py names the same
 # two, so a change to either list must change both.
 MOVE_SITES: tuple[str, ...] = ("agents/implementer.md", "agents/test-engineer.md")

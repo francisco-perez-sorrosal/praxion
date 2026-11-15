@@ -1,3 +1,76 @@
+## v0.65.0 (2026-11-15)
+
+### Feat
+
+- Name the run's arms in the report's legend and verdict sentences
+- Report a paired run in its own arms' names, and say why an arm was not shown
+- Close, list and refuse to continue a paired run
+- Run the paired move through the loop: the setup's axis, the kernel owed to both arms, the run's axis in its file, the earlier-run listing kept per axis
+- Grade a pool session on the default checks, the role's end-state checklist and the skill's arrival
+- Decide the delivery proof from the proof spawn's own transcript
+- Build the two arms of the paired move as plugin copies, each shown in its preload state at no cost
+- Grade a pool session from the change since its starting commit, with its task's own mode
+- Stage a pool task's scratch repository without its answer key, as the new axis's staging
+- Plan and dry-run the paired move from the refactoring pool
+- The refactoring-delivery axis and its two arms as values
+- Grade the test-engineer's refactoring end state: the second template's data
+- Grade the test-engineer's refactoring end state: the checks and the first template's data
+- Grade the implementer's refactoring end state: the second template's data
+- Grade the implementer's refactoring end state: the grader and the first template's data
+- Test-engineer refactoring pool: two pre-refactor templates
+- Implementer refactoring pool, outside the default pool
+- The reversible move tool, applied to copies only
+- Wire the delivery into the emitter and turn the spawn scenarios green
+- Decide and deliver, failing open and never silently
+- Read the skill's body, bounded
+- Render the block, the failure notice and the arrival matcher
+- Read a definition's preload state
+- Resolve a step-loop pointer to its step heading
+- Classify a delegation by its own words
+- Add the `skill_delivery` observation event class
+
+### Fix
+
+- A results file that names an unknown axis is refused when it is read
+- Say what the marker does in words true in both states
+- A session's own broken tests fail the item; only a run that could not judge them is an error
+- The paired run's evidence: a damaged record proves nothing, a test run that could not run is not a failed item
+- The move tool's follow-ups: never half-moved, a true drift message, tests that cannot go empty
+- The delivery hook's follow-ups: a pointer line with trailing space, the failure report's edges, tests that write to the real log
+- The paired run refuses in its own words, names the option it declines, and blocks only its own axis
+- Keep the probe's check id in the registered script
+- Snapshot the newest journal entries at compaction
+- Restore the stamp gate's texts a split shortened
+- Report a replayed review's verdict from its file
+- Keep a stop a stop when HANDOFF.md is not the composer's
+- Tell a plan-field stop to correct the plan line
+- List a step's own files first in a marked stop
+- Keep the newest attempts in a cut prompt slot
+- Keep bracketed words in a commit subject
+- Stop fitness tests claiming the name tests
+- drop the retired rule from the delivery order
+- warn when a packaged skill is not portable
+- Log the id-citation gate fire in the judged repo
+- Snapshot the newest test results at compaction
+- Check a realign's from key against the row's own
+- Stop the step-loop driver on a change type it cannot read
+- Type the first commit the step-loop driver keeps for a step
+- Read the conventional change type a plan declares for a step
+
+### Refactor
+
+- The launch, the arm copies and the proof read the run's record
+- The axis run record, with the default axis's behaviour in every field, and the plan routed through it
+- Positions and patched paths as values: the arm build, the pairing and the launch order read them
+- Move the dry-run printer out of the eval's command line
+- Move the arm copies, their record and their proof out of the session loop
+- Give the prompt-rewrite emitter a trailing-segment slot
+- Lift the marker grammar into the delivery module
+- Move the probe's rendering to a sibling module
+- Import the ledger record for annotations only
+- split the Codex frontmatter reader
+- Split the stamp gate's record-anchor checks out
+
 ## v0.64.0 (2026-11-14)
 
 ### Feat

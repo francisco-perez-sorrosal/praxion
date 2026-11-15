@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-15T18:27:57Z'
+generated_at: '2026-11-15T20:17:21Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-14'
+  last_modified: '2026-11-15'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -682,7 +682,7 @@ surfaces:
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-13'
+  last_modified: '2026-11-15'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3727,7 +3727,7 @@ surfaces:
   path: .ai-state/decisions/504-diet-closes-catalogue-and-manifest-items.md
   type: markdown
   title: The startup-context diet closes its preload, catalogue and manifest-axis items by recorded decision
-  last_modified: '2026-11-13'
+  last_modified: '2026-11-15'
   renderer: adr_card
 - id: ai-state-decisions-505-hand-path-instructions-step-beside-the-update-path
   path: .ai-state/decisions/505-hand-path-instructions-step-beside-the-update-path.md
@@ -3793,7 +3793,7 @@ surfaces:
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-13'
+  last_modified: '2026-11-15'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4108,6 +4108,12 @@ surfaces:
   title: 'Spec: main-session-adherence (the adherence eval measures a rule move in headless main sessions, so a rule can leave session-start residency only on evidence)'
   last_modified: '2026-10-28'
   renderer: default_markdown
+- id: ai-state-specs-spec-memory-to-artifacts-2026-11-15
+  path: .ai-state/specs/SPEC_memory-to-artifacts_2026-11-15.md
+  type: markdown
+  title: 'Spec: memory-to-artifacts (process knowledge moves from memory to the artifacts that govern it; memory keeps status and preferences)'
+  last_modified: '2026-11-15'
+  renderer: default_markdown
 - id: ai-state-specs-spec-merge-triggers-2026-10-03
   path: .ai-state/specs/SPEC_merge-triggers_2026-10-03.md
   type: markdown
@@ -4176,6 +4182,12 @@ surfaces:
   type: markdown
   title: "Spec: ralph-lite (the step-loop driver's goal mode \u2014 Ralph-lite \u2014 built per dec-434)"
   last_modified: '2026-10-08'
+  renderer: default_markdown
+- id: ai-state-specs-spec-refactoring-delivery-2026-11-15
+  path: .ai-state/specs/SPEC_refactoring-delivery_2026-11-15.md
+  type: markdown
+  title: 'Spec: refactoring-delivery (the refactoring skill delivered to marked delegations; the move that drops the preload is held)'
+  last_modified: '2026-11-15'
   renderer: default_markdown
 - id: ai-state-specs-spec-routing-facts-2026-11-02
   path: .ai-state/specs/SPEC_routing-facts_2026-11-02.md
@@ -4840,6 +4852,7 @@ groups:
   - ai-state-specs-spec-loop-gate-followups-2026-10-22
   - ai-state-specs-spec-loop-gate-hardening-2026-10-20
   - ai-state-specs-spec-main-session-adherence-2026-10-28
+  - ai-state-specs-spec-memory-to-artifacts-2026-11-15
   - ai-state-specs-spec-merge-triggers-2026-10-03
   - ai-state-specs-spec-model-routing-move-2026-11-01
   - ai-state-specs-spec-multi-language-support-2026-05-11
@@ -4851,6 +4864,7 @@ groups:
   - ai-state-specs-spec-project-gating-2026-11-06
   - ai-state-specs-spec-project-metrics-2026-04-23
   - ai-state-specs-spec-ralph-lite-2026-10-08
+  - ai-state-specs-spec-refactoring-delivery-2026-11-15
   - ai-state-specs-spec-routing-facts-2026-11-02
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13
   - ai-state-specs-spec-sidecar-placement-2026-09-03

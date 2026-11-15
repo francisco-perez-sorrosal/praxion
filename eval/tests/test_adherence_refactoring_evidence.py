@@ -164,7 +164,13 @@ def test_a_rewritten_prompt_must_end_in_the_block(block, rewritten, arrives):
     assert refactoring_arms._ask_copy(REPO_ROOT, refactoring_arms._ARRIVES, prompt) is arrives
 
 
-# --- a session's broken tests fail the item; a run that could not judge them is errored ---------------------------------------
+# --- a session's broken tests fail the item; a run that could not judge them is errored ---------
+
+
+_FAILING_FIXTURE = (
+    "import pytest\n\n@pytest.fixture\ndef f():\n    raise ValueError\n\ndef test_x(f):\n    pass\n"
+)
+_STDERR_LINE = "stderr-line-before-the-hang"
 
 
 def _repo_running(tmp_path: Path, test_source: str) -> Path:
@@ -177,10 +183,7 @@ def _repo_running(tmp_path: Path, test_source: str) -> Path:
     [
         ("def test_ok():\n    assert True\n", True),
         ("def test_bad():\n    assert False\n", False),
-        (
-            "import pytest\n\n@pytest.fixture\ndef f():\n    raise ValueError\n\ndef test_x(f):\n    pass\n",
-            False,
-        ),
+        (_FAILING_FIXTURE, False),
     ],
 )
 def test_the_exit_codes_pytest_gives_a_verdict_with_decide_the_item(tmp_path, test_source, holds):
@@ -222,12 +225,30 @@ def test_a_conftest_that_cannot_be_loaded_is_a_usage_error_and_errored(tmp_path)
     assert "conftest" in str(caught.value)
 
 
-def test_a_run_that_outlasts_its_time_is_errored(tmp_path, monkeypatch):
-    monkeypatch.setattr(checks_refactoring, "TEST_TIMEOUT_SECONDS", 1)
-    source = "import time\n\ndef test_slow():\n    time.sleep(30)\n"
+def _hang_after_a_stderr_line(monkeypatch, tmp_path: Path) -> str:
+    """Make the nested pytest write a line to stderr as it starts, and return a test that hangs.
 
-    with pytest.raises(checks_refactoring.PytestRunError, match="did not finish within 1 s"):
-        checks_refactoring._pytest_passes(_repo_running(tmp_path, source))
+    Why a startup hook: pytest captures what a test or a conftest writes, so only a line written
+    before pytest starts reaches the stderr of the run.
+    """
+    hook = tmp_path / "hook"
+    hook.mkdir()
+    line = f"import sys\nsys.stderr.write({_STDERR_LINE!r} + '\\n')\n"
+    (hook / "sitecustomize.py").write_text(line)
+    monkeypatch.setenv("PYTHONPATH", str(hook))
+    monkeypatch.setattr(checks_refactoring, "TEST_TIMEOUT_SECONDS", 1)
+    return "import time\n\ndef test_slow():\n    time.sleep(30)\n"
+
+
+def test_a_run_that_outlasts_its_time_is_errored_with_its_stderr(tmp_path, monkeypatch):
+    source = _hang_after_a_stderr_line(monkeypatch, tmp_path)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    with pytest.raises(checks_refactoring.PytestRunError, match="within 1 s") as caught:
+        checks_refactoring._pytest_passes(_repo_running(repo, source))
+
+    assert _STDERR_LINE in str(caught.value)
 
 
 def test_the_nested_run_keeps_its_temporary_files_in_a_directory_of_its_own(tmp_path):
@@ -256,8 +277,14 @@ def test_the_nested_run_keeps_its_temporary_files_in_a_directory_of_its_own(tmp_
     assert not where.exists()  # the grader removed what it made
 
 
-def _graded_workspace(tmp_path: Path, tests: dict[str, str]) -> Path:
-    """A repository whose only commit holds the manifest, the source and ``tests``."""
+def _graded_workspace(
+    tmp_path: Path, tests: dict[str, str], then: dict[str, str | None] | None = None
+) -> Path:
+    """A repository whose only commit holds the manifest, the source and ``tests``.
+
+    ``then`` is what the session did afterwards, in the working tree: a file's new text, or
+    ``None`` to delete it.
+    """
     files = {
         "refactoring.toml": (
             'source = "src/a.py"\ntarget = "src/b.py"\ntests = "tests"\nmoving = ["moving"]\n'
@@ -271,22 +298,28 @@ def _graded_workspace(tmp_path: Path, tests: dict[str, str]) -> Path:
     identity = ("-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid")
     for step in (("init", "-q", "-b", "main"), ("add", "-A"), ("commit", "-q", "-m", "start")):
         subprocess.run(["git", *identity, *step], cwd=tmp_path, check=True, capture_output=True)
+    for name, text in (then or {}).items():
+        if text is None:
+            (tmp_path / name).unlink()
+        else:
+            (tmp_path / name).write_text(text)
     return tmp_path
 
 
 _RUN_ITEMS = {"the tests still pass", "behaviour is unchanged"}
 
 
+_PASSING_TESTS = {"tests/test_old.py": "def test_ok():\n    pass\n"}
+
+
 @pytest.mark.parametrize(
-    "tests",
+    "session_left",
     [
-        {"tests/note.txt": "no test module\n"},  # nothing to collect
+        {"tests/test_old.py": None},  # every test deleted: nothing to collect
         {"tests/test_old.py": "import module_that_is_not_there\n\ndef test_x():\n    pass\n"},
         {"tests/test_old.py": "def test_x(:\n"},
         {"tests/test_old.py": "def test_bad():\n    assert False\n"},
-        {
-            "tests/test_old.py": "import pytest\n\n@pytest.fixture\ndef f():\n    raise ValueError\n\ndef test_x(f):\n    pass\n"
-        },
+        {"tests/test_old.py": _FAILING_FIXTURE},
     ],
     ids=[
         "no test left",
@@ -296,14 +329,16 @@ _RUN_ITEMS = {"the tests still pass", "behaviour is unchanged"}
         "a failing fixture",
     ],
 )
-def test_a_grade_over_tests_the_session_broke_fails_the_items_that_run_them(tmp_path, tests):
-    workspace = _graded_workspace(tmp_path, tests)
+def test_a_session_that_breaks_the_passing_tests_fails_the_item_that_runs_them(
+    tmp_path, session_left
+):
+    workspace = _graded_workspace(tmp_path, _PASSING_TESTS, then=session_left)
 
     result = checks_refactoring.grade_workspace("implementer", workspace, "")
 
-    assert _RUN_ITEMS <= set(result.failed)
+    assert "the tests still pass" in result.failed
+    assert "behaviour is unchanged" not in set(result.failed) | set(result.errored)
     assert not result.errored
-    assert not result.passed
 
 
 def test_a_grade_over_passing_tests_passes_the_items_that_run_them(tmp_path):
@@ -319,7 +354,9 @@ def test_a_grade_over_passing_tests_passes_the_items_that_run_them(tmp_path):
     [
         (
             {
-                "tests/test_old.py": "import pytest\n\ndef test_x():\n    pytest.exit('broke here', returncode=3)\n"
+                "tests/test_old.py": (
+                    "import pytest\n\ndef test_x():\n    pytest.exit('broke here', returncode=3)\n"
+                )
             },
             "broke here",
         ),
@@ -346,15 +383,17 @@ def test_a_grade_over_a_run_that_broke_errors_the_items_with_the_last_lines(
     assert not result.passed
 
 
-def test_a_grade_over_a_run_that_timed_out_errors_the_items(tmp_path, monkeypatch):
-    monkeypatch.setattr(checks_refactoring, "TEST_TIMEOUT_SECONDS", 1)
-    source = "import time\n\ndef test_slow():\n    time.sleep(30)\n"
-    workspace = _graded_workspace(tmp_path, {"tests/test_old.py": source})
+def test_a_grade_over_a_run_that_timed_out_errors_the_items_with_the_stderr(tmp_path, monkeypatch):
+    source = _hang_after_a_stderr_line(monkeypatch, tmp_path)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    workspace = _graded_workspace(repo, {"tests/test_old.py": source})
 
     result = checks_refactoring.grade_workspace("implementer", workspace, "")
 
     assert set(result.errored) == _RUN_ITEMS
     assert "did not finish within 1 s" in result.errored["the tests still pass"]
+    assert _STDERR_LINE in result.errored["the tests still pass"]
     assert not _RUN_ITEMS & set(result.failed)
 
 

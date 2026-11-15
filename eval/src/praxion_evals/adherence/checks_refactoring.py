@@ -506,12 +506,12 @@ def _dotted(node: ast.expr) -> str:
 def _pytest_passes(root: Path) -> bool:
     """Whether the repository's tests pass; ``PytestRunError`` when the run reached no verdict.
 
-    Mapped by who caused the result. Exit 0 passes. Exits 1 (tests failed, a failing fixture
-    included), 2 (collection stopped on an import or syntax error in the repository) and 5 (no test
-    collected) are the session's own doing, so they fail the item: else a session could break or
-    delete its tests and escape "the tests still pass". Exit 3 (pytest's internal error), 4 (a usage
-    error of this grader's command line, or a conftest that cannot load) and a timeout say nothing
-    about the session: they raise, and an errored item is never counted as passed.
+    Mapped by who caused it. Exit 0 passes. Exits 1 (tests failed, a failing fixture included), 2
+    (collection stopped on an import or syntax error in the repository) and 5 (no test collected)
+    are the session's own doing, so they fail the item: else a session could break or delete its
+    tests and escape "the tests still pass". Exit 3 (pytest's internal error), 4 and a timeout
+    raise: pytest gives 4 to a grader usage error and to a conftest that cannot load alike, so a
+    broken conftest reads errored, a gap left open. An errored item is never counted as passed.
     """
     env = {k: v for k, v in os.environ.items() if not k.startswith(_FOREIGN_ENV_PREFIXES)}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -525,15 +525,15 @@ def _pytest_passes(root: Path) -> bool:
             )
         except subprocess.TimeoutExpired as error:
             ran = f"pytest did not finish within {TEST_TIMEOUT_SECONDS} s"
-            raise PytestRunError(f"{ran}\n{_tail(error.output)}") from error
+            raise PytestRunError(f"{ran}\n{_tail(error.output, error.stderr)}") from error
     if run.returncode not in (0, *PYTEST_SESSION_FAULTS):
-        raise PytestRunError(f"pytest exited {run.returncode}\n{_tail(run.stdout + run.stderr)}")
+        raise PytestRunError(f"pytest exited {run.returncode}\n{_tail(run.stdout, run.stderr)}")
     return run.returncode == 0
 
 
-def _tail(output: bytes | None) -> str:
-    lines = (output or b"").decode("utf-8", errors="replace").strip().splitlines()
-    return "\n".join(lines[-ERROR_DETAIL_LINES:])
+def _tail(*streams: bytes | None) -> str:
+    text = b"".join(s or b"" for s in streams).decode("utf-8", errors="replace")
+    return "\n".join(text.strip().splitlines()[-ERROR_DETAIL_LINES:])
 
 
 def _git(workspace: Path, *args: str) -> bytes:

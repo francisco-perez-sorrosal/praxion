@@ -3,7 +3,7 @@
 The run's loop, launch and arm module read an ``AxisRun`` where each used to call the default
 axis's function, so a second axis overrides one field at a time instead of branching in them.
 ``DEFAULT_RUN`` holds in every field the function that runs today for ``inherited-context``;
-``refactoring-delivery`` is that record with its own name, positions, plan and refusals.
+``refactoring-delivery`` is that record with its own name, positions, plan, staging and refusals.
 
 Imports nothing from ``session_launch``, ``session_arms``, ``session_loop`` or ``cli`` at run
 time: they import this module, and the types it needs from them come in under TYPE_CHECKING.
@@ -131,6 +131,7 @@ def axis_run(axis: Axis) -> AxisRun:
                 axis=axis,
                 positions=POSITIONS[axis],
                 plan=refactoring_tasks.planned_pool,
+                stage=refactoring_tasks.stage_pool_task,
                 refusals=refuse_calibration,
             )
         case _:

@@ -8,15 +8,23 @@ loader, variant mapping, ids and slugs, so a pool task is shaped exactly like a 
 
 What marks a pool task is the words it is delegated in: the prompt names the refactoring step, and
 the plan and the brief the role reads carry the same marker, which is what the axis measures.
+
+A pool template also holds the grader's data, ``start/`` and ``end_states/``, and ``tasks``' loader
+hands a session every file under a template directory. ``stage_pool_task`` is the staging that
+keeps the answer key out of what the session can read.
 """
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 
 from praxion_evals.adherence import tasks
+from praxion_evals.adherence.checks_refactoring import MANIFEST
+from praxion_evals.adherence.confinement import CONFINED_ROLES
 from praxion_evals.adherence.model import KitMode, Role, TaskSpec
 from praxion_evals.adherence.tasks import Template
 
@@ -26,6 +34,8 @@ MARKER = "[Phase: Refactoring]"
 MIN_POOL_TEMPLATES = 2
 VARIANTS = ("ambiguity", "conflict", "early-stop")
 _PLANT_TOKEN = "@@PLANT@@"
+START_DIRNAME = "start"  # the starting tree: the scratch repository's whole content
+ANSWER_DIRNAME = "end_states"  # the clean end state and one violating tree per checklist item
 
 
 @dataclass(frozen=True)
@@ -122,6 +132,52 @@ def pool_templates(role: Role) -> tuple[Template, ...]:
     for template in found:
         _require_marked(role, pool, template)
     return found
+
+
+def stage_pool_task(task: TaskSpec, dest: Path, page_url: str | None = None) -> str:
+    """Make ``dest`` a git repository holding the template's starting tree and plan inputs.
+
+    The signature and the repository are ``tasks.build_scratch_repo``'s (the same helpers build
+    the instruction file, the overlays and the one fixture commit), except that the tree comes
+    from ``start/`` and only the template's plan inputs go under ``.ai-work/<slug>/``. Neither
+    ``end_states/`` nor the grader's manifest is copied anywhere the session can read. Returns
+    the commit the grader compares with.
+    """
+    if dest.exists() and any(dest.iterdir()):
+        raise FileExistsError(f"{dest} already holds files")
+    template = next(t for t in pool_templates(task.role) if t.template_id == task.template_id)
+    plan_inputs = _plan_inputs(template)
+    start = tasks.FIXTURES_DIR / task.role / POOL_DIRNAME / task.template_id / START_DIRNAME
+    dest.mkdir(parents=True, exist_ok=True)
+    tasks._copy_tree(start, dest, skip=frozenset({MANIFEST}))
+    for overlay in tasks.kit_for(task.role).overlays:
+        tasks._copy_tree(tasks.OVERLAYS_DIR / overlay, dest)
+    tasks._write_instructions(task, dest)
+    for name, text in plan_inputs:
+        target = dest / tasks.AI_WORK / task.slug / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(tasks._fill(text, task, page_url), encoding="utf-8")
+    commit = tasks._commit_fixture(dest)
+    if task.role in CONFINED_ROLES:  # as build_scratch_repo: no global ignore file in the sandbox
+        tasks._git(dest, "config", "--local", "core.excludesFile", os.devnull)
+    return commit
+
+
+def _plan_inputs(template: Template) -> tuple[tuple[str, str], ...]:
+    """The inputs a session may read: everything but the two trees the loader also returns.
+
+    A top-level ``start/`` or ``end_states/`` is the template's layout; the same grader data
+    anywhere else among the inputs is a declared input that would leak, so the template is refused.
+    """
+    staged = []
+    for name, text in template.inputs:
+        path = PurePosixPath(name)
+        if path.parts[0] in (START_DIRNAME, ANSWER_DIRNAME):
+            continue
+        if ANSWER_DIRNAME in path.parts or path.name == MANIFEST:
+            raise ValueError(f"template {template.template_id} declares {name} as an input")
+        staged.append((name, text))
+    return tuple(staged)
 
 
 def _pool_of(role: Role) -> RefactoringPool:

@@ -23,7 +23,7 @@ answered here. It plays the harness the way a real session presents itself:
   file of the template's `start/` but the grader's manifest, the `.tmpl` suffix dropped, with the
   same bytes) is a task session of that template. The manifest is grading material and is not
   staged, so a session neither holds nor leaves it. A proof's answer is the reply its prompt asks
-  for.
+  for; its ending is the script's entry for the arm's proofs, served unless the script says not.
 - A task session in a copy whose role definition carries a lower turn limit than the shipped one
   is an early stop: the harness ends the role at its limit with the repository as it started, so
   the session leaves no end state and its script entry is the script's default. The scripted
@@ -116,6 +116,9 @@ class StandIn:
 class Script:
     by_arm: Mapping[str, Sequence[Ending]] = field(default_factory=dict)  # by task-launch ordinal
     default: Ending = field(default_factory=Ending)
+    proofs: Mapping[str, Ending] = field(
+        default_factory=dict
+    )  # an arm's proof sessions; default served
 
 
 # -- Driver side ---------------------------------------------------------------------------------
@@ -137,6 +140,7 @@ def install(
                 "templates": {name: str(path) for name, path in templates.items()},
                 "by_arm": {arm: [asdict(e) for e in ends] for arm, ends in script.by_arm.items()},
                 "default": asdict(script.default),
+                "proofs": {arm: asdict(e) for arm, e in script.proofs.items()},
             }
         ),
         encoding="utf-8",
@@ -188,7 +192,7 @@ def serve(config_path: str) -> int:
     stopped_early = template is not None and _turn_limit_lowered(plugin_dir, role)
     previous = _logged(Path(config["log_dir"]))
     ordinal = -1 if template is None or stopped_early else _task_launches(previous, arm)
-    ending = _scripted(config, arm, ordinal) if template is not None else Ending()
+    ending = _scripted(config, arm, ordinal) if template is not None else _proof_ending(config, arm)
     _log(
         config,
         previous,
@@ -256,6 +260,10 @@ def _turn_limit_lowered(plugin_dir: Path, role: str) -> bool:
 
 def _task_launches(previous: Sequence[Mapping[str, Any]], arm: str) -> int:
     return sum(1 for raw in previous if raw["arm"] == arm and raw["ordinal"] >= 0)
+
+
+def _proof_ending(config: Mapping[str, Any], arm: str) -> Ending:
+    return Ending(**config["proofs"][arm]) if arm in config["proofs"] else Ending()
 
 
 def _scripted(config: Mapping[str, Any], arm: str, ordinal: int) -> Ending:

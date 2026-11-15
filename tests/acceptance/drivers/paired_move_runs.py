@@ -180,6 +180,11 @@ def every_session_ends_in(text: str) -> Script:
     return Script(default=Ending(error=text))
 
 
+def proof_unserved_in(arm: str) -> Script:
+    """The spawn hook's rewrite never reaches the role of `arm`'s proof sessions; tasks are served."""
+    return Script(proofs={arm: Ending(served=False)})
+
+
 def stopped_paired_run(workspace: Path, checkout: Path, role: str) -> PairedRun:
     """A paired run asked to stop, as any run stops, on a streak of one error kind in both arms.
 

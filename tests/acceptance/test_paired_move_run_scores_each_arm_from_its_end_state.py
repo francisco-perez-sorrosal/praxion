@@ -63,6 +63,16 @@ def unshown(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
     return role, workspace, paired.run_paired(workspace, checkout, role)
 
 
+@pytest.fixture(scope="module", params=ROLES)
+def proof_refused(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory):
+    """A checkout that keeps the delivery, whose proof spawn in the arm after the move receives none."""
+    role = request.param
+    workspace = tmp_path_factory.mktemp(f"paired-proof-refused-{role}")
+    checkout = paired.new_checkout(workspace)
+    script = paired.proof_unserved_in("delivered")
+    return role, workspace, paired.run_paired(workspace, checkout, role, script)
+
+
 def finished(scored):
     """The scored run, once it is known to have planned tasks and run to its end."""
     _, _, planned, run = scored
@@ -214,9 +224,9 @@ def test_the_report_says_for_each_check_whether_the_run_holds_enough_evidence(sc
 
 
 def test_an_arm_that_cannot_be_shown_to_receive_the_skill_launches_none_of_its_tasks(
-    unshown,
+    proof_refused,
 ) -> None:
-    _, _, run = unshown
+    _, _, run = proof_refused
 
     assert run.proofs("delivered"), "the arm after the move was never put to its proof"
     assert run.tasks("delivered") == []

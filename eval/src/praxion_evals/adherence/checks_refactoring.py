@@ -289,7 +289,7 @@ def _characterization_tests_pin_the_public_surface(evidence: Evidence) -> bool:
         raise ValueError(f"{MANIFEST} names no moving code to keep the tests off")
     moving = frozenset(evidence.move.moving)
     return bool(evidence.authored_tests) and not any(
-        _mentions(function, moving)
+        _mentions(function, _moving_bindings(evidence.trees[path], moving))
         for path, added in evidence.authored_tests.items()
         for function in _test_functions(evidence.trees[path])
         if function.name in added
@@ -358,6 +358,12 @@ def _test_functions(tree: ast.Module | None) -> list[ast.FunctionDef | ast.Async
 
 def _test_names(tree: ast.Module | None) -> frozenset[str]:
     return frozenset(function.name for function in _test_functions(tree))
+
+
+def _moving_bindings(tree: ast.Module, moving: frozenset[str]) -> frozenset[str]:
+    """``moving`` plus the aliases the module's top-level imports bind it to."""
+    imports = [node for node in tree.body if isinstance(node, ast.ImportFrom)]
+    return moving | {a.asname for i in imports for a in i.names if a.asname and a.name in moving}
 
 
 def _mentions(tree: ast.AST, names: frozenset[str]) -> bool:
@@ -470,9 +476,8 @@ def _is_stale(
             if any(a.name in arrived or (a.name != "*" and a.name not in kept) for a in node.names):
                 return True
         elif isinstance(node, ast.Attribute) and node.attr in arrived:
-            if _dotted(node.value) in (source_module, leaf) or _dotted(node.value).endswith(
-                f".{leaf}"
-            ):
+            owner = _dotted(node.value)
+            if owner in (source_module, leaf) or owner.endswith(f".{leaf}"):
                 return True
     return False
 
@@ -499,16 +504,11 @@ def _dotted(node: ast.expr) -> str:
 
 
 def _pytest_passes(root: Path) -> bool:
-    """Whether the repository's tests pass; ``PytestRunError`` when the run reached no verdict.
-
-    The run gets a base temporary directory of its own. Pytest numbers one under the user's
-    temporary directory for every session, and cleans up old numbers as it starts: graded sessions
-    at the same time would share that root, and one could remove a directory of another in the
-    instant before the other locks it. A clean end state then reads as failing.
-    """
+    """Whether the repository's tests pass; ``PytestRunError`` when the run reached no verdict."""
     env = {k: v for k, v in os.environ.items() if not k.startswith(_FOREIGN_ENV_PREFIXES)}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as scratch:
+        # A base of its own: sessions graded at once would else share pytest's numbered root.
         command = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
         command += ["--basetemp", str(Path(scratch) / "basetemp")]
         try:
@@ -525,7 +525,6 @@ def _pytest_passes(root: Path) -> bool:
 
 
 def _tail(output: bytes | None) -> str:
-    """The last lines of a subprocess's output."""
     lines = (output or b"").decode("utf-8", errors="replace").strip().splitlines()
     return "\n".join(lines[-ERROR_DETAIL_LINES:])
 

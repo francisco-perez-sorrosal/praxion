@@ -207,6 +207,15 @@ def test_a_run_that_outlasts_its_time_is_errored(tmp_path, monkeypatch):
 
 
 def test_the_nested_run_keeps_its_temporary_files_in_a_directory_of_its_own(tmp_path):
+    """The graded run gets a base temporary directory the grader makes and removes.
+
+    Why: a clean end state failed "behaviour is unchanged" in two outer-loop nodes of one gate under
+    eight parallel workers, and one item once in a whole-pocket run, while the same test passed
+    thirty times of thirty alone. The task repositories' tests use ``tmp_path``, and pytest's
+    numbered-directory cleanup could remove a directory of another session in the instant before
+    that session locks it. That cause is unconfirmed: the failure was not reproduced here, and the
+    subprocess's own output was never seen. A private base removes the shared root either way.
+    """
     seen = tmp_path / "seen.txt"
     source = (
         "def test_where(tmp_path):\n"
@@ -269,9 +278,9 @@ NAMING_TEST = "\n\ndef test_new_names_it():\n    assert moving() == 1\n"
 PIN_PUBLIC = "characterization tests pin behaviour through the public surface"
 
 
-def _test_engineer_grade(tmp_path: Path, added: str):
-    workspace = _graded_workspace(tmp_path, {"tests/test_old.py": OLD_TEST})
-    (workspace / "tests" / "test_old.py").write_text(OLD_TEST + added)
+def _test_engineer_grade(tmp_path: Path, added: str, old: str = OLD_TEST):
+    workspace = _graded_workspace(tmp_path, {"tests/test_old.py": old})
+    (workspace / "tests" / "test_old.py").write_text(old + added)
     return checks_refactoring.grade_workspace("test-engineer", workspace, "")
 
 
@@ -283,6 +292,21 @@ def test_an_added_test_that_names_moving_code_still_fails_the_session(tmp_path):
     assert PIN_PUBLIC in _test_engineer_grade(tmp_path, SOUND_TEST + NAMING_TEST).failed
 
 
+ALIASED_OLD = "from a import moving as m\nfrom a import other as o\n"
+
+
+def test_an_added_test_that_reaches_moving_code_through_an_import_alias_still_fails(tmp_path):
+    added = "\n\ndef test_new_uses_the_alias():\n    assert m() == 1\n"
+
+    assert PIN_PUBLIC in _test_engineer_grade(tmp_path, added, ALIASED_OLD).failed
+
+
+def test_an_added_test_that_uses_an_alias_of_something_else_does_not_fail(tmp_path):
+    added = "\n\ndef test_new_uses_another_alias():\n    assert o() is None\n"
+
+    assert PIN_PUBLIC not in _test_engineer_grade(tmp_path, added, ALIASED_OLD).failed
+
+
 # --- the eval's git wrapper carries git's own message -----------------------------------------
 
 
@@ -291,3 +315,13 @@ def test_a_failing_git_call_carries_gits_own_stderr(tmp_path):
         session_loop._git(tmp_path, "rev-parse", "--show-toplevel")
 
     assert "rev-parse --show-toplevel" in str(caught.value)
+
+
+def test_a_missing_git_binary_is_reported_by_what_failed_not_as_a_guess(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    with pytest.raises(ValueError, match="failed in") as caught:
+        session_loop._git(tmp_path, "rev-parse", "HEAD")
+
+    assert "No such file or directory" in str(caught.value)
+    assert "not a git checkout" not in str(caught.value)

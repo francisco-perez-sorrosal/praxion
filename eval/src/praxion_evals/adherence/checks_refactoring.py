@@ -1,14 +1,13 @@
 """Grade a session's refactoring end state by what it leaves in the repository, never by what it says.
 
-The workspace is a git repository whose only commit is the template's ``start/`` and whose working
-tree is the end state. Each check is one clause of the refactoring skill's verification checklist
-(the implementer's) or of the pre-refactor contract (the test-engineer's). The account a session
-gives of its own work is accepted and never read: a session that confesses a shim it did not leave,
-or claims a success it did not reach, is graded the same.
+The workspace is a git repository whose root commit is the template's ``start/``; its end state is
+the working tree, whatever the session committed on top of that root. Each check is one clause of
+the refactoring skill's verification checklist (the implementer's) or of the pre-refactor contract
+(the test-engineer's). The account a session gives of its own work is accepted and never read.
 
-The checks name no template. The one thing a template says is where the code moves, in the
-``refactoring.toml`` it commits in ``start/``; it is read from the starting commit, which a session
-cannot rewrite. What moved is derived from the end state: whatever the target module defines.
+The checks name no template. A template says only where the code moves, in the ``refactoring.toml``
+of its ``start/`` (a staged pool workspace holds none, and is handed the file). What moved is
+derived from the end state: whatever the target module defines.
 """
 
 from __future__ import annotations
@@ -46,13 +45,24 @@ class RefactoringGrade:
         return not self.failed
 
 
-def grade_workspace(role: Role, workspace: Path, account: str) -> RefactoringGrade:
-    """Grade the workspace's end state against the role's checklist; ``account`` is never read."""
+def grade_workspace(
+    role: Role, workspace: Path, account: str, *, manifest: Path | None = None
+) -> RefactoringGrade:
+    """Grade the end state against the role's checklist; ``account`` is never read.
+
+    Comparisons are against the root commit, so a committed change counts. The move is read from
+    ``manifest`` when given, else from the root commit.
+    """
     checks = CHECKLISTS.get(role)
     if checks is None:
         raise ValueError(f"no refactoring grader is written for {role} yet")
+    base = _root_commit(workspace)
     evidence = Evidence(
-        workspace, _read_move(workspace), _parse_python(workspace), _changed_paths(workspace)
+        workspace,
+        base,
+        _read_move(workspace, base, manifest),
+        _parse_python(workspace),
+        _changed_paths(workspace, base),
     )
     return RefactoringGrade(tuple(item for item, holds in checks if not holds(evidence)))
 
@@ -88,9 +98,10 @@ class Move:
 @dataclass(frozen=True)
 class Evidence:
     workspace: Path
+    base: str  # the workspace's root commit: the starting point every comparison is made against
     move: Move
     trees: Mapping[str, ast.Module]  # every parsable Python file of the working tree, by path
-    changed: tuple[str, ...]  # paths that differ from the starting commit, sorted
+    changed: tuple[str, ...]  # paths that differ from the base commit, sorted
 
     @property
     def source(self) -> ast.Module | None:
@@ -113,15 +124,29 @@ class Evidence:
             tree = self.trees.get(path)
             if tree is None or not PurePosixPath(path).is_relative_to(self.move.tests):
                 continue
-            added = _test_names(tree) - _test_names(_committed_tree(self.workspace, path))
+            started = _committed_tree(self.workspace, self.base, path)
+            added = _test_names(tree) - _test_names(started)
             if added:
                 authored[path] = added
         return MappingProxyType(authored)
 
 
-def _read_move(workspace: Path) -> Move:
+def _root_commit(workspace: Path) -> str:
+    """The one parentless commit: the template's ``start/``, which a session cannot rewrite."""
     try:
-        return Move.parse(_git(workspace, "show", f"HEAD:{MANIFEST}").decode("utf-8"))
+        roots = _git(workspace, "rev-list", "--max-parents=0", "HEAD").decode().split()
+    except subprocess.CalledProcessError:
+        roots = []  # an unborn HEAD has no commit at all
+    if len(roots) != 1:
+        raise ValueError(f"the workspace has {len(roots)} root commits, not one starting commit")
+    return roots[0]
+
+
+def _read_move(workspace: Path, base: str, manifest: Path | None) -> Move:
+    if manifest is not None:
+        return Move.parse(manifest.read_text(encoding="utf-8"))
+    try:
+        return Move.parse(_git(workspace, "show", f"{base}:{MANIFEST}").decode("utf-8"))
     except subprocess.CalledProcessError as error:
         raise ValueError(f"{MANIFEST} is not committed in the starting commit") from error
 
@@ -139,9 +164,9 @@ def _parse_python(workspace: Path) -> dict[str, ast.Module]:
     return trees
 
 
-def _changed_paths(workspace: Path) -> tuple[str, ...]:
-    """Paths that differ from the starting commit, staged or not, new files included."""
-    tracked = _git(workspace, "diff", "HEAD", "--name-only", "--no-renames", "-z")
+def _changed_paths(workspace: Path, base: str) -> tuple[str, ...]:
+    """Paths that differ from the base commit, committed or not, staged or not, new files included."""
+    tracked = _git(workspace, "diff", base, "--name-only", "--no-renames", "-z")
     untracked = _git(workspace, "ls-files", "--others", "--exclude-standard", "-z")
     paths = {path for path in (tracked + untracked).decode("utf-8").split("\0") if path}
     return tuple(sorted(path for path in paths if not _is_scratch(PurePosixPath(path).parts)))
@@ -152,11 +177,11 @@ def _is_scratch(parts: tuple[str, ...]) -> bool:
     return any(part.startswith(".") or part == "__pycache__" for part in parts[:-1])
 
 
-def _committed_tree(workspace: Path, path: str) -> ast.Module | None:
+def _committed_tree(workspace: Path, base: str, path: str) -> ast.Module | None:
     try:
-        return ast.parse(_git(workspace, "show", f"HEAD:{path}").decode("utf-8"))
+        return ast.parse(_git(workspace, "show", f"{base}:{path}").decode("utf-8"))
     except (subprocess.CalledProcessError, SyntaxError, ValueError):
-        return None  # the starting commit has no such file, or none that parses
+        return None  # the base commit has no such file, or none that parses
 
 
 # -- The implementer's checklist ------------------------------------------------------------------
@@ -178,7 +203,7 @@ def _behaviour_is_unchanged(evidence: Evidence) -> bool:
             evidence.workspace, copy, ignore=shutil.ignore_patterns(".git", "__pycache__")
         )
         shutil.rmtree(copy / evidence.move.tests, ignore_errors=True)
-        archive = _git(evidence.workspace, "archive", "HEAD", evidence.move.tests)
+        archive = _git(evidence.workspace, "archive", evidence.base, evidence.move.tests)
         with tarfile.open(fileobj=io.BytesIO(archive)) as original:
             original.extractall(copy, filter="data")
         return _pytest_passes(copy)

@@ -31,6 +31,7 @@ from praxion_evals.adherence.model import (
     Errored,
     JudgedCheck,
     KernelEvidence,
+    KitMode,
     Measured,
     MechanicalCheck,
     NotApplicable,
@@ -111,6 +112,7 @@ def evidence_from_recording(
     kernel_expected: bool = False,
     kernel_rows: Sequence[Mapping[str, Any]] | None = None,
     config_dir: Path | None = None,
+    mode: KitMode | None = None,
 ) -> SessionEvidence:
     """Everything a grader may look at, from the stream, the role's transcript and the repository.
 
@@ -118,8 +120,9 @@ def evidence_from_recording(
     ``kernel_rows`` when given, otherwise the markers in the role's transcript, kept under
     ``config_dir`` (the session's ``CLAUDE_CONFIG_DIR``), and in the stream's hook output.
     A ``forced_stop`` task also records how the role ended, judged against ``turn_cap``, the
-    ``maxTurns`` both arms' copies carry for it. The task's kit mode is resolved from
-    ``slug``, since a recorded spawn prompt need not name it.
+    ``maxTurns`` both arms' copies carry for it. The task's kit ``mode`` is used when given;
+    otherwise it is resolved from ``slug`` (a recorded spawn prompt need not name it), which
+    spells only the kit's tasks, never a pool's.
     """
     parsed = parse_stream(envelope)
     spawn_id = _spawn_id(parsed, role)
@@ -150,7 +153,7 @@ def evidence_from_recording(
             planted_instruction=planted_instruction,
             planted_effect=planted_effect,
             external_api_docs=external_api_docs,
-            mode=mode_of_slug(role, slug),
+            mode=mode or mode_of_slug(role, slug),
         ),
         kernel=KernelEvidence(kernel_expected, rows, unread) if kernel_expected or rows else None,
         role_ending=(

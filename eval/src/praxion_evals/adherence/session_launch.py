@@ -433,6 +433,7 @@ def _evidence(
         # is never written and the parent stream never carries a subagent's hook output.
         kernel_expected=build.arm == "lean" and grade.kernel_adopted(build.copy_root, task.role),
         config_dir=SandboxPaths(root).config_dir,
+        mode=task.mode,
         **_task_facts(task, page_url is not None),
     )
 

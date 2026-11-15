@@ -29,7 +29,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from praxion_evals.adherence import grade
-from praxion_evals.adherence.axis import SessionArm
+from praxion_evals.adherence.axis import SESSION_ARMS, SessionArm
 from praxion_evals.adherence.model import (
     ARMS,
     ROLES,
@@ -302,16 +302,34 @@ class ProofObservation:
 
 def observe_proof(evidence: SessionEvidence, real_home: Path) -> ProofObservation | NotBuilt:
     """What the proof session's role answered, or why nothing was observed."""
+    unobserved = unobserved_proof(evidence, real_home)
+    if unobserved is not None:
+        return unobserved
+    return ProofObservation(
+        answer=evidence.role_return or "",
+        first_request_tokens=grade.first_request_tokens(evidence),
+    )
+
+
+def unobserved_proof(evidence: SessionEvidence, real_home: Path) -> NotBuilt | None:
+    """Why a proof session shows nothing of its role: it ended in an error, or spawned no role."""
     run = SessionRun("", "", None if evidence.timed_out else evidence.exit_code)
     error = session_error(evidence.envelope, run, evidence.plugin_copy, real_home=real_home)
     if error is not None:
         return NotBuilt(f"the proof session ended in {error.kind}: {error.detail}")
     if evidence.spawn_id is None:
         return NotBuilt("the role was never spawned in the proof session")
-    return ProofObservation(
-        answer=evidence.role_return or "",
-        first_request_tokens=grade.first_request_tokens(evidence),
-    )
+    return None
+
+
+@dataclass(frozen=True)
+class DeliveryObservation:
+    """What a proof spawn's own record holds of the skill, and its first request's size."""
+
+    delivered_blocks: int  # labelled blocks whose digest is the body installed in the arm's copy
+    stray_labels: int  # labelled blocks whose digest is not
+    preload_messages: int  # harness preload messages for the refactoring skill
+    first_request_tokens: int | None  # recorded, never decisive
 
 
 @dataclass(frozen=True)
@@ -323,13 +341,13 @@ class ArmProven:
     as well as the nonce.
     """
 
-    arm: Arm
+    arm: SessionArm
     first_request_tokens: int | None
     cross_checked: bool
 
     def __post_init__(self) -> None:
-        if self.arm not in ARMS:
-            raise ValueError(f"a proven arm must be one of {list(ARMS)}, got {self.arm!r}")
+        if self.arm not in SESSION_ARMS:
+            raise ValueError(f"a proven arm must be one of {list(SESSION_ARMS)}, got {self.arm!r}")
         tokens = self.first_request_tokens
         if tokens is not None and tokens < 0:
             raise ValueError(f"a first request cannot hold {tokens} tokens")
@@ -393,3 +411,34 @@ def _cross_check_tokens(full: ArmProven, lean: ArmProven) -> ArmVerdict:
             f"than the full one ({full.first_request_tokens})"
         )
     return replace(lean, cross_checked=True)
+
+
+# What a proof spawn's record must hold per arm: (matching blocks, stray labels, preload messages).
+_DELIVERY_WANTED = {"delivered": (1, 0, 0), "preloaded": (0, 0, 1)}
+
+
+def decide_delivery_proof(
+    observed: Mapping[SessionArm, DeliveryObservation | None],
+) -> dict[SessionArm, ArmVerdict]:
+    """One verdict per observed arm of the refactoring move; ``None`` marks a role never spawned.
+
+    ``delivered`` is proven by exactly one matching block, no stray label and no preload
+    message; ``preloaded`` by exactly one preload message and no block of either kind. The
+    nonce plays no part and nothing is cross-checked: the figure is recorded, never decisive.
+    """
+    unknown = [arm for arm in observed if arm not in _DELIVERY_WANTED]
+    if unknown:
+        raise ValueError(f"unknown arms {sorted(unknown)}")
+    return {arm: _judge_delivery(arm, seen) for arm, seen in observed.items()}
+
+
+def _judge_delivery(arm: SessionArm, seen: DeliveryObservation | None) -> ArmVerdict:
+    if seen is None:
+        return NotBuilt(f"the role was never spawned in the {arm} proof session")
+    held = (seen.delivered_blocks, seen.stray_labels, seen.preload_messages)
+    if held == _DELIVERY_WANTED[arm]:
+        return ArmProven(arm, seen.first_request_tokens, cross_checked=False)
+    return NotBuilt(
+        f"the {arm} arm's role record holds (matching blocks, stray labels, preload messages)"
+        f" = {held}, and the arm needs {_DELIVERY_WANTED[arm]}"
+    )

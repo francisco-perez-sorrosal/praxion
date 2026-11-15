@@ -48,17 +48,20 @@ from praxion_evals.adherence.transcript import (
     EndedOnItsOwn,
     RoleEnding,
     RoleTranscript,
+    RoleUserMessages,
     StoppedAtCap,
     TranscriptRead,
     TranscriptUnread,
     Unknown,
     read_role_transcript,
+    read_role_user_messages,
     role_ending,
     spawned_agent_id,
 )
 from praxion_evals.harness.judge_client import JudgeClient
 from praxion_evals.live.scenarios import _is_authored  # drops hook and toolchain byproducts
 from praxion_evals.live.session import (
+    SandboxPaths,
     SessionEnvelope,
     SessionRun,
     ToolUse,
@@ -197,14 +200,30 @@ def _role_transcript(
     """The spawned role's transcript; None when no role was spawned or no config dir was given."""
     if spawn_id is None or config_dir is None:
         return None
+    cwd, session_id, agent_id = _transcript_key(envelope, spawn_id)
+    return read_role_transcript(config_dir, cwd or str(repo_root.resolve()), session_id, agent_id)
+
+
+def role_user_messages(evidence: SessionEvidence) -> RoleUserMessages:
+    """The spawned role's own user messages, found as its transcript is: in the sandbox's config
+    directory, by the session id and the spawn's agent id; or why there are none."""
+    if evidence.spawn_id is None:
+        return TranscriptUnread("the role was never spawned, so it has no transcript")
+    cwd, session_id, agent_id = _transcript_key(evidence.envelope, evidence.spawn_id)
+    if cwd is None:
+        return TranscriptUnread("the stream reports no working directory to find the transcript by")
+    config_dir = SandboxPaths(evidence.sandbox).config_dir
+    return read_role_user_messages(config_dir, cwd, session_id, agent_id)
+
+
+def _transcript_key(
+    envelope: SessionEnvelope, spawn_id: str
+) -> tuple[str | None, str | None, str | None]:
+    """What locates a spawn's transcript: the session's cwd, its session id and the agent id."""
     init_cwd = None if envelope.init is None else envelope.init.cwd
     result = envelope.final_result
-    return read_role_transcript(
-        config_dir,
-        init_cwd or str(repo_root.resolve()),
-        None if result is None else result.session_id,
-        spawned_agent_id(envelope.tool_results.get(spawn_id)),
-    )
+    session_id = None if result is None else result.session_id
+    return init_cwd, session_id, spawned_agent_id(envelope.tool_results.get(spawn_id))
 
 
 def kernel_marker_records(

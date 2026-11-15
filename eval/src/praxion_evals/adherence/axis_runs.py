@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, assert_never
+from typing import TYPE_CHECKING, Any, assert_never
 
 from praxion_evals.adherence import arms, grade, refactoring_arms, refactoring_tasks, results, tasks
 from praxion_evals.adherence.axis import DEFAULT_AXIS, POSITIONS, Axis, Positions
@@ -31,10 +31,13 @@ from praxion_evals.adherence.model import (
     TaskSpec,
 )
 from praxion_evals.harness.judge_client import JudgeClient
-from praxion_evals.live.materialize import Materialization
+from praxion_evals.live.materialize import Materialization, install_user_scope
 
 if TYPE_CHECKING:
     from praxion_evals.adherence.session_loop import RunConfig
+
+
+Observation = arms.ProofObservation | arms.DeliveryObservation
 
 
 @dataclass(frozen=True)
@@ -44,8 +47,9 @@ class ArmProof:
 
     prompt: str
     prepare: Callable[[Materialization, Path], str]
-    observe: Callable[[SessionEvidence, Path], arms.ProofObservation | NotBuilt]
-    decide: Callable[[str, Mapping[Arm, arms.ProofObservation | None]], dict[Arm, arms.ArmVerdict]]
+    observe: Callable[[SessionEvidence, Path], Observation | NotBuilt]
+    # Each axis decides over its own observations and arms, so the mapping is left open.
+    decide: Callable[[str, Mapping[Any, Any]], dict[Any, arms.ArmVerdict]]
 
 
 @dataclass(frozen=True)
@@ -103,6 +107,19 @@ def refuse_calibration(config: RunConfig) -> tuple[str, ...]:
     )
 
 
+def prepare_delivery_home(original: Materialization, template: Path) -> str:
+    """The proof home is a task's home with no nonce planted: that proof reads the role's record."""
+    install_user_scope(original.root, template)
+    return ""
+
+
+def delivery_proof_decision(
+    nonce: str, observed: Mapping[Any, arms.DeliveryObservation | None]
+) -> dict[Any, arms.ArmVerdict]:
+    del nonce
+    return arms.decide_delivery_proof(observed)
+
+
 DEFAULT_RUN = AxisRun(
     axis=DEFAULT_AXIS,
     positions=POSITIONS[DEFAULT_AXIS],
@@ -133,6 +150,12 @@ def axis_run(axis: Axis) -> AxisRun:
                 plan=refactoring_tasks.planned_pool,
                 stage=refactoring_tasks.stage_pool_task,
                 build=refactoring_arms.build_refactoring_copy,
+                proof=ArmProof(
+                    prompt=refactoring_arms.PROOF_PROMPT,
+                    prepare=prepare_delivery_home,
+                    observe=refactoring_arms.observe_delivery,
+                    decide=delivery_proof_decision,
+                ),
                 refusals=refuse_calibration,
             )
         case _:

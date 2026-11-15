@@ -11,6 +11,8 @@ ran out of turns (only a note in the parent's result text), so :func:`role_endin
 from what the transcript does hold: a role that stopped at its cap has exactly ``cap`` distinct
 requests and its last one calls a tool, because the harness runs that call and then stops
 without a further request. Whatever the record cannot establish is ``Unknown``, with the reason.
+The same file holds its user messages (a preloaded skill is filed as a message of its own, and
+a delegation a hook rewrote arrives as one): :func:`read_role_user_messages` reads them.
 """
 
 from __future__ import annotations
@@ -69,6 +71,15 @@ class TranscriptUnread:
 
 
 RoleTranscript = TranscriptRead | TranscriptUnread
+
+
+@dataclass(frozen=True)
+class UserMessagesRead:
+    path: Path
+    messages: tuple[str, ...]  # the text of each user message, in transcript order
+
+
+RoleUserMessages = UserMessagesRead | TranscriptUnread
 
 
 @dataclass(frozen=True)
@@ -140,6 +151,27 @@ def read_role_transcript(
     config_dir: Path, cwd: str, session_id: str | None, agent_id: str | None
 ) -> RoleTranscript:
     """The role's transcript attachments, or why there are none to read."""
+    found = _read_records(config_dir, cwd, session_id, agent_id)
+    if isinstance(found, TranscriptUnread):
+        return found
+    path, records, all_whole = found
+    return TranscriptRead(path, _attachments(records), _turns(records, all_whole))
+
+
+def read_role_user_messages(
+    config_dir: Path, cwd: str, session_id: str | None, agent_id: str | None
+) -> RoleUserMessages:
+    """The text of the role's user messages (a tool result holds no text block), or why none."""
+    found = _read_records(config_dir, cwd, session_id, agent_id)
+    if isinstance(found, TranscriptUnread):
+        return found
+    return UserMessagesRead(found[0], _user_messages(found[1]))
+
+
+def _read_records(
+    config_dir: Path, cwd: str, session_id: str | None, agent_id: str | None
+) -> tuple[Path, list[dict], bool] | TranscriptUnread:
+    """The transcript's path, its records and whether every line was one; or why it is unread."""
     if session_id is None:
         return TranscriptUnread("the stream reports no session id to find the role's transcript by")
     if agent_id is None:
@@ -152,7 +184,7 @@ def read_role_transcript(
     except OSError as error:
         return TranscriptUnread(f"the role's transcript at {path} could not be read: {error}")
     records, all_whole = _records(text)
-    return TranscriptRead(path, _attachments(records), _turns(records, all_whole))
+    return path, records, all_whole
 
 
 def role_ending(transcript: RoleTranscript, cap: int | None) -> RoleEnding:
@@ -208,6 +240,22 @@ def _as_record(line: str) -> dict | None:
 def _attachments(records: list[dict]) -> tuple[Mapping[str, Any], ...]:
     found = (record.get("attachment") for record in records if record.get("type") == "attachment")
     return tuple(attachment for attachment in found if isinstance(attachment, dict))
+
+
+def _user_messages(records: list[dict]) -> tuple[str, ...]:
+    """Each user record's text: a string content as it is, text blocks joined by a newline."""
+    found = (_message_text(record) for record in records if record.get("type") == "user")
+    return tuple(text for text in found if text is not None)
+
+
+def _message_text(record: dict) -> str | None:
+    message = record.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return content if isinstance(content, str) else None
+    blocks = [b.get("text") for b in content if isinstance(b, dict) and b.get("type") == "text"]
+    texts = [text for text in blocks if isinstance(text, str)]
+    return "\n".join(texts) if texts else None
 
 
 def _turns(records: list[dict], all_whole: bool) -> RoleTurns:

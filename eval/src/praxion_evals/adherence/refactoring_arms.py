@@ -8,12 +8,16 @@ once built and differs from it at exactly ``patched_paths``.
 An arm is shown before any session is paid for: the copy's own preload reader and spawn hook, run
 once on a marked delegation, must give the arm's account of the skill. The paired run precedes the
 move, so an original already moved has no preloaded arm and is refused.
+
+The paid proof then shows the harness's half from the role's own record, never its answer:
+``delivered`` by one block the copy's matcher accepts and no preload, ``preloaded`` by the reverse.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -21,16 +25,20 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from praxion_evals.adherence import grade
 from praxion_evals.adherence.arms import (
     MAX_TURNS_KEY,
     ArmCopyError,
+    DeliveryObservation,
     definition_path,
     set_frontmatter_key,
+    unobserved_proof,
     verify_copy_diff,
 )
 from praxion_evals.adherence.axis import ARMS_BY_AXIS, SessionArm, patched_paths
-from praxion_evals.adherence.model import ArmBuild, Role
+from praxion_evals.adherence.model import ArmBuild, NotBuilt, Role, SessionEvidence
 from praxion_evals.adherence.refactoring_tasks import MARKER
+from praxion_evals.adherence.transcript import TranscriptUnread
 from praxion_evals.live.materialize import (
     Materialization,
     digest_entries,
@@ -47,13 +55,34 @@ OBSERVATION_ENV_PREFIX = "PRAXION_"  # a developer's own settings must not reach
 RUN_TIMEOUT_SECONDS = 30
 MARKED_PROMPT = f"Extract the pricing rules into their own module. {MARKER}"
 
-# Asked of the copy's own delivery module, so what the check applies is what the copy ships.
-_ASK_PROGRAM = (
-    "import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1] + '/hooks'); "
-    "import _skill_delivery as d; text = sys.stdin.read(); print({question})"
+# A marked delegation in prose, outside any code span; no nonce is planted.
+PROOF_PROMPT = (
+    "Task slug: arm-proof. This is a [Phase: Refactoring] proof step: "
+    "reply with exactly ARM-PROOF-DONE and use no tool."
 )
+# A harness preload is its own user message: wrapper lines naming the skill, the line naming its
+# directory, a blank line, then the body (recorded from a real role transcript).
+_PRELOAD_COMMAND = "<command-name>refactoring</command-name>"
+_PRELOAD_DIRECTORY = re.compile(
+    r"^Base directory for this skill: .*[/\\]skills[/\\]refactoring\s*$", re.MULTILINE
+)
+
+# Asked of the copy's own delivery module, so what the check applies is what the copy ships.
+_IMPORT_DELIVERY = (
+    "import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1] + '/hooks'); "
+    "import _skill_delivery as d\n"
+)
+_ASK_PROGRAM = _IMPORT_DELIVERY + "text = sys.stdin.read(); print({question})"
 _PRELOADS = "isinstance(d.preload_state(Path(sys.argv[1]), text), d.Preloaded)"
 _ARRIVES = "d.shows_arrival(text)"
+# Reads a JSON list of messages on stdin; prints how many blocks (each closed by an end line) the
+# matcher accepts for the body the copy installs, and how many labelled ones it does not.
+_COUNT_PROGRAM = _IMPORT_DELIVERY + (
+    "import json; body = d.read_body(d.skill_dir(Path(sys.argv[1]))); assert isinstance(body, str)\n"
+    "blocks = [p + d.END_LINE for t in json.load(sys.stdin) for p in t.split(d.END_LINE)[:-1]]\n"
+    "matching = sum(d.shows_arrival(b, body) for b in blocks)\n"
+    "print(matching, sum(d.shows_arrival(b) for b in blocks) - matching)"
+)
 
 
 def build_refactoring_copy(
@@ -100,6 +129,33 @@ def verify_arm(copy_root: Path, arm: SessionArm, role: Role) -> None:
     if arrives != (arm == "delivered"):
         verb = "serves no" if arm == "delivered" else "serves a"
         raise ArmCopyError(f"the {arm} copy's spawn hook {verb} skill block to a marked {role}")
+
+
+def observe_delivery(evidence: SessionEvidence, real_home: Path) -> DeliveryObservation | NotBuilt:
+    """What the proof spawn's own user messages hold, or why nothing was observed."""
+    unobserved = unobserved_proof(evidence, real_home)
+    if unobserved is not None:
+        return unobserved
+    record = grade.role_user_messages(evidence)
+    if isinstance(record, TranscriptUnread):
+        return NotBuilt(f"the proof spawn's own record cannot be read: {record.reason}")
+    try:
+        counts = _run(
+            "the copy's delivery module",
+            "-c",
+            _COUNT_PROGRAM,
+            str(evidence.plugin_copy),
+            input=json.dumps(record.messages),
+        )
+    except ArmCopyError as error:
+        return NotBuilt(f"the copy's delivery module could not read the record: {error}")
+    blocks, strays = map(int, counts.split())
+    preloads = sum(_is_preload(message) for message in record.messages)
+    return DeliveryObservation(blocks, strays, preloads, grade.first_request_tokens(evidence))
+
+
+def _is_preload(message: str) -> bool:
+    return _PRELOAD_COMMAND in message and _PRELOAD_DIRECTORY.search(message) is not None
 
 
 def _move_tool(root: Path, *flags: str) -> None:

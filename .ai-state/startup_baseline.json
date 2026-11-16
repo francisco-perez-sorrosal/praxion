@@ -21,6 +21,28 @@
         }
       }
     },
+    "managed|sonnet|default|mcp|installed|subscription": {
+      "claude_code_version": "2.1.325",
+      "profile": {
+        "credential": "subscription",
+        "cwd_kind": "managed",
+        "key": "managed|sonnet|default|mcp|installed|subscription",
+        "model": "sonnet",
+        "plugin_dir": null,
+        "setting_sources": null,
+        "strict_mcp_config": false
+      },
+      "recorded": "2026-11-15",
+      "targets": {
+        "main": {
+          "cache_creation": 42408,
+          "cache_read": 11370,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 53780
+        }
+      }
+    },
     "managed|sonnet|default|no-mcp|installed": {
       "claude_code_version": "2.1.296",
       "profile": {

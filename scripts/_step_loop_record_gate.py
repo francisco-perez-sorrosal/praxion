@@ -30,7 +30,7 @@ from typing import Any, Protocol, cast
 
 from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep
-from _step_loop_files import gate_heading, write_gate_block
+from _step_loop_files import gate_heading, write_atomic, write_gate_block
 from _step_loop_gate import (
     GateRun,
     GoalTargets,
@@ -79,6 +79,9 @@ NOTHING_SELECTED = "the step declares no check and the test scope selects no tes
 NOTHING_TO_RUN = "nothing-to-run"  # the resolver's decision when no test is needed
 SCOPE_COMMAND = "resolve_test_scope.py"
 GATE_DIRECTORY = "gate"  # under the task directory: one subdirectory of run logs per request
+COMMAND_FILE = "command.txt"  # beside a request's run logs: the check's whole command
+COMMAND_LINE_MAX_CHARS = 200  # keeps a green block inside its ceiling whatever the check's length
+COMMAND_LINE_OPENING, COMMAND_LINE_CLOSING = "Command: `", "`"
 GATE_WAIT_VARIABLE = "PRAXION_STEP_LOOP_GATE_WAIT_SECONDS"
 DEFAULT_GATE_WAIT_SECONDS = 480.0  # under the skill's 600 s ceiling on one `record` call
 FAILED_LINES_SHOWN = 20
@@ -191,9 +194,9 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     else:
         lines = gate_result_lines(scope and scope.deciding, check)
     # The scope's runs are summarised, their argv being the first line of each log; the check's
-    # own command is the plan's one and stays.
+    # own command is the plan's one and is named in full, in the block or in the file it points at.
     derived = (derived_from(task.repo, changed),) if scope else ()
-    command = (f"Command: `{check.command}`",) if check and check.command else ()
+    command = command_lines(task, run_dir, request, check)
     kept = tuple(finished_line(run) for run in (scope.kept if scope else ()))
     summary = (*(scope.scopes if scope else ()), *derived)
     body = (
@@ -206,6 +209,38 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     )
     write_gate_block(results, step.id, request, body)
     return Gate(body, any(run.red for run in runs))
+
+
+def command_lines(
+    task: TaskView, run_dir: Path, request: str, check: GateRun | None
+) -> tuple[str, ...]:
+    """The block's `Command:` line for the check; a command too long for it is also kept whole in
+    a file beside the run logs, which the line names, before the block is written."""
+    if not (check and check.command):
+        return ()
+    pointer = f".ai-work/{task.slug}/{GATE_DIRECTORY}/{request}/{COMMAND_FILE}"
+    line = command_line(check.command, pointer)
+    if not fits_command_line(check.command):
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_atomic(run_dir / COMMAND_FILE, check.command)
+    return (line,)
+
+
+def command_line(command: str, pointer: str) -> str:
+    """`Command: `<command>``, cut by fixed length to the ceiling and ending on `pointer` when
+    longer, so one command always renders one line."""
+    line = f"{COMMAND_LINE_OPENING}{command}{COMMAND_LINE_CLOSING}"
+    if fits_command_line(command):
+        return line
+    ending = f" ... (whole command: {pointer}){COMMAND_LINE_CLOSING}"
+    kept = max(COMMAND_LINE_MAX_CHARS - len(ending), len(COMMAND_LINE_OPENING))
+    return line[:kept] + ending
+
+
+def fits_command_line(command: str) -> bool:
+    return len(COMMAND_LINE_OPENING) + len(command) + len(COMMAND_LINE_CLOSING) <= (
+        COMMAND_LINE_MAX_CHARS
+    )
 
 
 def evidence_lines(scope: ScopeReading | None, check: GateRun | None) -> tuple[str, ...]:

@@ -1,0 +1,70 @@
+{
+  "schema": 2,
+  "runs": {
+    "20261116T063715Z-20b249": {
+      "file": "20261116T063715Z-20b249.json",
+      "sha256": "9d3c15b07e87a5a7cd77a892444040e1cd07c2141920a72a397097c0285c84a4",
+      "lineage_root": "20261116T063715Z-20b249",
+      "ending": "closed",
+      "roles": {
+        "implementer": {
+          "complete_pairs": 5,
+          "flip": "not clear",
+          "scored_checks": []
+        }
+      }
+    },
+    "20261116T065225Z-9695ab": {
+      "file": "20261116T065225Z-9695ab.json",
+      "sha256": "e218d5d7eb7da9d4e717a09890b8655ecd32e9e4c6c66e895e32b8a51a7dfdbf",
+      "lineage_root": "20261116T065225Z-9695ab",
+      "ending": "finished",
+      "roles": {
+        "implementer": {
+          "complete_pairs": 1,
+          "flip": "clear",
+          "scored_checks": [
+            "C1",
+            "C2",
+            "C4",
+            "implementer: TEST_RESULTS.md has the shape its definition states",
+            "implementer: [IN-PROGRESS] is written to WIP.md before any code change",
+            "implementer: an existing sibling file is read before a new file is created in a directory",
+            "implementer: check_id_citation_discipline.py exits 0 on its change",
+            "implementer: it follows the convention its project's instruction file states",
+            "implementer: nothing changes under the acceptance or end-to-end test directories",
+            "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]",
+            "refactoring-delivery: the skill reached the role its arm's way",
+            "refactoring: behaviour is unchanged",
+            "refactoring: every call site is re-wired",
+            "refactoring: no dead code remains",
+            "refactoring: no transitional shim remains",
+            "refactoring: the tests still pass"
+          ]
+        }
+      }
+    },
+    "20261116T065539Z-587265": {
+      "file": "20261116T065539Z-587265.json",
+      "sha256": "af5f4b920ea95d3d95a8f3541c1a78803a9b39df1aa6690a00cb1ae691a45591",
+      "lineage_root": "20261116T065539Z-587265",
+      "ending": "finished",
+      "roles": {
+        "test-engineer": {
+          "complete_pairs": 6,
+          "flip": "clear",
+          "scored_checks": [
+            "C4",
+            "refactoring-delivery: the skill reached the role its arm's way",
+            "refactoring: characterization tests exist before any structural change",
+            "refactoring: characterization tests pin behaviour through the public surface",
+            "test-engineer: it follows the convention its project's instruction file states",
+            "test-engineer: its RED tests are present and fail",
+            "test-engineer: its change touches no production file"
+          ]
+        }
+      }
+    }
+  },
+  "skipped": []
+}

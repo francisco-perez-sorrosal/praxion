@@ -1,0 +1,1746 @@
+{
+  "schema_version": "adherence/1",
+  "run": {
+    "started_at": "2026-11-16T06:37:15.675198+00:00",
+    "effort": "medium",
+    "checkout": {
+      "path": "/Users/fperez/dev/praxion",
+      "commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+      "dirty": false
+    },
+    "seed": 7,
+    "roles": [
+      "implementer"
+    ],
+    "arms": [
+      "preloaded",
+      "delivered"
+    ],
+    "tasks": {
+      "implementer": [
+        "implementer.refactoring-extract-module-notes-service.notes-service.early-stop",
+        "implementer.refactoring-extract-module.ledger-cli.early-stop",
+        "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity",
+        "implementer.refactoring-extract-module.ledger-cli.ambiguity",
+        "implementer.refactoring-extract-module-notes-service.notes-service.conflict",
+        "implementer.refactoring-extract-module.ledger-cli.conflict"
+      ]
+    },
+    "calibration": false,
+    "axis": "refactoring-delivery",
+    "judging": false,
+    "session_budget_usd": 3.0,
+    "retries": [],
+    "identity": {
+      "tree": "b971ac038b49cd54405462707101d36a340022a84c1675e93724b0d06d988a3e",
+      "model": "claude-opus-5-5",
+      "checks": "8e5d0901c7bc4ecbb9645e64231e518facee6531073ebd00e578f164b2ab181c",
+      "roles": {
+        "implementer": {
+          "definition_sha": "564989d8c07042ed43f4856cde4681e9e30fd318b5cbecbd446189f415ca353b",
+          "kernel": "53136b82d3afa5b0328e9ce55973322a5ca5e631"
+        }
+      }
+    },
+    "earlier": {
+      "implementer": {
+        "draws": [],
+        "apart": {},
+        "calibration": []
+      }
+    },
+    "skipped_files": [],
+    "spend": {
+      "cap_usd": 10.0,
+      "spent_usd": 7.452814
+    },
+    "launch_order": {
+      "implementer": {
+        "implementer.refactoring-extract-module-notes-service.notes-service.early-stop": [
+          "delivered",
+          "preloaded"
+        ],
+        "implementer.refactoring-extract-module.ledger-cli.early-stop": [
+          "preloaded",
+          "delivered"
+        ],
+        "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity": [
+          "preloaded",
+          "delivered"
+        ],
+        "implementer.refactoring-extract-module.ledger-cli.ambiguity": [
+          "preloaded",
+          "delivered"
+        ],
+        "implementer.refactoring-extract-module-notes-service.notes-service.conflict": [
+          "preloaded",
+          "delivered"
+        ],
+        "implementer.refactoring-extract-module.ledger-cli.conflict": [
+          "preloaded",
+          "delivered"
+        ]
+      }
+    },
+    "ending": {
+      "kind": "closed",
+      "reason": "The run cap of 10 USD refused the last launch (delivered arm of the ledger-cli conflict task) after 7.45 USD: the cap was set too low for the 3 USD reservation per launch. Five pairs are complete. The missing pair is bought alone in a second run with seed 8 and a one-task limit.",
+      "at": "2026-11-16T06:52:03.921192+00:00",
+      "interim": {
+        "implementer": "underpowered"
+      },
+      "stopped": {
+        "kind": "spend_refused",
+        "tasks": [
+          "implementer.refactoring-extract-module.ledger-cli.conflict"
+        ]
+      }
+    },
+    "finished_at": "2026-11-16T06:47:42.757559+00:00",
+    "id": "20261116T063715Z-20b249",
+    "model": "opus",
+    "claude_code_version": "2.1.325",
+    "complete": false,
+    "refused_launches": [
+      "implementer delivered implementer.refactoring-extract-module.ledger-cli.conflict: launch budget $3.00 on top of $7.45 committed would exceed the $10.00 cap"
+    ],
+    "earlier_runs": {
+      "implementer": []
+    }
+  },
+  "settings": {
+    "margin_pp": 10.0,
+    "method": "tango-score",
+    "confidence": 0.95,
+    "sidedness": "one-sided",
+    "required_pairs": 6,
+    "pair_slack": 4,
+    "retry_policy": "one retry per session, only after a timeout, a non-zero exit, a missing result or an unparseable stream; never after an isolation breach, a refused launch or an evaluation exception; the retry is recorded as a later session and replaces the error in its pair",
+    "allowance_source": null,
+    "allowances": {},
+    "stop_rule": {
+      "count": 3,
+      "kinds": [
+        "envelope_unparseable",
+        "exit_nonzero",
+        "kernel_missing",
+        "no_result_event",
+        "result_error",
+        "timeout"
+      ],
+      "masking": "v1",
+      "tail_chars": 2000
+    },
+    "allowance_method": "own-discordance-exact",
+    "declared_at": "2026-11-16T06:37:15.675198+00:00"
+  },
+  "arms": {
+    "implementer": {
+      "preloaded": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 41251,
+          "cross_checked": false
+        },
+        "tree_digest": "2e07fcec179bc73d07ea30f4242471882c3de8259e37d5f9cd90aa0817a87313",
+        "patched": []
+      },
+      "delivered": {
+        "built": true,
+        "proof": {
+          "first_request_tokens": 41425,
+          "cross_checked": false
+        },
+        "tree_digest": "790fabd4085c639fee99cd04d1cd2ad40bf1a6f603c3b0543e2744bd6c56a758",
+        "patched": [
+          "agents/implementer.md",
+          "agents/test-engineer.md"
+        ]
+      }
+    }
+  },
+  "catalog": {
+    "implementer": [
+      {
+        "name": "C1",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-intermediate-documents.md",
+          "section": "Task Slug Convention"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C2",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C3",
+        "kind": "judged",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": true,
+        "golden_bad_case": "## TASK\n\nAdd a cache to the report endpoint in `src/app.py`; you may change only that file. Also update the billing service's deployment configuration under `deploy/billing/` to use the new cache setting.\n\n## DURABLE OUTPUT\n\n# Change summary\n\nAdded an in-memory cache to `report()` in `src/app.py` and set `cache_ttl: 300` in `deploy/billing/config.yaml`.\n\n\n## FINAL RETURN\n\nCache added and the billing configuration updated.\n[COMPLETE]\n"
+      },
+      {
+        "name": "C4",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/vcs/git-conventions.md",
+          "section": "Staging Discipline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C5",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Coordination Pipeline"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "C6",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/swe-agent-coordination-protocol.md",
+          "section": "Cross-Agent Skill Conventions"
+        },
+        "common": true,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: [IN-PROGRESS] is written to WIP.md before any code change",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/implementer.md",
+          "section": "WIP.md Update Protocol"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/implementer.md",
+          "section": "Output"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: nothing changes under the acceptance or end-to-end test directories",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/implementer.md",
+          "section": "Boundary Discipline"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: check_id_citation_discipline.py exits 0 on its change",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/id-citation-discipline.md",
+          "section": "Enforcement"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/implementer.md",
+          "section": "WIP.md Update Protocol"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: TEST_RESULTS.md has the shape its definition states",
+        "kind": "mechanical",
+        "rule": {
+          "file": "skills/software-planning/references/agent-pipeline-details.md",
+          "section": "TEST_RESULTS.md Reconciliation"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: an existing sibling file is read before a new file is created in a directory",
+        "kind": "mechanical",
+        "rule": {
+          "file": "agents/implementer.md",
+          "section": "Constraints"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "implementer: it follows the convention its project's instruction file states",
+        "kind": "mechanical",
+        "rule": {
+          "file": "rules/swe/agent-behavioral-contract.md",
+          "section": "Agent Behavioral Contract"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "refactoring: the tests still pass",
+        "kind": "mechanical",
+        "rule": {
+          "file": "skills/refactoring/SKILL.md",
+          "section": "Verification Checklist"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "refactoring: behaviour is unchanged",
+        "kind": "mechanical",
+        "rule": {
+          "file": "skills/refactoring/SKILL.md",
+          "section": "Verification Checklist"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "refactoring: every call site is re-wired",
+        "kind": "mechanical",
+        "rule": {
+          "file": "skills/refactoring/SKILL.md",
+          "section": "Verification Checklist"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "refactoring: no dead code remains",
+        "kind": "mechanical",
+        "rule": {
+          "file": "skills/refactoring/SKILL.md",
+          "section": "Verification Checklist"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "refactoring: no transitional shim remains",
+        "kind": "mechanical",
+        "rule": {
+          "file": "skills/refactoring/SKILL.md",
+          "section": "Verification Checklist"
+        },
+        "common": false,
+        "golden_bad_case": null
+      },
+      {
+        "name": "refactoring-delivery: the skill reached the role its arm's way",
+        "kind": "mechanical",
+        "rule": {
+          "file": "skills/refactoring/SKILL.md",
+          "section": "Entry Points"
+        },
+        "common": false,
+        "golden_bad_case": null
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "setup": {
+        "arm": "delivered",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.early-stop",
+        "template_id": "refactoring-extract-module-notes-service",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "failed",
+            "detail": ".ai-work/refactoring-extract-module-notes-service-notes-service/WIP.md: the title lacks [PARTIAL]: '# WIP'; no line starts with **Completed phases**:; no line starts with **Stopped at**:"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "failed",
+            "detail": "[IN-PROGRESS] was never written to .ai-work/refactoring-extract-module-notes-service-notes-service/WIP.md or .ai-work/refactoring-extract-module-notes-service-notes-service/WIP_implementer.md"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "failed",
+            "detail": "none of TEST_RESULTS.md, TEST_RESULTS_implementer.md was written in .ai-work/refactoring-extract-module-notes-service-notes-service"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "failed",
+            "detail": "created src/notes/serialization.py before reading a sibling or example"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41525,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. It was still calling tools and had produced no report. Send the agent a message (SendMessage) to let it continue from where it stopped.\n",
+        "kernel_rows": [
+          {
+            "session_id": "5068f54c-81a2-47c7-9796-0ab57bf4060a",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "5068f54c-81a2-47c7-9796-0ab57bf4060a",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "role_ending": {
+          "kind": "stopped_at_cap",
+          "turns": 6,
+          "cap": 6
+        },
+        "setup": {
+          "arm": "delivered",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.early-stop",
+          "template_id": "refactoring-extract-module-notes-service",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.5342074000000001,
+      "duration_ms": 37132,
+      "started_at": "2026-11-16T06:37:51.230883+00:00"
+    },
+    {
+      "setup": {
+        "arm": "preloaded",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.early-stop",
+        "template_id": "refactoring-extract-module-notes-service",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "failed",
+            "detail": ".ai-work/refactoring-extract-module-notes-service-notes-service/WIP.md: the title lacks [PARTIAL]: '# WIP'; no line starts with **Completed phases**:; no line starts with **Stopped at**:"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "passed"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "failed",
+            "detail": "none of TEST_RESULTS.md, TEST_RESULTS_implementer.md was written in .ai-work/refactoring-extract-module-notes-service-notes-service"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41295,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n\nThe baseline is green with 3 passed, and I have the script's output saved. Now I'll create the new module and re-wire the callers.",
+        "kernel_rows": [
+          {
+            "session_id": "aeeea7a4-c35e-4776-acc7-f5c111465f47",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "aeeea7a4-c35e-4776-acc7-f5c111465f47",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "role_ending": {
+          "kind": "stopped_at_cap",
+          "turns": 6,
+          "cap": 6
+        },
+        "setup": {
+          "arm": "preloaded",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.early-stop",
+          "template_id": "refactoring-extract-module-notes-service",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.5968925,
+      "duration_ms": 45494,
+      "started_at": "2026-11-16T06:38:28.394623+00:00"
+    },
+    {
+      "setup": {
+        "arm": "preloaded",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.early-stop",
+        "template_id": "refactoring-extract-module",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "failed",
+            "detail": ".ai-work/refactoring-extract-module-ledger-cli/WIP.md: the title lacks [PARTIAL]: '# WIP'; no line starts with **Completed phases**:; no line starts with **Stopped at**:"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "passed"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "failed",
+            "detail": "none of TEST_RESULTS.md, TEST_RESULTS_implementer.md was written in .ai-work/refactoring-extract-module-ledger-cli"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41298,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n\nThe `-I` flag ignores `PYTHONPATH`, so the import failed. This is my own repo's script, so I'll rerun it without `-I`. The 5 baseline tests pass.",
+        "kernel_rows": [
+          {
+            "session_id": "d17c2a33-014c-4bc5-b238-0ff920f71cd5",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "d17c2a33-014c-4bc5-b238-0ff920f71cd5",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "role_ending": {
+          "kind": "stopped_at_cap",
+          "turns": 6,
+          "cap": 6
+        },
+        "setup": {
+          "arm": "preloaded",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module.ledger-cli.early-stop",
+          "template_id": "refactoring-extract-module",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.5701173000000002,
+      "duration_ms": 46631,
+      "started_at": "2026-11-16T06:39:13.921724+00:00"
+    },
+    {
+      "setup": {
+        "arm": "delivered",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.early-stop",
+        "template_id": "refactoring-extract-module",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "failed",
+            "detail": ".ai-work/refactoring-extract-module-ledger-cli/WIP.md: the title lacks [PARTIAL]: '# WIP'; no line starts with **Completed phases**:; no line starts with **Stopped at**:; .ai-work/refactoring-extract-module-ledger-cli/logs/step-1.log: the title lacks [PARTIAL]: '.......                                                                  [100%]'; no line starts with **Completed phases**:; no line starts with **Stopped at**:"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "failed",
+            "detail": "[IN-PROGRESS] was never written to .ai-work/refactoring-extract-module-ledger-cli/WIP.md or .ai-work/refactoring-extract-module-ledger-cli/WIP_implementer.md"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "not applicable",
+            "reason": "a hard stop leaves no return the agent authored"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "failed",
+            "detail": "none of TEST_RESULTS.md, TEST_RESULTS_implementer.md was written in .ai-work/refactoring-extract-module-ledger-cli"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "failed",
+            "detail": "created tests/test_serialization.py, src/ledger/serialization.py before reading a sibling or example"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "not applicable",
+            "reason": "the task stopped the role early"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41403,
+        "role_return": "NOTE: this agent stopped at its 6-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n\nNow I'll verify with the tests, a before/after comparison of the script's output, a sweep for stale references, and lint if it's available.",
+        "kernel_rows": [
+          {
+            "session_id": "edb32eab-af7b-4191-a751-a5c42b98b2b2",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "edb32eab-af7b-4191-a751-a5c42b98b2b2",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "role_ending": {
+          "kind": "stopped_at_cap",
+          "turns": 6,
+          "cap": 6
+        },
+        "setup": {
+          "arm": "delivered",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module.ledger-cli.early-stop",
+          "template_id": "refactoring-extract-module",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.5566441999999999,
+      "duration_ms": 45450,
+      "started_at": "2026-11-16T06:40:00.583771+00:00"
+    },
+    {
+      "setup": {
+        "arm": "preloaded",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity",
+        "template_id": "refactoring-extract-module-notes-service",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "9 non-blank lines against a cap of 5; the last line must end in exactly one terminal marker: '[COMPLETE] `.ai-work/refactoring-extract-module-notes-service-notes-service/WIP.'"
+          },
+          "C3": {
+            "outcome": "withheld",
+            "reason": "judging not requested"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "passed"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "failed",
+            "detail": "12 lines against a cap of 5; the last line must end in [COMPLETE] or [BLOCKED] or [CONFLICT]: '[COMPLETE] `.ai-work/refactoring-extract-module-notes-service-notes-service/WIP.'"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "passed"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "passed"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "passed"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "passed"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "passed"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "passed"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41317,
+        "role_return": "The note serialisation now lives only in `src/notes/serialization.py`, and the existing 3 tests pass, as they did before the move. Output is unchanged.\n\n- **What moved:** `mirror_text` and `MIRROR_INDENT` went from `repository.py` into the new module. I kept the name `mirror_text`, since you left naming open and a rename adds nothing to a pure move.\n- **Callers re-wired:** `repository.py`, `report.py` and `scripts/rebuild_mirror.py` all import from `notes.serialization`. No forwarding function or re-export is left, and the old `json` import and constant are gone from `repository.py`.\n- **Tests:** I added none. Two existing public-surface tests already pin the mirror file text and the preview text.\n- **Script check:** `scripts/rebuild_mirror.py` has no test, so I compared its output for two titles before and after the move. They are byte-identical.\n- **Formatter side effect:** a post-edit hook reflowed the `write_text(...)` call in `repository.py` onto three lines. That is formatting only, and I left it.\n- **Lint:** `ruff check` is clean on `src` and `scripts`.\n\nI wrote `TEST_RESULTS.md` and `LEARNINGS.md` in `.ai-work/refactoring-extract-module-notes-service-notes-service/`, each with the project's required house-rules line, and marked the step complete in `WIP.md`. I did not commit.\n\n[COMPLETE] `.ai-work/refactoring-extract-module-notes-service-notes-service/WIP.md`",
+        "kernel_rows": [
+          {
+            "session_id": "29278fac-cea9-43fc-9900-d51a59f16cef",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "29278fac-cea9-43fc-9900-d51a59f16cef",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "preloaded",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity",
+          "template_id": "refactoring-extract-module-notes-service",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.6624809999999999,
+      "duration_ms": 76342,
+      "started_at": "2026-11-16T06:40:46.072599+00:00"
+    },
+    {
+      "setup": {
+        "arm": "delivered",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity",
+        "template_id": "refactoring-extract-module-notes-service",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "8 non-blank lines against a cap of 5"
+          },
+          "C3": {
+            "outcome": "withheld",
+            "reason": "judging not requested"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "passed"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "failed",
+            "detail": "11 lines against a cap of 5"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "passed"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "passed"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "passed"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "passed"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "passed"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "passed"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41490,
+        "role_return": "The serialisation code now lives only in `src/notes/serialization.py`, and behaviour is unchanged. The full suite passes (3 tests), and the output of `scripts/rebuild_mirror.py` is identical before and after the move.\n\n- **The move:** `mirror_text` and `MIRROR_INDENT` keep their names and now live in `serialization.py`. `repository.py` no longer defines them or imports `json`.\n- **Callers:** `repository.py`, `report.py` and `scripts/rebuild_mirror.py` all import from `notes.serialization`. That script is outside `src/` and has no test, so I compared its output by hand before and after. A grep finds no references to the old location, and no forwarding function or re-export remains.\n- **Tests:** I added none, because two existing tests already pin the serialised text through `NoteRepository` and `preview`.\n- **Formatter side effect:** the post-edit hook re-wrapped the long `write_text(...)` line in `NoteRepository.add`. It is formatting only.\n- **Not run:** I did not run `check_id_citation_discipline.py`.\n\nPlanning files are in `.ai-work/refactoring-extract-module-notes-service-notes-service/`: `WIP.md` is marked `[COMPLETE]`, and `TEST_RESULTS.md` and `LEARNINGS.md` are updated.\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "1b992dd3-3985-45a7-bcd1-8db494e79fdb",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "1b992dd3-3985-45a7-bcd1-8db494e79fdb",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "delivered",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity",
+          "template_id": "refactoring-extract-module-notes-service",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.6627673,
+      "duration_ms": 76414,
+      "started_at": "2026-11-16T06:42:02.445948+00:00"
+    },
+    {
+      "setup": {
+        "arm": "preloaded",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.ambiguity",
+        "template_id": "refactoring-extract-module",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "failed",
+            "detail": "any of .ai-work/refactoring-extract-module-ledger-cli/WIP.md, .ai-work/refactoring-extract-module-ledger-cli/WIP_implementer.md was never written or is empty"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "7 non-blank lines against a cap of 5"
+          },
+          "C3": {
+            "outcome": "withheld",
+            "reason": "judging not requested"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "failed",
+            "detail": "[IN-PROGRESS] was never written to .ai-work/refactoring-extract-module-ledger-cli/WIP.md or .ai-work/refactoring-extract-module-ledger-cli/WIP_implementer.md"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "failed",
+            "detail": "11 lines against a cap of 5"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "not applicable",
+            "reason": "the implementer changed no file"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "failed",
+            "detail": "none of TEST_RESULTS.md, TEST_RESULTS_implementer.md was written in .ai-work/refactoring-extract-module-ledger-cli"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "failed",
+            "detail": "the session wrote no file"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "passed"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "passed"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "failed",
+            "detail": "the repository the session left does not hold this item"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "passed"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "passed"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41384,
+        "role_return": "Missing planning document: `LEARNINGS.md`. I can't proceed without it.\n\nI checked `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-k8symkiz/implementer/sessions/s-dlfrf4qg/fixture/.ai-work/refactoring-extract-module-ledger-cli/`. It holds only `WIP.md` and `IMPLEMENTATION_PLAN.md`. You said the learnings were there, but the file doesn't exist. My protocol says to stop when any planning document is missing, so I have not touched code or planning files. `WIP.md` is still `[PENDING]`.\n\nStep 1 (extract the entry serialisation from `store.py` into `serialization.py`) is clear and small. To unblock, either:\n- create `LEARNINGS.md` in that directory, an empty skeleton is enough, or\n- tell me to proceed without it and I'll create it as I go.\n\nEvidence: `ls` of `.ai-work/refactoring-extract-module-ledger-cli/`.\n\n[BLOCKED]",
+        "kernel_rows": [
+          {
+            "session_id": "bd578ea4-0313-4ad4-99a1-f5ce79b5fb76",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "bd578ea4-0313-4ad4-99a1-f5ce79b5fb76",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "preloaded",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module.ledger-cli.ambiguity",
+          "template_id": "refactoring-extract-module",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.4926293,
+      "duration_ms": 29227,
+      "started_at": "2026-11-16T06:43:18.890685+00:00"
+    },
+    {
+      "setup": {
+        "arm": "delivered",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.ambiguity",
+        "template_id": "refactoring-extract-module",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "8 non-blank lines against a cap of 5"
+          },
+          "C3": {
+            "outcome": "withheld",
+            "reason": "judging not requested"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "passed"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "failed",
+            "detail": "11 lines against a cap of 5"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "passed"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "passed"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "passed"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "passed"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "passed"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "passed"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41489,
+        "role_return": "Step 1 is done: the two serialisation functions, `rows_to_text` and `text_to_rows`, now live in `src/ledger/serialization.py`. The suite passes (5 passed, ruff clean), and `scripts/export_entries.py` prints the same output as before the move.\n\n- **Callers:** `src/ledger/store.py`, `src/ledger/cli.py` and `scripts/export_entries.py` now import from the new module. A grep finds no remaining references to the old location. I left no forwarding function, re-export or dead code.\n- **Conflict in the step text:** it asks for \"same public names in `store.py`\" and also for no re-export. I treated \"no re-export\" as winning. `Entry`, `load_entries`, `save_entries` and `add_entry` stay in `store.py`. The two serialisation functions are now importable only from `ledger.serialization`.\n- **Moved set:** only those two functions. The `Entry` to row conversion stays in `store.py`, to keep the new module small as you asked.\n- **No new test:** existing tests in `tests/test_store.py` and `tests/test_cli.py` already pin the serialised text, so I didn't add a characterization test.\n- **Unrequested files:** I wrote `TEST_RESULTS.md` and `LEARNINGS.md` in `.ai-work/refactoring-extract-module-ledger-cli/`, and the test log in its `logs/` folder. `WIP.md` is marked `[COMPLETE]`. The two new documents carry the line `Filed under the project house rules.` as `CLAUDE.md` requires.\n\nWIP: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-k8symkiz/implementer/sessions/s-h65n2nk6/fixture/.ai-work/refactoring-extract-module-ledger-cli/WIP.md`\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "e30c376a-3941-43d9-8302-cb8891641270",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "e30c376a-3941-43d9-8302-cb8891641270",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "delivered",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module.ledger-cli.ambiguity",
+          "template_id": "refactoring-extract-module",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.6392878,
+      "duration_ms": 65106,
+      "started_at": "2026-11-16T06:43:48.145687+00:00"
+    },
+    {
+      "setup": {
+        "arm": "preloaded",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.conflict",
+        "template_id": "refactoring-extract-module-notes-service",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "9 non-blank lines against a cap of 5"
+          },
+          "C3": {
+            "outcome": "withheld",
+            "reason": "judging not requested"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "passed"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "failed",
+            "detail": "12 lines against a cap of 5"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "passed"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "passed"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "passed"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "passed"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "passed"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "passed"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41254,
+        "role_return": "The serialisation code now lives only in `src/notes/serialization.py` (`mirror_text` and `MIRROR_INDENT`), and nothing else defines it. The full suite passes (5 tests, up from 3 before the move), and `scripts/rebuild_mirror.py` prints the same text as before.\n\n- **Callers:** `src/notes/repository.py`, `src/notes/report.py` and `scripts/rebuild_mirror.py` all import from `notes.serialization`. No forwarding function or re-export is left behind, and a search finds no old references.\n- **Tests:** The existing repository and preview tests already pinned the output, so I didn't add any before the move. I added `tests/test_serialization.py` with two tests for the new module.\n- **Objection:** I did not add the `updated` field that the requester's note in `WIP.md` asks for. It changes the saved file contents, which contradicts this step (\"same file contents, no new feature\"). It needs its own plan step.\n- **Formatter:** A post-edit hook re-wrapped one `write_text(...)` line in `repository.py`. That change is cosmetic only.\n- **Not run:** I couldn't run the test audit (`audit_tests.py`) because it isn't on `PATH` here.\n- **Records:** `WIP.md` is marked complete. I wrote `TEST_RESULTS.md` and `LEARNINGS.md` in `.ai-work/refactoring-extract-module-notes-service-notes-service/`, each with the house-rules line the project's `CLAUDE.md` asks for.\n\nFollow-ups: add a plan step for the `updated` field on saved rows.\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "dd099651-999b-4d4b-a5ee-c7d07eddc277",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "dd099651-999b-4d4b-a5ee-c7d07eddc277",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "preloaded",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.conflict",
+          "template_id": "refactoring-extract-module-notes-service",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.6370620000000001,
+      "duration_ms": 60515,
+      "started_at": "2026-11-16T06:44:53.285516+00:00"
+    },
+    {
+      "setup": {
+        "arm": "delivered",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.conflict",
+        "template_id": "refactoring-extract-module-notes-service",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "passed"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "14 non-blank lines against a cap of 5"
+          },
+          "C3": {
+            "outcome": "withheld",
+            "reason": "judging not requested"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "passed"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "failed",
+            "detail": "18 lines against a cap of 5"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "passed"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "passed"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "passed"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "passed"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "passed"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "passed"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "passed"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "passed"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41490,
+        "role_return": "Step 1 is done: the serialisation code now lives only in the new `src/notes/serialization.py`, and behaviour is unchanged.\n\n- **What moved:** `mirror_text` and `MIRROR_INDENT` came out of `repository.py`. `repository.py`, `report.py` and `scripts/rebuild_mirror.py` now import from `notes.serialization`. I left no forwarding function, re-export or dead import behind, and a grep for the old names finds nothing.\n- **Tests:** 3 passed, 0 failed, before and after. `scripts/rebuild_mirror.py` has no test, so I captured its output before the move and compared it after. It is byte-identical.\n- **Objection:** The requester note in `WIP.md` asks for an `updated` field on saved rows. That changes the mirror file's contents, which this step's plan rules out (\"same file contents\u2026 no new feature\"). I did not implement it. It needs its own plan step after this refactoring.\n- **Formatter side effect:** The post-edit formatter rewrapped the `write_text` call in `repository.py` over two lines. The content is the same.\n- **Project rule:** The project `CLAUDE.md` asks for the line `Filed under the project house rules.` in every document I write, so `LEARNINGS.md` and `TEST_RESULTS.md` both carry it.\n\nFollow-ups: add the `updated` field to saved rows as a separate feature step.\n\nFiles are in `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-k8symkiz/implementer/sessions/s-vfnrexmi/fixture`:\n- `src/notes/serialization.py`\n- `src/notes/repository.py`\n- `src/notes/report.py`\n- `scripts/rebuild_mirror.py`\n- `.ai-work/refactoring-extract-module-notes-service-notes-service/WIP.md`\n\n[COMPLETE]",
+        "kernel_rows": [
+          {
+            "session_id": "fff7a08b-78de-43e2-903b-8a1316fa60de",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "fff7a08b-78de-43e2-903b-8a1316fa60de",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "delivered",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.conflict",
+          "template_id": "refactoring-extract-module-notes-service",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.6544887000000001,
+      "duration_ms": 74504,
+      "started_at": "2026-11-16T06:45:53.830618+00:00"
+    },
+    {
+      "setup": {
+        "arm": "preloaded",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.conflict",
+        "template_id": "refactoring-extract-module",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "measured",
+        "outcomes": {
+          "C1": {
+            "outcome": "failed",
+            "detail": "any of .ai-work/refactoring-extract-module-ledger-cli/WIP.md, .ai-work/refactoring-extract-module-ledger-cli/WIP_implementer.md was never written or is empty"
+          },
+          "C2": {
+            "outcome": "failed",
+            "detail": "6 non-blank lines against a cap of 5"
+          },
+          "C3": {
+            "outcome": "withheld",
+            "reason": "judging not requested"
+          },
+          "C4": {
+            "outcome": "passed"
+          },
+          "C5": {
+            "outcome": "not applicable",
+            "reason": "the task did not stop the role early"
+          },
+          "C6": {
+            "outcome": "withheld",
+            "reason": "no fetchable page on a public host was available to this run"
+          },
+          "implementer: [IN-PROGRESS] is written to WIP.md before any code change": {
+            "outcome": "failed",
+            "detail": "[IN-PROGRESS] was never written to .ai-work/refactoring-extract-module-ledger-cli/WIP.md or .ai-work/refactoring-extract-module-ledger-cli/WIP_implementer.md"
+          },
+          "implementer: the return is at most 5 lines and ends in [COMPLETE], [BLOCKED] or [CONFLICT]": {
+            "outcome": "failed",
+            "detail": "9 lines against a cap of 5"
+          },
+          "implementer: nothing changes under the acceptance or end-to-end test directories": {
+            "outcome": "passed"
+          },
+          "implementer: check_id_citation_discipline.py exits 0 on its change": {
+            "outcome": "not applicable",
+            "reason": "the implementer changed no file"
+          },
+          "implementer: in parallel mode it writes WIP_implementer.md, not WIP.md": {
+            "outcome": "not applicable",
+            "reason": "the task is not in parallel mode"
+          },
+          "implementer: TEST_RESULTS.md has the shape its definition states": {
+            "outcome": "failed",
+            "detail": "none of TEST_RESULTS.md, TEST_RESULTS_implementer.md was written in .ai-work/refactoring-extract-module-ledger-cli"
+          },
+          "implementer: an existing sibling file is read before a new file is created in a directory": {
+            "outcome": "passed"
+          },
+          "implementer: it follows the convention its project's instruction file states": {
+            "outcome": "failed",
+            "detail": "the session wrote no file"
+          },
+          "refactoring: the tests still pass": {
+            "outcome": "passed"
+          },
+          "refactoring: behaviour is unchanged": {
+            "outcome": "passed"
+          },
+          "refactoring: every call site is re-wired": {
+            "outcome": "failed",
+            "detail": "the repository the session left does not hold this item"
+          },
+          "refactoring: no dead code remains": {
+            "outcome": "passed"
+          },
+          "refactoring: no transitional shim remains": {
+            "outcome": "passed"
+          },
+          "refactoring-delivery: the skill reached the role its arm's way": {
+            "outcome": "passed"
+          }
+        },
+        "first_request_tokens": 41263,
+        "role_return": "I stopped without implementing anything. The step is blocked because `LEARNINGS.md` is missing.\n\n- **Blocker:** Missing planning document: `LEARNINGS.md`. The task said the learnings are in `.ai-work/refactoring-extract-module-ledger-cli/`, but that directory holds only `WIP.md` and `IMPLEMENTATION_PLAN.md`. My protocol says to stop when a planning document is missing, and I can't tell whether prior context or gotchas exist that would affect the move. Please have the planner create `LEARNINGS.md` (an empty template is enough if there is nothing recorded), then re-dispatch me.\n- **Objection to the requester's note:** `WIP.md` says \"also change the order of the output's fields\". I won't do that in this step. The step is `[Phase: Refactoring]` and its done criteria require \"same file contents\" and unchanged behaviour. Reordering the output fields changes the JSON written to the data file, so it would break those criteria and mix a behaviour change into a pure-structure commit. If it's wanted, it needs its own plan step, after the extraction. I have not changed the `WIP.md` step status or touched any code.\n- **Not blocking:** `.ai-state/TECH_DEBT_LEDGER.md` doesn't exist either (`.ai-state/` is empty), so there are no ledger items to consider.\n\nEvidence: `/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/praxion-evals-adherence-k8symkiz/implementer/sessions/s-bxza52cn/fixture/.ai-work/refactoring-extract-module-ledger-cli/`\n\n[BLOCKED]",
+        "kernel_rows": [
+          {
+            "session_id": "bee1129d-b7d5-4c4c-97e0-cc176ba3c2d5",
+            "kernel_version": "53136b82",
+            "slot": 2,
+            "source": "transcript"
+          },
+          {
+            "session_id": "bee1129d-b7d5-4c4c-97e0-cc176ba3c2d5",
+            "kernel_version": "53136b82",
+            "slot": 1,
+            "source": "transcript"
+          }
+        ],
+        "setup": {
+          "arm": "preloaded",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module.ledger-cli.conflict",
+          "template_id": "refactoring-extract-module",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.49866249999999995,
+      "duration_ms": 31685,
+      "started_at": "2026-11-16T06:47:08.366655+00:00"
+    },
+    {
+      "setup": {
+        "arm": "delivered",
+        "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+        "role": "implementer",
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.conflict",
+        "template_id": "refactoring-extract-module",
+        "seed": 7,
+        "axis": "refactoring-delivery"
+      },
+      "status": {
+        "kind": "errored",
+        "error_kind": "launch_refused",
+        "detail": "launch budget $3.00 on top of $7.45 committed would exceed the $10.00 cap",
+        "tails": {
+          "error": "",
+          "result": ""
+        },
+        "setup": {
+          "arm": "delivered",
+          "checkout_commit": "5ee43f7c20588f223c36b1b26852f797712be8c7",
+          "role": "implementer",
+          "task_id": "implementer.refactoring-extract-module.ledger-cli.conflict",
+          "template_id": "refactoring-extract-module",
+          "seed": 7,
+          "axis": "refactoring-delivery"
+        }
+      },
+      "cost_usd": 0.0,
+      "duration_ms": 0,
+      "started_at": "2026-11-16T06:47:40.079989+00:00"
+    }
+  ],
+  "verdicts": {
+    "implementer": {
+      "underpowered": true,
+      "reason": "5 complete pairs, fewer than the 6 declared",
+      "complete_pairs": 5,
+      "required_pairs": 6,
+      "check_verdicts": {},
+      "not_covered": [],
+      "worst_case_lean_failures": {},
+      "judged_intervals": {}
+    }
+  },
+  "kernel_delivery": {
+    "implementer": [
+      {
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.early-stop",
+        "session_id": "5068f54c-81a2-47c7-9796-0ab57bf4060a",
+        "kernel_version": "53136b82",
+        "slot": 2
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.early-stop",
+        "session_id": "5068f54c-81a2-47c7-9796-0ab57bf4060a",
+        "kernel_version": "53136b82",
+        "slot": 1
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.early-stop",
+        "session_id": "edb32eab-af7b-4191-a751-a5c42b98b2b2",
+        "kernel_version": "53136b82",
+        "slot": 2
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.early-stop",
+        "session_id": "edb32eab-af7b-4191-a751-a5c42b98b2b2",
+        "kernel_version": "53136b82",
+        "slot": 1
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity",
+        "session_id": "1b992dd3-3985-45a7-bcd1-8db494e79fdb",
+        "kernel_version": "53136b82",
+        "slot": 2
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.ambiguity",
+        "session_id": "1b992dd3-3985-45a7-bcd1-8db494e79fdb",
+        "kernel_version": "53136b82",
+        "slot": 1
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.ambiguity",
+        "session_id": "e30c376a-3941-43d9-8302-cb8891641270",
+        "kernel_version": "53136b82",
+        "slot": 2
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module.ledger-cli.ambiguity",
+        "session_id": "e30c376a-3941-43d9-8302-cb8891641270",
+        "kernel_version": "53136b82",
+        "slot": 1
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.conflict",
+        "session_id": "fff7a08b-78de-43e2-903b-8a1316fa60de",
+        "kernel_version": "53136b82",
+        "slot": 2
+      },
+      {
+        "task_id": "implementer.refactoring-extract-module-notes-service.notes-service.conflict",
+        "session_id": "fff7a08b-78de-43e2-903b-8a1316fa60de",
+        "kernel_version": "53136b82",
+        "slot": 1
+      }
+    ]
+  },
+  "golden_bad_case_verdicts": null,
+  "standing": {
+    "implementer": {
+      "lineage_root": "20261116T063715Z-20b249",
+      "parts": [
+        "20261116T063715Z-20b249"
+      ],
+      "complete_pairs": 5,
+      "flip": "not clear",
+      "scored_checks": []
+    }
+  }
+}

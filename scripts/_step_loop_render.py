@@ -24,6 +24,7 @@ from _markdown_tables import find_section, split_lines
 from _plan_steps import CHANGE_TYPES, HEADING_TAG_RE, PlanStep, Routing
 from _step_loop_gate import GateEvidence
 from _step_loop_ownership import own_node_permissions
+from _step_loop_review import SUPERSEDED_HEADING
 from _step_schema import STEP_ID_RE
 
 PROMPT_CEILING = 16_000
@@ -198,7 +199,7 @@ def render_prompt(inputs: PromptInputs) -> tuple[str, tuple[tuple[str, str], ...
         "\n".join([*request.agent_call.prompt.splitlines()[:2], opening]),
         f'<step id="{step.id}">\n{step.block}\n</step>',
         *(element for element, _ in shown if element),
-        _FINISH[kind].format(sid=sid, id=step.id, work=inputs.work_dir),
+        _FINISH[kind].format(sid=sid, id=step.id, work=inputs.work_dir, later=_later_round(key)),
     ]
     text, warnings = "\n\n".join(sections) + "\n", tuple(w for _, w in shown if w)
     if len(text) > PROMPT_CEILING:
@@ -217,10 +218,14 @@ _FINISH_WORK = """\
 _FINISH_REVIEW = """\
 <finish>
 1. Write your review to {work}/LIGHT_REVIEW_step-{id}.md: `verdict: [PARTIAL]` first, each finding
-   as you confirm it, the verdict line last (`verdict: accept`, or `verdict: revise` + findings).
+   as you confirm it, the verdict line last (`verdict: accept`, or `verdict: revise` + findings).{later}
 2. Review only the change in <diff> against the step above; edit no other file.
 3. End with at most 15 lines: the verdict block, then one marker last: [COMPLETE] or [PARTIAL].
 </finish>"""
+_LATER_ROUND = (
+    "\n   Keep an earlier round's record below your review, under a `{heading}` heading:"
+    "\n   the driver reads only the text above it, so your verdict goes there."
+)
 _FINISH_GOAL = """\
 <finish>
 1. Pick one unit of the goal, finish it, and leave the tree committable.
@@ -247,6 +252,12 @@ _FINISH = {
     "review": _FINISH_REVIEW,
     "goal": _FINISH_GOAL,
 }
+
+
+def _later_round(key: RequestKey) -> str:
+    """What a review request past the first adds to its finish: where the earlier record goes."""
+    later = key.kind == "review" and (key.round or 1) >= 2
+    return _LATER_ROUND.format(heading=SUPERSEDED_HEADING) if later else ""
 
 
 def _slots(inputs: PromptInputs) -> list[_Slot]:

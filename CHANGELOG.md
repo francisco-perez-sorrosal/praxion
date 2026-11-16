@@ -1,3 +1,9 @@
+## v0.65.1 (2026-11-16)
+
+### Perf
+
+- Deliver the refactoring skill at spawn, not preloaded
+
 ## v0.65.0 (2026-11-15)
 
 ### Feat

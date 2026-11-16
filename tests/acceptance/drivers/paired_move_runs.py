@@ -52,8 +52,14 @@ CHECKLIST = rme.CHECKLIST
 
 
 def new_checkout(workspace: Path) -> Path:
-    """A committed copy of the plugin, every switched role put back on trial."""
-    root = rd.new_installation(workspace / "checkout").root
+    """A committed copy of the plugin, before the move, every switched role put back on trial.
+
+    A paired run precedes the move, and the eval refuses one pointed at a checkout that is already
+    moved, so the copy is put in the state before it whichever state the working tree holds.
+    """
+    installation = rd.new_installation(workspace / "checkout")
+    rd.before_the_move(installation)
+    root = installation.root
     for definition in sorted((root / "agents").glob("*.md")):
         text = definition.read_text(encoding="utf-8")
         definition.write_text(

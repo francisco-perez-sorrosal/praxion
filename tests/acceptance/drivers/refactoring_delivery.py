@@ -755,19 +755,31 @@ def apply_the_move(installation: Installation) -> None:
 
     The tool is idempotent, so a scenario may apply it to an installation already in the end state.
     """
+    _run_move_tool(installation, "delivered")
+
+
+def before_the_move(installation: Installation) -> None:
+    """Run the installation's own move tool to put the skill back into both definitions' preloads.
+
+    A paired run precedes the move, so a scenario about one builds its checkout in this state
+    whichever state the working tree it was copied from holds. The tool is idempotent: an
+    installation already in this state is left as it is.
+    """
+    _run_move_tool(installation, "preloaded")
+
+
+def _run_move_tool(installation: Installation, state: str) -> None:
     root = installation.root
     tool = root / MOVE_TOOL
     assert tool.is_file(), f"the installation has no {MOVE_TOOL}"
     done = subprocess.run(
-        [sys.executable, str(tool), "--to", "delivered", "--root", str(root)],
+        [sys.executable, str(tool), "--to", state, "--root", str(root)],
         capture_output=True,
         text=True,
         env=isolated_env(root.parent / f".{root.name}-move"),
         timeout=60,
     )
-    assert done.returncode == 0, (
-        f"{MOVE_TOOL} --to delivered exited {done.returncode}: {done.stderr}"
-    )
+    assert done.returncode == 0, f"{MOVE_TOOL} --to {state} exited {done.returncode}: {done.stderr}"
 
 
 _FAILURES_CODE = """

@@ -272,9 +272,13 @@ def build_paired_move_arms(role: str, workspace: Path) -> dict[ArmKind, Path]:
 
     The move changes both roles' definitions together, so the arms do not depend on `role`; the
     checkout they are built from is a committed copy of the plugin, which the builder materializes
-    as it does a real checkout, and which stays untouched.
+    as it does a real checkout, and which stays untouched. A paired run precedes the move and the
+    builder refuses a checkout already moved, so the copy is put before the move, whichever state
+    the working tree it was copied from holds.
     """
-    checkout = rd.new_installation(workspace / "checkout").root
+    installation = rd.new_installation(workspace / "checkout")
+    rd.before_the_move(installation)
+    checkout = installation.root
     _commit_all(checkout, "a checkout of the plugin")
     payload = {"checkout": str(checkout), "arms_dir": str(workspace / "arms"), "arms": ARM_KINDS}
     built = adherence_eval.run_in_eval(_BUILD_ARMS_CODE, payload)

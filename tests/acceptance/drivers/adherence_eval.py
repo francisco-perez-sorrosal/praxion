@@ -99,6 +99,8 @@ from typing import Any, Literal
 
 import yaml
 
+from scripts._step_loop_pocket_runs import pocket_bound
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EVAL_PROJECT = REPO_ROOT / "eval"
 EVAL_SRC = EVAL_PROJECT / "src"
@@ -1622,6 +1624,20 @@ class SuiteRun:
     claude_starts: list[str]
 
 
+_ROOT_POCKET = "."  # the pocket whose run contains the node that starts the nested suite
+
+
+def nested_suite_limit_seconds(environ: Mapping[str, str]) -> float:
+    """The seconds the nested suite may run: the bound of the run that contains this node.
+
+    The node runs in the root pocket, so it is held to the root pocket's bound, read as the gate
+    reads it. An entry naming the evaluation pocket bounds another run and is ignored here. The
+    evaluation pocket declares no worker option, so the nested run is serial and adds no worker
+    pool beside the suite that contains the node.
+    """
+    return pocket_bound(REPO_ROOT, _ROOT_POCKET, environ).bound.seconds
+
+
 def run_eval_suite_under_tripwire(workspace: Path) -> SuiteRun:
     """Run `cd eval && uv run pytest -q` with a refusing `claude` first on PATH."""
     tripwire = install_tripwire(workspace)
@@ -1639,7 +1655,7 @@ def run_eval_suite_under_tripwire(workspace: Path) -> SuiteRun:
         text=True,
         env=env,
         cwd=EVAL_PROJECT,
-        timeout=1200,
+        timeout=nested_suite_limit_seconds(os.environ),
     )
     tail = "\n".join((result.stdout + result.stderr).splitlines()[-30:])
     return SuiteRun(

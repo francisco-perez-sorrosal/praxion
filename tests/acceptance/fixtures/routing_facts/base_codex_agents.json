@@ -36,7 +36,7 @@
    "model_reasoning_effort": "medium"
   },
   "implementer": {
-   "instructions_digest": "9bf007e10f43580f25181a61a643877edbf9bc01f1625f66f8fada5c8951cd27",
+   "instructions_digest": "ea8e13e4aa106a7b4ddfb604ba9a90128c97aec4aaf61e32fa71d8d399fdb4fc",
    "model": "gpt-5.4",
    "model_reasoning_effort": "medium"
   },
@@ -76,7 +76,7 @@
    "model_reasoning_effort": "high"
   },
   "test-engineer": {
-   "instructions_digest": "d3f22fdd86368dfbae1fe26fcf384fae987df782fff8b6949e15ade827c1c879",
+   "instructions_digest": "da2e1af9018121db39ab8510b17e2229aff88417663ac45d42d9922b850b2dbf",
    "model": "gpt-5.4",
    "model_reasoning_effort": "medium"
   },

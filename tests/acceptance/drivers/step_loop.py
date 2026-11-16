@@ -224,8 +224,13 @@ class LoopTask:
         raise KeyError(step_id)
 
 
+AMBIENT_LOOP_PREFIX = "PRAXION_STEP_LOOP_"
+
+
 def _clean_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    # A gate that runs this suite sets its own loop variables (a pocket's time bound); a scenario's
+    # task must see only the ones the scenario sets itself, never the gate's.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", AMBIENT_LOOP_PREFIX))}
     env.pop("PYTEST_ADDOPTS", None)
     # `python` on PATH must be an interpreter that has pytest, as it is under `uv run`.
     env["PATH"] = f"{Path(PYTHON).parent}{os.pathsep}{env.get('PATH', '')}"

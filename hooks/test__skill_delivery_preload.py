@@ -37,8 +37,8 @@ def state_of(tmp_path: Path, text: str) -> delivery.PreloadState:
     reason="a mutation sensor's copy of hooks/ sits beside no agents/ directory",
 )
 @pytest.mark.parametrize("role", ["implementer", "test-engineer"])
-def test_live_definitions_preload_the_skill(role):
-    assert delivery.preload_state(PLUGIN_ROOT, role) == delivery.Preloaded()
+def test_live_definitions_leave_the_skill_to_the_delivery(role):
+    assert delivery.preload_state(PLUGIN_ROOT, role) == delivery.NotPreloaded()
 
 
 @pytest.mark.parametrize(

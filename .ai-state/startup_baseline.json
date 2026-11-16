@@ -387,6 +387,42 @@
         }
       }
     },
+    "praxion-repo|sonnet|default|no-mcp|plugin-dir|subscription": {
+      "claude_code_version": "2.1.325",
+      "profile": {
+        "credential": "subscription",
+        "cwd_kind": "praxion-repo",
+        "key": "praxion-repo|sonnet|default|no-mcp|plugin-dir|subscription",
+        "model": "sonnet",
+        "plugin_dir": "/Users/fperez/dev/praxion",
+        "setting_sources": null,
+        "strict_mcp_config": true
+      },
+      "recorded": "2026-11-15",
+      "targets": {
+        "agent:implementer": {
+          "cache_creation": 32185,
+          "cache_read": 0,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 32187
+        },
+        "agent:test-engineer": {
+          "cache_creation": 31667,
+          "cache_read": 3573,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 35242
+        },
+        "main": {
+          "cache_creation": 41125,
+          "cache_read": 13226,
+          "input_tokens": 2,
+          "model": "claude-sonnet-5-5",
+          "tokens": 54353
+        }
+      }
+    },
     "unmanaged|sonnet|default|mcp|installed": {
       "claude_code_version": "2.1.296",
       "profile": {

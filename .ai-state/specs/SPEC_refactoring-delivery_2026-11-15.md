@@ -12,7 +12,7 @@
 - final verification on 2026-11-15, two more gated steps after its report (28a and 28b), the merge into main as a fast-forward, and release v0.65.0.
 
 **Archived**: 2026-11-15
-**Status**: completed -- final verdict PASS WITH FINDINGS (0 FAIL, 11 WARN); the interim state shipped and the move that drops the preload is held, not applied
+**Status**: completed -- final verdict PASS WITH FINDINGS (0 FAIL, 11 WARN); the interim state shipped with the move held; the move was applied later the same day, after the paired run (`7382aae7`, see Held, "Applied on 2026-11-15")
 **Tier**: Full (re-tiered from Standard after step 22: the spawn tally had reached the Standard budget before documentation and verification; the verifier's retrospective calibration reads under-calibrated)
 **Complexity**: large: 23 requirements, 52 reconciled plan steps (29 numbered, 23 lettered), 78 commits and 279 files changed against main as it stood at the merge of main into the branch (84 of those files outside fixtures; +16,436 and -494 lines, `git diff --shortstat dc7d0106..1d73eedf`), one new hook module, one new script, a trailing slot in the single prompt-rewrite emitter, a second arm axis in the adherence eval with its paid-loop wiring, and four refactoring-pool templates with their end-state trees (two per role, six tasks per role).
 **Base commit**: `095da2ee` (main after release v0.64.0 plus the ledger fixes of 2026-11-13). Main (`dc7d0106`) was merged into the branch as `c76d6dbc`. Further commits:
@@ -171,6 +171,46 @@ The user delegated the open decisions of this section to the orchestrator on 202
 - **The move:** applied once the criterion is met, after the run's result has been shown to the user.
 
 Not delegated: each spend. Each role's paired run and each live startup reading still waits for the user's go on a run card at that moment.
+
+### Applied on 2026-11-15
+
+The user gave the go for each paid run on its run card, saw both roles' results, and approved the move. Everything below was billed to the subscription; the judge was off, so nothing reached the API key.
+
+**The paired runs** (checkout `5ee43f7c`, `opus`, effort `medium`, results under `tmp/e1-run-2026-11-15/`, which is not committed):
+
+| | Implementer | Test-engineer |
+|---|---|---|
+| Runs | `20261116T063715Z-20b249` (11 sessions measured, the 12th refused by the cap) and `20261116T065225Z-9695ab` (the missing pair alone, seed 8, one task) | `20261116T065539Z-587265` |
+| Both arms proven | yes, in each run | yes |
+| Complete pairs | 6 of 6, in two files | 6 of 6 |
+| Delivered sessions in which the skill arrived | 6 of 6 | 6 of 6 |
+| Checks read as a regression | none | none |
+| Refactoring checklist, delivered arm | 4 of 4 on each of five items | 4 of 4 on each of two items |
+| Spend | $7.45 + $2.25 | $8.37 |
+
+- **The criterion (D1) is met for both roles.** The checks the reports list as not covered stay unproven and are not counted as passed: the judged check (judge off), the forced-stop check (fewer than 5 pairs ran out of turns on both sides), the web-fetch check (no fetchable page), and every check on which one arm led by a pair or two (the allowance then exceeds the margin times the pairs).
+- **The implementer's verdict was read over two files.** The run's cap was set at $10, and the tool admits a launch only while the spend plus the $3 session budget stays within the cap, so the last launch was refused at $7.45. That was an error in the run card, not a finding. The paired axis cannot be continued, so the first run was closed with its reason and the missing pair was run alone; the six pairs were then read as one run with the eval's own `results.merged` and `role_verdicts` (nothing written), under what the first file declared. Filed as `td-672`.
+- **Against the delivered arm, at noise level:** in the implementer's two turn-capped tasks the delivered arm created files without first marking the step in progress or reading a sibling file, and the preloaded arm did both (2 pairs to 0 on one check, 2 to 1 on the other). In the four uncapped pairs the delivered arm passed both checks 4 of 4. For the test-engineer, one pair on two checks. Neither is a regression under the declared rule (which needs five one-sided pairs), and neither is cleared.
+- **Not about the move:** the implementer's returns ran 9 to 18 lines against its 5-line cap in every scored session of both arms (`td-572`, already open); the test-engineer's "RED tests are present and fail" check read 0 of 6 in both arms, because a characterization task has no failing test to write.
+
+**The move:** `python3 scripts/refactoring_move.py --to delivered`, commit `7382aae7`; `--check` exits 0. The six named gates exit 0.
+
+**What the plan did not foresee.** The held step named two digests in one fixture. The acceptance suite after the move read 27 failed: that guard, a second frozen fixture pinning the same two exports (`routing_facts/base_codex_agents.json`), and 25 paired-run scenarios whose drivers copied the working tree and so assumed it was not moved yet (the eval refuses a paired run on a moved checkout). One test-engineer re-pinned the four entries one at a time and made the two drivers put their checkout in the state before the move with the copy's own move tool (`09553132`, `e6d6bf9d`). A paired run on this axis from this checkout is now refused until the move is taken back on a copy.
+
+**Footprint readings after the move:**
+
+| Reading | Before | After |
+|---|---|---|
+| Always-loaded tokens | 20,310 | 20,310 |
+| Skill and agent description listing tokens (FC-02) | 13,335 | 13,335 |
+| Prompt-size findings (FC-03) | 3 warn, 0 fail | 3 warn, 0 fail |
+| Refactoring skill body tokens (FC-04) | 4,184 | 4,184 (the file is unchanged) |
+| Live `implementer` spawn, first request | 36,081 | 32,187 (3,894 fewer) |
+| Live `test-engineer` spawn, first request | 39,168 | 35,242 (3,926 fewer) |
+
+The live readings are `measure_startup_payload.py agent:implementer agent:test-engineer --strict-mcp-config --plugin-dir <checkout>`, `sonnet`, Claude Code 2.1.325, one session per target; the after-readings are recorded in `.ai-state/startup_baseline.json` under `praxion-repo|sonnet|default|no-mcp|plugin-dir|subscription`. The probe sends an unmarked one-word delegation, so these are the unmarked path. A first attempt at the after-readings spawned nothing: Claude Code's auto-mode check refused the `Agent` call with a transient error, which the probe reported as a timeout (`td-673`).
+
+**Paid in all:** about $0.40 for the managed-project probe, $18.07 for the paired runs, about $2.50 for six probe sessions; about $21.
 
 ## Requirements
 

@@ -1,0 +1,175 @@
+{
+ "base_commit": "38fa77251861603e25ca6dee464288da0ef95443",
+ "cases": {
+  "exhausted-with-handoff": {
+   "next": {
+    "iterations": {
+     "budget": 2,
+     "used": 2
+    },
+    "outcome": "needs-human",
+    "schema": 1,
+    "slug": "loop-task",
+    "stop": {
+     "attempts": [
+      {
+       "agent_id": "a8aa80575e205435",
+       "attempt": 1,
+       "commit": null,
+       "gate": "Result: pass=0 fail=1 skip=0 pending=0 by=step-loop",
+       "max_turns": 100,
+       "stop_reason": "completed",
+       "turns": 12,
+       "verdict": "mismatch"
+      },
+      {
+       "agent_id": "a20128ca8869f45d",
+       "attempt": 2,
+       "commit": null,
+       "gate": "Result: pass=0 fail=1 skip=0 pending=0 by=step-loop",
+       "max_turns": 100,
+       "stop_reason": "completed",
+       "turns": 12,
+       "verdict": "attempts-exhausted"
+      }
+     ],
+     "cause": "attempts-exhausted",
+     "evidence": "2 of 2 fresh attempts at Step 1 ended unverified",
+     "handoff": "/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/tmp5bnog9y1/project/.ai-work/loop-task/HANDOFF.md",
+     "replan_request": "attempt 1: completed; Result: pass=0 fail=1 skip=0 pending=0 by=step-loop; no commit | attempt 2: completed; Result: pass=0 fail=1 skip=0 pending=0 by=step-loop; no commit",
+     "resume": "python3 scripts/step_loop.py next loop-task",
+     "step": "1"
+    },
+    "warnings": []
+   },
+   "scratch_base": "6a7de870c0cbf53fd6d68cdfd2f9bef108398b8f",
+   "status": {
+    "iterations": {
+     "budget": 2,
+     "used": 2
+    },
+    "outcome": "needs-human",
+    "pending_request": null,
+    "schema": 1,
+    "selected_step": "1",
+    "slug": "loop-task",
+    "steps": [
+     {
+      "assignee": "implementer",
+      "attempt_cap": 2,
+      "attempts": 2,
+      "commit": null,
+      "review": null,
+      "step": "1",
+      "verdict": "attempts-exhausted"
+     }
+    ],
+    "stop": {
+     "attempts": [
+      {
+       "agent_id": "a8aa80575e205435",
+       "attempt": 1,
+       "commit": null,
+       "gate": "Result: pass=0 fail=1 skip=0 pending=0 by=step-loop",
+       "max_turns": 100,
+       "stop_reason": "completed",
+       "turns": 12,
+       "verdict": "mismatch"
+      },
+      {
+       "agent_id": "a20128ca8869f45d",
+       "attempt": 2,
+       "commit": null,
+       "gate": "Result: pass=0 fail=1 skip=0 pending=0 by=step-loop",
+       "max_turns": 100,
+       "stop_reason": "completed",
+       "turns": 12,
+       "verdict": "attempts-exhausted"
+      }
+     ],
+     "cause": "attempts-exhausted",
+     "evidence": "2 of 2 fresh attempts at Step 1 ended unverified",
+     "handoff": "/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/tmp5bnog9y1/project/.ai-work/loop-task/HANDOFF.md",
+     "replan_request": "attempt 1: completed; Result: pass=0 fail=1 skip=0 pending=0 by=step-loop; no commit | attempt 2: completed; Result: pass=0 fail=1 skip=0 pending=0 by=step-loop; no commit",
+     "resume": "python3 scripts/step_loop.py next loop-task",
+     "step": "1"
+    },
+    "then": null
+   },
+   "written_at": "/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/tmp5bnog9y1/project"
+  },
+  "reviewed-then-outstanding": {
+   "next": {
+    "iterations": {
+     "budget": 9,
+     "used": 5
+    },
+    "outcome": "spawn",
+    "request": {
+     "agent_call": {
+      "description": "Step 2 attempt 2/2",
+      "model": "sonnet",
+      "prompt": "Task slug: loop-task\nSpawn request: s2-a2-implement\nRead /private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/tmpx_shqbfa/project/.ai-work/loop-task/PROMPT_s2-a2-implement.md first and follow it; it holds your step and its constraints.",
+      "subagent_type": "praxion:implementer"
+     },
+     "attempt": 2,
+     "attempt_cap": 2,
+     "id": "s2-a2-implement",
+     "kind": "implement",
+     "prompt_path": "/private/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/tmpx_shqbfa/project/.ai-work/loop-task/PROMPT_s2-a2-implement.md",
+     "reissued": true,
+     "step": "2"
+    },
+    "schema": 1,
+    "slug": "loop-task",
+    "then": "python3 scripts/step_loop.py record loop-task --request s2-a2-implement --agent-id <agentId> --marker <complete|blocked|conflict|partial|none>",
+    "warnings": []
+   },
+   "scratch_base": "dc04082672b7640e2bb5a7ea05a6045fea31d683",
+   "status": {
+    "iterations": {
+     "budget": 9,
+     "used": 5
+    },
+    "outcome": "spawn",
+    "pending_request": "s2-a2-implement",
+    "schema": 1,
+    "selected_step": "2",
+    "slug": "loop-task",
+    "steps": [
+     {
+      "assignee": "implementer",
+      "attempt_cap": 2,
+      "attempts": 1,
+      "commit": "f95478b",
+      "review": "accepted",
+      "step": "1",
+      "verdict": "verified-complete"
+     },
+     {
+      "assignee": "implementer",
+      "attempt_cap": 2,
+      "attempts": 2,
+      "commit": null,
+      "review": null,
+      "step": "2",
+      "verdict": "in-flight"
+     },
+     {
+      "assignee": "implementer",
+      "attempt_cap": 2,
+      "attempts": 0,
+      "commit": null,
+      "review": null,
+      "step": "3",
+      "verdict": "pending"
+     }
+    ],
+    "stop": null,
+    "then": "python3 scripts/step_loop.py record loop-task --request s2-a2-implement --agent-id <agentId> --marker <complete|blocked|conflict|partial|none>"
+   },
+   "written_at": "/var/folders/x5/pt_h187j3px6_b1dh6fc74kr0000gn/T/tmpx_shqbfa/project"
+  }
+ },
+ "slug": "loop-task"
+}

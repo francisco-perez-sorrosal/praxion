@@ -218,7 +218,9 @@ def test_the_stop_names_the_command_that_resumes_the_loop(tmp_path):
 
     stopped = next_action(task)
 
-    assert stopped.stop["resume"] == f"python3 scripts/step_loop.py next {SLUG}"
+    resume = stopped.stop["resume"]
+    assert resume.startswith(f"python3 scripts/step_loop.py next {SLUG}"), resume
+    assert resume.split()[-4:] == ["--repo-root", str(task.root), "--base-ref", task.base], resume
 
 
 def test_a_budget_stop_also_leaves_a_handoff_with_the_resume_command(tmp_path):

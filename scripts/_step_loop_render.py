@@ -23,6 +23,7 @@ from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
 from _plan_steps import CHANGE_TYPES, HEADING_TAG_RE, PlanStep, Routing
 from _step_loop_gate import GateEvidence
+from _step_loop_ownership import own_node_permissions
 from _step_schema import STEP_ID_RE
 
 PROMPT_CEILING = 16_000
@@ -277,6 +278,7 @@ def _slots(inputs: PromptInputs) -> list[_Slot]:
     return [
         lead,
         *follow,
+        ("own-nodes", "", "\n".join(own_node_permissions(step)), ""),
         section("health-guards", "TASK_BRIEF.md", "Health Guards"),
         section("corrections", "WIP.md", "Corrections in force"),
     ]

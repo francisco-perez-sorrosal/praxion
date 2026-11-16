@@ -22,20 +22,12 @@ key, so a run red only by errors still meets `pass>=2 fail=0`; the caller must A
 `classify_run` reads one run's whole output: a derived scope of several invocations is
 merged into one run by the caller, never concatenated raw.
 
-Normative ownership of a failed node -- a `Read-only:` entry owns every node it is a
-prefix of, at a path, `::` or `[` boundary (`a.py::f` owns `a.py::f[x]` but not
-`a.py::fg`). The longest owning entry decides. A node counts as pending only when every
-entry tied for longest belongs to another step that is not done; any other failure is
-a failure, so a tie with the step's own entry stays a failure.
-
 Normative reading of an agent's final text -- its last non-blank line carries one
 terminal marker (`[COMPLETE]`, `[BLOCKED]`, `[CONFLICT]` or `[PARTIAL]`) at its start or
 its end, past any `*`, `_` or backtick emphasis. Two different markers there, or a marker
 elsewhere in the text, read as no marker.
 
-`Ownership.step`, `done_steps` and the map keys share one id form; `step` must be a key of
-the map (a step with no entries maps to `()`).
-
+Who owns a failed node is `_step_loop_ownership.py`'s rule (`Ownership`, a `PendingRule`).
 A goal step has no other owner: the failing nodes of its own check run are its targets, and
 `GoalTargets` pends exactly those, in the check's run and the derived scope's alike. An `ERROR`
 node is never a target -- a collection or fixture error is no failing test -- and stays a
@@ -50,6 +42,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal, Protocol, Union
 
+from _step_loop_ownership import Ownership, entry_owns  # noqa: F401 -- re-exported
 from _step_schema import RED, Counts, NoRun
 
 BY_STEP_LOOP = "by=step-loop"
@@ -66,8 +59,6 @@ _COUNT_RE = re.compile(r"\b(\d+) (passed|failed|skipped|errors?)\b")
 _NO_TESTS_RE = re.compile(r"\bno tests ran\b")
 _NODE_LINE_RE = re.compile(r"^(?P<kind>FAILED|ERROR) (?P<rest>\S.*)$")
 _REASON_SEPARATOR = " - "
-_NODE_BOUNDARIES = ("::", "[")
-_PATH_BOUNDARY = "/"
 
 _MARKERS: Mapping[str, Marker] = {
     "[COMPLETE]": "complete",
@@ -181,50 +172,7 @@ def _cut_reason(rest: str) -> str:
     return rest
 
 
-# --- Who owns a failed node ---
-
-
-def entry_owns(entry: str, node_id: str) -> bool:
-    """Whether `entry` is a prefix of `node_id` at a path, `::` or `[` boundary (`/` only
-    for a bare path entry: inside a node id a slash can only follow `[`)."""
-    if not node_id.startswith(entry):
-        return False
-    rest = node_id[len(entry) :]
-    boundaries = _NODE_BOUNDARIES if "::" in entry else (_PATH_BOUNDARY, *_NODE_BOUNDARIES)
-    return rest == "" or entry.endswith(_PATH_BOUNDARY) or rest.startswith(boundaries)
-
-
-@dataclass(frozen=True)
-class Ownership:
-    """Which step holds each outer-loop test: `step` is the one being gated,
-    `read_only_by_step` maps every plan step to its `Read-only:` entries, and
-    `done_steps` are the steps already complete."""
-
-    step: str
-    read_only_by_step: Mapping[str, tuple[str, ...]]
-    done_steps: frozenset[str]
-
-    def __post_init__(self) -> None:
-        if self.step not in self.read_only_by_step:
-            raise ValueError(f"step {self.step!r} is not a key of the Read-only map")
-
-    def is_pending_error(self, node_id: str) -> bool:
-        """An errored node is owned like a failed one."""
-        return self.is_pending(node_id)
-
-    def is_pending(self, node_id: str) -> bool:
-        """True when only other steps that are not done own `node_id` (longest entry wins)."""
-        claims = [
-            (len(entry), owner)
-            for owner, entries in self.read_only_by_step.items()
-            for entry in entries
-            if entry_owns(entry, node_id)
-        ]
-        if not claims:
-            return False
-        longest = max(length for length, _ in claims)
-        owners = {owner for length, owner in claims if length == longest}
-        return all(owner != self.step and owner not in self.done_steps for owner in owners)
+# --- Who owns a failed node: `Ownership` (re-exported above) or `GoalTargets` ---
 
 
 @dataclass(frozen=True)

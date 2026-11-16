@@ -8,8 +8,8 @@ repository or runs a command.
   the snapshot records it. After the commit its file set must equal the staged files and the
   tree outside them must be unchanged; otherwise the disturbance is reported with both
   snapshots and nothing is unstaged, reset or restored for the caller. Outer-loop files (under
-  `tests/acceptance/` or `tests/e2e/`, or named by any step's `Read-only:`) are withheld
-  whatever the plan declares.
+  `tests/acceptance/` or `tests/e2e/`, or named by any step's `Read-only:` as a bare path) are
+  withheld whatever the plan declares; a node entry withholds nothing.
 * **Scope**: `tree_patch`, the whole tree's difference from `HEAD` (the index untouched), and
   `restore_paths`, which returns a declared scope to `HEAD` and touches nothing else.
 * **Runner**: the `Check:` command and the derived test scope, each held to the bound of the
@@ -39,11 +39,12 @@ import sys
 import tempfile
 import threading
 from collections.abc import Iterable, Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Union
 
 from _git_runner import GIT_TIMEOUT_SECONDS, GitUnavailableError, run_git
+from _step_loop_ownership import OUTER_LOOP_PREFIXES, read_only_entry, withheld  # noqa: F401
 from _step_loop_pocket_runs import (
     CutOff,
     Finished,
@@ -57,7 +58,6 @@ from _step_loop_pocket_runs import (
     with_outcome_reports,
 )
 
-OUTER_LOOP_PREFIXES = ("tests/acceptance/", "tests/e2e/")
 # The commit runs the repository's hooks (about twenty, installing environments on a first
 # run): a bound of its own, not the thirty seconds of plain plumbing.
 COMMIT_TIMEOUT_SECONDS = 600.0
@@ -80,7 +80,6 @@ _DOT_RUN = "..."
 _HOOK_BOOKKEEPING = ("- hook id:", "- exit code:")
 RESOLVER = Path(__file__).resolve().with_name("resolve_test_scope.py")
 _LITERAL_PATHSPEC = ":(literal)"
-_NODE_SEPARATOR = "::"
 _WIDENED = "full"  # the resolver's word for a pocket that runs its whole suite
 _STATUS_PATH_OFFSET = 3  # porcelain v1: two status letters and a space precede the path
 _UNTRACKED_DIRECTORY_MARK = "/"
@@ -266,13 +265,17 @@ def split_outer_loop(
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """(kept, withheld), both normalised: outer-loop files leave the set whatever the plan says.
 
-    `paths` are files (`commit_paths` expands directories first). A `Read-only:` entry is a
-    path, a directory or `path::node`, cut at the first `::` only, so `weird[1].txt` is a path.
+    `paths` are files (`commit_paths` expands directories first). A `Read-only:` entry is read by
+    `_step_loop_ownership.withheld`: a bare path or directory withholds its files, a node entry
+    none.
     """
-    named = tuple(normalise_path(entry.split(_NODE_SEPARATOR, 1)[0], root) for entry in read_only)
+    entries = tuple(
+        replace(entry, path=normalise_path(entry.path, root))
+        for entry in map(read_only_entry, read_only)
+    )
     clean = tuple(normalise_path(p, root) for p in paths)
-    withheld = tuple(p for p in clean if _is_outer_loop(p, named))
-    return tuple(p for p in clean if p not in withheld), withheld
+    left_out = tuple(p for p in clean if withheld(p, entries))
+    return tuple(p for p in clean if p not in left_out), left_out
 
 
 def snapshot_outside(repo: Path, files: frozenset[str]) -> TreeSnapshot:
@@ -397,12 +400,6 @@ def _commit_and_judge(repo: Path, job: _Job) -> CommitOutcome:
     if refused is not None:
         return CommitRefused(refused)
     return _verified(repo, job, expected)
-
-
-def _is_outer_loop(path: str, named: tuple[str, ...]) -> bool:
-    if (path + "/").startswith(OUTER_LOOP_PREFIXES):
-        return True
-    return any(path == one or path.startswith(one + "/") for one in named)
 
 
 def _specs(paths: Iterable[str]) -> tuple[str, ...]:

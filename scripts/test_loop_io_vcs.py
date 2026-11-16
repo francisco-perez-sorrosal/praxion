@@ -144,18 +144,29 @@ def test_outer_loop_directories_are_withheld_whatever_the_plan_says(path: str) -
     "entry",
     [
         "docs/outer.md",
-        "docs/outer.md::check_it",
-        "docs/outer.md::check_it[case 1]",
         "docs/",
         "docs",
         "./docs/outer.md",
-        "docs/../docs/outer.md::check_it",
     ],
 )
 def test_a_read_only_entry_withholds_its_path_in_every_form(entry: str) -> None:
     kept, withheld = split_outer_loop(["docs/outer.md", "src/a.py"], [entry])
 
     assert (kept, withheld) == (("src/a.py",), ("docs/outer.md",))
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "docs/outer.md::check_it",
+        "docs/outer.md::check_it[case 1]",
+        "docs/../docs/outer.md::check_it",
+    ],
+)
+def test_a_node_entry_withholds_no_file(entry: str) -> None:
+    kept, withheld = split_outer_loop(["docs/outer.md", "src/a.py"], [entry])
+
+    assert (kept, withheld) == (("docs/outer.md", "src/a.py"), ())
 
 
 @pytest.mark.parametrize(
@@ -392,9 +403,19 @@ def test_an_outer_loop_file_the_plan_declares_is_never_committed(surrounded: Pat
 def test_a_read_only_entry_of_any_step_keeps_a_file_out_of_the_commit(surrounded: Path) -> None:
     write(surrounded, "b.py", "b = 2\n")
 
-    outcome = commit_paths(surrounded, ["a.py", "b.py"], MESSAGE, read_only=["b.py::test_it"])
+    outcome = commit_paths(surrounded, ["a.py", "b.py"], MESSAGE, read_only=["b.py"])
 
     assert (outcome.withheld, committed_files(surrounded)) == (("b.py",), {"a.py"})
+
+
+def test_a_node_entry_of_any_step_does_not_keep_its_file_out_of_the_commit(
+    surrounded: Path,
+) -> None:
+    write(surrounded, "b.py", "b = 2\n")
+
+    outcome = commit_paths(surrounded, ["a.py", "b.py"], MESSAGE, read_only=["b.py::test_it"])
+
+    assert (outcome.withheld, committed_files(surrounded)) == ((), {"a.py", "b.py"})
 
 
 def test_only_outer_loop_paths_commit_nothing(surrounded: Path) -> None:
@@ -448,9 +469,7 @@ def test_an_outer_loop_directory_declared_alone_commits_nothing(repo: Path) -> N
     )
 
 
-@pytest.mark.parametrize(
-    "entry", ["./tests/test_inner.py::test_it", "tests/test_inner.py", "tests", "tests/../tests/"]
-)
+@pytest.mark.parametrize("entry", ["tests/test_inner.py", "tests", "tests/../tests/"])
 def test_a_read_only_entry_in_any_spelling_keeps_a_declared_directory_file_out(
     repo: Path, entry: str
 ) -> None:
@@ -460,6 +479,17 @@ def test_a_read_only_entry_in_any_spelling_keeps_a_declared_directory_file_out(
     outcome = commit_paths(repo, ["tests", "a.py"], MESSAGE, read_only=[entry])
 
     assert (outcome.files, outcome.withheld) == (("a.py",), ("tests/test_inner.py",))
+
+
+def test_a_node_entry_in_any_spelling_leaves_a_declared_directory_file_in(repo: Path) -> None:
+    write(repo, "tests/test_inner.py", "inner = 2\n")
+    write(repo, "a.py", "a = 2\n")
+
+    outcome = commit_paths(
+        repo, ["tests", "a.py"], MESSAGE, read_only=["./tests/test_inner.py::test_it"]
+    )
+
+    assert (outcome.files, outcome.withheld) == (("a.py", "tests/test_inner.py"), ())
 
 
 def test_a_moved_file_with_identical_content_commits_without_a_false_disturbance(

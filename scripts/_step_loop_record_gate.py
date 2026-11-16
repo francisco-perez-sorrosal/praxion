@@ -20,11 +20,10 @@ from __future__ import annotations
 
 import math
 import os
-import posixpath
 import shlex
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -46,11 +45,13 @@ from _step_loop_io import (
     PocketScope,
     ScopeRuns,
     ScopeUnresolved,
+    check_pocket,
     head_sha,
     paths_differing_from_head,
     run_bounded_check,
     run_derived_scope,
 )
+from _step_loop_ownership import repository_form
 from _step_loop_pocket_runs import (
     CutOff,
     Finished,
@@ -88,7 +89,6 @@ FAILED_LINES_SHOWN = 20
 DERIVED_FILES_SHOWN = 3  # declared files the `Derived from:` line names, the rest only counted
 DERIVED_NAMES_MAX_CHARS = 200  # keeps a green block inside its ceiling whatever the path lengths
 SHORT_SHA_LENGTH = 7
-ROOT_POCKET = "."
 CHECK_OUTPUT = "the Check: run's output"  # where a check's failures beyond the list were shown
 _MORE_FAILURES = "…"
 _HEADING_PREFIX, _RESULT_PREFIX = "## ", "Result:"
@@ -384,6 +384,7 @@ def scope_line(pocket: PocketScope, readings: Sequence[_RunReading]) -> str | No
 
 
 def read_observed(pocket: str, observed: Observed, rule: PendingRule) -> _RunReading:
+    rule = _asked_in(rule, pocket)
     if isinstance(observed, Finished):
         command = shlex.join(observed.argv)
         run = classify_run(command, observed.output, rule)
@@ -413,10 +414,12 @@ def read_observed(pocket: str, observed: Observed, rule: PendingRule) -> _RunRea
 
 
 def _in_pocket(pocket: str, nodes: Sequence[str]) -> tuple[str, ...]:
-    """The node ids as the repository names them: a pocket's runs print theirs relative to it."""
-    if pocket == ROOT_POCKET:
-        return tuple(nodes)
-    return tuple(posixpath.join(pocket, node) for node in nodes)
+    return tuple(repository_form(pocket, node) for node in nodes)
+
+
+def _asked_in(rule: PendingRule, pocket: str) -> PendingRule:
+    """`rule` asked about the ids of `pocket`'s runs; a rule that knows no pockets is asked as is."""
+    return rule.in_pocket(pocket) if isinstance(rule, Ownership) else rule
 
 
 def _unanswered(log: str, rule: PendingRule, known: Sequence[str] = ()) -> tuple[str, ...]:
@@ -462,7 +465,9 @@ def check_run(
     if not isinstance(step.check, Check):
         return GateRun("Check:", NoRun(f"the Check: line cannot be read: {step.check.reason}"))
     ran = bounded_check(repo, run_dir, step.check.command, give_up_at)
-    return classified(ran, rule, step.check.command)
+    pocket = check_pocket(ran.argv)
+    run = classified(ran, _asked_in(rule, pocket), step.check.command)
+    return replace(run, failed_ids=_in_pocket(pocket, run.failed_ids))
 
 
 def bounded_check(repo: Path, run_dir: Path, command: str, give_up_at: float) -> CommandRun:

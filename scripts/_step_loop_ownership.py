@@ -15,7 +15,9 @@ plan says.
 
 Normative ownership of a failed node -- a `Read-only:` entry owns every node it is a
 prefix of, at a path, `::` or `[` boundary (`a.py::f` owns `a.py::f[x]` but not
-`a.py::fg`). The longest owning entry decides. A node counts as pending only when every
+`a.py::fg`). A node id is asked in the repository-relative form a plan's entry spells: a run
+in a non-root pocket prints ids relative to the pocket, so `Ownership.in_pocket` puts the
+pocket's directory in front of them first. The longest owning entry decides. A node counts as pending only when every
 entry tied for longest belongs to another step that is not done; any other failure is
 a failure, so a tie with the step's own entry stays a failure. `Ownership.step`,
 `done_steps` and the map keys share one id form; `step` must be a key of the map (a step
@@ -36,6 +38,7 @@ OUTER_LOOP_PREFIXES = ("tests/acceptance/", "tests/e2e/")
 _NODE_SEPARATOR = "::"
 _NODE_BOUNDARIES = (_NODE_SEPARATOR, "[")
 _PATH_BOUNDARY = "/"
+_ROOT_POCKET = "."
 
 
 # --- One entry, parsed once ---
@@ -109,6 +112,30 @@ class Ownership:
         longest = max(length for length, _ in claims)
         owners = {owner for length, owner in claims if length == longest}
         return all(owner != self.step and owner not in self.done_steps for owner in owners)
+
+    def in_pocket(self, pocket: str) -> PocketOwnership:
+        """This rule asked about node ids as `pocket`'s own runs print them."""
+        return PocketOwnership(self, pocket)
+
+
+@dataclass(frozen=True)
+class PocketOwnership:
+    """`Ownership` for the node ids of one pocket's run, each read in repository form."""
+
+    ownership: Ownership
+    pocket: str
+
+    def is_pending(self, node_id: str) -> bool:
+        return self.ownership.is_pending(repository_form(self.pocket, node_id))
+
+    def is_pending_error(self, node_id: str) -> bool:
+        return self.ownership.is_pending_error(repository_form(self.pocket, node_id))
+
+
+def repository_form(pocket: str, node_id: str) -> str:
+    """`node_id` as the repository names it: a pocket's runs print theirs relative to it."""
+    directory = posixpath.normpath(pocket or _ROOT_POCKET)
+    return node_id if directory == _ROOT_POCKET else posixpath.join(directory, node_id)
 
 
 # --- The commit's reading: which files no step's commit may take ---

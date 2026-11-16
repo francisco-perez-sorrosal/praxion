@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.acceptance.drivers.loop_repairs import without_location
 from tests.acceptance.drivers.step_loop import (
     CONFIG_DIR_VARIABLE,
     END_WAIT_VARIABLE,
@@ -41,7 +42,19 @@ def _normalized(value, *roots: str):
     # `/private` before `/var`), so the shorter one replaced first would leave the prefix behind.
     for root in sorted(set(roots), key=len, reverse=True):
         text = text.replace(root, ROOT_MARK)
-    return json.loads(text)
+    return _without_echo(json.loads(text))
+
+
+def _without_echo(value):
+    """Printed commands are compared without the location options they end with: those are
+    the caller's own words, echoed back, and say nothing of how a record was read."""
+    if isinstance(value, dict):
+        return {key: _without_echo(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_without_echo(item) for item in value]
+    if isinstance(value, str):
+        return without_location(value)
+    return value
 
 
 def _read_back(tmp_path: Path, root: Path, case: str):

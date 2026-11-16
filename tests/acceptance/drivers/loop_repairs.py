@@ -123,6 +123,21 @@ def trailing_location(command: str) -> list[tuple[str, str]]:
     return pairs
 
 
+def without_location(text: str) -> str:
+    """A printed command minus the location options it ends with; any other text unchanged.
+
+    The options echo the caller's own words, so two readers that were called differently
+    print the same command up to them.
+    """
+    try:
+        pairs = trailing_location(text)
+    except ValueError:  # prose with an unbalanced quote is no command
+        return text
+    if not pairs:
+        return text
+    return text[: text.rindex(f" {pairs[0][0]} ")]
+
+
 def as_pairs(options: list[str]) -> list[tuple[str, str]]:
     return list(zip(options[::2], options[1::2], strict=True))
 

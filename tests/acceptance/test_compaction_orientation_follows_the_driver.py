@@ -14,6 +14,7 @@ import re
 import pytest
 
 from tests.acceptance.drivers import compaction_orientation as orientation
+from tests.acceptance.drivers.loop_repairs import without_location
 from tests.acceptance.drivers.step_loop import (
     Step,
     Work,
@@ -54,7 +55,9 @@ def test_the_orientation_names_the_outstanding_request_and_its_record_call(tmp_p
     context = orientation.orient(task.root).context
 
     assert asked.request is not None, asked.doc
-    record_call = asked.doc["then"][asked.doc["then"].index("record ") :]
+    # Up to the location options: each reader echoes the ones it was called with, and the
+    # hook's own status call is not the call that issued the request.
+    record_call = without_location(asked.doc["then"][asked.doc["then"].index("record ") :])
     assert asked.request["id"] in context
     assert record_call in context, context
 

@@ -8,7 +8,7 @@ description: >
   testing infrastructure. Operates at the implementer's pipeline level, receiving
   steps from the implementation-planner. In `Mode: acceptance-design` it designs outer-loop tests from the spec alone.
 tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch
-skills: [software-planning, code-review, refactoring]
+skills: [software-planning, code-review]
 background: true
 model: sonnet
 effort: high
@@ -63,7 +63,7 @@ Before writing tests, detect the project language to load the right test framewo
 4. Identify the test framework in use (`pytest`, `jest`, `vitest`, `cargo test`, `go test`, etc.) from config files and existing tests
 5. Match the project's existing test patterns: directory structure, fixture conventions, assertion style, test naming
 
-The three statically-injected skills (`software-planning`, `code-review`, `refactoring`) are always available. Language skills are loaded on demand based on the project. If the project involves AI agents (detected via agentic SDK dependencies, agent configuration files, or step description mentioning "agent eval"), also load `skills/agent-evals/SKILL.md` for agent-specific evaluation patterns -- non-determinism handling, trajectory evaluation, LLM-as-judge grading, and eval framework selection. If the step writes integration tests against an external API (Stripe, OpenAI, Anthropic, AWS, Railway, Supabase, etc.), verify current endpoint signatures, response shapes, and error codes per [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before designing the test scenarios — contract tests and response fixtures built on stale training data are a recurring source of brittle test suites. If the docs disagree with observed responses (shape drift, missing error codes, failing examples), record the mismatch in `LEARNINGS.md` before finishing the test design phase.
+The skills listed in your `skills:` frontmatter are always available. Language skills are loaded on demand based on the project. If the project involves AI agents (detected via agentic SDK dependencies, agent configuration files, or step description mentioning "agent eval"), also load `skills/agent-evals/SKILL.md` for agent-specific evaluation patterns -- non-determinism handling, trajectory evaluation, LLM-as-judge grading, and eval framework selection. If the step writes integration tests against an external API (Stripe, OpenAI, Anthropic, AWS, Railway, Supabase, etc.), verify current endpoint signatures, response shapes, and error codes per [§ Current docs for external APIs](../skills/software-planning/references/cross-agent-skill-conventions.md#current-docs-for-external-apis) before designing the test scenarios — contract tests and response fixtures built on stale training data are a recurring source of brittle test suites. If the docs disagree with observed responses (shape drift, missing error codes, failing examples), record the mismatch in `LEARNINGS.md` before finishing the test design phase.
 
 ## Input Protocol
 
@@ -219,6 +219,10 @@ When the step involves refactoring existing tests (not writing new ones), apply 
 **File-disjointness contract preserved.** You write test files only, never production code. The implementer's restructuring steps that follow yours work on disjoint file sets per the standard parallel-step contract. If a characterization test you intend to write would require touching production code (e.g., introducing a test seam), report `[BLOCKED]` and surface the seam need — the implementer or architect resolves it before you continue. Do not add the seam yourself.
 
 **Characterization-test discipline** (per `skills/refactoring/SKILL.md` — "write characterization tests first" before restructuring untested code): tests pin observable behavior through the public API, not internal structure; assertions must catch real regressions, not coincidental shape preservation; if you cannot characterize a behavior because the surface is genuinely undefined, surface it in `LEARNINGS.md ### Testability Feedback` so the architect or implementer can refine the public contract before the refactor proceeds. Tests written here become the regression detector that every subsequent restructuring step in the mini-pipeline must pass.
+
+<!-- codex-wrapper:begin -->
+A step whose delegation carries `[Phase: Refactoring]` is verified against `skills/refactoring/SKILL.md`. Where that skill's text is not already in your context (a host with no spawn-time delivery, or a delivery that failed), read it before starting the step.
+<!-- codex-wrapper:end -->
 
 **Subsequent steps.** After your characterization-tests-first step, you pair with the implementer on each refactor step per the standard BDD/TDD execution rule (tests first on disjoint file sets, integration checkpoint at the end). The acceptance criteria you validate are `PRE_REFACTOR_PLAN.md § Acceptance Criteria` (the verifier reads the same source when invoked in pre-refactor mode), not `SYSTEMS_PLAN.md § Acceptance Criteria`.
 

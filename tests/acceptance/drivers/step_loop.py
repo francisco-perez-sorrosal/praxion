@@ -57,7 +57,13 @@ INTENT_TEXT = "The loop widget exists so the acceptance suite can drive a plan (
 GOAL_TEXT = "Build the loop widget one step at a time (plan goal 53)."
 
 EXIT_CODES = frozenset({0, 1, 2, 3, 4})
-_EXIT_BY_OUTCOME = {"spawn": 0, "complete": 0, "needs-human": 2, "budget-exhausted": 3}
+_EXIT_BY_OUTCOME = {
+    "spawn": 0,
+    "complete": 0,
+    "withdrawn": 0,
+    "needs-human": 2,
+    "budget-exhausted": 3,
+}
 _COMMAND_TIMEOUT = 900
 
 

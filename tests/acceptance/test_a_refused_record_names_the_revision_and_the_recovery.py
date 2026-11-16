@@ -4,7 +4,7 @@ Revising a step block of IMPLEMENTATION_PLAN.md while a request is outstanding m
 the loop no longer issue that request, so its `record` is refused with
 `request-not-pending` and exit 4. The refusal keeps that code and status and adds the
 cause, the recovery (put the revised block back as it was when the request was issued,
-record the request, then re-apply the revision and run `next`) and the order that
+record the request, then re-apply the revision while no request is out and run `next`) and the order that
 avoids it (record the outstanding request before revising any step block). The
 refusal of a request that is neither pending nor recorded is unchanged.
 """
@@ -24,12 +24,14 @@ from tests.acceptance.drivers.step_loop import (
     new_agent_id,
     next_action,
     record,
+    record_not_started,
     revise_step,
     work_on,
 )
 from tests.acceptance.drivers.step_loop_recovery import missing_patterns, plan_text, put_plan
 
 REVISION = "Write `src/step_1.py` returning the step id, revised while its request was out."
+TAKEN_BACK = "the plan is amended before this request starts"
 
 CAUSE = (r"IMPLEMENTATION_PLAN\.md", r"revis", r"outstanding|pending|issued|\bout\b")
 RECOVERY = (
@@ -78,11 +80,15 @@ def test_following_the_recovery_records_the_request_and_resumes_the_loop(tmp_pat
     put_plan(task, as_issued)
 
     recorded = record(task, request["id"], agent_id=agent_id, marker="complete")
+    # That record issues the next step's request. A plan is amended only while no request is
+    # out, so the request no agent has started is taken back before the revision goes back in.
+    taken_back = record_not_started(task, recorded.request["id"], TAKEN_BACK)
     put_plan(task, revised)
     resumed = next_action(task)
 
     assert recorded.exit_code == 0, recorded.doc
     assert recorded.recorded["request"] == request["id"]
+    assert taken_back.error is None, taken_back.doc
     assert resumed.exit_code == 0, resumed.doc
 
 

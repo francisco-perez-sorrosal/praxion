@@ -44,6 +44,11 @@ def _driven_loop(tmp_path):
     return task, asked
 
 
+def _the_hooks_status_call(task) -> tuple[tuple[str, ...]]:
+    """One call, the one the hook makes today to read the position of the task."""
+    return (orientation.hook_status_call(task.slug, task.root),)
+
+
 def _stale_current_step(task) -> str:
     wip = task.wip_path.read_text(encoding="utf-8")
     return wip.split("## Current Step", 1)[1].strip().splitlines()[0]
@@ -52,8 +57,10 @@ def _stale_current_step(task) -> str:
 def test_the_orientation_names_the_outstanding_request_and_its_record_call(tmp_path):
     task, asked = _driven_loop(tmp_path)
 
-    context = orientation.orient(task.root).context
+    result = orientation.orient_over_the_real_status(task.root, task.slug)
 
+    context = result.context
+    assert result.driver_calls == _the_hooks_status_call(task)
     assert asked.request is not None, asked.doc
     # Up to the location options: each reader echoes the ones it was called with, and the
     # hook's own status call is not the call that issued the request.
@@ -68,8 +75,10 @@ def test_the_orientation_names_the_step_the_driver_acts_on_with_its_state_and_at
     step = next(s for s in state["steps"] if s["step"] == "5")
     assert asked.request is not None, asked.doc
 
-    context = orientation.orient(task.root).context
+    result = orientation.orient_over_the_real_status(task.root, task.slug)
 
+    context = result.context
+    assert result.driver_calls == _the_hooks_status_call(task)
     assert re.search(r"\b5\b", context), context
     assert step["verdict"] in context, context
     assert re.search(rf"\b{step['attempts']}\s*(/|of)\s*{asked.request['attempt_cap']}\b", context)
@@ -80,8 +89,10 @@ def test_the_orientation_names_the_step_the_driver_acts_on_with_its_state_and_at
 def test_the_orientation_never_reports_the_step_records_stale_position(tmp_path):
     task, _ = _driven_loop(tmp_path)
 
-    context = orientation.orient(task.root).context
+    result = orientation.orient_over_the_real_status(task.root, task.slug)
 
+    context = result.context
+    assert result.driver_calls == _the_hooks_status_call(task)
     assert _stale_current_step(task) not in context
     assert STALE_OPEN_ITEM not in context
     assert STALE_NEXT_ACTION not in context
@@ -90,9 +101,10 @@ def test_the_orientation_never_reports_the_step_records_stale_position(tmp_path)
 def test_the_orientation_keeps_its_cap_its_pointers_and_its_withheld_words(tmp_path):
     task, _ = _driven_loop(tmp_path)
 
-    result = orientation.orient(task.root)
+    result = orientation.orient_over_the_real_status(task.root, task.slug)
 
     context = result.context
+    assert result.driver_calls == _the_hooks_status_call(task)
     assert result.exit_code == 0
     assert len(context.encode("utf-8")) <= orientation.CAP_BYTES
     handoff = context.index(".ai-work/loop-task/HANDOFF.md")
@@ -109,8 +121,10 @@ def test_a_stopped_loop_is_reported_as_stopped_with_its_cause(tmp_path):
         attempt(task, Work(passes=False))
     stop = status(task, as_json=True).json()["stop"]
 
-    context = orientation.orient(task.root).context
+    result = orientation.orient_over_the_real_status(task.root, task.slug)
 
+    context = result.context
+    assert result.driver_calls == _the_hooks_status_call(task)
     assert "stopped" in context.lower(), context
     assert stop["cause"] in context, context
 
@@ -120,8 +134,10 @@ def test_a_complete_loop_is_reported_as_complete(tmp_path):
     attempt(task, Work())
     assert status(task, as_json=True).json()["outcome"] == "complete"
 
-    context = orientation.orient(task.root).context
+    result = orientation.orient_over_the_real_status(task.root, task.slug)
 
+    context = result.context
+    assert result.driver_calls == _the_hooks_status_call(task)
     assert "complete" in context.lower(), context
     assert _stale_current_step(task) not in context
 

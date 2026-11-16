@@ -12,7 +12,7 @@ Bound here, because the specification or the base commit fixes them:
   plugin tree the hook runs from (`<plugin root>/scripts/step_loop.py`), so a copy of that
   tree whose driver is removed or replaced by a stand-in shows what an unreadable position
   does; the copy is exported as `CLAUDE_PLUGIN_ROOT` and nothing else on `PATH` names a
-  driver;
+  driver; a stand-in that replays the real driver's answer also records the call it got;
 - the orientation outside a step loop is frozen, byte for byte, in
   `tests/acceptance/fixtures/compaction_orientation_before.json`: what the hook printed at
   the base commit for each scenario `OUTSIDE_A_LOOP` builds;
@@ -28,13 +28,15 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from tests.acceptance.drivers import process_probe
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 HOOK_RELATIVE = Path("hooks") / "inject_compaction_orientation.py"
+DRIVER_RELATIVE = Path("scripts") / "step_loop.py"
+DRIVER_ANSWER_TIMEOUT_SECONDS = 300  # the real driver's answer is read outside the hook's bound
 FROZEN = REPO_ROOT / "tests" / "acceptance" / "fixtures" / "compaction_orientation_before.json"
 CAP_BYTES = 1024
 WITHHELD_WORDS = ("spawn", "commit", "proceed to verification")
@@ -59,6 +61,7 @@ class Orientation:
     stdout: str
     seconds: float
     probe: process_probe.Probe
+    driver_calls: tuple[tuple[str, ...], ...] = ()  # argument vectors a replaying driver recorded
 
     @property
     def context(self) -> str:
@@ -70,23 +73,9 @@ def orient(
     project: Path, *, plugin_root: Path = REPO_ROOT, home: Path | None = None
 ) -> Orientation:
     """Run the orientation after a compaction in `project`, from `plugin_root`."""
-    workspace = project.parent
-    probe = process_probe.install(workspace / "orientation-probe")
+    probe = process_probe.install(project.parent / "orientation-probe")
     probe.forget()
-    env = {
-        k: v
-        for k, v in os.environ.items()
-        if not k.startswith(("CLAUDE", "PRAXION_", "PYTHON", "VIRTUAL_ENV", "GIT_"))
-    }
-    env.update(
-        {
-            "PATH": os.pathsep.join([str(Path(sys.executable).parent), "/usr/bin", "/bin"]),
-            "HOME": str(home or workspace / "home"),
-            "CLAUDE_PLUGIN_ROOT": str(plugin_root),
-            "CLAUDE_PROJECT_DIR": str(project),
-            **probe.env(),
-        }
-    )
+    env = {**_hook_environment(project, plugin_root, home), **probe.env()}
     started = time.monotonic()
     try:
         result = subprocess.run(
@@ -103,6 +92,68 @@ def orient(
     return Orientation(result.returncode, result.stdout, time.monotonic() - started, probe)
 
 
+def _hook_environment(project: Path, plugin_root: Path, home: Path | None) -> dict[str, str]:
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith(("CLAUDE", "PRAXION_", "PYTHON", "VIRTUAL_ENV", "GIT_"))
+    }
+    env.update(
+        {
+            "PATH": os.pathsep.join([str(Path(sys.executable).parent), "/usr/bin", "/bin"]),
+            "HOME": str(home or project.parent / "home"),
+            "CLAUDE_PLUGIN_ROOT": str(plugin_root),
+            "CLAUDE_PROJECT_DIR": str(project),
+        }
+    )
+    return env
+
+
+# -- The real driver's answer, replayed ---------------------------------------------------------
+#
+# The hook gives the driver `STATUS_TIMEOUT_SECONDS` to answer, and a saturated machine can
+# spend that on the driver's start alone. A scenario about what the hook makes of the driver's
+# answer therefore takes the answer first, unbounded, and has the hook read it from a stand-in
+# that prints it; the stand-in records the call it received, so the scenario can also say
+# the hook asked for what it asked for.
+
+
+def hook_status_call(slug: str, project: Path) -> tuple[str, ...]:
+    """The arguments the hook gives the driver to read the position of task `slug`."""
+    return ("status", slug, "--json", "--worktree-root", str(project))
+
+
+def orient_over_the_real_status(project: Path, slug: str) -> Orientation:
+    """Run the orientation over what the real driver's `status` prints for `project`'s task."""
+    call = hook_status_call(slug, project)
+    answer = subprocess.run(
+        [sys.executable, str(REPO_ROOT / DRIVER_RELATIVE), *call],
+        capture_output=True,
+        text=True,
+        cwd=project,
+        env=_hook_environment(project, REPO_ROOT, None),
+        timeout=DRIVER_ANSWER_TIMEOUT_SECONDS,
+    )
+    calls_file = project.parent / "driver-calls.jsonl"
+    plugin = _plugin_copy(
+        project.parent / "plugin-replaying-the-driver",
+        _replaying_driver(answer.stdout, answer.returncode, calls_file),
+    )
+    oriented = orient(project, plugin_root=plugin)
+    recorded = calls_file.read_text(encoding="utf-8").splitlines() if calls_file.exists() else []
+    return replace(oriented, driver_calls=tuple(tuple(json.loads(line)) for line in recorded))
+
+
+def _replaying_driver(stdout: str, exit_code: int, calls_file: Path) -> str:
+    return (
+        "import json, sys\n"
+        f"with open({str(calls_file)!r}, 'a', encoding='utf-8') as calls:\n"
+        "    calls.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        f"sys.stdout.write({stdout!r})\n"
+        f"sys.exit({exit_code})\n"
+    )
+
+
 # -- A plugin tree whose driver cannot be read ---------------------------------------------
 
 DRIVER_STAND_INS: dict[str, str | None] = {
@@ -115,16 +166,20 @@ DRIVER_STAND_INS: dict[str, str | None] = {
 
 def plugin_copy_with_driver(workspace: Path, stand_in: str) -> Path:
     """A copy of the plugin's hooks and scripts whose `scripts/step_loop.py` is `stand_in`."""
-    root = workspace / f"plugin-{stand_in.replace(' ', '-')}"
+    return _plugin_copy(
+        workspace / f"plugin-{stand_in.replace(' ', '-')}", DRIVER_STAND_INS[stand_in]
+    )
+
+
+def _plugin_copy(root: Path, driver_text: str | None) -> Path:
     ignore = shutil.ignore_patterns("__pycache__", "*.pyc", "project_metrics", "gate_probes")
     for tree in ("hooks", "scripts"):
         shutil.copytree(REPO_ROOT / tree, root / tree, ignore=ignore)
-    driver = root / "scripts" / "step_loop.py"
-    text = DRIVER_STAND_INS[stand_in]
-    if text is None:
+    driver = root / DRIVER_RELATIVE
+    if driver_text is None:
         driver.unlink()
     else:
-        driver.write_text(text, encoding="utf-8")
+        driver.write_text(driver_text, encoding="utf-8")
     return root
 
 

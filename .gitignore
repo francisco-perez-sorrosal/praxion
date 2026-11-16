@@ -78,7 +78,10 @@ tmp/
 **/.claude/settings.local.json
 
 # Personal, uncommitted project instructions (Claude Code loads the file at
-# launch beside CLAUDE.md). It exists only in the checkout it was written in.
+# launch beside CLAUDE.md). Ignored so one is never committed. Do not keep one
+# at this repository's root: the root is also the plugin root, where
+# `claude plugin validate` warns on the file and the plugin-validation
+# acceptance test admits only the known warnings.
 CLAUDE.local.md
 
 # Environment files (secrets)

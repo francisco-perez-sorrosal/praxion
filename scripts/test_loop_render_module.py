@@ -621,7 +621,7 @@ CAUSES = {
     "attempts-exhausted", "stalled", "blocked-marker", "conflict-marker", "human-verdict",
     "unnamed-attempts", "review-revised-twice", "review-unfinished", "revision-failed",
     "review-without-work", "not-driven", "dependency-defect", "commit-disturbed-tree", "loop-state-defect",
-    "iteration-budget", "files-glob",
+    "iteration-budget", "files-glob", "request-outstanding", "attempts-disagree",
 }  # fmt: skip
 
 

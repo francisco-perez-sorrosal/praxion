@@ -3,7 +3,7 @@
 The arguments come in through `parse`, which refuses a bad call as a `CallerError`. Then pure:
 the loop's decision and its inputs come in; the JSON envelope, its exit code, the stderr
 lines and the `status` object and table go out. Nothing here reads a file or the clock, so a
-stop repeats byte for byte. An envelope is built only by the four constructors below, one per
+stop repeats byte for byte. An envelope is built only by the five constructors below, one per
 kind of outcome, so a field is present exactly when its outcome says it is.
 """
 
@@ -24,6 +24,8 @@ from _step_loop_action import (
     Stop,
     iteration_budget,
     iterations_used,
+    outstanding_id,
+    read_outstanding,
 )
 from _step_loop_render import Invocation, PriorAttempt, SpawnRequest, StopView
 from _step_loop_review import (
@@ -66,7 +68,13 @@ RUN_DEFAULT_MAX_TURNS = 40  # one unit of work: the 30-45 tool calls a step is s
 RUN_DEFAULT_MAX_BUDGET_USD = 2.00  # a fuse, not an estimate: an iteration is expected at $0.3-$1
 MARKERS = ("complete", "blocked", "conflict", "partial", "none")
 RECORD_PLACEHOLDERS = "--agent-id <agentId> --marker <complete|blocked|conflict|partial|none>"
-EXIT_BY_OUTCOME = {"spawn": 0, "complete": 0, "needs-human": 2, "budget-exhausted": 3}
+EXIT_BY_OUTCOME = {
+    "spawn": 0,
+    "withdrawn": 0,
+    "complete": 0,
+    "needs-human": 2,
+    "budget-exhausted": 3,
+}
 EXIT_CALLER_ERROR, EXIT_INTERNAL = 4, 1
 INTERNAL = "internal"
 _REVIEW_WORDS = {
@@ -210,7 +218,7 @@ def parse(argv: Sequence[str], description: str | None) -> argparse.Namespace:
     return args
 
 
-# --- The four constructors, one per kind of outcome ----------------------------------------
+# --- The five constructors, one per kind of outcome ----------------------------------------
 
 
 def _envelope(frame: Frame, outcome: str, **parts: Any) -> dict[str, Any]:
@@ -249,6 +257,12 @@ def record_command(slug: str, request_id: str, invoke: str | Invocation) -> str:
     return Invocation.of(invoke).command(
         "record", slug, "--request", request_id, RECORD_PLACEHOLDERS
     )
+
+
+def withdrawn_envelope(frame: Frame, invoke: str | Invocation) -> dict[str, Any]:
+    """A request was taken back and none is issued: `then` is the call that continues the loop,
+    and until it runs no request is out, so a plan block may be amended."""
+    return _envelope(frame, "withdrawn", then=Invocation.of(invoke).command("next", frame.slug))
 
 
 def complete_envelope(frame: Frame) -> dict[str, Any]:
@@ -335,6 +349,10 @@ def spawn_line(request: SpawnRequest, counts: Iterations) -> str:
     )
 
 
+def withdrawn_line(request: str, then: str) -> str:
+    return f"{SUMMARY_PREFIX}{request} taken back; no request is out. To continue: {then}"
+
+
 def complete_line(steps: Sequence[PlanStep], counts: Iterations) -> str:
     driven = sum(isinstance(step.assignee, Implementer) for step in steps)
     return (
@@ -370,7 +388,9 @@ def status_object(
     stop: Mapping[str, Any] | None,
     invoke: str | Invocation,
 ) -> dict[str, Any]:
-    pending = action.key.id if isinstance(action, Spawn) and action.reissued else None
+    pending = outstanding_id(read_outstanding(inputs))
+    if pending is None and isinstance(action, Spawn) and action.reissued:
+        pending = action.key.id  # a review its file shows requested, with no line naming it
     used, budget = iterations_of(inputs)
     return {
         "schema": SCHEMA,

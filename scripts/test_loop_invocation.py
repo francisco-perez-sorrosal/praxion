@@ -152,15 +152,15 @@ def test_a_stop_view_given_a_plain_string_prints_what_it_always_printed():
 # --- drive ----------------------------------------------------------------------------------
 
 
-def test_drive_by_default_prints_a_then_that_ends_at_the_request_id_and_its_placeholders(tmp_path):
+def test_drive_by_default_ends_a_withdrawal_on_a_then_naming_next_without_the_location(tmp_path):
     root = build(tmp_path, plan())
     observed = Observed()
 
     step_loop.drive(NeverStarts(), SLUG, where(root), observe=observed)
 
     ((_, _, doc),) = observed.calls
-    assert doc["then"].startswith(f"{PROGRAM} record {SLUG} --request s1-a1-implement --agent-id")
-    assert "--repo-root" not in doc["then"]
+    assert doc["outcome"] == "withdrawn"
+    assert doc["then"] == f"{PROGRAM} next {SLUG}"
 
 
 def test_drive_with_echo_ends_a_spawns_then_with_the_location(tmp_path):

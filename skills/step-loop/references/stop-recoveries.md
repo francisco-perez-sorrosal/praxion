@@ -49,11 +49,16 @@ Never edit the block of a step the loop has already verified. Its verified recor
 
 ## Putting a step ahead of the next
 
-To run a step before the one `next` would issue, change the plan before the `record` that would issue that next one. This is a workaround until the driver withdraws and re-issues a request cleanly:
+A plan block is amended while no request is out. To run a step before the one `next` would issue, take that request back first: `record --request <id> --not-started "<reason>"` prints `withdrawn` and issues nothing. Insert or revise the block, then run the `next` its `then` names; it issues exactly one request, for the step the plan now puts first.
 
-- A withdrawn request (`record --not-started`) is issued again at once.
-- After a plan change the withdrawal is refused, and `next` then issues the inserted step while the other is still marked outstanding. Two outstanding lines stop every call, `record` included.
+- A `next` made after the plan changed while a request is out stops with `request-outstanding`, naming the request. Take it back with `--not-started` if no agent started on it, else record its return; then run `next` again.
+- A request whose step's block was revised after its series' records is refused by a return's `record`: put the block back as it was, record the return, then re-apply the revision.
+- Declared limit: a block revised while its series' first request is out is not seen, and `next` issues the stale request again. Withdraw that request before revising the block.
 - The blocks of later steps can be amended freely while an earlier request is out.
+
+## An attempts line that disagrees with its request
+
+`attempts-disagree` means an `Attempts:` line in `WIP.md` names a request whose attempt (`-a<n>-`) is not the line's own `count=`; a hand edit or a stale line does that. Neither `next` nor `record` acts on it. Correct the line so the count is the request's attempt (or remove its `request=` when no agent ran it), then run `next`.
 
 ## A warning that a file was left uncommitted
 

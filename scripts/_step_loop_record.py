@@ -51,7 +51,16 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
 from _loop_fields import GoalBudget, OutstandingAttempt  # noqa: E402
 from _plan_steps import PlanStep  # noqa: E402
-from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
+from _step_loop_action import (  # noqa: E402
+    Current,
+    Malformed,
+    Miscounted,
+    OutstandingReading,
+    Several,
+    Spawn,
+    Superseded,
+    read_outstanding,
+)
 from _step_loop_files import (  # noqa: E402
     STEP_LABEL,
     agent_stopped,
@@ -89,7 +98,13 @@ from _step_loop_record_gate import (  # noqa: E402
     read_verdict,
     run_gate,
 )
-from _step_loop_render import SpawnRequest, commit_message, spawn_request  # noqa: E402
+from _step_loop_render import (  # noqa: E402
+    RequestKey,
+    SpawnRequest,
+    commit_message,
+    parse_request_id,
+    spawn_request,
+)
 from _step_loop_review import file_verdict, review_record  # noqa: E402
 from _step_loop_settle import (  # noqa: E402
     PROMPT_FILE,
@@ -269,10 +284,11 @@ def record_review(
 
 
 def withdraw_request(task: TaskView, request: str) -> Taken:
-    """Take back a request whose Agent call never started: the `Attempts:` line returns to
-    what it was before the write-ahead and the prompt file goes, so the next `next` writes
-    both again byte for byte. Refused when a transcript naming the request exists."""
-    spawn = _pending(task.inputs, request)
+    """Take back a request whose Agent call never started, whatever the plan now says: the
+    `Attempts:` line returns to what it was before the write-ahead and the prompt file goes, so
+    the next `next` writes both again byte for byte unless the plan was amended in between.
+    Refused when a transcript naming the request exists."""
+    step_id, key = _withdrawable(task.inputs, request)
     prompt = task.dir / PROMPT_FILE.format(request)
     since = prompt.stat().st_mtime if prompt.exists() else float("-inf")
     if find_request_transcript(request, since) is not None:
@@ -281,10 +297,24 @@ def withdraw_request(task: TaskView, request: str) -> Taken:
             f"record failed because an agent was started on {request}. To fix: report its"
             " agentId and marker once it ends, instead of --not-started.",
         )
-    outstanding = cast(OutstandingAttempt, task.inputs.attempts[spawn.step.id])
-    withdraw_line(task.dir / WIP_FILE, spawn.step.id, outstanding, spawn.key.kind)
+    outstanding = cast(OutstandingAttempt, task.inputs.attempts[step_id])
+    withdraw_line(task.dir / WIP_FILE, step_id, outstanding, key.kind)
     prompt.unlink(missing_ok=True)
-    return Taken(withdrawn_object(request), spawn.step.id)
+    return Taken(withdrawn_object(request), step_id)
+
+
+def _withdrawable(inputs: LoopInputs, request: str) -> tuple[str, RequestKey]:
+    """The step and key of `request` when the reading holds it out with a count that can be
+    restored: a current or superseded request, or a member of several whose id names its step."""
+    reading = read_outstanding(inputs)
+    if isinstance(reading, (Current, Superseded)) and reading.key.id == request:
+        return reading.step, reading.key
+    if isinstance(reading, Several):
+        for step_id, named in reading.requests:
+            key = parse_request_id(named)
+            if named == request and key is not None and key.step == step_id:
+                return step_id, key
+    raise _not_outstanding(inputs, reading, request)
 
 
 def withdrawn_object(request: str) -> dict[str, Any]:
@@ -321,18 +351,45 @@ def require_known(inputs: LoopInputs, request: str) -> None:
 
 
 def _pending(inputs: LoopInputs, request: str) -> Spawn:
-    """The spawn the loop reissues for `request`: it names the step and the request's key."""
-    action = next_action(inputs)
-    if isinstance(action, Spawn) and action.reissued and action.key.id == request:
-        return action
-    found = f"stops ({action.cause})" if isinstance(action, Stop) else "does not reissue it"
+    """The spawn whose return `record` takes back: a current request, or a superseded one whose
+    step's block still holds its series, so the return is gated against the block it was for."""
+    reading = read_outstanding(inputs)
+    if not (isinstance(reading, (Current, Superseded)) and reading.key.id == request):
+        raise _not_outstanding(inputs, reading, request)
+    if isinstance(reading, Current) or reading.block_kept:
+        return Spawn(_plan_step(inputs, reading.step), reading.key, reissued=True)
     raise RecordRefusedError(
         "request-not-pending",
-        f"record failed because the loop {found} for {request}. Revising any step block of"
-        " IMPLEMENTATION_PLAN.md while a request is outstanding produces this refusal. To fix: put"
-        " the revised block back as it was when the request was issued, record the request, then"
-        " re-apply the revision and run next; if no block was revised, run status and resolve it."
-        " To avoid it, record the outstanding request before revising any step block.",
+        f"record failed because the loop no longer issues {request}. Revising any step block of"
+        " IMPLEMENTATION_PLAN.md while a request is outstanding produces this refusal. To fix:"
+        " put the revised block back as it was when the request was issued, record the request,"
+        " then re-apply the revision and run next. To avoid it, record the outstanding request"
+        " before revising any step block.",
+    )
+
+
+def _not_outstanding(
+    inputs: LoopInputs, reading: OutstandingReading, request: str
+) -> RecordRefusedError:
+    """The refusal of a request the reading holds out as nothing to take back: a line that
+    disagrees with itself (its count restored would be a lie), or another request out."""
+    if isinstance(reading, (Malformed, Miscounted)) and reading.request == request:
+        count = inputs.attempts[reading.step].count
+        what = (
+            "whose attempt is not the line's own"
+            if isinstance(reading, Miscounted)
+            else "which is no request of that step's series at"
+        )
+        return RecordRefusedError(
+            "request-not-pending",
+            f"record failed because the Attempts: line of {STEP_LABEL}{reading.step} names"
+            f" {request}, {what} count={count}; nothing was written. To fix: correct the line"
+            " in WIP.md, then run status.",
+        )
+    return RecordRefusedError(
+        "request-not-pending",
+        f"record failed because {request} is not the outstanding request; nothing was written."
+        " To fix: run status, and record the request it names.",
     )
 
 

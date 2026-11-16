@@ -253,7 +253,9 @@ def test_the_withdrawal_envelope_is_the_next_action_with_a_recorded_object_and_n
         "not-started",
         False,
     )
-    assert json.loads(reply.stdout)["request"]["id"] == request["id"]
+    printed = json.loads(reply.stdout)
+    assert (printed["outcome"], "request" in printed) == ("withdrawn", False)
+    assert printed["then"].endswith(f" next {SLUG}")
 
 
 def test_a_replay_of_the_capped_attempt_settles_the_replan_and_the_stop_carries_it(tmp_path):

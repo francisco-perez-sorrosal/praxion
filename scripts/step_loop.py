@@ -30,11 +30,12 @@ constructor per outcome in `_step_loop_cli.py`; `record` adds `recorded` unless 
 `status` prints a table, or with `--json` its own object.
 stderr: lines that begin `step_loop: ` (a summary, warnings, and the stop block on a stop).
 
-Outcome and exit code: spawn or complete 0; needs-human 2 (a stalled goal among its causes);
-budget-exhausted 3; an error 4, or 1 for the code `internal`. Outcome precedence: complete, then
-needs-human, then budget-exhausted, then spawn. Error codes: usage, missing-artifact,
-request-not-pending, not-started-but-ran, agent-not-found, agent-not-for-request, agent-running,
-gate-running, worker-not-started (`run`), internal.
+Outcome and exit code: spawn, withdrawn or complete 0; needs-human 2 (a stalled goal among its
+causes); budget-exhausted 3; an error 4, or 1 for the code `internal`. `withdrawn` is printed by
+`record --not-started` alone: it carries `recorded` and a `then` naming `next`, and no request.
+Outcome precedence: complete, then needs-human, then budget-exhausted, then spawn. Error codes:
+usage, missing-artifact, request-not-pending, not-started-but-ran, agent-not-found,
+agent-not-for-request, agent-running, gate-running, worker-not-started (`run`), internal.
 
 Guarantees:
 * A spawn that is new has its attempt written to `WIP.md` (`- Attempts: Step <id> count=<n>
@@ -45,6 +46,11 @@ Guarantees:
 * No request exceeds the attempt cap. A stop leaves `HANDOFF.md` whose section 2 names it.
 * `record` gates, commits and records an ended agent's return once per request (see
   `_step_loop_record.py`); a request neither pending nor recorded is refused (exit 4).
+* At most one request is out. `record --not-started` takes the outstanding request back whatever
+  the plan now says and issues none, so between it and the `next` its `then` names no request is
+  out and a plan block may be amended; left alone, that `next` issues the same attempt again.
+  A `next` made while a request is out and the plan issues another first stops
+  (`request-outstanding`) naming the request and the record call that takes it back.
 
 `then` and a stop's `resume` echo how this command was started: `step_loop.py` when its
 directory is a `PATH` entry, else `python3 scripts/step_loop.py`.
@@ -77,8 +83,9 @@ from _step_loop_files import (
     iteration_patches,
     latest_gate_evidence,
     latest_reading,
-    set_attempts_line,
     snapshot_requests,
+    with_attempts_line,
+    write_atomic,
     write_prompt,
     write_stop_handoff,
 )
@@ -95,6 +102,7 @@ from _step_loop_render import (
     stop_stderr,
 )
 from _step_loop_state import (
+    STEP_LABEL,
     LoopInputs,
     Marked,
     request_kind,
@@ -104,6 +112,7 @@ from _step_loop_state import (
     wants_outside_work,
     work_start,
 )
+from _step_schema import checklist_step_id
 from iteration_ledger import read_ledger
 from reconcile_pipeline_state import reconcile
 
@@ -328,7 +337,27 @@ def _write_ahead(task: Task, action: Spawn) -> None:
     series (a plan revision's fresh series restarts at 1); a review or revise keeps the count."""
     key, existing = action.key, task.inputs.attempts.get(action.step.id)
     count = key.attempt if key.kind == "implement" or existing is None else existing.count
-    set_attempts_line(task.dir / WIP_FILE, action.step.id, OutstandingAttempt(count, key.id))
+    wip = task.dir / WIP_FILE
+    listed = with_checklist_line(wip.read_text("utf-8"), action.step, task.inputs.steps)
+    attempt = OutstandingAttempt(count, key.id)
+    write_atomic(wip, with_attempts_line(listed, action.step.id, attempt))
+
+
+def with_checklist_line(wip_text: str, step: PlanStep, steps: Sequence[PlanStep]) -> str:
+    """The WIP text with a checklist line for `step`. A step put into the plan ahead of another
+    has none, and the reconciler judges only the steps WIP lists, so its line goes in front of
+    the line of the first later step that has one; with no such line the text is unchanged."""
+    lines = wip_text.split("\n")
+    claimed = [checklist_step_id(line) for line in lines]
+    if STEP_LABEL + step.id in claimed:
+        return wip_text
+    later = (STEP_LABEL + s.id for s in steps[steps.index(step) + 1 :])
+    at = next((claimed.index(label) for label in later if label in claimed), None)
+    if at is None:
+        return wip_text
+    indent = lines[at][: len(lines[at]) - len(lines[at].lstrip())]
+    lines.insert(at, f"{indent}- [ ] {STEP_LABEL}{step.id}: {step.title}")
+    return "\n".join(lines)
 
 
 def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:
@@ -353,6 +382,10 @@ def run_record(task: Task, args: argparse.Namespace, invoke: Invocation) -> Repl
         )
     except rec.RecordRefusedError as refused:
         raise CallerError(refused.code, refused.message, cli.iterations_of(task.inputs)) from None
+    if args.not_started is not None:  # nothing is issued: the plan may be amended before `next`
+        frame = cli.Frame(task.slug, cli.iterations_of(task.inputs), took.warnings, took.recorded)
+        doc = cli.withdrawn_envelope(frame, invoke)
+        return Reply(doc, (cli.withdrawn_line(args.request, doc["then"]),))
     return run_next(read_task(args), args, invoke, took)
 
 
@@ -430,14 +463,14 @@ def drive(
     echo: bool = False,
     observe: Observer | None = None,
 ) -> Mapping[str, Any]:
-    """Relay `next` and `record` through `spawner` until the outcome is not a spawn, or until a
-    request never started (the withdrawal's envelope returns: whether to retry is the caller's).
+    """Relay `next` and `record` through `spawner` until the outcome is not a spawn; a request
+    that never started ends it on the withdrawal's envelope (whether to retry is the caller's).
 
     With `echo` every command a call prints ends with `location`; `observe` hears each
     request, the spawner's return and the envelope its `record` printed, once per record."""
     shown = tuple(location) if echo else ()
     doc = execute(["next", slug, *location], echo=shown).doc
-    while doc["outcome"] == "spawn" and doc.get("recorded", {}).get("stop_reason") != "not-started":
+    while doc["outcome"] == "spawn":
         request = doc["request"]
         returned = spawner.spawn(request)
         if isinstance(returned, AgentRan):
@@ -459,7 +492,8 @@ def run_goal(args: argparse.Namespace) -> Reply:
     reporter = worker.reporter()
     location = _goal_run.location(task.repo, task.base_ref, args)
     doc = drive(worker, args.slug, location, echo=True, observe=reporter)
-    if doc["outcome"] == "spawn":  # the loop ends on a spawn only when its worker never started
+    # The loop ends on a withdrawal only when its worker never started.
+    if doc["outcome"] == "withdrawn":
         raise reporter.refusal()
     return Reply(doc, reporter.closing(doc))
 

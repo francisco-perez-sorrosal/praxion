@@ -420,6 +420,13 @@ _ACTIONS = {  # `{step}` is the stop's step id
     "files-glob": "name each path, or a directory by its bare path, in the step's Files:",
     "commit-disturbed-tree": "restore what you need from the snapshot, then delete it",
     "loop-state-defect": "keep the request whose agent ran and remove request=<id> from the other",
+    "request-outstanding": (
+        "take back the request the evidence names: record it with --not-started <reason> if no"
+        " agent started, else record its return; amend the plan only once none is out"
+    ),
+    "attempts-disagree": (
+        "correct Step {step}'s Attempts: line in WIP.md so its count is its request's attempt"
+    ),
     "iteration-budget": "re-tier or split the remaining steps with the user",
 }
 

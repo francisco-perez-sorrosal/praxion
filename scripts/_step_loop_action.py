@@ -9,7 +9,7 @@ hand-back, and a changed reconciler verdict clears a human verdict.
 Normative precedence, a total function of the inputs, first match wins:
 
 1. `Complete` when every step is done.
-2. A human stop, in this order: `loop-state-defect` (more than one outstanding request),
+2. A human stop, in this order: the stop of the outstanding request's reading (below),
    `unnamed-attempts`, `dependency-defect`, `commit-disturbed-tree`, a marker, then the stop of
    the selected step, which is the earliest step in plan order that is not done.
 3. `iteration-budget` when the iterations used have reached the budget, or when the selected
@@ -21,13 +21,19 @@ the stall outranks a spent budget because the human stops come first. The budget
 from the plan alone, so a plan revision opens a new series without growing it.
 `commit-disturbed-tree` holds while the tree snapshot of the step's latest recorded request
 exists beside the task documents, and clears when a person deletes the file.
+
+At most one request is out after any sequence of calls: the outstanding request is read once
+against the plan (`read_outstanding`), and only `NoneOut` lets the plan's own action through.
+`Current` reissues the request; `Several` and `Malformed` stop as `loop-state-defect`,
+`Miscounted` as `attempts-disagree` and `Superseded` as `request-outstanding`, so a plan changed
+while a request is out costs one corrected call (the withdrawal, or the return's record).
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, cast
 
 from _loop_fields import STALL_RUN, GoalBudget, OutstandingAttempt, request_cap
 from _plan_steps import PlanStep
@@ -66,6 +72,7 @@ from _step_loop_state import (
     series_states,
     spent,
     step_cap,
+    step_series,
 )
 
 if TYPE_CHECKING:
@@ -77,7 +84,8 @@ UNCOMMITTED_SHOWN = 5  # file names a marked stop spells out; the rest are count
 HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed review-without-work not-driven
-    dependency-defect commit-disturbed-tree loop-state-defect files-glob""".split()
+    dependency-defect commit-disturbed-tree loop-state-defect files-glob request-outstanding
+    attempts-disagree""".split()
 )
 NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", BUDGET_CAUSE)
 REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound
@@ -130,6 +138,122 @@ class Stop:
 Action = Union[Spawn, Complete, Stop]  # noqa: UP007 -- runtime value, 3.9 floor
 
 
+# --- The outstanding request, read against the plan -------------------------------------------
+
+
+@dataclass(frozen=True)
+class NoneOut:
+    """No `Attempts:` line names a request the ledger has not recorded."""
+
+
+@dataclass(frozen=True)
+class Several:
+    """More than one line names an outstanding request, as `(step, request)` pairs in step
+    order: a state only a hand edit or an earlier driver could leave."""
+
+    requests: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class Malformed:
+    """The line's request is no request id, names another step, or a series its step has not
+    reached."""
+
+    step: str
+    request: str
+
+
+@dataclass(frozen=True)
+class Miscounted:
+    """The request's attempt differs from the count on its own line."""
+
+    step: str
+    request: str
+    count: int
+
+
+@dataclass(frozen=True)
+class Current:
+    """The plan issues exactly this request now, or would once the stop it meets clears."""
+
+    step: str
+    key: RequestKey
+
+
+@dataclass(frozen=True)
+class Superseded:
+    """The plan no longer issues this request; `why` says what moved, and `block_kept` says
+    whether the step's block still holds the request's series, so its return can be gated."""
+
+    step: str
+    key: RequestKey
+    why: str
+    block_kept: bool
+
+
+OutstandingReading = Union[  # noqa: UP007 -- runtime value, 3.9 floor
+    NoneOut, Several, Malformed, Miscounted, Current, Superseded
+]
+
+
+def read_outstanding(inputs: LoopInputs) -> OutstandingReading:
+    """The outstanding request against the plan; the series is checked only for a step that is
+    running, so a step that stops for another reason keeps its own stop."""
+    out = tuple(
+        (step, a.request, a.count)
+        for step, a in sorted(inputs.attempts.items())
+        if isinstance(a, OutstandingAttempt)
+    )
+    if len(out) > 1:
+        return Several(tuple((step, request) for step, request, _ in out))
+    if not out:
+        return NoneOut()
+    step_id, request, count = out[0]
+    key = parse_request_id(request)
+    if key is None or key.step != step_id:
+        return Malformed(step_id, request)
+    if key.attempt != count:
+        return Miscounted(step_id, request, count)
+    step = next((s for s in inputs.steps if s.id == step_id), None)
+    if step is None:
+        return Superseded(step_id, key, f"{STEP_LABEL}{step_id} is no longer in the plan", False)
+    state = step_series(step, inputs)
+    if isinstance(state, Running) and key.series != state.series:
+        if key.series > state.series:
+            return Malformed(step_id, request)
+        why = f"the block of {STEP_LABEL}{step_id} was revised after the request's series"
+        return Superseded(step_id, key, why, False)
+    selection = select_step(inputs)
+    if isinstance(selection, Next) and selection.step.id != step_id:
+        why = f"the plan now issues {STEP_LABEL}{selection.step.id} first"
+        return Superseded(step_id, key, why, True)
+    return Current(step_id, key)
+
+
+def outstanding_id(reading: OutstandingReading) -> str | None:
+    """The request a reading still holds out: the id of a current or a superseded one."""
+    return reading.key.id if isinstance(reading, (Current, Superseded)) else None
+
+
+def _outstanding_stop(reading: OutstandingReading) -> Stop | None:
+    if isinstance(reading, Several):
+        named = ", ".join(f"{STEP_LABEL}{step}" for step, _ in reading.requests)
+        return Stop("loop-state-defect", None, f"WIP.md names an outstanding request on {named}")
+    if isinstance(reading, Malformed):
+        evidence = f"WIP.md names {reading.request}, not the series' own"
+        return Stop("loop-state-defect", None, evidence)
+    if isinstance(reading, Miscounted):
+        evidence = (
+            f"the Attempts: line of {STEP_LABEL}{reading.step} names {reading.request}, whose"
+            f" attempt is not the line's own count={reading.count}"
+        )
+        return Stop("attempts-disagree", reading.step, evidence)
+    if isinstance(reading, Superseded):
+        evidence = f"{reading.key.id} is outstanding and {reading.why}"
+        return Stop("request-outstanding", reading.step, evidence)
+    return None
+
+
 def iteration_budget(steps: Iterable[PlanStep]) -> int:
     """The request cap of each driven step's bound, plus the review cycle of each the trigger
     marks: every request the steps' own bounds allow, so a plan that is never revised meets a
@@ -169,10 +293,8 @@ def issuable_action(inputs: LoopInputs) -> Action:
 
 
 def _human_stop(inputs: LoopInputs, selection: Next | Defects) -> Stop | None:
-    outstanding = sorted(s for s, a in inputs.attempts.items() if isinstance(a, OutstandingAttempt))
-    if len(outstanding) > 1:
-        named = ", ".join(f"{STEP_LABEL}{step}" for step in outstanding)
-        return Stop("loop-state-defect", None, f"WIP.md names an outstanding request on {named}")
+    if stop := _outstanding_stop(read_outstanding(inputs)):
+        return stop
     if inputs.unnamed:
         return Stop(
             "unnamed-attempts", None, f"an Attempts: line names no step: {inputs.unnamed[0]}"
@@ -238,8 +360,6 @@ def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
     if globbed:
         why = f"{where} names {', '.join(globbed)} in Files:, and the driver commits literal paths"
         return Stop("files-glob", step.id, why)
-    if isinstance(state, Running) and _running_key(step, state).id != state.request:
-        return Stop("loop-state-defect", None, f"WIP.md names {state.request}, not the series' own")
     if isinstance(state, Verified) and type(state.review) in _REVIEW_STOPS:
         cause, what = _REVIEW_STOPS[type(state.review)]
         return Stop(cause, step.id, f"{what} at {where}")
@@ -278,15 +398,6 @@ def _goal_budget_stop(selection: Selection) -> Stop | None:
     return Stop(BUDGET_CAUSE, None, evidence)
 
 
-def _running_key(step: PlanStep, state: Running) -> RequestKey:
-    """The outstanding request, of any kind, when its id names this step and series; else the
-    series' own implement request, which the caller finds different from the id WIP names."""
-    named = parse_request_id(state.request)
-    if named is not None and named.step == step.id and named.series == state.series:
-        return named
-    return RequestKey(step.id, state.n, "implement", state.series)
-
-
 def _spawn(selection: Selection) -> Spawn:
     if not isinstance(selection, Next):
         raise ValueError("a spawn needs a selected step")
@@ -297,8 +408,8 @@ def _spawn(selection: Selection) -> Spawn:
         return Spawn(
             step, RequestKey(step.id, spent(state.attempts) + 1, "implement", state.series)
         )
-    if isinstance(state, Running):
-        return Spawn(step, _running_key(step, state), reissued=True)
+    if isinstance(state, Running):  # the reading found it current, so its id parses
+        return Spawn(step, cast(RequestKey, parse_request_id(state.request)), reissued=True)
     if isinstance(state, Verified) and isinstance(state.review, (Due, Requested, ReviseDue)):
         review = state.review
         kind: Kind = "revise" if isinstance(review, ReviseDue) else "review"

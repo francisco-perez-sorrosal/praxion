@@ -452,7 +452,7 @@ def test_a_record_refused_after_a_step_block_revision_names_the_cause_and_the_wa
     root = build(tmp_path, TWO_STEP_PLAN, wip, [first])
     written = snapshot(root)
 
-    reply = call(root, "record", "--request", "s1-a2-implement", "--not-started", "revised")
+    reply = call(root, "record", "--request", "s1-a2-implement", *RELAY)
 
     message = reply.doc["error"]["message"]
     assert (reply.doc["error"]["code"], reply.exit) == REFUSED

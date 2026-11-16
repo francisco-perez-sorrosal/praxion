@@ -409,7 +409,7 @@ def test_the_request_that_would_have_followed_is_withdrawn_unspent(looped):
     looped.run()
 
     assert ledger_requests(looped) == [f"s{STEP}-a1-implement"]
-    assert attempt_lines(looped) == [f"- Attempts: Step {STEP} count=2 request={second}"]
+    assert attempt_lines(looped) == [f"- Attempts: Step {STEP} count=1"]
     assert not worker_marker_path(looped.task_dir, second).exists()
     assert not worker_result_path(looped.task_dir, second).exists()
 

@@ -38,6 +38,6 @@ Relay the step-loop driver's requests for the task slug `$ARGUMENTS`. The driver
    | 1 | `error` | Report it to the user and do not retry. |
 
 3. The marker is the terminal marker on the last line of the agent's final message, lowercase and without brackets: `complete`, `blocked`, `conflict` or `partial`, or `none` when the message carries no marker.
-4. If the Agent call fails before any agent starts, run the `then` command with `--not-started "<the error>"` in place of `--agent-id` and `--marker`.
+4. If the Agent call fails before any agent starts, run the `then` command with `--not-started "<the error>"` in place of `--agent-id` and `--marker`. That record takes the request back and issues none: it prints the outcome `withdrawn` (exit 0), whose `then` is the `next` call that continues the loop. Between the two no request is out, so that is the moment to amend a plan block; left as it is, the plan gets the same attempt issued again.
 5. Run every `record` with the Bash timeout at 600000 ms. If one is cut off anyway, run the same command again: it resumes where it stopped.
 6. If the session that made the Agent call ended before the agent returned (a restart), the agent can no longer end and `record` refuses it as running. Run the `then` command with the agent id the observation log or the transcript store gives, `--marker none`, and `--session-exited`: the driver takes the transcript back as it stands and gates or stops on what it shows.

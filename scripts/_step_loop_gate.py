@@ -57,7 +57,7 @@ RunCounts = Union[Counts, NoRun]  # noqa: UP007 -- runtime value, 3.9 floor
 _SUMMARY_DURATION_RE = re.compile(r"\bin \d+(?:\.\d+)?s\b")
 _COUNT_RE = re.compile(r"\b(\d+) (passed|failed|skipped|errors?)\b")
 _NO_TESTS_RE = re.compile(r"\bno tests ran\b")
-_COLLECTED_SUMMARY_RE = re.compile(r"\bcollected\b|\b\d+ errors?\b")
+_COLLECTED_SUMMARY_RE = re.compile(r"\bcollected\b|\b\d+ errors?\b|\bno tests ran\b")
 _NODE_LINE_RE = re.compile(r"^(?P<kind>FAILED|ERROR) (?P<rest>\S.*)$")
 _REASON_SEPARATOR = " - "
 
@@ -99,16 +99,18 @@ def parse_pytest_summary(output: str) -> PytestSummary | None:
 
 
 def collected(output: str) -> bool:
-    """Whether a `--collect-only` run printed its summary: the last line holding a duration and
-    the word `collected` or a count of errors (`3 tests collected in 0.02s`, `no tests collected
-    in 0.00s`, `1 error in 0.05s`). A run that stopped before it began collecting, on a missing
-    plugin or an option it does not know, prints none."""
-    summary = (
-        line
-        for line in reversed(output.splitlines())
-        if _SUMMARY_DURATION_RE.search(line) and not _NODE_LINE_RE.match(line)
+    """Whether a `--collect-only` run printed its summary: a line holding a duration and the word
+    `collected`, `no tests ran` or a count of errors (`3 tests collected in 0.02s`, `no tests
+    collected in 0.00s`, `no tests ran in 0.00s`, `1 error in 0.05s`). Any line counts, because
+    the runner's own lines (`Installed 3 packages in 1.50s`) may come after pytest's. A run that
+    stopped before it began collecting, on a missing plugin or an option it does not know, prints
+    none."""
+    return any(
+        _SUMMARY_DURATION_RE.search(line)
+        and _COLLECTED_SUMMARY_RE.search(line)
+        and not _NODE_LINE_RE.match(line)
+        for line in output.splitlines()
     )
-    return _COLLECTED_SUMMARY_RE.search(next(summary, "")) is not None
 
 
 def _read_count_line(lines: list[str]) -> Counts | None:

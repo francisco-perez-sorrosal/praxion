@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import shlex
 import time
 from collections.abc import Sequence
@@ -95,7 +96,10 @@ CHECK_OUTPUT = "the Check: run's output"  # where a check's failures beyond the 
 _MORE_FAILURES = "…"
 COLLECT_ONLY = "--collect-only"
 COLLECTION_LINES_SHOWN = 5  # last lines of a refused collection that a stop's evidence quotes
+COLLECTION_TIMEOUT_SECONDS = 120.0  # a collection takes seconds; a hung one is doubt, not a stop
 _SHELL_OPERATORS = frozenset({"|", "&&", "||", ";"})
+_QUIETEST_RE = re.compile(r"^-q{2,}$")  # `-qq` makes pytest print no summary at all
+_PACKAGE_VALUE_OPTIONS = frozenset({"--with", "-w", "--with-editable"})  # `uv run --with pytest`
 _HEADING_PREFIX, _RESULT_PREFIX = "## ", "Result:"
 
 
@@ -489,7 +493,7 @@ def check_collects(repo: Path, step: PlanStep) -> str | None:
     if not isinstance(step.check, Check) or not _is_plain_pytest(step.check.command):
         return None
     command = step.check.command
-    ran = run_check(repo, f"{command} {COLLECT_ONLY}")
+    ran = run_check(repo, f"{command} {COLLECT_ONLY}", COLLECTION_TIMEOUT_SECONDS)
     if ran.problem is not None or ran.returncode == 0:
         return None
     if collected(ran.output):
@@ -500,11 +504,19 @@ def check_collects(repo: Path, step: PlanStep) -> str | None:
 
 
 def _is_plain_pytest(command: str) -> bool:
+    """Whether `command` runs pytest with a summary the probe can read: no shell operator, no
+    verbosity that prints none, and `pytest` the program run (a package a runner is asked to add,
+    as in `uv run --with pytest python x.py`, does not count)."""
     try:
         words = shlex.split(command)
     except ValueError:
         return False
-    return any(Path(word).name == "pytest" for word in words) and not _SHELL_OPERATORS & set(words)
+    if _SHELL_OPERATORS & set(words) or any(_QUIETEST_RE.match(word) for word in words):
+        return False
+    return any(
+        Path(word).name == "pytest" and (at == 0 or words[at - 1] not in _PACKAGE_VALUE_OPTIONS)
+        for at, word in enumerate(words)
+    )
 
 
 def bounded_check(repo: Path, run_dir: Path, command: str, give_up_at: float) -> CommandRun:

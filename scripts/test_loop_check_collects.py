@@ -19,6 +19,7 @@ import pytest
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import _step_loop_record_gate  # noqa: E402
 import step_loop  # noqa: E402
 from _plan_steps import parse_plan_steps  # noqa: E402
 from _step_loop_action import HUMAN_CAUSES, Spawn  # noqa: E402
@@ -55,12 +56,19 @@ def repo_with(tmp_path, **files):
         pytest.param("no tests collected in 0.00s\n", True, id="nothing-selected"),
         pytest.param("no tests collected, 1 error in 0.05s\n", True, id="collection-error"),
         pytest.param("2/3 tests collected (1 deselected) in 0.01s\n", True, id="deselected"),
+        pytest.param("no tests ran in 0.00s\n", True, id="absent-path-on-an-older-pytest"),
+        pytest.param(
+            "no tests collected in 0.00s\nInstalled 3 packages in 1.50s\n",
+            True,
+            id="runner-line-after",
+        ),
         pytest.param("ERROR: Missing required plugins: x\n", False, id="stopped-before-collecting"),
+        pytest.param("Installed 3 packages in 1.50s\n", False, id="only-a-runner-line"),
         pytest.param("ERROR a.py - ImportError in 3s\n", False, id="a-node-line-is-no-summary"),
         pytest.param("", False, id="no-output"),
     ],
 )
-def test_a_collect_only_summary_is_read_off_its_last_duration_line(output, shown):
+def test_a_collect_only_summary_is_read_off_any_duration_line(output, shown):
     assert collected(output) is shown
 
 
@@ -107,6 +115,19 @@ def test_a_check_that_is_not_pytest_is_never_run_by_the_probe(tmp_path):
     assert not marker.exists()
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        pytest.param("uv run --with pytest python -c pass", id="pytest-is-an-added-package"),
+        pytest.param("PYTEST -qq", id="quietest-prints-no-summary"),
+    ],
+)
+def test_a_check_whose_summary_cannot_be_read_is_not_probed(tmp_path, command):
+    repo = repo_with(tmp_path, **{"pyproject.toml": NEEDS_AN_ABSENT_PLUGIN})
+
+    assert check_collects(repo, step_checking(command.replace("PYTEST", PYTEST))) is None
+
+
 def stand_in_pytest(tmp_path, body):
     script = tmp_path / "pytest"
     script.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
@@ -136,21 +157,47 @@ def test_a_run_that_exits_without_a_summary_is_refused_with_its_exit_when_silent
     assert "exit 3, no output" in why
 
 
-def test_only_the_series_first_implement_request_is_asked_to_collect(tmp_path):
-    repo = repo_with(tmp_path, **{"pyproject.toml": NEEDS_AN_ABSENT_PLUGIN})
-    step = step_checking(f"{PYTEST} -q")
-    task = SimpleNamespace(repo=repo)
-    first = Spawn(step, RequestKey("1", 1, "implement"))
+def test_a_collection_that_could_not_start_is_never_a_refusal(tmp_path):
+    command = f"{tmp_path / 'absent' / 'pytest'} -q"
 
-    refused = step_loop._first_request_refused(task, first)
+    assert check_collects(tmp_path, step_checking(command)) is None
+
+
+def test_a_collection_that_outlives_its_bound_is_never_a_refusal(tmp_path, monkeypatch):
+    monkeypatch.setattr(_step_loop_record_gate, "COLLECTION_TIMEOUT_SECONDS", 0.3)
+    script = stand_in_pytest(tmp_path, "sleep 5; exit 3")
+
+    assert check_collects(tmp_path, step_checking(f"{script} -q")) is None
+
+
+@pytest.fixture
+def refusing_task(tmp_path):
+    repo = repo_with(tmp_path, **{"pyproject.toml": NEEDS_AN_ABSENT_PLUGIN})
+    return SimpleNamespace(repo=repo), step_checking(f"{PYTEST} -q")
+
+
+def test_the_series_first_implement_request_is_refused_before_it_goes_out(refusing_task):
+    task, step = refusing_task
+
+    refused = step_loop._first_request_refused(task, Spawn(step, RequestKey("1", 1, "implement")))
 
     assert refused is not None
     assert refused.cause in HUMAN_CAUSES
     assert refused.step == "1"
-    for later in (
-        Spawn(step, RequestKey("1", 2, "implement")),
-        Spawn(step, RequestKey("1", 1, "review", round=1)),
-        Spawn(step, RequestKey("1", 1, "revise", round=1)),
-        Spawn(step, RequestKey("1", 1, "implement"), reissued=True),
-    ):
-        assert step_loop._first_request_refused(task, later) is None
+
+
+@pytest.mark.parametrize(
+    ("key", "reissued"),
+    [
+        pytest.param(RequestKey("1", 2, "implement"), False, id="a-later-attempt"),
+        pytest.param(RequestKey("1", 1, "review", round=1), False, id="a-review"),
+        pytest.param(RequestKey("1", 1, "revise", round=1), False, id="a-revision"),
+        pytest.param(RequestKey("1", 1, "implement"), True, id="a-reissued-request"),
+    ],
+)
+def test_a_request_that_is_not_the_series_first_is_not_asked_to_collect(
+    refusing_task, key, reissued
+):
+    task, step = refusing_task
+
+    assert step_loop._first_request_refused(task, Spawn(step, key, reissued=reissued)) is None

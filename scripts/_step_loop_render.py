@@ -445,7 +445,7 @@ _ACTIONS = {  # `{step}` is the stop's step id
     "unreadable-plan-field": "correct the plan line the evidence names in IMPLEMENTATION_PLAN.md",
     "check-cannot-collect": (
         "correct the step's Check: in IMPLEMENTATION_PLAN.md so that its command collects tests"
-        " (name a path that exists, and plugins its pocket has)"
+        " (name the plugins and options its pocket has)"
     ),
     "iteration-budget": "re-tier or split the remaining steps with the user",
 }

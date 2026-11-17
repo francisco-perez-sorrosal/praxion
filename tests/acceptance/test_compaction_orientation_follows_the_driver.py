@@ -65,8 +65,13 @@ def test_the_orientation_names_the_outstanding_request_and_its_record_call(tmp_p
     # Up to the location options: each reader echoes the ones it was called with, and the
     # hook's own status call is not the call that issued the request.
     record_call = without_location(asked.doc["then"][asked.doc["then"].index("record ") :])
-    assert asked.request["id"] in context
     assert record_call in context, context
+    # The record call holds the request's id too, so the id is looked for outside it and as a whole
+    # word: a hook that misnames the request and echoes the driver's command would otherwise pass.
+    named = re.search(
+        rf"(?<![\w-]){re.escape(asked.request['id'])}(?![\w-])", context.replace(record_call, "")
+    )
+    assert named, context
 
 
 def test_the_orientation_names_the_step_the_driver_acts_on_with_its_state_and_attempts(tmp_path):

@@ -217,7 +217,7 @@ def test_an_ended_agent_whose_record_holds_the_lock_is_in_flight_not_held(root, 
 
 def test_an_ended_agent_whose_record_lock_is_free_is_held_as_before(root, ended_agent):
     subagents, request = ended_agent
-    with held_elsewhere(run_dir(root, request)):  # a record that ended leaves its lock file behind
+    with held_elsewhere(run_dir(root, request)):  # the file a crashed holder left behind
         pass
 
     (judged,) = verdicts(root, subagents)

@@ -56,6 +56,39 @@ def test_the_line_is_read_whatever_the_marker_says():
     assert fu.return_items("Follow-ups: a\n[BLOCKED]") == ("a",)
 
 
+@pytest.mark.parametrize("none", ["none", "None.", "NONE", "none.", "None"])
+def test_an_item_that_says_only_none_is_no_item(none):
+    assert fu.return_items(f"Follow-ups: {none}\n[COMPLETE]") == ()
+
+
+def test_none_among_other_items_is_dropped_and_the_others_kept():
+    assert fu.return_items("Follow-ups: none; a real one\n[COMPLETE]") == ("a real one",)
+
+
+def test_an_item_that_only_starts_with_none_is_kept():
+    assert fu.return_items("Follow-ups: none of the fixtures use it\n[COMPLETE]") == (
+        "none of the fixtures use it",
+    )
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "**Follow-ups:** a; b",
+        "- Follow-ups: a; b",
+        "- **Follow-ups:** a; b",
+        "* Follow-ups: a; b",
+        "  - Follow-ups:   a; b",
+    ],
+)
+def test_an_emphasised_or_bulleted_line_is_the_same_line(line):
+    assert fu.return_items(f"Done.\n{line}\n[COMPLETE]") == ("a", "b")
+
+
+def test_a_bulleted_line_is_not_confused_with_prose_that_mentions_the_prefix():
+    assert fu.return_items("- I wrote no Follow-ups: here\n[COMPLETE]") == ()
+
+
 # --- append_open --------------------------------------------------------------------------------
 
 
@@ -84,6 +117,15 @@ def test_no_items_leave_an_absent_record_absent(tmp_path):
     fu.append_open(record, ())
 
     assert not record.exists()
+
+
+def test_no_items_never_read_the_record(tmp_path):
+    record = tmp_path / "FOLLOW_UPS.md"
+    record.write_bytes(b"\xff\xfe not utf-8")
+
+    fu.append_open(record, ())
+
+    assert record.read_bytes() == b"\xff\xfe not utf-8"
 
 
 def test_no_items_leave_a_present_record_byte_for_byte(tmp_path):

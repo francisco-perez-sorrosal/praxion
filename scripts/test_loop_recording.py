@@ -222,6 +222,23 @@ def test_a_record_whose_lock_file_was_removed_meanwhile_still_ends_cleanly(run_d
     assert recording.record_in_flight(run_dir) is False
 
 
+def test_a_release_leaves_the_file_a_later_call_made_at_the_path(run_dir):
+    lock = run_dir / recording.LOCK_FILE
+    with recording.holding_record(run_dir):
+        lock.unlink()
+        lock.write_bytes(b"the successor's file")
+    assert lock.read_bytes() == b"the successor's file"
+
+
+def test_a_removal_that_fails_does_not_fail_a_record_that_has_done_its_work(run_dir, monkeypatch):
+    def refuse(self, missing_ok=False):
+        raise PermissionError(13, "Permission denied", str(self))
+
+    with recording.holding_record(run_dir):
+        monkeypatch.setattr(Path, "unlink", refuse)
+    assert recording.record_in_flight(run_dir) is False
+
+
 def test_a_record_whose_body_raises_releases_the_lock(run_dir):
     with pytest.raises(RuntimeError), recording.holding_record(run_dir):
         raise RuntimeError("the record failed")

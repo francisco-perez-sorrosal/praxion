@@ -51,7 +51,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     parse_transcript,
     request_count,
 )
-from _follow_ups import RECORD_FILE, append_open, return_items  # noqa: E402
+from _follow_ups import FOLLOW_UPS_FILE, append_open, return_items  # noqa: E402
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
 from _loop_fields import GoalBudget, OutstandingAttempt  # noqa: E402
 from _plan_steps import PlanStep  # noqa: E402
@@ -234,7 +234,7 @@ def record_return(
         else:
             tick_step(task.dir / WIP_FILE, step.id)
         verdict = read_verdict(task, step.id, request, gate)
-    append_open(task.dir / RECORD_FILE, return_items(seen.final_text))
+    warnings += copy_follow_ups(task.dir / FOLLOW_UPS_FILE, seen.final_text)
     record = IterationRecord(
         step=STEP_LABEL + step.id,
         attempt=key.attempt,
@@ -257,6 +257,16 @@ def record_return(
     warnings += edit_warnings(task, step, request)
     taken = recorded_object(record, marker, summary)
     return Taken(taken, step.id, warnings)
+
+
+def copy_follow_ups(path: Path, final_text: str | None) -> Warnings:
+    """Copy the return's follow-up items into the record at `path`. A copy that cannot be made
+    must not undo a commit that has landed, so it is a warning and the call goes on."""
+    try:
+        append_open(path, return_items(final_text))
+    except (OSError, UnicodeDecodeError) as exc:
+        return (("follow-ups-not-copied", f"the Follow-ups: line was not copied to {path}: {exc}"),)
+    return ()
 
 
 def record_review(

@@ -426,7 +426,7 @@ def _series_of_records(
 
 def step_bound(step: PlanStep) -> Bound:
     """The bound every reader sizes the step by. An unreadable `Iterations:` value never runs a
-    series (`step_series` reads it as a human verdict first), so it sizes as the attempt cap."""
+    series (`step_series` reads it as an unreadable field first), so it sizes as the attempt cap."""
     return AttemptCap() if isinstance(step.bound, UnreadableIterations) else step.bound
 
 

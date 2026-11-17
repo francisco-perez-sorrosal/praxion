@@ -22,9 +22,14 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import _step_loop_record_gate  # noqa: E402
 import step_loop  # noqa: E402
 from _plan_steps import parse_plan_steps  # noqa: E402
-from _step_loop_action import HUMAN_CAUSES, Spawn  # noqa: E402
+from _step_loop_action import Spawn  # noqa: E402
 from _step_loop_gate import collected  # noqa: E402
-from _step_loop_record_gate import check_collects  # noqa: E402
+from _step_loop_record_gate import (  # noqa: E402
+    COLLECTION_TIMEOUT_SECONDS,
+    DEFAULT_GATE_WAIT_SECONDS,
+    _is_plain_pytest,
+    check_collects,
+)
 from _step_loop_render import RequestKey  # noqa: E402
 
 ABSENT_PLUGIN = "pytest-absent-unit-plugin"
@@ -35,6 +40,9 @@ NEEDS_AN_ABSENT_PLUGIN = (
 PASSING_TEST = "def test_it():\n    assert True\n"
 STEP_ONE = "Step 1"  # id-citation-discipline:ignore (plan heading format)
 PYTEST = f"{shlex.quote(sys.executable)} -m pytest"
+CHECK_CANNOT_COLLECT = "check-cannot-collect"
+CALL_CEILING_SECONDS = 600  # what a caller's shell allows one `record` call
+CALL_MARGIN_SECONDS = 60  # left over for the commit and the ledger record after both waits
 
 
 def step_checking(command):
@@ -128,6 +136,57 @@ def test_a_check_whose_summary_cannot_be_read_is_not_probed(tmp_path, command):
     assert check_collects(repo, step_checking(command.replace("PYTEST", PYTEST))) is None
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        "pytest -q",
+        "/venv/bin/pytest -q tests",
+        "python3 -m pytest -q",
+        "python3.13 -u -m pytest -q",
+        "uv run pytest -q",
+        "uv run --project scripts pytest -q",
+        "uv run --with extra --directory scripts python -m pytest -q",
+        "uv run -q python3 -m pytest -q",
+        "TERM=dumb uv run pytest -q",
+    ],
+)
+def test_the_command_itself_being_pytest_counts_alone_or_after_a_runner(command):
+    assert _is_plain_pytest(command) is True
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "python3 scripts/check_x.py --runner pytest",
+        "python3 scripts/check_x.py -m pytest",
+        "python3 -c 'import sys' pytest",
+        "uv run python scripts/check_x.py --runner pytest",
+        "uv run --with pytest python -c pass",
+        "echo pytest",
+        "make pytest",
+        "uv pytest",
+        "uv run",
+        "",
+    ],
+)
+def test_a_command_that_only_mentions_pytest_is_not_pytest(command):
+    assert _is_plain_pytest(command) is False
+
+
+def test_a_check_that_only_names_pytest_as_an_argument_is_never_run_by_the_probe(tmp_path):
+    script = tmp_path / "check_x.py"
+    script.write_text("import sys\nsys.exit(3)\n", encoding="utf-8")
+    command = f"{shlex.quote(sys.executable)} {script} --runner pytest"
+
+    assert check_collects(tmp_path, step_checking(command)) is None
+
+
+def test_the_probe_bound_and_the_gate_wait_leave_a_margin_under_the_calls_ceiling():
+    waits = DEFAULT_GATE_WAIT_SECONDS + COLLECTION_TIMEOUT_SECONDS
+
+    assert waits <= CALL_CEILING_SECONDS - CALL_MARGIN_SECONDS
+
+
 def stand_in_pytest(tmp_path, body):
     script = tmp_path / "pytest"
     script.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
@@ -182,7 +241,7 @@ def test_the_series_first_implement_request_is_refused_before_it_goes_out(refusi
     refused = step_loop._first_request_refused(task, Spawn(step, RequestKey("1", 1, "implement")))
 
     assert refused is not None
-    assert refused.cause in HUMAN_CAUSES
+    assert refused.cause == CHECK_CANNOT_COLLECT
     assert refused.step == "1"
 
 

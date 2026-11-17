@@ -200,12 +200,9 @@ def next_line_of(cause, evidence):
     return line
 
 
-STEP_ONE = "Step 1"  # id-citation-discipline:ignore (plan heading format)
-
-
 def test_an_unreadable_plan_field_says_to_correct_the_plan_line_the_evidence_names():
     line = next_line_of(
-        "unreadable-plan-field", f"{STEP_ONE}: the Iterations: value cannot be read"
+        "unreadable-plan-field", f"{STEP_LABEL}: the Iterations: value cannot be read"
     )
 
     assert "correct the plan line the evidence names" in line

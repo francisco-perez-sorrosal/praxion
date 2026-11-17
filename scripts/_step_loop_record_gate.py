@@ -96,10 +96,17 @@ CHECK_OUTPUT = "the Check: run's output"  # where a check's failures beyond the 
 _MORE_FAILURES = "…"
 COLLECT_ONLY = "--collect-only"
 COLLECTION_LINES_SHOWN = 5  # last lines of a refused collection that a stop's evidence quotes
-COLLECTION_TIMEOUT_SECONDS = 120.0  # a collection takes seconds; a hung one is doubt, not a stop
+# A collection takes seconds; a hung one is doubt, not a stop. The bound is charged after the gate's
+# wait inside one call, so the two together stay well under the 600 s a caller's shell allows.
+COLLECTION_TIMEOUT_SECONDS = 30.0
 _SHELL_OPERATORS = frozenset({"|", "&&", "||", ";"})
 _QUIETEST_RE = re.compile(r"^-q{2,}$")  # `-qq` makes pytest print no summary at all
-_PACKAGE_VALUE_OPTIONS = frozenset({"--with", "-w", "--with-editable"})  # `uv run --with pytest`
+_RUNNERS = frozenset({"uv", "poetry", "pdm", "pixi", "hatch", "rye"})
+_RUNNER_VALUE_OPTIONS = frozenset(  # the options of `uv run` that take the next word as a value
+    {"--with", "-w", "--with-editable", "--project", "--directory", "--python", "-p", "--package"}
+)
+_INTERPRETER_PREFIXES = ("python", "pypy")
+_ENV_ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 _HEADING_PREFIX, _RESULT_PREFIX = "## ", "Result:"
 
 
@@ -223,33 +230,28 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
 def command_lines(
     task: TaskView, run_dir: Path, request: str, check: GateRun | None
 ) -> tuple[str, ...]:
-    """The block's `Command:` line for the check; a command too long for it is also kept whole in
-    a file beside the run logs, which the line names, before the block is written."""
+    """The block's `Command:` line for the check. A command too long for the line is cut by fixed
+    length to the ceiling, ending on a pointer to a file beside the run logs that holds it whole
+    (one line per command, and the file is written before the block is)."""
     if not (check and check.command):
         return ()
+    line = f"{COMMAND_LINE_OPENING}{check.command}{COMMAND_LINE_CLOSING}"
+    if len(line) <= COMMAND_LINE_MAX_CHARS:
+        return (line,)
     pointer = f".ai-work/{task.slug}/{GATE_DIRECTORY}/{request}/{COMMAND_FILE}"
-    line = command_line(check.command, pointer)
-    if not fits_command_line(check.command):
-        run_dir.mkdir(parents=True, exist_ok=True)
-        write_atomic(run_dir / COMMAND_FILE, check.command)
-    return (line,)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    write_atomic(run_dir / COMMAND_FILE, check.command + "\n")
+    return (_cut_command_line(line, pointer),)
 
 
-def command_line(command: str, pointer: str) -> str:
-    """`Command: `<command>``, cut by fixed length to the ceiling and ending on `pointer` when
-    longer, so one command always renders one line."""
-    line = f"{COMMAND_LINE_OPENING}{command}{COMMAND_LINE_CLOSING}"
-    if fits_command_line(command):
-        return line
-    ending = f" ... (whole command: {pointer}){COMMAND_LINE_CLOSING}"
-    kept = max(COMMAND_LINE_MAX_CHARS - len(ending), len(COMMAND_LINE_OPENING))
-    return line[:kept] + ending
-
-
-def fits_command_line(command: str) -> bool:
-    return len(COMMAND_LINE_OPENING) + len(command) + len(COMMAND_LINE_CLOSING) <= (
-        COMMAND_LINE_MAX_CHARS
-    )
+def _cut_command_line(line: str, pointer: str) -> str:
+    """`line` cut to end on `pointer`; a pointer too long for the ceiling keeps its tail."""
+    head, tail = " ... (whole command: ", f"){COMMAND_LINE_CLOSING}"
+    room = COMMAND_LINE_MAX_CHARS - len(COMMAND_LINE_OPENING) - len(head) - len(tail)
+    if len(pointer) > room:
+        pointer = "…" + pointer[len(pointer) - room + 1 :]
+    ending = f"{head}{pointer}{tail}"
+    return line[: COMMAND_LINE_MAX_CHARS - len(ending)] + ending
 
 
 def evidence_lines(scope: ScopeReading | None, check: GateRun | None) -> tuple[str, ...]:
@@ -505,18 +507,49 @@ def check_collects(repo: Path, step: PlanStep) -> str | None:
 
 def _is_plain_pytest(command: str) -> bool:
     """Whether `command` runs pytest with a summary the probe can read: no shell operator, no
-    verbosity that prints none, and `pytest` the program run (a package a runner is asked to add,
-    as in `uv run --with pytest python x.py`, does not count)."""
+    verbosity that prints none, and the command itself `pytest` or an interpreter's `-m pytest`,
+    straight or after a runner (`uv run` and its options). A word that only names pytest, as an
+    argument or an added package, does not count."""
     try:
         words = shlex.split(command)
     except ValueError:
         return False
     if _SHELL_OPERATORS & set(words) or any(_QUIETEST_RE.match(word) for word in words):
         return False
-    return any(
-        Path(word).name == "pytest" and (at == 0 or words[at - 1] not in _PACKAGE_VALUE_OPTIONS)
-        for at, word in enumerate(words)
+    program = _program_words(words)
+    if not program:
+        return False
+    if Path(program[0]).name == "pytest":
+        return True
+    if not Path(program[0]).name.startswith(_INTERPRETER_PREFIXES):
+        return False
+    options = iter(program[1:])
+    for option in options:
+        if option == "-m":
+            return next(options, "") == "pytest"
+        if not option.startswith("-"):
+            return False
+    return False
+
+
+def _program_words(words: Sequence[str]) -> Sequence[str]:
+    """`words` from the program the command runs: past leading `NAME=value` words, and past a
+    runner's `run` and the options after it (an option that takes a value takes the next word)."""
+    start = next(
+        (at for at, word in enumerate(words) if not _ENV_ASSIGNMENT_RE.match(word)), len(words)
     )
+    program = words[start:]
+    if not program or Path(program[0]).name not in _RUNNERS:
+        return program
+    if "run" not in program:
+        return ()
+    rest = iter(program[program.index("run") + 1 :])
+    for word in rest:
+        if not word.startswith("-"):
+            return (word, *rest)
+        if word in _RUNNER_VALUE_OPTIONS:
+            next(rest, None)
+    return ()
 
 
 def bounded_check(repo: Path, run_dir: Path, command: str, give_up_at: float) -> CommandRun:

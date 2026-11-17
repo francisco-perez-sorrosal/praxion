@@ -6,10 +6,11 @@
 holder exits, however it exits, so a crashed call never leaves a record that reads as running.
 The file's content, `{"pid", "started"}`, only names the holder in a refusal.
 
-A call removes the file as it lets go, so a refused or finished `record` leaves no file behind.
-The holder unlinks before it closes, and a call that takes the lock keeps it only while the file
-at the path is still the one it locked (else it opens the new one): two calls can never each
-hold a lock, one on the removed file and one on its successor.
+A call removes the file as it lets go, so a refused or finished `record` leaves no file behind,
+unless the removal fails or the file at the path is another call's by then (it removes only its
+own). The holder unlinks before it closes, and a call that takes the lock keeps it only while
+the file at the path is still the one it locked (else it opens the new one): two calls can never
+each hold a lock, one on the removed file and one on its successor.
 
 The probe takes the same lock for an instant, so a `record` that starts at that instant retries
 for `WAIT_SECONDS` before it refuses. The descriptor is not inherited (PEP 446, the default of
@@ -62,9 +63,20 @@ def holding_record(
         yield
     finally:
         try:
-            lock.unlink(missing_ok=True)  # before the close: who locks the old file sees it gone
+            _remove_own_file(lock, descriptor)  # before the close: who locks it sees it gone
         finally:
             os.close(descriptor)  # closing the only descriptor releases the lock
+
+
+def _remove_own_file(lock: Path, descriptor: int) -> None:
+    """Remove the file at `lock` only while it is the one `descriptor` holds: a file made there
+    since is another call's. A removal that fails leaves the file, which the next call reuses; it
+    must not turn a record that has done its work into an error."""
+    try:
+        if _still_at(lock, descriptor):
+            lock.unlink()
+    except OSError:
+        pass
 
 
 def record_in_flight(run_dir: Path) -> bool:

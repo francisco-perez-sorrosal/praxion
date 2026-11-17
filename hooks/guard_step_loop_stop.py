@@ -9,10 +9,11 @@ Fail-open and read-only by construction. Empty, unparseable or non-object input,
 that says a stop hook already held this stop, a session id that is not one plain path segment,
 no checkout or no `.ai-work/` in it, no issued request, every request recorded, an agent still
 running, a `record` of the request running (its gate run in flight, or its OS lock
-`gate/<request>/record.lock` held), any exception: exit 0 with nothing printed. The body writes no file and starts no
-process. The probe (`scripts/_step_loop_outstanding.py`) is imported only once a text test finds
-an issued request its task's iteration ledger does not name, so a project with no step loop
-pays one directory walk and a loop whose requests are all recorded imports nothing.
+`gate/<request>/record.lock` held), any exception: exit 0 with nothing printed. The body writes
+no file and starts no process. The probe (`scripts/_step_loop_outstanding.py`) is imported only
+once a text test finds an issued request its task's iteration ledger does not name, so a
+project with no step loop pays one directory walk and a loop whose requests are all recorded
+imports nothing.
 
 Synchronous (`async: false`, a held stop needs the verdict before the turn ends), registered
 once under `Stop` in `hooks/hooks.json`.

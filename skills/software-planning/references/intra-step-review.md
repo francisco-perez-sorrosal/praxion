@@ -69,7 +69,7 @@ Each finding must reference either the step's acceptance criteria or a documente
 
 **The reviewer does NOT produce a `VERIFICATION_REPORT.md`** in light-review mode. It writes the bounded verdict block to `.ai-work/<task-slug>/LIGHT_REVIEW_step-<N>.md` early, as `verdict: [PARTIAL]`, appends findings as it confirms them, sets the verdict last, and returns the same block inline. A capped reviewer therefore leaves its findings so far, and a file still reading `verdict: [PARTIAL]` is an unfinished review, never an `accept`.
 
-The step-loop driver reads the last `verdict:` line of a light-review file.
+The step-loop driver reads the last `verdict:` line of a light-review file's current round: in a file that keeps an earlier round under a `## Superseded round-<n> record` heading, the last one above that heading.
 
 ---
 

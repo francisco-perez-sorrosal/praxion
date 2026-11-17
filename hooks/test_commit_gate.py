@@ -236,6 +236,52 @@ def test_a_reader_that_cannot_answer_leaves_the_hook_to_run(
     assert DELEGATION_MARKER in result.stdout, "a reader with no answer skipped the hook"
 
 
+# `git` only outside the command (here, in the session's directory), so the first text
+# checks pass every row on and the command alone decides.
+GIT_IN_ANOTHER_FIELD = "/home/someone/git/project"
+
+# Commands that name a commit without a git invocation of their own: the reader cannot see
+# inside the script or file, so each must start the checker.
+NAMED_FOR_A_COMMIT = {
+    "script-run-by-path": "./scripts/commit.sh",
+    "script-run-by-a-shell": "sh tools/do-commit",
+    "file-read-by-another-program": "cat commit-notes.md",
+}
+
+READ_ONLY_WITH_GIT_IN_ANOTHER_FIELD = {
+    "words-only-in-the-description": {"command": "ls", "description": "git commit"},
+    "log-grep-for-commit": {"command": "git log --grep=commit --oneline"},
+    "show-head": {"command": "git show HEAD"},
+    "merge-no-commit": {"command": "git merge --no-commit topic"},
+}
+
+
+@pytest.mark.parametrize("command", list(NAMED_FOR_A_COMMIT.values()), ids=list(NAMED_FOR_A_COMMIT))
+def test_a_command_named_for_a_commit_with_no_git_of_its_own_starts_the_checker(
+    command: str, tmp_path: Path, shell: str
+) -> None:
+    payload = {"tool_name": "Bash", "cwd": GIT_IN_ANOTHER_FIELD, "tool_input": {"command": command}}
+
+    result = _run_gate(payload, hook=_write_delegation_spy(tmp_path), shell=shell)
+
+    assert DELEGATION_MARKER in result.stdout, f"{command!r} skipped the checker"
+
+
+@pytest.mark.parametrize(
+    "tool_input",
+    list(READ_ONLY_WITH_GIT_IN_ANOTHER_FIELD.values()),
+    ids=list(READ_ONLY_WITH_GIT_IN_ANOTHER_FIELD),
+)
+def test_a_read_only_command_with_git_in_another_field_never_starts_the_checker(
+    tool_input: dict, tmp_path: Path, shell: str
+) -> None:
+    payload = {"tool_name": "Bash", "cwd": GIT_IN_ANOTHER_FIELD, "tool_input": tool_input}
+
+    result = _run_gate(payload, hook=_write_delegation_spy(tmp_path), blocking=True, shell=shell)
+
+    assert (result.returncode, result.stdout) == (0, "")
+
+
 def _copy_gate_beside_a_reader(tmp_path: Path, reader: str | None) -> Path:
     """A copy of the gate whose reader is `reader`'s source, or missing when None."""
     gate = tmp_path / "gate" / GATE_SCRIPT.name

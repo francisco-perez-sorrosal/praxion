@@ -22,9 +22,10 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
   unknown option, a word holding `$`, no subcommand at all) is `uncertain`;
 - what no rule above can follow keeps the checkers running: a word that holds a whole
   `git ... commit` script for another program, or, in a simple command with no
-  invocation or script of its own, a bare `commit` word (`make commit`, `$GIT commit`,
-  `xargs git` fed the word) or a word that holds both `git` and `commit` (the dashed
-  `git-commit -m x`, `bash scripts/git-commit.sh`).
+  invocation or script of its own, any word that holds `commit`: the bare word
+  (`make commit`, `$GIT commit`, `xargs git` fed the word), a dashed `git-commit -m x`,
+  or a script or file named for the act (`./scripts/commit.sh`, `cat commit-notes.md`),
+  whose contents the reader cannot see.
 
 Runs on the gate's path as `python -I -S`: `json` and `shlex` only, Python 3.9 syntax.
 """
@@ -156,7 +157,7 @@ def _simple_verdict(words: Sequence[str], depth: int) -> Verdict:
     readings = scripts + invocations
     if not scripts and any(_holds_a_commit_script(word) for word in words):
         readings.append("uncertain")
-    if not readings and any(word == "commit" or _names_git_and_commit(word) for word in words):
+    if not readings and any("commit" in word for word in words):
         readings.append("uncertain")
     return _strongest(readings)
 

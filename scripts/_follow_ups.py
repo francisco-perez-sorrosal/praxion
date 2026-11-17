@@ -156,16 +156,16 @@ def return_items(final_text: Optional[str]) -> tuple[str, ...]:  # noqa: UP045 -
 
 def append_open(path: Path, items: tuple[str, ...]) -> None:
     """Append each item to the record at `path` as `- [open] <item>`, skipping any open line the
-    record already holds. The record is created, with its heading, only when a line is written;
-    with no items it is not read."""
+    record already holds. A record that is absent or empty gets its heading before the first line,
+    and only when a line is written; with no items it is not read."""
     if not items:
         return
-    held = path.read_text(encoding="utf-8") if path.exists() else None
-    present = set((held or "").splitlines())
+    held = path.read_text(encoding="utf-8") if path.exists() else ""
+    present = set(held.splitlines())
     wanted = dict.fromkeys(f"{ITEM_PREFIX}[open] {item}" for item in items)
     new = [line for line in wanted if line not in present]
     if not new:
         return
-    lead = _RECORD_HEADING if held is None else ("\n" if held and not held.endswith("\n") else "")
+    lead = _RECORD_HEADING if not held else ("" if held.endswith("\n") else "\n")
     with path.open("a", encoding="utf-8") as record:
         record.write(lead + "\n".join(new) + "\n")

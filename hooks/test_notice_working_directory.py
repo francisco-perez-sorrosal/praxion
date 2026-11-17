@@ -126,6 +126,23 @@ def payload(cwd: Path | str, command: str = "ls", **fields: object) -> str:
     return json.dumps(body)
 
 
+def failure_payload(cwd: Path | str, command: str = "ls", **fields: object) -> str:
+    """A Bash call that exited non-zero: no `tool_response`, an `error` after `tool_input`."""
+    body: dict[str, object] = {
+        "session_id": SESSION,
+        "transcript_path": "/nowhere/transcript.jsonl",
+        "cwd": str(cwd),
+        "hook_event_name": "PostToolUseFailure",
+        "tool_name": "Bash",
+        "tool_input": {"command": command, "description": "Move around"},
+        "tool_use_id": "toolu_01",
+        "error": "Exit code 1",
+        "is_interrupt": False,
+    }
+    body.update(fields)
+    return json.dumps(body)
+
+
 def seed(places: Places, tag: str, home: Path, last: Path) -> None:
     places.store.mkdir(parents=True, exist_ok=True)
     places.record.write_text(f"v1 {tag}\n{home}\n{last}\n")
@@ -240,6 +257,25 @@ def test_each_transition_leaves_its_record_and_announces_only_a_move_away_from_h
     assert len(run.contexts) == int(announced), run.contexts
 
 
+POST_TRANSITIONS = {name: row for name, row in TRANSITIONS.items() if row[1] == "post"}
+
+
+@pytest.mark.parametrize(
+    ("start", "event", "cwd", "command", "end", "announced"),
+    list(POST_TRANSITIONS.values()),
+    ids=list(POST_TRANSITIONS),
+)
+def test_a_call_that_fails_takes_the_same_transition_as_one_that_succeeds(
+    shell, places, start, event, cwd, command, end, announced
+):
+    seed_named(places, start)
+
+    run = run_hook(shell, places, event, failure_payload(places.named(cwd), command))
+
+    assert record_of(places) == expected(places, *end)
+    assert len(run.contexts) == int(announced), run.contexts
+
+
 @pytest.mark.parametrize(
     "command",
     ["make && pushd /tmp", "git pull\ncd src", "make;cd src", "(popd)", "cd\tsrc", "ls|cd"],
@@ -305,6 +341,18 @@ def test_a_directory_change_outside_the_command_is_not_a_pending_move(shell, pla
     assert places.record.stat().st_mtime == 1
 
 
+def test_a_directory_change_in_a_failed_calls_error_is_not_a_pending_move(shell, places):
+    seed(places, "settled", places.project, places.project)
+    os.utime(places.record, (1, 1))
+    stdin = failure_payload(
+        places.project, tool_input={"command": "make"}, error="Exit code 2\nmake: cd build failed"
+    )
+
+    run_hook(shell, places, "post", stdin)
+
+    assert places.record.stat().st_mtime == 1
+
+
 def test_the_same_physical_directory_by_another_name_is_not_a_move(shell, places):
     alias = places.home / "alias"
     alias.symlink_to(places.project)
@@ -349,13 +397,21 @@ def test_a_relative_config_directory_keeps_the_record_out_of_the_project(shell, 
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("event", "name"), [("pre", "PreToolUse"), ("post", "PostToolUse")])
+@pytest.mark.parametrize(
+    ("event", "shaped", "name"),
+    [
+        ("pre", payload, "PreToolUse"),
+        ("post", payload, "PostToolUse"),
+        ("post", failure_payload, "PostToolUseFailure"),
+    ],
+    ids=["pre", "post", "post-after-a-failure"],
+)
 def test_the_notice_is_one_line_of_context_for_the_firing_event_naming_both_directories(
-    shell, places, event, name
+    shell, places, event, shaped, name
 ):
     seed(places, "moving", places.project, places.project)
 
-    run = run_hook(shell, places, event, payload(places.elsewhere))
+    run = run_hook(shell, places, event, shaped(places.elsewhere))
 
     doc = json.loads(run.stdout)
     context = doc["hookSpecificOutput"]["additionalContext"]
@@ -366,10 +422,17 @@ def test_the_notice_is_one_line_of_context_for_the_firing_event_naming_both_dire
 
 
 def _session(shell: str, places: Places, calls: list[tuple[str, Path, str]]) -> list[str]:
+    return _contexts(
+        shell, places, [(event, payload(cwd, command)) for event, cwd, command in calls]
+    )
+
+
+def _contexts(shell: str, places: Places, calls: list[tuple[str, str]]) -> list[str]:
+    """The context each (event, payload) call adds, in order."""
     return [
         context
-        for event, cwd, command in calls
-        for context in run_hook(shell, places, event, payload(cwd, command)).contexts
+        for event, stdin in calls
+        for context in run_hook(shell, places, event, stdin).contexts
     ]
 
 
@@ -393,6 +456,31 @@ def test_a_move_away_adds_exactly_one_line_whichever_payload_shows_it(
     assert len(contexts) == 1, contexts
     assert str(places.elsewhere) in contexts[0]
     assert str(places.project) in contexts[0]
+
+
+@pytest.mark.parametrize(
+    "failure_shows_move", [True, False], ids=["shows-the-move", "shows-the-old-directory"]
+)
+def test_a_cd_in_a_failing_command_and_the_return_to_the_root_announce_only_the_move_away(
+    shell, places, failure_shows_move
+):
+    moving, returning = f"cd {places.inner} && false", f"cd {places.project}"
+    calls = [
+        ("pre", payload(places.project, "ls")),
+        ("pre", payload(places.project, moving)),
+        ("post", failure_payload(places.inner if failure_shows_move else places.project, moving)),
+        ("pre", payload(places.inner, "ls")),
+        ("post", payload(places.inner, "ls")),
+        ("pre", payload(places.inner, returning)),
+        ("post", payload(places.project, returning)),
+        ("pre", payload(places.project, "ls")),
+    ]
+
+    contexts = _contexts(shell, places, calls)
+
+    assert len(contexts) == 1, contexts
+    assert f"in {places.inner};" in contexts[0]
+    assert f"root is {places.project}." in contexts[0]
 
 
 def test_a_payload_without_spaces_after_its_colons_reads_the_same(shell, places):
@@ -538,3 +626,35 @@ def test_a_new_session_clears_records_quiet_for_a_week_and_keeps_the_rest(shell,
 
 def test_the_hook_is_executable():
     assert os.access(HOOK, os.X_OK), f"{HOOK} is not executable (chmod +x required)"
+
+
+# ---------------------------------------------------------------------------
+# The registry: `post` must follow every Bash call that may have moved the session
+# ---------------------------------------------------------------------------
+
+HOOKS_JSON = HOOK.parent / "hooks.json"
+
+
+def _registered(event: str) -> list[tuple[str, str]]:
+    """(matcher, command) of each command hook registered under the event."""
+    groups = json.loads(HOOKS_JSON.read_text())["hooks"].get(event, [])
+    return [
+        (group.get("matcher", ""), hook["command"]) for group in groups for hook in group["hooks"]
+    ]
+
+
+@pytest.mark.parametrize(
+    ("event", "matcher", "argument"),
+    [
+        ("PreToolUse", "", "pre"),
+        ("PostToolUse", "Bash", "post"),
+        ("PostToolUseFailure", "Bash", "post"),
+    ],
+    ids=["pre-on-every-tool", "post-after-a-bash-call", "post-after-a-failed-bash-call"],
+)
+def test_the_hook_is_registered_after_every_bash_call_and_before_every_tool(
+    event, matcher, argument
+):
+    command = f"${{CLAUDE_PLUGIN_ROOT}}/hooks/notice_working_directory.sh {argument}"
+
+    assert (matcher, command) in _registered(event)

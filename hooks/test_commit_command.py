@@ -85,7 +85,7 @@ RULES = {
     "value-less-flags": ("git --no-pager -P --no-optional-locks commit -m y", "commit"),
     "missing-option-value": ("git -C", "uncertain"),
     "bare-git": ("git", "uncertain"),
-    "assignment-ending-in-git": ("GIT_EXEC=/opt/git log --grep=commit", "not-a-commit"),
+    "assignment-ending-in-git": ("GIT_EXEC=/opt/git log --grep=commit", "uncertain"),
     "built-in-merge-no-commit": ("git merge --no-commit topic", "not-a-commit"),
     "built-in-help": ("git help commit", "not-a-commit"),
     "alias": ("git ci -m commit", "uncertain"),
@@ -112,6 +112,9 @@ OTHER_ROUTES = {
     "dashed-git-commit": "git-commit -m x",
     "dashed-git-commit-by-path": "/usr/lib/git-core/git-commit -m x",
     "script-named-for-a-commit": "bash scripts/git-commit.sh",
+    "script-named-for-a-commit-run-by-path": "./scripts/commit.sh",
+    "script-named-for-a-commit-run-by-a-shell": "sh tools/do-commit",
+    "file-named-for-a-commit": "cat commit-notes.md",
 }
 
 # Every command of the tables above that begins `git <a subcommand the gate decides in

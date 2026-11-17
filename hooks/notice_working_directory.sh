@@ -7,8 +7,9 @@
 #   pre   PreToolUse, every tool: resolves a move the moving call's own payload
 #         did not show, and takes a move no Bash call made (a worktree entered
 #         or left) as the session's new home
-#   post  PostToolUse, Bash: announces a move the call's payload already shows,
-#         or marks a call whose command may have moved the session
+#   post  PostToolUse and PostToolUseFailure, Bash: announces a move the call's
+#         payload already shows, or marks a call whose command may have moved
+#         the session (a call the user cancels fires neither: the next `pre` sees it)
 #
 # Home is the directory the harness last put the session in; the notice names
 # the new directory and home, and a session back at home hears nothing.
@@ -131,6 +132,7 @@ holds_directory_change() {
     command=${input#*\"command\":}
     command=${command%%\"description\":*}
     command=${command%%\"tool_response\":*}
+    command=${command%%\"error\":*}
     for word in cd pushd popd; do
         case $command in
             *$WORD_START"$word"$WORD_END* | *$WORD_START"$word"$ESCAPED_SPACE* | \
@@ -156,7 +158,12 @@ write_record() {
 }
 
 announce() {
-    case $event in pre) name=PreToolUse ;; *) name=PostToolUse ;; esac
+    name=PreToolUse
+    if [ "$event" = post ]; then
+        # One `post` follows a call that failed too; its output names that event.
+        name=PostToolUse
+        first_value hook_event_name && [ "$value" = PostToolUseFailure ] && name=$value
+    fi
     printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' \
         "$name" "$notice"
 }

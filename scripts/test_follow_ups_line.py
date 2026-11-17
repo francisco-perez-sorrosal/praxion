@@ -156,13 +156,13 @@ def test_a_record_with_no_final_newline_gets_one_before_the_first_item(tmp_path)
     assert record.read_text(encoding="utf-8") == "# Follow-ups\n\n- [open] held\n- [open] next\n"
 
 
-def test_an_empty_record_file_takes_the_items_without_a_second_heading(tmp_path):
+def test_an_empty_record_file_takes_the_heading_a_new_record_gets_before_its_items(tmp_path):
     record = tmp_path / "FOLLOW_UPS.md"
     record.write_text("", encoding="utf-8")
 
     fu.append_open(record, ("only",))
 
-    assert record.read_text(encoding="utf-8") == "- [open] only\n"
+    assert record.read_text(encoding="utf-8") == "# Follow-ups\n\n- [open] only\n"
 
 
 def test_an_item_whose_open_line_is_already_there_is_skipped(tmp_path):

@@ -109,6 +109,8 @@ OTHER_ROUTES = {
     "git-in-a-variable": '"$GIT" commit -m x',
     "script-for-another-interpreter": "python -c \"import os; os.system('git commit -m x')\"",
     "script-for-a-git-built-in": "git rebase -x 'git commit --amend --no-edit' main",
+    "commit-named-script-for-a-git-built-in": "git rebase -x ./scripts/commit.sh main",
+    "commit-named-script-for-git-bisect": "git bisect run ./check-commit.sh",
     "dashed-git-commit": "git-commit -m x",
     "dashed-git-commit-by-path": "/usr/lib/git-core/git-commit -m x",
     "script-named-for-a-commit": "bash scripts/git-commit.sh",

@@ -89,6 +89,10 @@ GIT_BUILTINS = frozenset(
     upload-archive--writer upload-pack url-parse var verify-commit verify-pack verify-tag
     version whatchanged worktree write-tree""".split()
 )
+# Built-ins that run a command the caller hands them (`rebase -x`, `bisect run`, `submodule
+# foreach`, a `filter-branch` filter): what that command does cannot be read from here, so one
+# that names a commit keeps the checkers running.
+GIT_RUNS_A_COMMAND = frozenset({"rebase", "bisect", "submodule", "filter-branch"})
 
 
 def main() -> int:
@@ -197,6 +201,8 @@ def _git_verdict(args: Sequence[str]) -> Verdict:
     subcommand = args[index]
     if subcommand == "commit":
         return "commit"
+    if subcommand in GIT_RUNS_A_COMMAND and any("commit" in word for word in args[index + 1 :]):
+        return "uncertain"
     return "not-a-commit" if subcommand in GIT_BUILTINS else "uncertain"
 
 

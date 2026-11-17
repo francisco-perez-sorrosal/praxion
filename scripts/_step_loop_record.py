@@ -205,13 +205,7 @@ def record_return(
     """Take back the agent's return for `request`, or replay the record it already has."""
     done = next((r for r in task.inputs.records if r.request == request), None)
     if done is not None:
-        marker = _MARKER_OF_STOP.get(done.stop_reason, "none")
-        step_id = bare_id(done.step)
-        settle_replan(task.dir / WIP_FILE, task.inputs, _plan_step(task.inputs, step_id), request)
-        reviewed = request_kind(done) == "review"
-        verdict = file_verdict(task.inputs.reviews.get(step_id)) if reviewed else None
-        taken = recorded_object(done, marker, None, replayed=True, review_verdict=verdict)
-        return Taken(taken, step_id)
+        return _replayed(task, done, request)
     spawn = _pending(task.inputs, request)
     step, key = spawn.step, spawn.key
     if key.kind == "review":  # a review's return is read from its verdict file, never gated
@@ -257,6 +251,17 @@ def record_return(
     warnings += edit_warnings(task, step, request)
     taken = recorded_object(record, marker, summary)
     return Taken(taken, step.id, warnings)
+
+
+def _replayed(task: TaskView, done: IterationRecord, request: str) -> Taken:
+    """The record `request` already has, given back as it was written: nothing is run again."""
+    marker = _MARKER_OF_STOP.get(done.stop_reason, "none")
+    step_id = bare_id(done.step)
+    settle_replan(task.dir / WIP_FILE, task.inputs, _plan_step(task.inputs, step_id), request)
+    reviewed = request_kind(done) == "review"
+    verdict = file_verdict(task.inputs.reviews.get(step_id)) if reviewed else None
+    taken = recorded_object(done, marker, None, replayed=True, review_verdict=verdict)
+    return Taken(taken, step_id)
 
 
 def copy_follow_ups(path: Path, final_text: str | None) -> Warnings:

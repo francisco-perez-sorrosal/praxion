@@ -4,7 +4,7 @@ title: A shipped shell hook tells the main conversation, once per move, that a B
 status: proposed
 category: architectural
 date: 2026-11-16
-summary: hooks/notice_working_directory.sh, registered under PreToolUse for every tool and PostToolUse for Bash, keeps one three-state record per main-conversation session and adds one additionalContext line when a Bash command leaves the session away from its home (its start directory, or the worktree the harness moved it into); POSIX sh only, fail-open, correct whether or not the moving call's PostToolUse payload already shows the new directory.
+summary: hooks/notice_working_directory.sh, registered under PreToolUse for every tool and, for Bash, under PostToolUse and PostToolUseFailure, keeps one three-state record per main-conversation session and adds one additionalContext line when a Bash command leaves the session away from its home (its start directory, or the worktree the harness moved it into); POSIX sh only, fail-open, correct whether or not the moving call's PostToolUse payload already shows the new directory.
 tags: [hooks, cwd, worktree, bash, additional-context, shipped]
 made_by: agent
 agent_type: systems-architect
@@ -24,6 +24,10 @@ A `cd` inside a Bash command persists in the main conversation and moves the ses
 ## Decision
 
 Add one hook component, `hooks/notice_working_directory.sh <pre|post>`, POSIX `sh` with builtins plus one `cat`, registered in `hooks/hooks.json` as two new groups: `PreToolUse` with matcher `""` (`pre`) and `PostToolUse` with matcher `Bash` (`post`). It keeps one record per main-conversation session under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/praxion/cwd-notice/<session_id>`, in one of three states: `Unseen`, `Settled(home, last)`, `Moving(home, last)`. A change of `cwd` seen at `post` is a Bash move; a change seen at `pre` is a Bash move only when the record is `Moving` (a Bash call whose command held `cd`, `pushd` or `popd` ended with its payload unchanged), else a move the harness made, which becomes the session's home silently. A Bash move away from home adds one line naming the new directory and home; a move to home adds nothing. Subagent payloads, unreadable payloads and paths the shell cannot write into JSON add nothing; the script always exits 0. No live probe of the payload question is run: neither answer would remove a registration, a process or a write from the silent path.
+
+## As built
+
+One assumption of this decision was wrong and was corrected before the merge. The decision registered the `post` half under `PostToolUse` only and attributed a change first seen at a `pre` with no moving record to the harness. That holds only if every Bash call fires `PostToolUse`. The hooks reference (read again 2026-11-17) says `PostToolUse` runs after a tool completes successfully and `PostToolUseFailure` when a tool that started executing fails, and its example of the latter is a Bash command whose error begins `Exit code 1`. So `cd sub && <a command that fails>` never reached `post`: the next `pre` took `sub` for the session's home, and a later return to the project root was announced as a move away. The final verifier found it by a probe. The `post` half is now registered under both events (matcher `Bash`), a failure's `error` text is not read as part of the command, and the notice names the event that fired it. One limit stays: the reference says cancelling a running tool fires neither event, so a move made by a call the user interrupts is first seen at the next `pre`. The hook still has not run under a live harness; this correction came from the reference, not from one.
 
 ## Considered Options
 

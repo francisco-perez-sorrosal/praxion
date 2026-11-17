@@ -212,6 +212,8 @@ _FINISH_WORK = """\
 1. Record a `## {sid}` section in {work}/TEST_RESULTS.md ending with your Check: Result: line.
 2. Flip only {sid}'s line in {work}/WIP.md; never edit an Attempts: or Check: line.
 3. Stop in a committable state and never commit: the step-loop driver commits once it verifies.
+   The driver runs the derived test scope at its gate once you return; start no scope yourself.
+   Run the step's Check in the foreground and finish it before you return.
 4. End with at most 5 lines whose last line is one marker: [COMPLETE], [BLOCKED] (add a Spec
    Question if a due outer-loop test contradicts the spec), [CONFLICT] or [PARTIAL].
 </finish>"""

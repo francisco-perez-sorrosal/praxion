@@ -32,6 +32,8 @@ Uncommitted edits to src/widget.py, tests/test_widget.py remain; read them first
 1. Record a `## Step 7` section in /repo/.ai-work/demo/TEST_RESULTS.md ending with your Check: Result: line.
 2. Flip only Step 7's line in /repo/.ai-work/demo/WIP.md; never edit an Attempts: or Check: line.
 3. Stop in a committable state and never commit: the step-loop driver commits once it verifies.
+   The driver runs the derived test scope at its gate once you return; start no scope yourself.
+   Run the step's Check in the foreground and finish it before you return.
 4. End with at most 5 lines whose last line is one marker: [COMPLETE], [BLOCKED] (add a Spec
    Question if a due outer-loop test contradicts the spec), [CONFLICT] or [PARTIAL].
 </finish>

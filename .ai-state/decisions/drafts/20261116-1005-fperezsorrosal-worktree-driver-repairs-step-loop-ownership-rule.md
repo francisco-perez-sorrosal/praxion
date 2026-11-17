@@ -41,7 +41,7 @@ The plan reader already parses `Read-only:`. Rejected: its import purity is pinn
 
 ## Consequences
 
-Positive: one definition serves pending, withholding and the prompt; about 80 lines leave `_step_loop_io.py`; a re-pin of a test in any pocket can be scheduled after the step that changes its value.
+Positive: one definition serves pending, withholding and the prompt; `_step_loop_io.py` stops growing (as built it went from 754 lines to 751: the rule moved out, and the re-exports that keep its callers working stayed, so the 80 lines this decision expected to leave did not); a re-pin of a test in any pocket can be scheduled after the step that changes its value.
 
 Negative: one more module; two re-export shims to keep until the standing tests import the new module directly.
 

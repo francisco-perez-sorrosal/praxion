@@ -63,6 +63,7 @@ from _step_loop_action import (  # noqa: E402
     Several,
     Spawn,
     Superseded,
+    outstanding_id,
     read_outstanding,
 )
 from _step_loop_files import (  # noqa: E402
@@ -106,7 +107,6 @@ from _step_loop_render import (  # noqa: E402
     RequestKey,
     SpawnRequest,
     commit_message,
-    parse_request_id,
     spawn_request,
 )
 from _step_loop_review import file_verdict, review_record  # noqa: E402
@@ -320,16 +320,29 @@ def withdraw_request(task: TaskView, request: str) -> Taken:
 
 def _withdrawable(inputs: LoopInputs, request: str) -> tuple[str, RequestKey]:
     """The step and key of `request` when the reading holds it out with a count that can be
-    restored: a current or superseded request, or a member of several whose id names its step."""
+    restored: a current or superseded request. A member of several is read as its line alone
+    would be, so a line that disagrees with itself refuses whether or not others are out."""
     reading = read_outstanding(inputs)
+    if isinstance(reading, Several):
+        inputs = _line_alone(inputs, reading, request)
+        reading = read_outstanding(inputs)
     if isinstance(reading, (Current, Superseded)) and reading.key.id == request:
         return reading.step, reading.key
-    if isinstance(reading, Several):
-        for step_id, named in reading.requests:
-            key = parse_request_id(named)
-            if named == request and key is not None and key.step == step_id:
-                return step_id, key
     raise _not_outstanding(inputs, reading, request)
+
+
+def _line_alone(inputs: LoopInputs, reading: Several, request: str) -> LoopInputs:
+    """The inputs with every outstanding line but the one naming `request` set aside, or as they
+    are when none names it."""
+    own = next((step for step, named in reading.requests if named == request), None)
+    if own is None:
+        return inputs
+    kept = {
+        step: attempt
+        for step, attempt in inputs.attempts.items()
+        if step == own or not isinstance(attempt, OutstandingAttempt)
+    }
+    return replace(inputs, attempts=kept)
 
 
 def withdrawn_object(request: str) -> dict[str, Any]:
@@ -387,24 +400,36 @@ def _not_outstanding(
     inputs: LoopInputs, reading: OutstandingReading, request: str
 ) -> RecordRefusedError:
     """The refusal of a request the reading holds out as nothing to take back: a line that
-    disagrees with itself (its count restored would be a lie), or another request out."""
-    if isinstance(reading, (Malformed, Miscounted)) and reading.request == request:
+    disagrees with itself (its count restored would be a lie), or another request out. Each
+    names the requests the lines hold, since `status` names none in either state."""
+    if isinstance(reading, (Malformed, Miscounted)):
         count = inputs.attempts[reading.step].count
         what = (
             "whose attempt is not the line's own"
             if isinstance(reading, Miscounted)
             else "which is no request of that step's series at"
         )
+        cause = "" if reading.request == request else f"{request} is not outstanding: "
         return RecordRefusedError(
             "request-not-pending",
-            f"record failed because the Attempts: line of {STEP_LABEL}{reading.step} names"
-            f" {request}, {what} count={count}; nothing was written. To fix: correct the line"
-            " in WIP.md, then run status.",
+            f"record failed because {cause}the Attempts: line of {STEP_LABEL}{reading.step}"
+            f" names {reading.request}, {what} count={count}; nothing was written. To fix:"
+            " correct the line in WIP.md, then run status.",
         )
+    if isinstance(reading, Several):
+        named = ", ".join(f"{req} ({STEP_LABEL}{step})" for step, req in reading.requests)
+        return RecordRefusedError(
+            "request-not-pending",
+            f"record failed because WIP.md holds several outstanding requests, {named}; nothing"
+            " was written. To fix: keep the request whose agent ran, remove request=<id> from"
+            " the other lines in WIP.md, then record the one kept.",
+        )
+    held = outstanding_id(reading)
+    state = f"the outstanding request is {held}" if held else "none is outstanding"
     return RecordRefusedError(
         "request-not-pending",
-        f"record failed because {request} is not the outstanding request; nothing was written."
-        " To fix: run status, and record the request it names.",
+        f"record failed because {request} is not the outstanding request ({state}); nothing was"
+        " written. To fix: record the outstanding request, or run next to get one.",
     )
 
 

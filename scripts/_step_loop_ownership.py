@@ -17,11 +17,11 @@ Normative ownership of a failed node -- a `Read-only:` entry owns every node it 
 prefix of, at a path, `::` or `[` boundary (`a.py::f` owns `a.py::f[x]` but not
 `a.py::fg`). A node id is asked in the repository-relative form a plan's entry spells: a run
 in a non-root pocket prints ids relative to the pocket, so `Ownership.in_pocket` puts the
-pocket's directory in front of them first. The longest owning entry decides. A node counts as pending only when every
-entry tied for longest belongs to another step that is not done; any other failure is
-a failure, so a tie with the step's own entry stays a failure. `Ownership.step`,
-`done_steps` and the map keys share one id form; `step` must be a key of the map (a step
-with no entries maps to `()`).
+pocket's directory in front of them first. The longest owning entry decides. A node counts
+as pending only when every entry tied for longest belongs to another step that is not done;
+any other failure is a failure, so a tie with the step's own entry stays a failure.
+`Ownership.step`, `done_steps` and the map keys share one id form; `step` must be a key of
+the map (a step with no entries maps to `()`).
 """
 
 from __future__ import annotations
@@ -77,7 +77,8 @@ def entry_owns(entry: str, node_id: str) -> bool:
     if not node_id.startswith(entry):
         return False
     rest = node_id[len(entry) :]
-    boundaries = _NODE_BOUNDARIES if "::" in entry else (_PATH_BOUNDARY, *_NODE_BOUNDARIES)
+    is_node = isinstance(read_only_entry(entry), NodeEntry)
+    boundaries = _NODE_BOUNDARIES if is_node else (_PATH_BOUNDARY, *_NODE_BOUNDARIES)
     return rest == "" or entry.endswith(_PATH_BOUNDARY) or rest.startswith(boundaries)
 
 

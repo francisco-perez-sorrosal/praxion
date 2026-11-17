@@ -38,8 +38,9 @@ addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
 markers = ["integration: builds a real repo copy on disk, no network"]
 
-# The step-loop gate runs this pocket's whole suite when a runner config changes: 822 s
-# measured, so 1200 s leaves 46 percent headroom (the driver default is 540 s).
+# The step-loop gate runs this pocket's whole suite when a runner config changes: 485 to
+# 565 s measured alone and 1,062 s on a loaded machine (2026-11-16), so 1200 s keeps the
+# loaded run inside its bound (the driver default is 540 s).
 [tool.praxion.step-loop]
 gate-timeout-seconds = 1200
 

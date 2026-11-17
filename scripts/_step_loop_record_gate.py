@@ -403,11 +403,12 @@ def read_observed(pocket: str, observed: Observed, rule: PendingRule) -> _RunRea
             seen = _unanswered(observed.output, rule)
             why = f"{pocket}: {run.counts.rationale}"
             return _RunReading(command, reason=why, failures=_in_pocket(pocket, seen))
+        run = _in_repository(pocket, run)
         if observed.returncode != 0 and not run.red and not run.pending_ids:
             # A runner that exits non-zero with no failure to show is not a pass.
             why = f"{pocket}: exited {observed.returncode} with no failure reported"
             return _RunReading(command, finished=run, reason=why)
-        return _RunReading(command, finished=run, failures=_in_pocket(pocket, run.failed_ids))
+        return _RunReading(command, finished=run, failures=run.failed_ids)
     if isinstance(observed, CutOff):
         bound = observed.bound
         cut = f"{pocket} after {bound.seconds:g}s ({bound.source})"
@@ -426,6 +427,13 @@ def read_observed(pocket: str, observed: Observed, rule: PendingRule) -> _RunRea
 
 def _in_pocket(pocket: str, nodes: Sequence[str]) -> tuple[str, ...]:
     return tuple(repository_form(pocket, node) for node in nodes)
+
+
+def _in_repository(pocket: str, run: GateRun) -> GateRun:
+    """`run` with every node id as the repository names it, so the runs of two pockets merge
+    without one pocket's id standing for the same relative id of another."""
+    failed, pending = _in_pocket(pocket, run.failed_ids), _in_pocket(pocket, run.pending_ids)
+    return replace(run, failed_ids=failed, pending_ids=pending)
 
 
 def _asked_in(rule: PendingRule, pocket: str) -> PendingRule:
@@ -476,9 +484,19 @@ def check_run(
     if not isinstance(step.check, Check):
         return GateRun("Check:", NoRun(f"the Check: line cannot be read: {step.check.reason}"))
     ran = bounded_check(repo, run_dir, step.check.command, give_up_at)
-    pocket = check_pocket(ran.argv)
+    pocket = _relative_pocket(repo, check_pocket(ran.argv))
     run = classified(ran, _asked_in(rule, pocket), step.check.command)
-    return replace(run, failed_ids=_in_pocket(pocket, run.failed_ids))
+    return _in_repository(pocket, run)
+
+
+def _relative_pocket(repo: Path, pocket: str) -> str:
+    """`pocket` as the repository names it: an absolute path inside `repo` is made relative to
+    it; any other spelling is kept (a pocket outside the repository holds no entry's node)."""
+    path = Path(pocket)
+    if not path.is_absolute():
+        return pocket
+    resolved, root = path.resolve(), repo.resolve()
+    return str(resolved.relative_to(root)) if resolved.is_relative_to(root) else pocket
 
 
 def check_collects(repo: Path, step: PlanStep) -> str | None:

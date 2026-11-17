@@ -65,8 +65,9 @@ DASH = "—"
 SHORT_SHA = 7
 VERBS = ("next", "record", "status")
 LOCATION_OPTIONS = ("--repo-root", "--worktree-root", "--base-ref")
-_ECHOED_OPTION = re.compile(  # a printed command's option: its value as `shlex.quote` writes it
-    rf"\s+(?:{'|'.join(LOCATION_OPTIONS)})(?:=|\s+)(?:'[^']*'|[\w@%+=:,./-]+)"
+_ECHOED_OPTION = re.compile(  # a printed command's option: its value as `shlex.quote` writes it,
+    # one shell word of quoted and bare runs, so a value holding `'` (`'a'"'"'b'`) is taken whole
+    rf"\s+(?:{'|'.join(LOCATION_OPTIONS)})(?:=|\s+)(?:'[^']*'|\"[^\"]*\"|[\w@%+=:,./-])+"
 )
 GOAL_VERB = "goal"
 RUN_VERB = "run"
@@ -238,17 +239,28 @@ def parse(argv: Sequence[str], description: str | None) -> argparse.Namespace:
 def location_echo(argv: Sequence[str]) -> tuple[str, ...]:
     """The location options a call gave, as `option value` words in the order given, whether
     spelled `--opt value` or `--opt=value`: the options every command it prints must repeat,
-    so a printed command run as printed reads the same repository, root and base."""
+    so a printed command run as printed reads the same repository, root and base. A prefix the
+    parser accepts (`--base`) is echoed under the full name, with the value as given."""
     echoed: list[str] = []
     words = iter(argv)
     for word in words:
-        option, equals, attached = word.partition("=")
-        if option not in LOCATION_OPTIONS:
+        spelled, equals, attached = word.partition("=")
+        option = _full_location_option(spelled)
+        if option is None:
             continue
         value = attached if equals else next(words, None)
         if value is not None:
             echoed += [option, value]
     return tuple(echoed)
+
+
+def _full_location_option(spelled: str) -> str | None:
+    """The location option `spelled` names in full or as the one option it begins; the parser
+    refuses a prefix several of its options share, so no call echoes one."""
+    if not spelled.startswith("--") or len(spelled) <= len("--"):
+        return None
+    named = [option for option in LOCATION_OPTIONS if option.startswith(spelled)]
+    return named[0] if len(named) == 1 else None
 
 
 def same_next_action(held: str | None, composed: str | None) -> bool:

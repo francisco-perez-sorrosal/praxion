@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -92,6 +93,17 @@ def test_a_location_option_among_other_options_is_found():
     assert location_echo(argv) == ("--base-ref", "main")
 
 
+@pytest.mark.parametrize(
+    ("argv", "echoed"),
+    [
+        pytest.param(["next", SLUG, "--base", "abc"], ("--base-ref", "abc"), id="separate"),
+        pytest.param(["next", SLUG, "--work=/w"], ("--worktree-root", "/w"), id="equals"),
+    ],
+)
+def test_an_abbreviated_option_is_echoed_under_its_full_name_with_its_value(argv, echoed):
+    assert location_echo(argv) == echoed
+
+
 def test_an_option_with_no_value_after_it_echoes_nothing():
     assert location_echo(["next", SLUG, "--base-ref"]) == ()
 
@@ -151,6 +163,12 @@ def test_an_option_inside_a_sentence_is_set_aside_without_its_punctuation():
     held = f"(it runs `{RESUME}`)"
 
     assert same_next_action(held, f"(it runs `{RESUME} {BASE}`)")
+
+
+def test_a_value_holding_a_quote_is_set_aside_whole_when_comparing():
+    quoted = shlex.quote("/it's here")
+
+    assert same_next_action(RESUME, f"{RESUME} --repo-root {quoted} {BASE}")
 
 
 def test_sections_carrying_different_options_are_not_one_action():

@@ -422,6 +422,15 @@ def test_a_revise_prompt_carries_the_findings_in_place_of_the_attempts():
     assert element(text, "review-findings") == "verdict: revise\nfindings:\n  - id: F1"
 
 
+def test_a_revise_prompt_tells_the_step_which_of_its_node_entries_are_its_own():
+    node = "tests/test_widget.py::test_value"
+    step = make_step(extra=(f"**Read-only**: `{node}`",))
+
+    text, _ = prompt_for("revise", step=step, findings_text="verdict: revise\n")
+
+    assert f"Your Read-only entry `{node}` names a node that is yours" in element(text, "own-nodes")
+
+
 def test_a_review_prompt_holds_the_step_the_signals_the_diff_command_and_the_finish():
     text, _ = prompt_for("review")
     markers = [

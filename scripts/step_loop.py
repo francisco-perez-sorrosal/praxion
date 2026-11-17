@@ -41,7 +41,9 @@ internal.
 Guarantees:
 * A spawn that is new has its attempt written to `WIP.md` (`- Attempts: Step <id> count=<n>
   request=<id>`) and its prompt file `PROMPT_<id>.md` written before it is printed; an
-  implement request counts an attempt, a review or revise request leaves the count alone.
+  implement request counts an attempt, a review or revise request leaves the count alone. The
+  same write gives a step that `WIP.md` does not list its checklist line (`- [ ] Step <id>:
+  <title>`), in front of the first later step's, so the reconciler judges it.
 * `next` twice with no `record` between prints the same request, `reissued` false and then
   true, and the second call writes nothing. A stop repeats byte for byte.
 * No request exceeds the attempt cap. A stop leaves `HANDOFF.md` whose section 2 names it.
@@ -91,6 +93,7 @@ from _step_loop_files import (
     latest_reading,
     snapshot_requests,
     with_attempts_line,
+    with_checklist_line,
     write_atomic,
     write_prompt,
     write_stop_handoff,
@@ -119,7 +122,6 @@ from _step_loop_state import (
     wants_outside_work,
     work_start,
 )
-from _step_schema import checklist_step_id
 from iteration_ledger import read_ledger
 from reconcile_pipeline_state import reconcile
 
@@ -368,23 +370,6 @@ def _write_ahead(task: Task, action: Spawn) -> None:
     listed = with_checklist_line(wip.read_text("utf-8"), action.step, task.inputs.steps)
     attempt = OutstandingAttempt(count, key.id)
     write_atomic(wip, with_attempts_line(listed, action.step.id, attempt))
-
-
-def with_checklist_line(wip_text: str, step: PlanStep, steps: Sequence[PlanStep]) -> str:
-    """The WIP text with a checklist line for `step`. A step put into the plan ahead of another
-    has none, and the reconciler judges only the steps WIP lists, so its line goes in front of
-    the line of the first later step that has one; with no such line the text is unchanged."""
-    lines = wip_text.split("\n")
-    claimed = [checklist_step_id(line) for line in lines]
-    if STEP_LABEL + step.id in claimed:
-        return wip_text
-    later = (STEP_LABEL + s.id for s in steps[steps.index(step) + 1 :])
-    at = next((claimed.index(label) for label in later if label in claimed), None)
-    if at is None:
-        return wip_text
-    indent = lines[at][: len(lines[at]) - len(lines[at].lstrip())]
-    lines.insert(at, f"{indent}- [ ] {STEP_LABEL}{step.id}: {step.title}")
-    return "\n".join(lines)
 
 
 def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:

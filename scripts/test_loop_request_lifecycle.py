@@ -30,6 +30,7 @@ from _step_loop_action import (  # noqa: E402
     next_action,
     read_outstanding,
 )
+from _step_loop_files import with_checklist_line  # noqa: E402
 from _step_loop_render import RequestKey  # noqa: E402
 from _step_loop_state import LoopInputs, series_states  # noqa: E402
 from iteration_ledger import IterationRecord, append_record  # noqa: E402
@@ -277,6 +278,40 @@ def test_a_line_that_disagrees_with_itself_refuses_the_withdrawal_naming_step_id
     assert wip_text(root) == before
 
 
+def several(second_line):
+    return (
+        f"# WIP\n\n## Progress\n\n- [ ] {STEP}1: Do it\n  - Attempts: {STEP}1 count=1"
+        f" request=s1-a1-implement\n- [ ] {STEP}2: Do it\n  - Attempts: {STEP}2 {second_line}\n"
+    )
+
+
+def test_a_miscounted_member_of_several_refuses_the_withdrawal_as_a_lone_line_does(tmp_path):
+    root = build(tmp_path, plan(1, 2), several("count=2 request=s2-a1-implement"))
+    before = wip_text(root)
+
+    reply = withdraw(root, "s2-a1-implement")
+
+    message = reply.doc["error"]["message"]
+    assert (reply.exit, reply.doc["error"]["code"]) == (4, "request-not-pending")
+    assert (f"{STEP}2" in message, "count=2" in message) == (True, True), message
+    assert wip_text(root) == before
+
+
+def test_a_return_met_by_several_outstanding_requests_is_refused_naming_each_of_them(tmp_path):
+    root = build(tmp_path, plan(1, 2), several("count=1 request=s2-a1-implement"))
+    before = wip_text(root)
+
+    reply = call(
+        root, "record", "--request", "s2-a1-implement", "--agent-id", "a", "--marker", "complete"
+    )
+
+    message = reply.doc["error"]["message"]
+    assert reply.doc["error"]["code"] == "request-not-pending"
+    assert ("s1-a1-implement" in message, "s2-a1-implement" in message) == (True, True), message
+    assert ("run status" in message, "remove request=" in message) == (False, True), message
+    assert wip_text(root) == before
+
+
 def test_the_withdrawn_envelope_prints_the_next_call_and_exits_zero():
     frame = cli.Frame(SLUG, cli.Iterations(0, 2), (), {"stop_reason": "not-started"})
 
@@ -289,6 +324,25 @@ def test_the_withdrawn_envelope_prints_the_next_call_and_exits_zero():
 def test_a_step_put_ahead_gets_its_checklist_line_in_front_of_the_next_one():
     steps = [PLAIN_STEP, SECOND]
 
-    listed = step_loop.with_checklist_line(WIP, PLAIN_STEP, steps)
+    listed = with_checklist_line(WIP, PLAIN_STEP, steps)
 
     assert listed == f"# WIP\n\n## Progress\n\n- [ ] {STEP}1: Do it\n- [ ] {STEP}2: Do it\n"
+
+
+@pytest.mark.parametrize(
+    ("wip", "steps"),
+    [
+        pytest.param(f"# WIP\n\n- [ ] {STEP}1: Do it\n- [ ] {STEP}2: Do it\n", [PLAIN_STEP, SECOND], id="listed"),
+        pytest.param(f"# WIP\n\n- [ ] {STEP}3: Other\n", [PLAIN_STEP, SECOND], id="no-later-line"),
+    ],
+)  # fmt: skip
+def test_a_step_already_listed_or_with_no_later_line_leaves_the_text_as_it_was(wip, steps):
+    assert with_checklist_line(wip, PLAIN_STEP, steps) == wip
+
+
+def test_a_checklist_line_shown_inside_a_code_fence_lists_no_step():
+    fenced = f"# WIP\n\n```\n- [ ] {STEP}1: Do it\n```\n\n- [ ] {STEP}2: Do it\n"
+
+    listed = with_checklist_line(fenced, PLAIN_STEP, [PLAIN_STEP, SECOND])
+
+    assert listed == fenced.replace(f"\n- [ ] {STEP}2", f"\n- [ ] {STEP}1: Do it\n- [ ] {STEP}2")

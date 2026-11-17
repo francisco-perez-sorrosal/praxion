@@ -38,6 +38,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
 from _handoff_inputs import read_existing  # noqa: E402
 from _handoff_readiness import WAL_AGENT_STOP, session_wal_rows  # noqa: E402
 from _loop_fields import REQUEST_ID_RE, AnyAttempt, render_attempts_line  # noqa: E402
+from _plan_steps import PlanStep  # noqa: E402
 from _step_loop_gate import EndEvidence, GateEvidence, parse_gate_evidence  # noqa: E402
 from _step_loop_render import AgentCall, parse_request_id  # noqa: E402
 from _step_loop_state import SNAPSHOT_STEM, SNAPSHOT_SUFFIX  # noqa: E402
@@ -116,6 +117,24 @@ def with_attempts_line(wip_text: str, step_id: str, attempt: AnyAttempt | None) 
         return "\n".join([*lines[:at], rendered, *lines[at:]])
     child = _indent(lines[anchor]) + _CHILD_INDENT + rendered
     return "\n".join([*lines[: anchor + 1], child, *lines[anchor + 1 :]])
+
+
+def with_checklist_line(wip_text: str, step: PlanStep, steps: Sequence[PlanStep]) -> str:
+    """The WIP text with a checklist line for `step`. A step put into the plan ahead of another
+    has none, and the reconciler judges only the steps WIP lists, so its line goes in front of
+    the line of the first later step that has one; with no such line the text is unchanged. A
+    line inside a code fence lists no step, as it declares no `Attempts:` count."""
+    lines = wip_text.split("\n")
+    fenced = _fenced_flags(lines)
+    claimed = [None if fenced[i] else checklist_step_id(line) for i, line in enumerate(lines)]
+    if STEP_LABEL + step.id in claimed:
+        return wip_text
+    later = (STEP_LABEL + s.id for s in steps[steps.index(step) + 1 :])
+    at = next((claimed.index(label) for label in later if label in claimed), None)
+    if at is None:
+        return wip_text
+    lines.insert(at, f"{_indent(lines[at])}- [ ] {STEP_LABEL}{step.id}: {step.title}")
+    return "\n".join(lines)
 
 
 def _indent(line: str) -> str:

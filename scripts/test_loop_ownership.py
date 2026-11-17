@@ -135,6 +135,15 @@ def test_a_step_whose_files_name_the_file_of_its_node_entry_is_told_the_file_is_
     assert (NODE in sentence, f"`{FILE}` is yours to edit" in sentence) == (True, True)
 
 
+@pytest.mark.parametrize("directory", ["tests/unit", "./tests/unit"])
+def test_a_step_whose_files_name_the_directory_of_its_node_entry_is_told_the_same(
+    directory: str,
+) -> None:
+    node = "tests/unit/test_widget.py::test_value"
+
+    assert len(own_node_permissions(step_of((directory,), (node,)))) == 1
+
+
 def test_a_step_is_told_once_for_each_node_entry() -> None:
     step = step_of((FILE,), (NODE, f"{FILE}::test_other"))
 

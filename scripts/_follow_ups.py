@@ -32,15 +32,20 @@ reader can show the owner what to repair.
 The five item types are the closed state set and `parse_record` is their only
 constructor; nothing outside the tests builds one by hand.
 
+The record's one writer is `append_open`, which copies the items `return_items` reads from an
+agent's `Follow-ups:` line as open lines; it appends and never rewrites, so what the record
+held stays byte for byte and a second copy of the same items adds nothing.
+
 Stdlib-only and Python 3.9-safe (no runtime `X | Y` unions, no `match`): managed
 projects run the consumers from `~/.local/bin` under a bare `python3`. Tests:
-`scripts/test__follow_ups.py`.
+`scripts/test__follow_ups.py`, `scripts/test_follow_ups_line.py`.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, Union
 
 # --- the record's value types ---------------------------------------------------------------
@@ -83,6 +88,10 @@ Item = Union[Open, Fixed, Ledgered, Dropped, Unreadable]  # noqa: UP007 -- runti
 # --- the line grammar -----------------------------------------------------------------------
 
 ITEM_PREFIX = "- "
+RECORD_FILE = "FOLLOW_UPS.md"
+_RECORD_HEADING = "# Follow-ups\n\n"
+_RETURN_LINE_PREFIX = "Follow-ups:"
+_RETURN_ITEM_SEPARATOR = ";"
 _ITEM = re.compile(r"- \[(?P<state>[^\]]*)\]\s+(?P<description>\S.*)")
 _SHA = re.compile(r"[0-9a-f]{7,40}")
 _LEDGER_ROW = re.compile(r"td-[0-9]{3,}")
@@ -124,3 +133,32 @@ def _read_state(state: str, description: str) -> Optional[Item]:  # noqa: UP045 
     if word == "dropped" and argument.strip():
         return Dropped(argument.strip(), description)
     return None
+
+
+# --- the return line and its copy into the record --------------------------------------------
+
+
+def return_items(final_text: Optional[str]) -> tuple[str, ...]:  # noqa: UP045 -- 3.9 floor
+    """The items of the last `Follow-ups:` line of an agent's final text, in order.
+
+    Items are split on `;`, stripped, and dropped when empty; no such line reads as no items."""
+    stripped = (line.strip() for line in (final_text or "").splitlines())
+    lines = [line for line in stripped if line.startswith(_RETURN_LINE_PREFIX)]
+    if not lines:
+        return ()
+    items = lines[-1][len(_RETURN_LINE_PREFIX) :].split(_RETURN_ITEM_SEPARATOR)
+    return tuple(item for item in (item.strip() for item in items) if item)
+
+
+def append_open(path: Path, items: tuple[str, ...]) -> None:
+    """Append each item to the record at `path` as `- [open] <item>`, skipping any open line the
+    record already holds. The record is created, with its heading, only when a line is written."""
+    held = path.read_text(encoding="utf-8") if path.exists() else None
+    present = set((held or "").splitlines())
+    wanted = dict.fromkeys(f"{ITEM_PREFIX}[open] {item}" for item in items)
+    new = [line for line in wanted if line not in present]
+    if not new:
+        return
+    lead = _RECORD_HEADING if held is None else ("\n" if held and not held.endswith("\n") else "")
+    with path.open("a", encoding="utf-8") as record:
+        record.write(lead + "\n".join(new) + "\n")

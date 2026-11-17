@@ -21,11 +21,14 @@ derived here, in phases:
    reader sees the attempt unverified; the last two (and a repository whose commands cannot run)
    also leave a `TREE_SNAPSHOT_<request>.patch`, which keeps the loop stopped for a person until
    they delete it.
-5. **Ledger**: exactly one record per return (a light reviewer's skips phases 3 and 4).
+5. **Follow-ups**: the items of the return's `Follow-ups:` line become open lines of the task's
+   follow-up record, whatever the marker and the verdict (a light reviewer's return has none).
+6. **Ledger**: exactly one record per return (a light reviewer's skips phases 3 to 5).
 
 Every phase is keyed by the request, so a call cut off part-way completes when run again: a
 gate block for the request reuses its runs, a HEAD commit naming the request reuses its sha,
-and a ledger record for the request makes the call a replay that writes nothing.
+and a ledger record for the request makes the call a replay that writes nothing. A cut-off
+call writes no follow-up line twice.
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ from _agent_transcript import (  # noqa: E402 (after sys.path injection)
     parse_transcript,
     request_count,
 )
+from _follow_ups import RECORD_FILE, append_open, return_items  # noqa: E402
 from _git_runner import GitUnavailableError, run_git  # noqa: E402
 from _loop_fields import GoalBudget, OutstandingAttempt  # noqa: E402
 from _plan_steps import PlanStep  # noqa: E402
@@ -230,6 +234,7 @@ def record_return(
         else:
             tick_step(task.dir / WIP_FILE, step.id)
         verdict = read_verdict(task, step.id, request, gate)
+    append_open(task.dir / RECORD_FILE, return_items(seen.final_text))
     record = IterationRecord(
         step=STEP_LABEL + step.id,
         attempt=key.attempt,

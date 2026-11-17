@@ -18,6 +18,7 @@ Relay the step-loop driver's requests for the task slug `$ARGUMENTS`. The driver
 - Never read the rendered prompt.
 - Never compose an implementer prompt.
 - Never commit.
+- Never copy a return's `Follow-ups:` line into the follow-up record: the driver copies it when it records the return.
 - Never edit an `Attempts:` line.
 - Never stop a running `record` (TaskStop on its shell included): it owns the gate's detached test runs, so stopping it kills them and the next `record` reads the attempt as a mismatch (observed 2026-11-01). Run it in the foreground with the 600000 ms timeout, which moves it to the background by itself on a timeout, and answer the stop guard by saying the record is in flight.
 - Never wait on a record with `while pgrep -f "<command>"; do sleep 5; done`: `pgrep -f` matches the waiting shell's own command line, so the loop never ends (observed 2026-10-29). Wait on the PID (`kill -0 <pid>`), bracket one character of the pattern (`pgrep -f "[s]tep_loop.py record"`), or use a monitor with an until-loop, and stop every wait loop once its record returns.

@@ -75,7 +75,7 @@ def returned(monkeypatch, tmp_path):
             return asked
 
         def the_end(repo, request, agent_id, max_turns, exited=False):
-            return SimpleNamespace(turns=5)
+            return SimpleNamespace(turns=5, final_text=None)
 
         def the_return(seen, relayed_marker, asked, max_turns):
             return resolved, rec.derive_stop_reason(resolved, seen.turns, max_turns), ()

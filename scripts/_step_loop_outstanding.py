@@ -9,6 +9,8 @@ keeping a second reading:
   does not record (`parse_attempts` and `read_ledger`, the driver's readers). A task whose
   `WIP.md` or ledger cannot be read yields no request: a guard that cannot look lets the stop
   through.
+* **In flight**: a request whose `record` call holds its lock (`record_in_flight`), or whose gate
+  run started and is still inside its bound, is no stop's to hold: `record` is running.
 * **Held**: an agent transcript of this session (`subagents_dir`) that `names_request` ties to
   the request, whose prompt also carries the `Task slug:` line of the request's own task (request
   ids restart in every task), and that `end_source` reads as ended: the predicate `record` accepts
@@ -58,6 +60,7 @@ from _step_loop_files import (  # noqa: E402
 from _step_loop_gate import Marker, end_source, parse_marker  # noqa: E402
 from _step_loop_record import declared_max_turns  # noqa: E402
 from _step_loop_record_gate import GATE_DIRECTORY  # noqa: E402
+from _step_loop_recording import record_in_flight  # noqa: E402
 from _step_loop_render import Invocation, parse_request_id  # noqa: E402
 from iteration_ledger import read_ledger  # noqa: E402
 
@@ -76,7 +79,9 @@ MAX_TRANSCRIPTS, MAX_BYTES_READ, DEADLINE_SECONDS = 64, 16 * 1024 * 1024, 5.0
 LAUNCHER_GRACE_SECONDS = 30.0
 _TRANSCRIPT_PREFIX, _TRANSCRIPT_GLOBS = "agent-", ("agent-*.jsonl", "workflows/*/agent-*.jsonl")
 
-NotHeldReason = Literal["no-transcript-in-session", "running", "unreadable", "gate-running"]
+NotHeldReason = Literal[
+    "no-transcript-in-session", "running", "unreadable", "gate-running", "record-running"
+]
 _REASON_PRECEDENCE: tuple[NotHeldReason, ...] = ("unreadable", "running")
 
 
@@ -111,6 +116,7 @@ class NotHeld:
 Verdict = Union[Held, NotHeld]  # noqa: UP007 -- runtime value, 3.9 floor
 RUNNING = NotHeld("running")
 GATE_RUNNING = NotHeld("gate-running")
+RECORD_RUNNING = NotHeld("record-running")
 
 
 @dataclass(frozen=True)
@@ -135,21 +141,30 @@ def judge_outstanding(
     work_root: Path, subagents_dir: Path, invocation: Invocation, now: float | None = None
 ) -> tuple[tuple[Outstanding, Verdict], ...]:
     """Every outstanding request with its verdict; no transcript is read without a request. A
-    request whose gate run started and is still inside its bound is in flight: `record` is
-    waiting on that run (`now`, epoch seconds, defaults to the clock)."""
+    request whose `record` call holds its lock, or whose gate run started and is still inside
+    its bound, is in flight: `record` is running (`now`, epoch seconds, defaults to the clock)."""
     deadline = time.monotonic() + DEADLINE_SECONDS
     outstanding = outstanding_requests(work_root)
     if not outstanding:
         return ()
     at = time.time() if now is None else now
     transcripts = _load_transcripts(subagents_dir, min(o.issued_at for o in outstanding), deadline)
-    repo_root = work_root.parent
-    return tuple(
-        (o, GATE_RUNNING)
-        if _gate_in_flight(work_root / o.slug / GATE_DIRECTORY / o.request, at)
-        else (o, _judge(o, transcripts, repo_root, invocation))
-        for o in outstanding
-    )
+    return tuple((o, _verdict(o, work_root, transcripts, at, invocation)) for o in outstanding)
+
+
+def _verdict(
+    outstanding: Outstanding,
+    work_root: Path,
+    transcripts: Sequence[_Transcript],
+    now: float,
+    invocation: Invocation,
+) -> Verdict:
+    run_dir = work_root / outstanding.slug / GATE_DIRECTORY / outstanding.request
+    if record_in_flight(run_dir):
+        return RECORD_RUNNING
+    if _gate_in_flight(run_dir, now):
+        return GATE_RUNNING
+    return _judge(outstanding, transcripts, work_root.parent, invocation)
 
 
 def _gate_in_flight(run_dir: Path, now: float) -> bool:

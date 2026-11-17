@@ -28,6 +28,7 @@ from _step_loop_action import (
     outstanding_id,
     read_outstanding,
 )
+from _step_loop_recording import RecordRunningError
 from _step_loop_render import Invocation, PriorAttempt, SpawnRequest, StopView
 from _step_loop_review import (
     Accepted,
@@ -82,6 +83,7 @@ EXIT_BY_OUTCOME = {
 }
 EXIT_CALLER_ERROR, EXIT_INTERNAL = 4, 1
 INTERNAL = "internal"
+RECORD_RUNNING = "record-running"
 _REVIEW_WORDS = {
     Due: "due",
     Requested: "requested",
@@ -139,6 +141,16 @@ class CallerError(Exception):
     def __init__(self, code: str, message: str, counts: Iterations | None = None) -> None:
         super().__init__(message)
         self.code, self.message, self.counts = code, message, counts
+
+
+def record_running(running: RecordRunningError, counts: Iterations) -> CallerError:
+    """The refusal of a second `record` of a request while the first still holds its lock."""
+    return CallerError(
+        RECORD_RUNNING,
+        f"record failed because {running}; nothing was written. To fix: let that call end;"
+        " its envelope names what comes next.",
+        counts,
+    )
 
 
 class _Parser(argparse.ArgumentParser):

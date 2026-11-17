@@ -35,7 +35,8 @@ causes); budget-exhausted 3; an error 4, or 1 for the code `internal`. `withdraw
 `record --not-started` alone: it carries `recorded` and a `then` naming `next`, and no request.
 Outcome precedence: complete, then needs-human, then budget-exhausted, then spawn. Error codes:
 usage, missing-artifact, request-not-pending, not-started-but-ran, agent-not-found,
-agent-not-for-request, agent-running, gate-running, worker-not-started (`run`), internal.
+agent-not-for-request, agent-running, gate-running, record-running, worker-not-started (`run`),
+internal.
 
 Guarantees:
 * A spawn that is new has its attempt written to `WIP.md` (`- Attempts: Step <id> count=<n>
@@ -45,7 +46,9 @@ Guarantees:
   true, and the second call writes nothing. A stop repeats byte for byte.
 * No request exceeds the attempt cap. A stop leaves `HANDOFF.md` whose section 2 names it.
 * `record` gates, commits and records an ended agent's return once per request (see
-  `_step_loop_record.py`); a request neither pending nor recorded is refused (exit 4).
+  `_step_loop_record.py`); a request neither pending nor recorded is refused (exit 4). A call
+  holds an OS lock on `gate/<request>/record.lock` for its whole run, so a second `record` of
+  the same request started meanwhile is refused (`record-running`, exit 4) and writes nothing.
 * At most one request is out. `record --not-started` takes the outstanding request back whatever
   the plan now says and issues none, so between it and the `next` its `then` names no request is
   out and a plan block may be amended; left alone, that `next` issues the same attempt again.
@@ -93,7 +96,8 @@ from _step_loop_files import (
     write_stop_handoff,
 )
 from _step_loop_io import commits_touching, paths_differing_from_head
-from _step_loop_record_gate import RESULTS_FILE
+from _step_loop_record_gate import GATE_DIRECTORY, RESULTS_FILE
+from _step_loop_recording import RecordRunningError, holding_record
 from _step_loop_render import (
     GoalState,
     Invocation,
@@ -383,18 +387,39 @@ def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Repl
 
 
 def run_record(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:
+    """Take back a return while holding the request's record lock for the whole call.
+
+    The id is checked as one the loop knows before it names the lock's directory, and the task is
+    read again under the lock: a record of the request that ended a moment ago is then a replay,
+    never a second record from inputs read before it wrote."""
+    try:
+        rec.require_known(task.inputs, args.request)
+    except rec.RecordRefusedError as refused:
+        raise _refusal(task, refused) from None
+    try:
+        with holding_record(task.dir / GATE_DIRECTORY / args.request):
+            return _record_holding_lock(read_task(args), args, invoke)
+    except RecordRunningError as running:
+        raise cli.record_running(running, cli.iterations_of(task.inputs)) from None
+
+
+def _record_holding_lock(task: Task, args: argparse.Namespace, invoke: Invocation) -> Reply:
     try:
         rec.require_known(task.inputs, args.request)
         took = rec.take_back(
             task, args.request, args.agent_id, args.marker, session_exited=args.session_exited
         )
     except rec.RecordRefusedError as refused:
-        raise CallerError(refused.code, refused.message, cli.iterations_of(task.inputs)) from None
+        raise _refusal(task, refused) from None
     if args.not_started is not None:  # nothing is issued: the plan may be amended before `next`
         frame = cli.Frame(task.slug, cli.iterations_of(task.inputs), took.warnings, took.recorded)
         doc = cli.withdrawn_envelope(frame, invoke)
         return Reply(doc, (cli.withdrawn_line(args.request, doc["then"]),))
     return run_next(read_task(args), args, invoke, took)
+
+
+def _refusal(task: Task, refused: rec.RecordRefusedError) -> CallerError:
+    return CallerError(refused.code, refused.message, cli.iterations_of(task.inputs))
 
 
 _VERBS: Mapping[str, Callable[[Task, argparse.Namespace, Invocation], Reply]] = {

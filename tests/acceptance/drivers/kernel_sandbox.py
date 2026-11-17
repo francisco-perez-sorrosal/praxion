@@ -389,22 +389,26 @@ def shared_blocks_gate(root: Path) -> GateVerdict:
 
 def universal_block_carriers(root: Path) -> tuple[int, dict[str, int]]:
     """(agent definitions, carriers per universal block) from the shared-block report."""
-    result = _run(
-        [sys.executable, f"scripts/{SHARED_BLOCKS_GATE}", "--json", "--repo-root", "."],
-        root,
-        isolated_env(root.parent / f".{root.name}-blocks"),
-    )
+    # The scratch environment lives in a temporary directory, never beside `root`: `root` may be
+    # the live checkout, and a directory beside it would outlive the test.
+    with tempfile.TemporaryDirectory(prefix="blocks-") as scratch:
+        result = _run(
+            [sys.executable, f"scripts/{SHARED_BLOCKS_GATE}", "--json", "--repo-root", "."],
+            root,
+            isolated_env(Path(scratch)),
+        )
     report = json.loads(result.output[result.output.index("{") :])
     carriers = {slug: b["carriers"] for slug, b in report["blocks"].items() if b["universal"]}
     return report["definitions"], carriers
 
 
 def canonical_block(root: Path, slug: str) -> str:
-    result = _run(
-        [sys.executable, f"scripts/{SHARED_BLOCKS_GATE}", "--print-canonical", slug],
-        root,
-        isolated_env(root.parent / f".{root.name}-blocks"),
-    )
+    with tempfile.TemporaryDirectory(prefix="blocks-") as scratch:
+        result = _run(
+            [sys.executable, f"scripts/{SHARED_BLOCKS_GATE}", "--print-canonical", slug],
+            root,
+            isolated_env(Path(scratch)),
+        )
     assert result.exit_code == 0, f"no canonical text for the {slug} block:\n{result.output}"
     return result.output.strip("\n")
 

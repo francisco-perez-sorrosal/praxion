@@ -112,4 +112,7 @@ def omit_from_consumer(root: Path, consumer: str, name: str) -> None:
 def drift_test(root: Path) -> RunResult:
     """The registry's drift test, run with pytest from `root`."""
     argv = [sys.executable, "-m", "pytest", DRIFT_TEST, "-q", "-p", "no:cacheprovider"]
-    return _run(argv, root, isolated_env(root.parent / f".{root.name}-drift"), timeout=600)
+    # The scratch environment lives in a temporary directory, never beside `root`: `root` may be
+    # the live checkout, and a directory beside it would outlive the test.
+    with tempfile.TemporaryDirectory(prefix="drift-") as scratch:
+        return _run(argv, root, isolated_env(Path(scratch)), timeout=600)

@@ -169,6 +169,8 @@ Precedence mirrors `review: force`/`review: off` exactly: the planner field deci
 
 **Don't:** Build every piece and wire none -- at the planning checkpoint ask of each built piece what calls it on the path the user will run. A plan once built every piece of a paid run and wired none; a second architect found it twenty-two steps in, and it cost a re-tier
 
+**Don't:** Size a step's reach from the plan's own list of standing tests -- the whole suite says what a step re-pins, and one plan's list fell short in five of eight steps. Search for what it missed, by kind: unit tests that pin the defect being repaired; a byte-pinned prompt fixture; a table that must hold a case for every member of a union; a test stand-in that lacks a field the new code reads; a guide that must name every module of a glob. For a step that moves shipped text or a frozen digest, apply the change on a scratch copy and run the whole acceptance directory and the derived scope before the plan names the files and tests the step touches: one plan counted two digests to re-pin and the applied move turned twenty-seven acceptance tests red. A step block may also tell the implementer to search first and stop at once on a pinned test outside its files, which makes a miss cheap, but one implementer saw the file and built anyway: the planner's search is the fix that holds
+
 ## Claude Code Usage
 
 When using this skill with Claude Code specifically:

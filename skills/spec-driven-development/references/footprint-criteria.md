@@ -53,4 +53,5 @@ The two tables as the architect writes them, with placeholder footprints. A test
 - A breach whose diff touches none of the footprint's paths is still a FAIL; say so in the finding so the user can decide whether to re-baseline.
 - A final row goes stale (`stale-final`) when a later commit touches a measured path. Take the final rows last, at the head you ask to merge.
 - A baseline is a reading of the base tree. After the branch takes the default branch in, the change is `<default-branch>..HEAD`: read the baselines on the main checkout at the base commit, and run the verify stage with `--base-ref <default-branch>`. A baseline re-taken on the branch after its own commits reads `late-baseline`.
+- A timing bound measured on chosen payloads says nothing about the path they do not take: record a reading for that path beside them (a hook measured on two payloads that both reach the slow branch, say, leaves its fast branch unread).
 - The registry is how a footprint nobody wrote a row for is noticed (FP01, a warning naming the moved footprint and the paths). A warning is not a license to skip the row.

@@ -55,6 +55,8 @@ Hard-won lessons from production use. Read these before writing or debugging hoo
 
 - **Forward a hook payload with `printf '%s\n'`, never `echo`.** A wrapper that pipes the payload onward with `echo "$input"` under `/bin/sh` (bash 3.2 in POSIX mode on macOS) interprets backslash escapes, so any command containing `\|`, `\s` or `\n` (every grep pattern) reaches `json.loads` as invalid JSON. Every downstream gate then returns silently and records nothing. Write `printf '%s\n' "$input" | ...`, and give the wrapper's tests the input shape that failed in production (a backslash-bearing command), because backslash-free fixtures cannot see this bug. Observed 2026-09-08.
 
+- **A hook's first decision must not sit behind a pipe.** `printf ... | grep -q` reads a producer that died as "no match", and the hook then skips what it guards: measured on macOS with `dash` at heavy load, 21 of 12,000 runs. Decide with a shell builtin (`case` over the payload held in a variable), and keep it linear: one glob with two words backtracks quadratically in macOS `/bin/sh`, while two one-word tests do not.
+
 - **`if` field silently fails on non-tool events.** The `if` conditional (`"if": "Bash(git *)"`) is evaluated only on the five tool events: `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, and `PermissionDenied`. Adding `if` to other events (SessionStart, Stop, etc.) prevents the hook from running entirely with no error.
 
 - **`if` is best-effort and fails *open*.** When the Bash command can't be parsed, the filter runs your hook regardless of pattern. Never use `if` as a security boundary — upstream is explicit: "use the permission system rather than a hook to enforce a hard allow or deny."

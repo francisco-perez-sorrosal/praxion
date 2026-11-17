@@ -91,7 +91,7 @@ Verify: `uv run pytest tests/acceptance/test_stopped_run_is_continued_or_closed.
 
 Every new run declares the allowance method `own-discordance-exact` before its first launch. A mechanical check regresses when `fails_lean - fails_full` exceeds its allowance, the exact one-sided quantile, at the declared confidence, of the net discordance at that check's own count of discordant pairs `d` (zero at `d = 0`, the count itself up to 4, then for example 3 at 5, 6 at 10, 8 at 20). Each role and check has its own allowance. No calibration file is an allowance source: `--calibration-run FILE` is accepted for old command lines and writes one stderr line saying it sets none, and `--calibration` is a diagnostic of the slot order that sizes nothing.
 
-The two arms of each task launch in an order drawn from the run's seed for that task, recorded with the task and kept by a continuation. `--dry-run` prints each task's arms in that order, and the same seed gives the same order.
+The two arms of each task launch in an order drawn from the run's seed for that task, recorded with the task and kept by a continuation. `--dry-run` prints each task's arms in that order, and the same seed gives the same order. It lists the task sessions only, not the arm proofs; a run with one unproven arm goes on with the other arm alone.
 
 The report states, inside each mechanical check's block, the discordance and the allowance in pairs and in percentage points beside the declared margin. The coverage statement follows from it:
 
@@ -184,6 +184,8 @@ A *move* relocates one rule's text so it reaches the main session by another det
    Every refusal names what it refuses and exits 2. A change confined to the lean declaration leaves the floor run citable, because the lean arm never loads into a floor run.
 
 4. **Continue or close a stopped run.** A move run stops itself on repeated identical infrastructure failures in one arm (`--stop-count`, default 3), as a role run does; a floor run is continuable on its own streak. `--continue RUN` launches again only the planned tasks no part finished, under an identical measured identity; `--close RUN --reason TEXT` records the give-up. A fresh run of the move is refused while a continuable stopped run is neither continued nor closed. `--reindex` rebuilds `index.json` beside the move results files from the files alone. Verify: `uv run pytest tests/test_moves_stop.py tests/test_moves_lineage.py -q`.
+
+   A paired run of the refactoring axis cannot be continued. Close the stopped run, and buy a missing pair alone: find, with free `--dry-run` readings, a seed that plans its task first, then run with `--max-tasks 1 --required-pairs 1`.
 
 5. **Read the report.** `uv run praxion-evals-adherence --report .ai-state/eval_ledger/adherence/moves/<run>.json` renders a move results file. Per governed check it states:
    - the final-state failures of each arm and the history outcomes (right first time, repaired, not repaired, never taken);

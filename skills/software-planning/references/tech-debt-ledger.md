@@ -98,6 +98,8 @@ A debt is **small** only when all seven conditions hold:
 6. No shipped contract changes (a command-line flag, a hook payload, a canonical block, an agent's return contract).
 7. The fix fits in the current session.
 
+**A text fix is not small by its lines.** Where a project freezes its exports, a rule's text, and an agent's or a skill's `description:` and other exported frontmatter, are exported and pinned: one sentence there moves the frozen fixtures and fails the fourth condition. An agent's or a skill's body is not exported. Before calling a text fix small, search the acceptance fixtures for the file's name.
+
 **Filing rule.** File a row only for debt that is not small, or whose fix could not be finished this session; the row's `notes` give that reason. Small debt is fixed in its own commit after the feature. A follow-up that would change the feature's behaviour was never small. The sentinel and the architect-validator find debt with no task at hand and keep filing a row for every finding.
 
 **Before fixing on a long-lived branch.** Look for the fix on main first (`git log main -- <file>`): one fix was written twice and had to be reverted on the branch.

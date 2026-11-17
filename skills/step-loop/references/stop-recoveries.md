@@ -47,6 +47,8 @@ A step block is the unit the driver tracks its attempts and its verified record 
 
 Never edit the block of a step the loop has already verified. Its verified record belongs to the old block, so the next `next` issues the step again (observed 2026-11-12).
 
+A block is not edited either while its request is out (the return's `record` is refused) or after its step completed (its digest keys the attempt series). A ruling the spec made before the code existed can be wrong; when the implementer's counter-example against the acceptance kit shows it, the spec is corrected to the rule as built and the correction goes through its Spec Question, never into the block (see [`coordination-details.md § Spec-Question Routing`](../../software-planning/references/coordination-details.md#spec-question-routing)).
+
 ## Putting a step ahead of the next
 
 A plan block is amended while no request is out. To run a step before the one `next` would issue, take that request back first: `record --request <id> --not-started "<reason>"` prints `withdrawn` and issues nothing. Insert or revise the block, then run the `next` its `then` names; it issues exactly one request, for the step the plan now puts first.
@@ -73,3 +75,7 @@ A plan block is amended while no request is out. To run a step before the one `n
 A file the step's agent changed outside the step's `Files:` is left uncommitted, and the driver warns `undeclared-edit`; the warning names the file, not the remedy. The relay never commits, so the orchestrator does it at a step boundary: read `git status` after each `record`, and commit what is left by name at the next stop, or before the step that follows depends on it.
 
 The warning `outer-loop-edit` is different: an outer-loop test file is never committed by the driver, and a change to one goes through a Spec Question and an answered `Resolved in:`, not through a hand commit (see [`coordination-details.md § Spec-Question Routing`](../../software-planning/references/coordination-details.md#spec-question-routing)).
+
+## A gate that fails on a test the step did not touch
+
+A gate that reds on a test outside the step's `Files:` is not yet the step's fault: the machine, a load-sensitive test or a changed tool can fail it as well. Run that test alone on the step's tree, read the gate's own log under `.ai-work/<task-slug>/gate/<request>/` (`<n>.log`, with the command in `command.txt`), and stress the test (repeat it, and run it under load) before blaming the step or editing the plan.

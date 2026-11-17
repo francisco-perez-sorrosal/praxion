@@ -36,6 +36,7 @@ from _step_loop_gate import (
     Ownership,
     PendingRule,
     classify_run,
+    collected,
     gate_result_lines,
     parse_pytest_summary,
     render_result_line,
@@ -49,6 +50,7 @@ from _step_loop_io import (
     head_sha,
     paths_differing_from_head,
     run_bounded_check,
+    run_check,
     run_derived_scope,
 )
 from _step_loop_ownership import repository_form
@@ -91,6 +93,9 @@ DERIVED_NAMES_MAX_CHARS = 200  # keeps a green block inside its ceiling whatever
 SHORT_SHA_LENGTH = 7
 CHECK_OUTPUT = "the Check: run's output"  # where a check's failures beyond the list were shown
 _MORE_FAILURES = "…"
+COLLECT_ONLY = "--collect-only"
+COLLECTION_LINES_SHOWN = 5  # last lines of a refused collection that a stop's evidence quotes
+_SHELL_OPERATORS = frozenset({"|", "&&", "||", ";"})
 _HEADING_PREFIX, _RESULT_PREFIX = "## ", "Result:"
 
 
@@ -468,6 +473,38 @@ def check_run(
     pocket = check_pocket(ran.argv)
     run = classified(ran, _asked_in(rule, pocket), step.check.command)
     return replace(run, failed_ids=_in_pocket(pocket, run.failed_ids))
+
+
+def check_collects(repo: Path, step: PlanStep) -> str | None:
+    """Why the step's `Check:` cannot collect (the command and what collection printed), else None.
+
+    The check is run as written with `--collect-only` added, in the foreground under its pocket's
+    bound, so interpreter, directory and plugins are the gate's own. It cannot collect when it
+    exits non-zero without a collection summary (a missing plugin, an option pytest does not
+    know): a path that is not there yet, or a module that fails to import, still print one, and
+    the step may be the one that writes them. Doubt is never a stop: a run that never exited, a
+    check that is not plain pytest words (another runner, a shell operator that pytest would be
+    handed as an argument) and a run that exited 0 read as collecting.
+    """
+    if not isinstance(step.check, Check) or not _is_plain_pytest(step.check.command):
+        return None
+    command = step.check.command
+    ran = run_check(repo, f"{command} {COLLECT_ONLY}")
+    if ran.problem is not None or ran.returncode == 0:
+        return None
+    if collected(ran.output):
+        return None
+    shown = [line.strip() for line in ran.output.splitlines() if line.strip()]
+    printed = "; ".join(shown[-COLLECTION_LINES_SHOWN:]) or f"exit {ran.returncode}, no output"
+    return f"its Check: `{command}` cannot collect; collection printed: {printed}"
+
+
+def _is_plain_pytest(command: str) -> bool:
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return False
+    return any(Path(word).name == "pytest" for word in words) and not _SHELL_OPERATORS & set(words)
 
 
 def bounded_check(repo: Path, run_dir: Path, command: str, give_up_at: float) -> CommandRun:

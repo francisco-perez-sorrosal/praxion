@@ -83,7 +83,7 @@ from _handoff_inputs import HandoffError, resolve_base_ref
 from _loop_fields import GoalBudget, OutstandingAttempt, parse_attempts
 from _plan_steps import PlanStep, parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
-from _step_loop_action import Complete, Spawn, Stop, issuable_action
+from _step_loop_action import CHECK_CANNOT_COLLECT, Complete, Spawn, Stop, issuable_action
 from _step_loop_cli import CallerError
 from _step_loop_files import (
     iteration_patches,
@@ -96,7 +96,7 @@ from _step_loop_files import (
     write_stop_handoff,
 )
 from _step_loop_io import commits_touching, paths_differing_from_head
-from _step_loop_record_gate import GATE_DIRECTORY, RESULTS_FILE
+from _step_loop_record_gate import GATE_DIRECTORY, RESULTS_FILE, check_collects
 from _step_loop_recording import RecordRunningError, holding_record
 from _step_loop_render import (
     GoalState,
@@ -267,6 +267,8 @@ def run_next(
     action, counts = issuable_action(task.inputs), cli.iterations_of(task.inputs)
     frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
     if isinstance(action, Spawn):
+        action = _first_request_refused(task, action) or action
+    if isinstance(action, Spawn):
         return _issue(task, action, frame, invoke)
     if isinstance(action, Complete):
         line = cli.complete_line(task.inputs.steps, counts)
@@ -290,6 +292,19 @@ def run_next(
         )
     doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
     return Reply(doc, (stop_stderr(view), *cli.warning_lines(frame.warnings)))
+
+
+def _first_request_refused(task: Task, action: Spawn) -> Stop | None:
+    """The stop that keeps a series' first request from going out when its step's `Check:` cannot
+    collect: a plan defect no attempt can mend, found before one is spent. A request already out,
+    a review, a revision and any later attempt of the series are not asked."""
+    key = action.key
+    if action.reissued or key.kind != "implement" or key.attempt != 1:
+        return None
+    why = check_collects(task.repo, action.step)
+    if why is None:
+        return None
+    return Stop(CHECK_CANNOT_COLLECT, action.step.id, f"{STEP_LABEL}{action.step.id}: {why}")
 
 
 def _issue(task: Task, action: Spawn, frame: cli.Frame, invoke: Invocation) -> Reply:

@@ -80,13 +80,14 @@ if TYPE_CHECKING:
     from iteration_ledger import IterationRecord
 
 BUDGET_CAUSE = "iteration-budget"
+CHECK_CANNOT_COLLECT = "check-cannot-collect"
 GLOB_MARKS = "*?["
 UNCOMMITTED_SHOWN = 5  # file names a marked stop spells out; the rest are counted
 HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed review-without-work not-driven
     dependency-defect commit-disturbed-tree loop-state-defect files-glob request-outstanding
-    attempts-disagree unreadable-plan-field""".split()
+    attempts-disagree unreadable-plan-field check-cannot-collect""".split()
 )
 NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", BUDGET_CAUSE)
 REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound

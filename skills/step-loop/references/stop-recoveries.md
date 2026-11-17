@@ -64,6 +64,10 @@ A plan block is amended while no request is out. To run a step before the one `n
 
 `unreadable-plan-field` means a driven step's `Iterations:` or `Change type:` value does not read; the evidence names the field, the value as written and the line to correct. Fix that line in `IMPLEMENTATION_PLAN.md` (a whole number of at least 1, or one of the listed change types; the plan-level `Change type:` line sits outside every step block), then run `next`. A step's own `Iterations:` line is part of its block, so correcting it opens a fresh series for the step.
 
+## A Check that cannot collect
+
+`check-cannot-collect` means that, before the first request of a step's series, the driver ran the step's `Check:` command as written with `--collect-only` added and pytest ended non-zero without printing a collection summary (a plugin the project requires is not installed, an option pytest does not know). No request, attempts line or ledger record was written: no attempt was spent. The evidence names the step, the command and the last lines collection printed. Correct the `Check:` in `IMPLEMENTATION_PLAN.md`, or install what the project requires, then run `next`. A path the step has yet to write, or a module that fails to import, still print a summary and are not refused; neither is a check that holds a shell operator word (`|`, `&&`, `||`, `;`), one that is not run through pytest, or a collection that could not finish inside its pocket's bound, because a doubtful run is never a stop. The driver asks once per series, so a later attempt, a review and a revision of the step are not asked.
+
 ## A warning that a file was left uncommitted
 
 A file the step's agent changed outside the step's `Files:` is left uncommitted, and the driver warns `undeclared-edit`; the warning names the file, not the remedy. The relay never commits, so the orchestrator does it at a step boundary: read `git status` after each `record`, and commit what is left by name at the next stop, or before the step that follows depends on it.

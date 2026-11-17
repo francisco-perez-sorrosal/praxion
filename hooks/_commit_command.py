@@ -22,8 +22,9 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
   unknown option, a word holding `$`, no subcommand at all) is `uncertain`;
 - what no rule above can follow keeps the checkers running: a word that holds a whole
   `git ... commit` script for another program, or, in a simple command with no
-  invocation of its own, a bare `commit` word (`make commit`, `$GIT commit`, `xargs git`
-  fed the word).
+  invocation or script of its own, a bare `commit` word (`make commit`, `$GIT commit`,
+  `xargs git` fed the word) or a word that holds both `git` and `commit` (the dashed
+  `git-commit -m x`, `bash scripts/git-commit.sh`).
 
 Runs on the gate's path as `python -I -S`: `json` and `shlex` only, Python 3.9 syntax.
 """
@@ -155,7 +156,7 @@ def _simple_verdict(words: Sequence[str], depth: int) -> Verdict:
     readings = scripts + invocations
     if not scripts and any(_holds_a_commit_script(word) for word in words):
         readings.append("uncertain")
-    if not readings and "commit" in words:
+    if not readings and any(word == "commit" or _names_git_and_commit(word) for word in words):
         readings.append("uncertain")
     return _strongest(readings)
 
@@ -229,7 +230,11 @@ def _is_shell(word: str) -> bool:
 
 def _holds_a_commit_script(word: str) -> bool:
     """Whether one word is a script for another program that runs `git ... commit`."""
-    return len(word.split()) > 1 and "git" in word and "commit" in word
+    return len(word.split()) > 1 and _names_git_and_commit(word)
+
+
+def _names_git_and_commit(word: str) -> bool:
+    return "git" in word and "commit" in word
 
 
 if __name__ == "__main__":

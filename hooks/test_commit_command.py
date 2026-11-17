@@ -55,6 +55,7 @@ READ_ONLY = {
     "log-grep-for-commit": "git log --grep=commit --oneline",
     "show-head": "git show HEAD",
     "status": "git status",
+    "log-grep-for-a-dashed-commit": "git log --grep=git-commit",
 }
 
 # One row per rule of the reader's table, in the table's order: the input and its verdict.
@@ -108,6 +109,9 @@ OTHER_ROUTES = {
     "git-in-a-variable": '"$GIT" commit -m x',
     "script-for-another-interpreter": "python -c \"import os; os.system('git commit -m x')\"",
     "script-for-a-git-built-in": "git rebase -x 'git commit --amend --no-edit' main",
+    "dashed-git-commit": "git-commit -m x",
+    "dashed-git-commit-by-path": "/usr/lib/git-core/git-commit -m x",
+    "script-named-for-a-commit": "bash scripts/git-commit.sh",
 }
 
 # Every command of the tables above that begins `git <a subcommand the gate decides in
@@ -231,3 +235,13 @@ def test_a_row_the_shell_may_decide_gets_the_readers_answer_through_the_gate(cas
 @pytest.mark.parametrize("case", list(REAL_COMMITS))
 def test_every_real_commit_form_starts_the_checker_through_the_gate(case, tmp_path):
     assert _checker_starts(REAL_COMMITS[case], tmp_path), REAL_COMMITS[case]
+
+
+# The gate's first text test lets a payload with no `git` in it pass, so only these of the
+# other routes ever reach the reader.
+ROUTES_NAMING_GIT = {case: command for case, command in OTHER_ROUTES.items() if "git" in command}
+
+
+@pytest.mark.parametrize("case", list(ROUTES_NAMING_GIT))
+def test_a_commit_by_another_route_starts_the_checker_through_the_gate(case, tmp_path):
+    assert _checker_starts(ROUTES_NAMING_GIT[case], tmp_path), ROUTES_NAMING_GIT[case]

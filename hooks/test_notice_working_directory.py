@@ -91,11 +91,12 @@ class HookRun:
         return [json.loads(self.stdout)["hookSpecificOutput"]["additionalContext"]]
 
 
-def run_hook(shell: str, places: Places, event: str, stdin: str) -> HookRun:
+def run_hook(shell: str, places: Places, event: str, stdin: str, **env_overrides: str) -> HookRun:
     env = {
         "PATH": os.pathsep.join([str(places.home / "bin"), os.environ.get("PATH", "")]),
         "HOME": str(places.home),
         "CLAUDE_CONFIG_DIR": str(places.home / ".claude"),
+        **env_overrides,
     }
     result = subprocess.run(
         [shell, str(HOOK), event],
@@ -314,13 +315,33 @@ def test_the_same_physical_directory_by_another_name_is_not_a_move(shell, places
     assert (run.stdout, record_of(places)) == ("", expected(places, "settled", "P", "P"))
 
 
-def test_a_record_of_another_shape_reads_unseen_and_is_rewritten(shell, places):
+# Records the hook must not trust, `{P}` standing for the project. Each reads unseen, so
+# the call settles where it is; read as written, all but the first would announce a move.
+UNTRUSTED_RECORDS = {
+    "a-line-missing": "v0 settled\nnot-a-path\n",
+    "an-unknown-tag": "v2 moving\n{P}\n{P}\n",
+    "a-relative-home": "v1 settled\nproject\n{P}\n",
+    "a-relative-last": "v1 settled\n{P}\nproject\n",
+}
+
+
+@pytest.mark.parametrize("text", list(UNTRUSTED_RECORDS.values()), ids=list(UNTRUSTED_RECORDS))
+def test_a_record_of_another_shape_reads_unseen_and_is_rewritten(shell, places, text):
     places.store.mkdir(parents=True)
-    places.record.write_text("v0 settled\nnot-a-path\n")
+    places.record.write_text(text.format(P=places.project))
 
     run = run_hook(shell, places, "post", payload(places.elsewhere))
 
     assert (run.stdout, record_of(places)) == ("", expected(places, "settled", "E", "E"))
+
+
+def test_a_relative_config_directory_keeps_the_record_out_of_the_project(shell, places):
+    run = run_hook(
+        shell, places, "post", payload(places.elsewhere), CLAUDE_CONFIG_DIR="relative-config"
+    )
+
+    assert (run.exit_code, run.stdout, run.stderr) == (0, "", "")
+    assert sorted(entry.name for entry in places.project.iterdir()) == ["src"]
 
 
 # ---------------------------------------------------------------------------
@@ -422,7 +443,7 @@ def test_a_session_in_its_entered_worktree_hears_nothing(shell, places):
 # ---------------------------------------------------------------------------
 
 
-def test_a_subagent_payload_adds_nothing_and_keeps_no_record(shell, places):
+def test_a_subagent_payload_adds_nothing_and_leaves_the_record_untouched(shell, places):
     seed(places, "moving", places.project, places.project)
     os.utime(places.record, (1, 1))
 
@@ -431,6 +452,16 @@ def test_a_subagent_payload_adds_nothing_and_keeps_no_record(shell, places):
     )
 
     assert (run.exit_code, run.stdout, places.record.stat().st_mtime) == (0, "", 1)
+
+
+def test_an_agent_id_key_inside_the_tool_input_delays_a_pending_notice_by_one_call(shell, places):
+    seed(places, "moving", places.project, places.project)
+    tool_input = {"command": "ls", "agent_id": "a parameter of some tool"}
+
+    skipped = run_hook(shell, places, "pre", payload(places.elsewhere, tool_input=tool_input))
+    next_call = run_hook(shell, places, "pre", payload(places.elsewhere))
+
+    assert (skipped.stdout, len(next_call.contexts)) == ("", 1), next_call.stdout
 
 
 UNREADABLE = {

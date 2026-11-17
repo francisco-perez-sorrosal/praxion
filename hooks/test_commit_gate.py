@@ -52,13 +52,15 @@ def _run_gate(
     stderr: int | None = subprocess.PIPE,
     close_stderr: bool = False,
     gate: Path = GATE_SCRIPT,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Invoke commit_gate.sh with a JSON payload on stdin.
 
     `shell` runs the script under that interpreter instead of its shebang; `stderr`
     is what the gate's fd 2 is connected to, and `close_stderr` leaves fd 2 closed
     (both let a test prove a failed stderr write cannot change the verdict). `gate`
-    runs a copy of the script, beside a reader of the test's own making.
+    runs a copy of the script, beside a reader of the test's own making; `timeout`
+    bounds the run, in seconds.
     """
     real_hook = str(hook) if hook else str(HOOKS_DIR / "check_id_citation_discipline.py")
     merged_env = dict(os.environ)
@@ -74,6 +76,7 @@ def _run_gate(
         stderr=stderr,
         text=True,
         env=merged_env,
+        timeout=timeout,
         check=False,
     )
 
@@ -162,13 +165,38 @@ def test_non_commit_command_exits_fast(command: str, tmp_path: Path) -> None:
     )
 
 
+# About a megabyte of one word repeated, the other word nowhere. Under macOS /bin/sh
+# one two-word `*git*commit*` pattern backtracks over it for minutes; a linear first
+# test judges it in well under a second, so the bound misses one and meets the other
+# by a wide factor even on a loaded machine.
+ONE_WORD_PAYLOAD_BYTES = 1 << 20
+LINEAR_SCAN_SECONDS = 10
+
+
+@pytest.mark.parametrize("word", ["git", "commit"])
+def test_a_megabyte_of_one_word_is_judged_in_linear_time(
+    word: str, tmp_path: Path, shell: str
+) -> None:
+    command = f"{word} " * (ONE_WORD_PAYLOAD_BYTES // (len(word) + 1))
+
+    result = _run_gate(
+        _make_bash_payload(command),
+        hook=_write_delegation_spy(tmp_path),
+        shell=shell,
+        timeout=LINEAR_SCAN_SECONDS,
+    )
+
+    assert (result.returncode, result.stdout) == (0, "")
+
+
 # ---------------------------------------------------------------------------
 # Canary: a command that mentions a commit but records none
 #
-# Past the grep, the gate reads the command itself, through the stdlib reader
-# beside it, and skips the hook only when the reader says `not-a-commit`. A
-# reader that is missing or crashes must leave the hook to run, as before the
-# reader existed.
+# Past the first text checks, the gate reads the command itself: in shell, a
+# value that is plainly one `git <read-only built-in>` command is decided there;
+# anything else goes to the stdlib reader beside it, and the hook is skipped only
+# when the reader says `not-a-commit`. A reader that is missing or crashes must
+# leave the hook to run, as before the reader existed.
 # ---------------------------------------------------------------------------
 
 
@@ -237,8 +265,10 @@ LEFT_TO_THE_READER = {
     "backtick": "git log --grep=commit `ls`",
     "comment-sign": "git log --grep=commit # x",
     "redirection": "git log --grep=commit > out",
+    "input-redirection": "git log --grep=commit < in",
     "background": "git log --grep=commit &",
     "parenthesis": "git log --grep=commit (",
+    "closing-parenthesis": "git log --grep=commit )",
     "another-git-word": "git log --grep=x git commit -m y",
     "a-shell-name": "git log --grep=commit sh -c ls",
     "subcommand-not-listed": "git help commit",

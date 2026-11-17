@@ -16,7 +16,9 @@
 # One record per main-conversation session, three lines (`v1 settled|moving`,
 # home, last seen directory), under the per-user config directory and never in
 # the project. It is written only on a transition, through a temporary file and
-# `mv`, so parallel tool calls never read half a record.
+# `mv`, so parallel tool calls never read half a record. A known limit: that
+# makes the record whole, not the notice once-only; two `pre` calls running at
+# once while the record is `moving` can both announce the same move.
 #
 # Cost: this runs on every tool call of every session, so the silent path is
 # builtins only (one `cat` for stdin): no interpreter, no write, no `git`.
@@ -25,6 +27,7 @@
 # with certainty adds nothing.
 
 exec 2>/dev/null
+# Patterns match bytes, so `[!A-Za-z0-9_-]` and `[[:cntrl:]]` let no locale widen them.
 LC_ALL=C
 
 # A directory-change word starts the command value or follows whitespace or a
@@ -38,7 +41,11 @@ main() {
     event=$1
     input=$(cat)
     case $event in pre | post) ;; *) return ;; esac
-    # A subagent's `cd` is not the session's: its cwd resets between calls.
+    # A subagent's `cd` is not the session's: its cwd resets between calls. The
+    # key is matched anywhere, so a main-session call whose `tool_input` holds an
+    # `agent_id` key is skipped too and a pending notice waits one call: telling
+    # the top-level key apart needs the payload's nesting (no key order is
+    # documented), which no builtin reads.
     case $input in *'"agent_id"'*) return ;; esac
     first_value session_id || return
     session=$value

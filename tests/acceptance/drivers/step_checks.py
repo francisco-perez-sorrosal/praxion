@@ -219,8 +219,13 @@ def _attempt_of(raw: dict[str, Any]) -> int | None:
 # -- Bound: building the task ------------------------------------------------------
 
 
+# The same prefix the step-loop driver strips: a gate that runs this suite sets loop variables of its
+# own, and a scenario must see only what it sets itself. Kept as a literal so this kit imports no other.
+_AMBIENT_LOOP_PREFIX = "PRAXION_STEP_LOOP_"
+
+
 def _clean_env() -> dict[str, str]:
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    return {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", _AMBIENT_LOOP_PREFIX))}
 
 
 def _git(root: Path, *args: str) -> str:

@@ -111,6 +111,7 @@ MOVE_CHECKOUT_FILES = (
     "hooks/_rule_delivery.py",  # the injector's delivery planner, imported by inject_rules.py
     "hooks/_rule_blacklist.py",  # the blacklist and template helpers, imported by inject_rules.py
     "hooks/commit_gate.sh",  # the wrapper the registered PreToolUse Bash commands run through
+    "hooks/_commit_command.py",  # the reader commit_gate.sh asks whether a command is a commit
     "hooks/remind_adr.py",  # a registered PreToolUse hook on Bash, run on a commit command
     "cursor/config/export-cursor-rules.py",  # the Cursor rules export, run over each arm's tree
     "codex/config/export-codex-rules-bridge.py",  # the Codex rules bridge, run over each tree

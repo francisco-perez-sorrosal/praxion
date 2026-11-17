@@ -38,6 +38,7 @@ from typing import Any
 
 from tests.acceptance.drivers.shipped_texts import section
 from tests.acceptance.drivers.step_loop import (
+    AMBIENT_LOOP_PREFIX,
     CONFIG_DIR_VARIABLE,
     END_WAIT_VARIABLE,
     MARKER_TEXT,
@@ -126,7 +127,8 @@ def _write(root: Path, rel: str, text: str) -> None:
 
 
 def _clean_env() -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    # As in the step-loop driver: a gate that runs this suite sets loop variables of its own.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", AMBIENT_LOOP_PREFIX))}
     env.pop("PYTEST_ADDOPTS", None)
     env["PATH"] = f"{Path(PYTHON).parent}{os.pathsep}{env.get('PATH', '')}"
     return env

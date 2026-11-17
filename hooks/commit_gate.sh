@@ -1,8 +1,21 @@
 #!/bin/sh
 # Fast-path gate for PreToolUse hooks that only apply to git commit commands.
-# Reads stdin, checks for "git commit" with grep (< 1ms), and only invokes
-# the Python hook if the payload looks like a commit. Avoids ~200-500ms of
-# Python startup overhead on every non-commit Bash call.
+# Reads stdin and starts the Python hook only for a command that may record a
+# commit, deciding as much as it can before any interpreter starts (a Python
+# start costs 20 to 500 ms, and the gate runs on every Bash call):
+#
+#   1. a `case` over the whole payload: no `git`, then `commit`, anywhere, exit 0;
+#   2. one sed cuts out the command field's value: no `commit` in it (the words
+#      were only in the description or a path), exit 0;
+#   3. a `case` reads a value that is plainly one `git <read-only built-in>`
+#      command (`git log --grep=commit`), exit 0;
+#   4. the stdlib reader `_commit_command.py` reads the command as a shell
+#      would split it: `not-a-commit` (`git -C . log --grep=commit`), exit 0;
+#   5. anything else starts the hook: a commit, a form the reader cannot read
+#      with certainty, or a reader that failed for any reason.
+#
+# Each skip is decided on the command alone, and every doubt runs the hook: a
+# real commit no checker judged is the worse failure.
 #
 # Usage: commit_gate.sh [--blocking] <python-hook-script>
 #
@@ -57,6 +70,31 @@ refuse() {
     } >&2 || :
 }
 
+# Whether $1, the command value as stage 2 cut it, is plainly one simple command
+# `git <built-in> ...` that the reader would read `not-a-commit`: no backslash
+# (stage 2 marks a value it dropped escapes from with one), no character that
+# could end the simple command or change its words, `git` and one space first,
+# and no later word the reader would follow as another invocation (`git`, or a
+# shell's name: each of them holds `sh`). Builtins only, so it costs no process.
+# When in doubt it answers no and the reader decides.
+is_plainly_read_only_git() {
+    case "$1" in
+        *[\\\;\&\|\(\)\<\>\`\$\'\"\#]*) return 1 ;;
+        '=git '*) ;;
+        *) return 1 ;;
+    esac
+    words=${1#=git }
+    subcommand=${words%% *}
+    case "${words#"$subcommand"}" in
+        *git* | *sh*) return 1 ;;
+    esac
+    # A subset of GIT_BUILTINS in _commit_command.py; test_commit_command.py holds it there.
+    case "$subcommand" in
+        log | show | diff | status | branch | blame | grep | rev-parse | rev-list | ls-files) return 0 ;;
+    esac
+    return 1
+}
+
 blocking=0
 if [ "$1" = "--blocking" ]; then
     blocking=1
@@ -65,13 +103,58 @@ fi
 
 input=$(cat)
 
-# Quick text check — the JSON payload contains "git commit" in the command field.
-# False positives (rare) just run the Python hook unnecessarily — same as before.
+# Quick text check over the whole payload, the only stage most calls reach. Its
+# false positives (the words in the description, a path or a `git log --grep`)
+# are what the stages inside the arm settle before the hook starts. A `case`,
+# not a pipe into grep: a forked producer that dies under load (seen with dash)
+# leaves grep reading nothing, and a real commit would pass unjudged. It also
+# matches the words on different lines, a superset of a line-wise grep, so it
+# only sends more payloads on to the exact stages.
 # The payload is forwarded with printf, never echo: /bin/sh on macOS is bash in
 # POSIX mode, whose builtin echo interprets backslash escapes, so a command that
 # contains `\|`, `\s` or `\n` (any grep pattern) arrives as invalid JSON and
 # every Python hook's json.loads fails silently -- td-188.
-if printf '%s\n' "$input" | grep -q 'git.*commit'; then
+case "$input" in
+*git*commit*)
+    # The command field's value, cut out exactly: the field's opening quote, then
+    # unescaped characters and whole escapes, then the closing quote. The first
+    # `"command":` is cut at a newline (no JSON text holds a raw one), and the `=`
+    # before the value tells an empty command from no field at all; no field, or
+    # a sed that failed, goes on. A value that holds a backslash gains one in front
+    # of its `=`, so stage 3 can tell; then every `\\` and every `\"` is dropped.
+    # Dropping can only join letters into the word, never part them, so it errs
+    # towards the reader; a `\u` escape could spell the word, so it goes on to the
+    # reader too. LC_ALL=C reads the payload as bytes, so no multibyte character
+    # can stop sed. No subshell beyond the pipe: this stage is paid again on the
+    # way to the reader.
+    command_value=$(printf '%s\n' "$input" | LC_ALL=C sed -n \
+        -e 's/"command"[[:space:]]*:[[:space:]]*"\([^"\\]*\(\\.[^"\\]*\)*\)".*/\
+=\1/' -e 's/\(\n\)=\(.*\\\)/\1\\=\2/' \
+        -e 's/\\\\//g' -e 's/\\"//g' -e 's/^.*\n//p') || command_value=
+    case "$command_value" in
+        '' | *commit* | *'\u'*) ;;
+        *) exit 0 ;;
+    esac
+    if is_plainly_read_only_git "$command_value"; then
+        exit 0
+    fi
+
+    # The reader's interpreter, in the finalize chain's order: a real interpreter
+    # starts the reader in 20 to 30 ms, a version-manager shim on PATH in 200 ms or
+    # more. `-I -S` keeps any of them to the standard library. A reader that cannot
+    # start, crashes or prints anything but `not-a-commit` leaves the hook to run.
+    if [ -n "${PRAXION_PYTHON:-}" ] && [ -x "$PRAXION_PYTHON" ]; then
+        py=$PRAXION_PYTHON
+    elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -x "$CLAUDE_PROJECT_DIR/.venv/bin/python" ]; then
+        py=$CLAUDE_PROJECT_DIR/.venv/bin/python
+    else
+        py=python3
+    fi
+    verdict=$(printf '%s\n' "$input" | "$py" -I -S "${0%/*}/_commit_command.py" 2>/dev/null) || verdict=
+    if [ "$verdict" = not-a-commit ]; then
+        exit 0
+    fi
+
     # PRAXION_COMMIT_PAYLOAD tells a payload-aware checker that stdin carries a
     # hook payload deterministically, rather than sniffing stdin readiness with
     # a timed probe that can lose the race under load (a false "no payload" then
@@ -104,6 +187,6 @@ if printf '%s\n' "$input" | grep -q 'git.*commit'; then
         printf '%s' "$out" || :
     fi
     exit "$rc"
-else
-    exit 0
-fi
+    ;;
+*) exit 0 ;;
+esac

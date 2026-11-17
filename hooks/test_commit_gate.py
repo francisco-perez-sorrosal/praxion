@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -50,18 +51,20 @@ def _run_gate(
     shell: str | None = None,
     stderr: int | None = subprocess.PIPE,
     close_stderr: bool = False,
+    gate: Path = GATE_SCRIPT,
 ) -> subprocess.CompletedProcess[str]:
     """Invoke commit_gate.sh with a JSON payload on stdin.
 
     `shell` runs the script under that interpreter instead of its shebang; `stderr`
     is what the gate's fd 2 is connected to, and `close_stderr` leaves fd 2 closed
-    (both let a test prove a failed stderr write cannot change the verdict).
+    (both let a test prove a failed stderr write cannot change the verdict). `gate`
+    runs a copy of the script, beside a reader of the test's own making.
     """
     real_hook = str(hook) if hook else str(HOOKS_DIR / "check_id_citation_discipline.py")
     merged_env = dict(os.environ)
     merged_env.update(env or {})
     argv = [shell] if shell else []
-    argv += [str(GATE_SCRIPT)] + (["--blocking"] if blocking else []) + [real_hook]
+    argv += [str(gate)] + (["--blocking"] if blocking else []) + [real_hook]
     if close_stderr:
         argv = ["sh", "-c", 'exec "$@" 2>&-', "sh", *argv]
     return subprocess.run(
@@ -157,6 +160,132 @@ def test_non_commit_command_exits_fast(command: str, tmp_path: Path) -> None:
     assert DELEGATION_MARKER not in result.stdout, (
         f"non-commit command {command!r} must not reach Python; stdout={result.stdout!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Canary: a command that mentions a commit but records none
+#
+# Past the grep, the gate reads the command itself, through the stdlib reader
+# beside it, and skips the hook only when the reader says `not-a-commit`. A
+# reader that is missing or crashes must leave the hook to run, as before the
+# reader existed.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"tool_name": "Bash", "tool_input": {"command": "ls", "description": "git commit"}},
+        _make_bash_payload("git log --grep=commit --oneline"),
+    ],
+    ids=["words-only-in-the-description", "argument-of-git-log"],
+)
+def test_a_read_only_command_mentioning_a_commit_never_reaches_python(
+    payload: dict, tmp_path: Path
+) -> None:
+    result = _run_gate(payload, hook=_write_delegation_spy(tmp_path), blocking=True)
+
+    assert (result.returncode, result.stdout) == (0, "")
+
+
+@pytest.mark.parametrize(
+    "reader",
+    ["raise SystemExit('the reader broke')\n", None],
+    ids=["reader-crashes", "reader-missing"],
+)
+def test_a_reader_that_cannot_answer_leaves_the_hook_to_run(
+    reader: str | None, tmp_path: Path
+) -> None:
+    gate = _copy_gate_beside_a_reader(tmp_path, reader)
+
+    result = _run_gate(
+        _make_bash_payload("git -C . log --grep=commit --oneline"),
+        hook=_write_delegation_spy(tmp_path),
+        gate=gate,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert DELEGATION_MARKER in result.stdout, "a reader with no answer skipped the hook"
+
+
+def _copy_gate_beside_a_reader(tmp_path: Path, reader: str | None) -> Path:
+    """A copy of the gate whose reader is `reader`'s source, or missing when None."""
+    gate = tmp_path / "gate" / GATE_SCRIPT.name
+    gate.parent.mkdir()
+    shutil.copy2(GATE_SCRIPT, gate)
+    if reader is not None:
+        (gate.parent / "_commit_command.py").write_text(reader, encoding="utf-8")
+    return gate
+
+
+# Read-only commands the shell must leave to the reader: each holds a form that could make
+# it more than one `git <built-in>` simple command, or one the reader reads otherwise.
+LEFT_TO_THE_READER = {
+    "global-option-first": "git -C . log --grep=commit",
+    "two-spaces": "git  log --grep=commit",
+    "leading-space": " git log --grep=commit",
+    "pipe": "git log --oneline | grep commit",
+    "semicolon": "git log --grep=commit; ls",
+    "and-and": "git log --grep=commit && ls",
+    "single-quoted-argument": "git log --grep='commit'",
+    "double-quoted-argument": 'git log --grep="commit"',
+    "escaped-quote": 'git log --grep=\\"commit',
+    "dollar-word": "git log $commit",
+    "line-break": "git log --grep=commit\nls",
+    "backslash-in-the-subcommand": "git lo\\g --grep=commit",
+    "backslash-elsewhere": "git log --grep=commit x\\y",
+    "backtick": "git log --grep=commit `ls`",
+    "comment-sign": "git log --grep=commit # x",
+    "redirection": "git log --grep=commit > out",
+    "background": "git log --grep=commit &",
+    "parenthesis": "git log --grep=commit (",
+    "another-git-word": "git log --grep=x git commit -m y",
+    "a-shell-name": "git log --grep=commit sh -c ls",
+    "subcommand-not-listed": "git help commit",
+}
+
+
+@pytest.mark.parametrize("command", list(LEFT_TO_THE_READER.values()), ids=list(LEFT_TO_THE_READER))
+def test_a_command_the_shell_cannot_read_plainly_reaches_the_reader(
+    command: str, tmp_path: Path, shell: str
+) -> None:
+    gate = _copy_gate_beside_a_reader(tmp_path, "print('uncertain')\n")
+
+    result = _run_gate(
+        _make_bash_payload(command), hook=_write_delegation_spy(tmp_path), gate=gate, shell=shell
+    )
+
+    assert DELEGATION_MARKER in result.stdout, f"the shell decided {command!r} itself"
+
+
+def test_a_plain_git_log_mentioning_a_commit_is_decided_before_the_reader(tmp_path: Path) -> None:
+    gate = _copy_gate_beside_a_reader(tmp_path, "print('uncertain')\n")
+
+    result = _run_gate(
+        _make_bash_payload("git log --grep=commit --oneline"),
+        hook=_write_delegation_spy(tmp_path),
+        gate=gate,
+    )
+
+    assert (result.returncode, result.stdout) == (0, "")
+
+
+def test_a_real_commit_starts_the_checker_with_no_grep_on_the_path(tmp_path: Path) -> None:
+    """The first test is a shell builtin: with only what the later stages run on PATH
+    (no grep), a real commit still reaches the checker."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for tool in ("cat", "sed"):
+        (bin_dir / tool).symlink_to(shutil.which(tool))
+    (bin_dir / "python3").symlink_to(os.path.realpath(sys.executable))
+
+    result = _run_gate(
+        _make_bash_payload("git commit -m 'add feature'"),
+        hook=_write_delegation_spy(tmp_path),
+        env={"PATH": str(bin_dir)},
+    )
+
+    assert DELEGATION_MARKER in result.stdout, result.stderr
 
 
 # ---------------------------------------------------------------------------

@@ -43,10 +43,19 @@ def _copy_tree(source: Path, dest: Path) -> None:
             shutil.copy2(file, target)
 
 
+# A commit starts git's maintenance in the background, and its lock file under `.git/objects`
+# comes and goes while a test copies the repository: no background work in a fixture repository.
+_NO_BACKGROUND_WORK = ("-c", "maintenance.auto=false", "-c", "gc.auto=0")
+
+
 def _git(repository: Path, *args: str) -> None:
     identity = ("-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid")
     subprocess.run(
-        ["git", *identity, *args], cwd=repository, check=True, capture_output=True, timeout=60
+        ["git", *identity, *_NO_BACKGROUND_WORK, *args],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+        timeout=60,
     )
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, NoReturn
@@ -62,6 +63,10 @@ SUMMARY_PREFIX = "step_loop: "
 DASH = "—"
 SHORT_SHA = 7
 VERBS = ("next", "record", "status")
+LOCATION_OPTIONS = ("--repo-root", "--worktree-root", "--base-ref")
+_ECHOED_OPTION = re.compile(  # a printed command's option: its value as `shlex.quote` writes it
+    rf"\s+(?:{'|'.join(LOCATION_OPTIONS)})(?:=|\s+)(?:'[^']*'|[\w@%+=:,./-]+)"
+)
 GOAL_VERB = "goal"
 RUN_VERB = "run"
 RUN_DEFAULT_MAX_TURNS = 40  # one unit of work: the 30-45 tool calls a step is sized to
@@ -216,6 +221,36 @@ def parse(argv: Sequence[str], description: str | None) -> argparse.Namespace:
             return args
         _Parser(prog=f"{SCRIPT} record").error(problem)
     return args
+
+
+def location_echo(argv: Sequence[str]) -> tuple[str, ...]:
+    """The location options a call gave, as `option value` words in the order given, whether
+    spelled `--opt value` or `--opt=value`: the options every command it prints must repeat,
+    so a printed command run as printed reads the same repository, root and base."""
+    echoed: list[str] = []
+    words = iter(argv)
+    for word in words:
+        option, equals, attached = word.partition("=")
+        if option not in LOCATION_OPTIONS:
+            continue
+        value = attached if equals else next(words, None)
+        if value is not None:
+            echoed += [option, value]
+    return tuple(echoed)
+
+
+def same_next_action(held: str | None, composed: str | None) -> bool:
+    """Whether the next action a handoff file holds is the one the driver would write now.
+
+    Two sections that differ only in the location options their commands end with are the same
+    action, so a file written before a caller gave options (or by a call that gave none) is not
+    rewritten for them. Options that both sections carry and that differ are a caller who moved
+    the base, so the file is written again with the new ones."""
+    if held is None or composed is None:
+        return held == composed
+    held_options, composed_options = (_ECHOED_OPTION.findall(text) for text in (held, composed))
+    moved_base = bool(held_options and composed_options and held_options != composed_options)
+    return not moved_base and _ECHOED_OPTION.sub("", held) == _ECHOED_OPTION.sub("", composed)
 
 
 # --- The five constructors, one per kind of outcome ----------------------------------------

@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import contextlib
 import json
+import operator
 import os
 import re
 import sys
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -287,8 +288,13 @@ def write_stop_handoff(
     next_action: str,
     cause: str | None = None,
     base_ref: str | None = None,
+    same_action: Callable[[str | None, str | None], bool] = operator.eq,
 ) -> bool:
     """Compose `HANDOFF.md` with `next_action` as section 2 and write it only if section 2 moved.
+
+    `same_action` judges the two sections (the file's, then the composed one) and lets the caller
+    count the location options the commands end with as no move: a file that differs from this
+    call's only in them is left as it is.
 
     A stop's boundary is `mid-phase:<cause>`: the composer must name one once every step reads
     verified, and the cause (unlike a request id) repeats. Without one the composer picks its
@@ -308,7 +314,9 @@ def write_stop_handoff(
     )
     path: Path = composed["path"]
     existing = read_existing(path)
-    if existing is not None and _next_action_of(existing) == _next_action_of(composed["text"]):
+    if existing is not None and same_action(
+        _next_action_of(existing), _next_action_of(composed["text"])
+    ):
         return False
     return write_atomic(path, composed["text"])
 

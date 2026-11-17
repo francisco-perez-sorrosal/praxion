@@ -52,8 +52,11 @@ Guarantees:
   A `next` made while a request is out and the plan issues another first stops
   (`request-outstanding`) naming the request and the record call that takes it back.
 
-`then` and a stop's `resume` echo how this command was started: `step_loop.py` when its
-directory is a `PATH` entry, else `python3 scripts/step_loop.py`.
+Every command a call prints (`then`, a stop's `resume`, the handoff's next action, the status
+table's last line) echoes how this command was started, `step_loop.py` when its directory is a
+`PATH` entry, else `python3 scripts/step_loop.py`, and ends with the `--repo-root`,
+`--worktree-root` and `--base-ref` options that call was given, so a printed command run as
+printed reads the same repository and base.
 """
 
 from __future__ import annotations
@@ -267,7 +270,12 @@ def run_next(
     view = cli.stop_view(action, task.slug, invoke)
     try:
         write_stop_handoff(
-            task.slug, task.work, stop_next_action(view), action.cause, task.base_ref
+            task.slug,
+            task.work,
+            stop_next_action(view),
+            action.cause,
+            task.base_ref,
+            same_action=cli.same_next_action,
         )
     except HandoffError as refused:  # a stop for a human stays one, whatever sits at HANDOFF.md
         frame = frame._replace(
@@ -499,7 +507,8 @@ def run_goal(args: argparse.Namespace) -> Reply:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    reply = execute(sys.argv[1:] if argv is None else argv)
+    words = sys.argv[1:] if argv is None else argv
+    reply = execute(words, echo=cli.location_echo(words))
     sys.stdout.write(reply.stdout)
     for line in reply.lines:
         print(line, file=sys.stderr)

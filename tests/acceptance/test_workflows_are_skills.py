@@ -80,6 +80,7 @@ def test_the_plugin_manifest_neither_registers_nor_mentions_commands():
 # The pre-existing warning set: hook quoting anywhere, and the missing-frontmatter warnings of
 # the root guidance file and the agents directory's two prose files. Nothing else is tolerated.
 _HOOK_QUOTING = r"Shell command uses \$\{CLAUDE_PLUGIN_ROOT\} without quotes"
+_INVENTORY_HEADING = "Provides:"
 _PRE_EXISTING_FILES = ("/CLAUDE.md", "/agents/README.md", "/agents/CLAUDE.md")
 # Plugin-directory advisories the validator added in Claude Code 2.1.310, about no component: the
 # plugin has no icon, and its system-file scan stops at a size limit.
@@ -89,14 +90,45 @@ _DIRECTORY_ADVISORIES = (
 )
 
 
+def _findings(lines: list[str]) -> list[str]:
+    """The `❯` lines that are findings: under `Provides:` the validator lists, with the same bullet, what a file provides."""
+    findings, listing = [], False
+    for line in (ln.strip() for ln in lines):
+        if line == _INVENTORY_HEADING:
+            listing = True
+        elif line.startswith("❯"):
+            if not listing:
+                findings.append(line)
+        elif line:
+            listing = False
+    return findings
+
+
 def _validator_sections(output: str) -> list[tuple[str, list[str]]]:
     """Each `Validating <kind>: <path>` section with the warning lines it carries."""
     sections = []
     for chunk in re.split(r"\n(?=Validating )", output):
         lines = chunk.splitlines()
         if lines and lines[0].startswith("Validating "):
-            sections.append((lines[0], [ln.strip() for ln in lines if ln.strip().startswith("❯")]))
+            sections.append((lines[0], _findings(lines)))
     return sections
+
+
+def test_a_listing_of_what_a_file_provides_is_not_read_as_findings():
+    section = [
+        "Validating hooks: /plugin/hooks/hooks.json",
+        "⚠ Found 1 warning:",
+        "  ❯ hooks.Stop: a finding",
+        "",
+        "Provides:",
+        "",
+        '  ❯ hooks: Stop "" command "python3 hook.py"',
+        "",
+        "Plugin directory checks for /plugin",
+        "  ❯ a finding after the listing",
+    ]
+
+    assert _findings(section) == ["❯ hooks.Stop: a finding", "❯ a finding after the listing"]
 
 
 def _tolerated(header: str, warning: str) -> bool:

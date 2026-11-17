@@ -442,20 +442,13 @@ _ACTIONS = {  # `{step}` is the stop's step id
     "attempts-disagree": (
         "correct Step {step}'s Attempts: line in WIP.md so its count is its request's attempt"
     ),
+    "unreadable-plan-field": "correct the plan line the evidence names in IMPLEMENTATION_PLAN.md",
     "iteration-budget": "re-tier or split the remaining steps with the user",
 }
 
 
-# The human verdict whose evidence names a plan field the driver cannot read; the two phrases are
-# the wording `_step_loop_state` gives that evidence, and a test reads them back through it.
-_UNREADABLE_PLAN_FIELD_RE = re.compile(r"\b(?:Iterations|Change type): value cannot be read")
-_PLAN_FIELD_ACTION = "correct the plan line the evidence names in IMPLEMENTATION_PLAN.md"
-
-
 def _action(stop: StopView) -> str:
-    """What to do about the stop; a human verdict on an unreadable plan field is a plan fix."""
-    if stop.cause == "human-verdict" and _UNREADABLE_PLAN_FIELD_RE.search(stop.evidence):
-        return _PLAN_FIELD_ACTION
+    """What to do about the stop."""
     return _ACTIONS[stop.cause].format(step=stop.step)
 
 

@@ -60,6 +60,10 @@ A plan block is amended while no request is out. To run a step before the one `n
 
 `attempts-disagree` means an `Attempts:` line in `WIP.md` names a request whose attempt (`-a<n>-`) is not the line's own `count=`; a hand edit or a stale line does that. Neither `next` nor `record` acts on it. Correct the line so the count is the request's attempt (or remove its `request=` when no agent ran it), then run `next`.
 
+## A plan field the driver cannot read
+
+`unreadable-plan-field` means a driven step's `Iterations:` or `Change type:` value does not read; the evidence names the field, the value as written and the line to correct. Fix that line in `IMPLEMENTATION_PLAN.md` (a whole number of at least 1, or one of the listed change types; the plan-level `Change type:` line sits outside every step block), then run `next`. A step's own `Iterations:` line is part of its block, so correcting it opens a fresh series for the step.
+
 ## A warning that a file was left uncommitted
 
 A file the step's agent changed outside the step's `Files:` is left uncommitted, and the driver warns `undeclared-edit`; the warning names the file, not the remedy. The relay never commits, so the orchestrator does it at a step boundary: read `git status` after each `record`, and commit what is left by name at the next stop, or before the step that follows depends on it.

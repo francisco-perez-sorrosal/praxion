@@ -31,8 +31,8 @@ from _step_loop_render import RequestKey, spawn_request  # noqa: E402
 from _step_loop_state import (  # noqa: E402
     Exhausted,
     Failed,
-    HumanVerdict,
     LoopInputs,
+    UnreadableField,
     series_states,
     step_cap,
     step_series,
@@ -261,10 +261,10 @@ def test_an_unreadable_iterations_field_reads_unknown_to_the_reconciler(tmp_path
     assert "Iterations: value cannot be read" in verdict["evidence"]
 
 
-def test_an_unreadable_iterations_field_is_a_human_verdict_to_the_driver_state():
+def test_an_unreadable_iterations_field_is_an_unreadable_field_to_the_driver_state():
     state = step_series(the_step(UNREADABLE_PLAN), inputs(UNREADABLE_PLAN, ()))
 
-    assert (type(state), state.verdict) == (HumanVerdict, "unknown")
+    assert (type(state), state.field, state.text) == (UnreadableField, "Iterations", "many")
 
 
 @pytest.mark.parametrize("module", READERS)

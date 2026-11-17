@@ -46,6 +46,7 @@ from _step_loop_state import (  # noqa: E402
     Running,
     Series,
     StateWord,
+    UnreadableField,
     Verified,
     is_done,
     step_series,
@@ -80,6 +81,10 @@ STATES = {
     "verified": (Verified(1, 1, None), "verified-complete"),
     "done outside": (DoneOutside(), "verified-complete"),
     "reconciler human word": (HumanVerdict("unknown", "no evidence"), "human-verdict"),
+    "an unreadable plan field": (
+        UnreadableField("Iterations", "many", "write a whole number"),
+        "human-verdict",
+    ),
     "a line written without the loop": (
         HumanVerdict("attempts-exhausted", "the line says so"),
         "attempts-exhausted",

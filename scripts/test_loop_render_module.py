@@ -622,6 +622,7 @@ CAUSES = {
     "unnamed-attempts", "review-revised-twice", "review-unfinished", "revision-failed",
     "review-without-work", "not-driven", "dependency-defect", "commit-disturbed-tree", "loop-state-defect",
     "iteration-budget", "files-glob", "request-outstanding", "attempts-disagree",
+    "unreadable-plan-field",
 }  # fmt: skip
 
 

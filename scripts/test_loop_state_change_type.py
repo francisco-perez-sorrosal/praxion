@@ -3,7 +3,7 @@
 
 A step's own unreadable line stops that step only; an unreadable plan-level line stops every
 step that would have used it, so a step with its own readable field or the refactoring tag still
-runs. The stop is a human verdict naming the value, the legal values and the line to fix.
+runs. The stop is an unreadable field naming the value, the legal values and the line to fix.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from _plan_steps import CHANGE_TYPES, parse_plan_steps  # noqa: E402
 from _step_loop_action import Spawn, Stop, next_action  # noqa: E402
-from _step_loop_state import Fresh, HumanVerdict, LoopInputs, step_series  # noqa: E402
+from _step_loop_state import Fresh, LoopInputs, UnreadableField, step_series  # noqa: E402
 
 IMPLEMENTER = "**Assignee**: implementer"
 
@@ -44,36 +44,35 @@ def series_of(text, index=0):
 # -- The stop ---------------------------------------------------------------------------------
 
 
-def test_an_unreadable_step_line_is_a_human_verdict_naming_value_legal_values_and_line():
+def test_an_unreadable_step_line_is_an_unreadable_field_naming_value_legal_values_and_line():
     state = series_of(plan(step("1", "**Change type**: feature")))
 
-    assert (type(state), state.verdict) == (HumanVerdict, "unknown")
-    assert "feature" in state.evidence
-    assert all(legal in state.evidence for legal in CHANGE_TYPES)
-    assert "Change type:" in state.evidence
-    assert "step's block" in state.evidence
+    assert type(state) is UnreadableField
+    assert (state.field, state.text) == ("Change type", "feature")
+    assert all(legal in state.fix for legal in CHANGE_TYPES)
+    assert "step's block" in state.fix
 
 
 def test_an_unreadable_plan_level_line_names_the_plan_level_line_to_fix():
     state = series_of(plan(step("1"), head="**Change type**: feature\n\n"))
 
-    assert type(state) is HumanVerdict
-    assert "feature" in state.evidence
-    assert all(legal in state.evidence for legal in CHANGE_TYPES)
-    assert "plan-level" in state.evidence
+    assert type(state) is UnreadableField
+    assert state.text == "feature"
+    assert all(legal in state.fix for legal in CHANGE_TYPES)
+    assert "plan-level" in state.fix
 
 
 def test_two_plan_level_lines_that_disagree_stop_with_both_values_quoted():
     state = series_of(plan(step("1"), head="**Change type**: feat\n**Change type**: fix\n\n"))
 
-    assert type(state) is HumanVerdict
-    assert "feat; fix" in state.evidence
+    assert type(state) is UnreadableField
+    assert state.text == "feat; fix"
 
 
 def test_next_stops_before_any_spawn_on_an_unreadable_step_line():
     action = next_action(inputs_for(plan(step("1", "**Change type**: feature"))))
 
-    assert (type(action), action.cause, action.step) == (Stop, "human-verdict", "1")
+    assert (type(action), action.cause, action.step) == (Stop, "unreadable-plan-field", "1")
     assert "feature" in action.evidence
 
 
@@ -98,7 +97,7 @@ def test_an_unreadable_plan_level_line_does_not_stop_a_step_that_does_not_use_it
 def test_an_unreadable_step_line_stops_that_step_only():
     text = plan(step("1"), step("2", "**Change type**: nope"))
 
-    assert (series_of(text, 0), type(series_of(text, 1))) == (Fresh(1), HumanVerdict)
+    assert (series_of(text, 0), type(series_of(text, 1))) == (Fresh(1), UnreadableField)
     assert type(next_action(inputs_for(text))) is Spawn
 
 

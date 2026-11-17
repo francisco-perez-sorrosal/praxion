@@ -65,6 +65,7 @@ from _step_loop_state import (
     NotDriven,
     Running,
     Selection,
+    UnreadableField,
     Verified,
     is_driven,
     review_range,
@@ -85,7 +86,7 @@ HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed review-without-work not-driven
     dependency-defect commit-disturbed-tree loop-state-defect files-glob request-outstanding
-    attempts-disagree""".split()
+    attempts-disagree unreadable-plan-field""".split()
 )
 NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", BUDGET_CAUSE)
 REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound
@@ -354,6 +355,9 @@ def _step_stop(inputs: LoopInputs, selection: Next) -> Stop | None:
         if state.verdict == EXHAUSTED:
             return Stop("attempts-exhausted", step.id, evidence, (), evidence)
         return Stop("human-verdict", step.id, evidence)
+    if isinstance(state, UnreadableField):
+        evidence = f"{where}: the {state.field}: value cannot be read: {state.text}; {state.fix}"
+        return Stop("unreadable-plan-field", step.id, evidence)
     if isinstance(state, NotDriven):
         return Stop("not-driven", step.id, f"{where} is assigned to {state.assignee}")
     globbed = [path for path in step.files if any(mark in path for mark in GLOB_MARKS)]

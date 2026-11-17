@@ -8,16 +8,18 @@ Normative reading of a step's series -- first match wins:
 
 1. Not driven, no admitted `Files:` entry, no `Check:`, WIP claims `COMPLETE`: done outside
    the loop, since nothing is left for a gate to judge.
-2. Reconciler verdict `unknown` or `blocked`: a human verdict, whoever the assignee.
-3. Not driven otherwise: done outside only with the claim AND `verified-complete` (a step that
+2. Driven with an `Iterations:` or `Change type:` value that cannot be read: an unreadable
+   field, whatever the reconciler says of the step, so the stop names the field and not the
+   reconciler's own words.
+3. Reconciler verdict `unknown` or `blocked`: a human verdict, whoever the assignee.
+4. Not driven otherwise: done outside only with the claim AND `verified-complete` (a step that
    declares files can be credited a commit it never made); else not driven.
-4. Driven with an `Iterations:` value that cannot be read: a human verdict, since the step's
-   bound is unknown. Driven, WIP names an unrecorded request: running. A driver that died
-   between that write-ahead and its record leaves it so: `next` derives the same request id
-   again and `record` refuses until the agent's end shows.
-5. Driven with no driver record in any series: claimed and `verified-complete` is done outside,
+5. Driven, WIP names an unrecorded request: running. A driver that died between that
+   write-ahead and its record leaves it so: `next` derives the same request id again and
+   `record` refuses until the agent's end shows.
+6. Driven with no driver record in any series: claimed and `verified-complete` is done outside,
    `attempts-exhausted` (a line written without the loop) a human verdict, else a fresh series.
-6. Otherwise the series is the driver records whose `step_digest` equals the step's current
+7. Otherwise the series is the driver records whose `step_digest` equals the step's current
    digest, so revising the step block opens a fresh series and reverting it restores the old
    one. A `[BLOCKED]` or `[CONFLICT]` on its latest implement or revise return marks it; else
    a verified implement record verifies it; else a spent bound exhausts it (an ordinary step at
@@ -233,8 +235,27 @@ class HumanVerdict:
     evidence: str
 
 
+@dataclass(frozen=True)
+class UnreadableField:
+    """A plan field the driver cannot read: its name as the plan writes it, the value as
+    written, and what to do about the line."""
+
+    field: str
+    text: str
+    fix: str
+
+
 Series = Union[  # noqa: UP007 -- runtime value, 3.9 floor
-    Fresh, Running, Failed, Exhausted, Marked, Verified, DoneOutside, NotDriven, HumanVerdict
+    Fresh,
+    Running,
+    Failed,
+    Exhausted,
+    Marked,
+    Verified,
+    DoneOutside,
+    NotDriven,
+    HumanVerdict,
+    UnreadableField,
 ]
 
 
@@ -271,7 +292,8 @@ def step_state_word(state: Series) -> StateWord:
     reconciler and `marked` here. The word is the cause `next` stops on for an exhausted bound
     and a human verdict. It differs where `next` has no stop of that name: a spent goal bound
     reads `attempts-exhausted` (the stop's cause is `stalled`), a marked step reads `marked`
-    (the stop is `blocked-marker` or `conflict-marker`), a step the loop does not drive reads
+    (the stop is `blocked-marker` or `conflict-marker`), an unreadable plan field reads
+    `human-verdict` (the stop is `unreadable-plan-field`), a step the loop does not drive reads
     `pending` (the stop is `not-driven`), and a verified step whose review is unsatisfied reads
     by what `next` does about it."""
     if isinstance(state, (Fresh, NotDriven)):
@@ -290,6 +312,8 @@ def step_state_word(state: Series) -> StateWord:
         return "verified-complete"
     if isinstance(state, HumanVerdict):
         return "attempts-exhausted" if state.verdict == EXHAUSTED else "human-verdict"
+    if isinstance(state, UnreadableField):
+        return "human-verdict"
     _unreachable(state)
 
 
@@ -327,17 +351,13 @@ def step_series(step: PlanStep, inputs: LoopInputs) -> Series:
     driven = is_driven(step)
     if not driven and not step.files and step.check is None and claimed:
         return DoneOutside()
+    if driven and (unreadable := _unreadable_field(step)):
+        return unreadable
     if word in HUMAN_WORDS:
         return HumanVerdict(word, verdict.get("evidence", ""))
     if not driven:
         done = claimed and word == VERIFIED
         return DoneOutside() if done else NotDriven(getattr(step.assignee, "name", ""))
-    if isinstance(step.bound, UnreadableIterations):
-        return HumanVerdict(
-            "unknown", f"the step's Iterations: value cannot be read: {step.bound.text}"
-        )
-    if isinstance(step.change_type, UnreadableChangeType):
-        return _unreadable_change_type(step.change_type)
     attempt, own = inputs.attempts.get(step.id), inputs.driver_records(step.id)
     if isinstance(attempt, OutstandingAttempt):
         return Running(attempt.count, attempt.request, _series_index(own, step.digest))
@@ -346,18 +366,27 @@ def step_series(step: PlanStep, inputs: LoopInputs) -> Series:
     return _series_of_records(step, own, inputs.reviews.get(step.id))
 
 
-def _unreadable_change_type(reading: UnreadableChangeType) -> HumanVerdict:
-    """The stop for a change type the driver cannot read: the value, the legal ones, the line."""
-    fix = (
-        "in the step's block in IMPLEMENTATION_PLAN.md"
-        if reading.where == "step"
-        else "(the plan-level line, outside every step block) in IMPLEMENTATION_PLAN.md"
-    )
-    return HumanVerdict(
-        "unknown",
-        f"the {reading.where}'s Change type: value cannot be read: {reading.text}; "
-        f"legal values: {', '.join(CHANGE_TYPES)}; fix the Change type: line {fix}",
-    )
+def _unreadable_field(step: PlanStep) -> UnreadableField | None:
+    """The step's `Iterations:` or `Change type:` value when the plan grammar cannot read it."""
+    if isinstance(step.bound, UnreadableIterations):
+        fix = (
+            "write a whole number of at least 1 on the Iterations: line "
+            "in the step's block in IMPLEMENTATION_PLAN.md"
+        )
+        return UnreadableField("Iterations", step.bound.text, fix)
+    if isinstance(step.change_type, UnreadableChangeType):
+        reading = step.change_type
+        line = (
+            "in the step's block"
+            if reading.where == "step"
+            else "(the plan-level line, outside every step block)"
+        )
+        fix = (
+            f"legal values: {', '.join(CHANGE_TYPES)}; "
+            f"fix the Change type: line {line} in IMPLEMENTATION_PLAN.md"
+        )
+        return UnreadableField("Change type", reading.text, fix)
+    return None
 
 
 def _without_driver_record(word: str | None, claimed: bool, verdict: Mapping[str, Any]) -> Series:

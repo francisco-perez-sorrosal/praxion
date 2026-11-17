@@ -30,6 +30,8 @@ PRs that touch `.ai-state/` carry obligations beyond regular code PRs because th
 
 **Default: fast-forward only (`git merge --ff-only`).** Preserves a linear history on the target branch; post-merge git hooks fire as expected on the moved tip. When the source branch has diverged from the target, rebase the source onto the target first (`git rebase <target>` from inside the worktree) so the next attempt fast-forwards — the rebase exercises the `.ai-state/observations.jsonl` merge driver if any conflicts in that file exist. Do not silently fall back to a non-fast-forward merge commit.
 
+**One exception to that rebase.** A branch whose state files cite its own commit hashes may take the target in by a merge commit (`git merge <target>` from inside the worktree) as its last change, so the target still fast-forwards. Every other diverged branch rebases.
+
 **Do not squash-merge PRs that touch `.ai-state/`.** Squash collapses the source-branch history into a single commit on the target; the resulting tree replaces the target's `.ai-state/` wholesale, erasing any state the target accumulated since the branch diverged. Consequences include:
 
 - Merged-main ADRs whose cross-references were rewritten at finalize can regress to pre-finalize draft ids.

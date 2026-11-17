@@ -3,7 +3,7 @@
 #
 # Schema version: 1
 version: 1
-generated_at: '2026-11-13T08:39:25Z'
+generated_at: '2026-11-17T08:40:54Z'
 rules:
 - id: swe/adr-conventions
   path: rules/swe/adr-conventions.md
@@ -253,7 +253,7 @@ rules:
   load: path_scoped
   core: false
   install: symlink
-  chars: 6726
+  chars: 6996
   paths:
   - skills/review-pr/SKILL.md
   - skills/merge-worktree/SKILL.md

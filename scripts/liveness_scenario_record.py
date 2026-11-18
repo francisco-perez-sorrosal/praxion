@@ -16,7 +16,11 @@ Every line is `{"v": 1, "event": ...}`, one of two events:
   (a failed phase's text says the disk is full), `free`.
 
 A scenario with a `start` and no `end` was cut. The report is a record, not a gate: it exits 0
-whatever it reads, because the job's own step already carries the verdict.
+whatever it reads, because the job's own step already carries the verdict. The same holds for
+the writer: a record it cannot write is said once on stderr and never stops the scenarios.
+
+Under pytest-xdist the controller alone records (a worker's reports reach it, interleaved by
+scenario); a worker leaves the option alone, so no line is written twice.
 
 Stdlib-only and 3.9-safe: the report steps run under the runner's own `python3`, which has
 neither pytest nor this repository's environment. Not executable: it is a library and a
@@ -177,7 +181,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def pytest_configure(config: pytest.Config) -> None:
     """Record only when asked to, and never while merely collecting."""
     path = config.getoption("liveness_record")
-    if path is None or config.getoption("collectonly"):
+    if path is None or config.getoption("collectonly") or hasattr(config, "workerinput"):
         return
     config.pluginmanager.register(ScenarioRecorder(Path(path)), "liveness-scenario-recorder")
 
@@ -187,26 +191,38 @@ class ScenarioRecorder:
 
     def __init__(self, path: Path) -> None:
         self._path = path
-        self._phases: list[Phase] = []
+        self._phases: dict[str, list[Phase]] = {}  # by node: xdist interleaves scenarios
+        self._said_unwritable = False
 
     def pytest_sessionstart(self, session: pytest.Session) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text("", encoding="utf-8")
+        self._write("", "w")
 
     def pytest_runtest_logstart(self, nodeid: str, location: object) -> None:
         self._append(Start(node=nodeid, at=time.time(), free=free_bytes()))
 
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
         text = str(report.longrepr) if report.failed else ""
-        self._phases.append(Phase(report.outcome, report.duration, text))
+        phase = Phase(report.outcome, report.duration, text)
+        self._phases.setdefault(report.nodeid, []).append(phase)
         if report.when == "teardown":
-            self._append(end_event(report.nodeid, self._phases, time.time(), free_bytes()))
-            self._phases = []
+            phases = self._phases.pop(report.nodeid)
+            self._append(end_event(report.nodeid, phases, time.time(), free_bytes()))
 
     def _append(self, event: Start | End) -> None:
-        # Open and close per line: the close is the flush, and a line is one write.
-        with self._path.open("a", encoding="utf-8") as record:
-            record.write(to_line(event) + "\n")
+        self._write(to_line(event) + "\n", "a")
+
+    def _write(self, text: str, mode: str) -> None:
+        # The record is an observer: when the disk is the very thing that is wrong, losing
+        # the record is better than ending the run it watches.
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            # Open and close per line: the close is the flush, and a line is one write.
+            with self._path.open(mode, encoding="utf-8") as record:
+                record.write(text)
+        except OSError as error:
+            if not self._said_unwritable:
+                self._said_unwritable = True
+                print(f"liveness record: cannot write {self._path}: {error}", file=sys.stderr)
 
 
 def free_bytes() -> int:
@@ -290,7 +306,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"free disk space before the scenarios: {format_size(free_bytes())}")
         return 0
     try:
-        text = args.path.read_text(encoding="utf-8")
+        # Bytes that are not UTF-8 become a malformed line, reported by number.
+        text = args.path.read_text(encoding="utf-8", errors="replace")
     except OSError as error:
         print(f"cannot read the record {args.path}: {error}")
         text = ""

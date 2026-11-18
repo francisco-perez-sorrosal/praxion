@@ -72,6 +72,26 @@ def _recorded(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
+def _report(node: str, when: str, outcome: str, seconds: float) -> pytest.TestReport:
+    return pytest.TestReport(
+        nodeid=node,
+        location=("a.py", 0, node),
+        keywords={},
+        outcome=outcome,
+        longrepr="E   failed" if outcome == "failed" else None,
+        when=when,
+        duration=seconds,
+    )
+
+
+def _ends_of(path: Path) -> dict[str, tuple[object, object]]:
+    return {
+        entry["node"]: (entry["outcome"], entry["seconds"])
+        for entry in _recorded(path)
+        if entry["event"] == "end"
+    }
+
+
 def _ends(path: Path, field: str) -> dict[str, object]:
     return {entry["node"]: entry[field] for entry in _recorded(path) if entry["event"] == "end"}
 
@@ -148,10 +168,9 @@ def test_the_plugin_writes_nothing_without_its_option(pytester):
 
     result = _run_pytest(pytester, "-p", "no:cacheprovider")
 
-    assert (result.ret, {entry.name for entry in pytester.path.iterdir()} - before) == (
-        1,
-        {"test_scenarios.py", "__pycache__"},
-    )
+    # `__pycache__` appears only when the interpreter writes bytecode; it is not the plugin's.
+    new = {entry.name for entry in pytester.path.iterdir()} - before - {"__pycache__"}
+    assert (result.ret, new) == (1, {"test_scenarios.py"})
 
 
 def test_collect_only_writes_nothing_even_with_the_option(pytester):
@@ -169,6 +188,58 @@ def test_a_new_session_starts_the_record_afresh(pytester):
     _run_pytest(pytester, f"--liveness-record={path}")
 
     assert "left over" not in path.read_text(encoding="utf-8")
+
+
+def test_scenarios_whose_reports_interleave_keep_their_own_outcome_and_duration(tmp_path):
+    path = tmp_path / "scenarios.jsonl"
+    scenarios = record.ScenarioRecorder(path)
+    scenarios.pytest_sessionstart(session=None)
+
+    for node, when, outcome, seconds in [
+        ("a::slow", "call", "failed", 4.0),
+        ("a::quick", "call", "passed", 1.0),
+        ("a::quick", "teardown", "passed", 0.5),
+        ("a::slow", "teardown", "passed", 2.0),
+    ]:
+        scenarios.pytest_runtest_logreport(_report(node, when, outcome, seconds))
+
+    assert _ends_of(path) == {"a::quick": ("passed", 1.5), "a::slow": ("failed", 6.0)}
+
+
+def test_a_worker_process_records_nothing_so_no_line_is_written_twice(pytester):
+    path = pytester.path / "scenarios.jsonl"
+    config = pytester.parseconfig("-p", "liveness_scenario_record", f"--liveness-record={path}")
+    config.workerinput = {}
+
+    record.pytest_configure(config)
+
+    assert not config.pluginmanager.has_plugin("liveness-scenario-recorder")
+
+
+def test_a_record_that_cannot_be_written_is_said_once_and_the_scenarios_go_on(
+    tmp_path, monkeypatch, capsys
+):
+    def disk_full(self, *args, **kwargs):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(Path, "open", disk_full)
+    scenarios = record.ScenarioRecorder(tmp_path / "scenarios.jsonl")
+
+    scenarios.pytest_sessionstart(session=None)
+    scenarios.pytest_runtest_logstart("a::one", ("a.py", 0, "one"))
+    scenarios.pytest_runtest_logstart("a::two", ("a.py", 1, "two"))
+
+    assert capsys.readouterr().err.count("liveness record: cannot write") == 1
+
+
+def test_a_session_whose_record_cannot_be_created_still_runs_every_scenario(pytester):
+    blocker = pytester.path / "blocker"
+    blocker.write_text("a file, not a directory", encoding="utf-8")
+
+    result = _run_pytest(pytester, f"--liveness-record={blocker / 'scenarios.jsonl'}")
+
+    result.assert_outcomes(passed=1, failed=2, skipped=1)
+    assert result.ret == 1
 
 
 # --- Folding a scenario's phases into its end line -------------------------
@@ -451,6 +522,15 @@ def test_report_prints_one_line_per_finding_in_order(tmp_path, capsys, monkeypat
 def test_report_exits_zero_whatever_it_reads(tmp_path, capsys):
     path = tmp_path / "scenarios.jsonl"
     path.write_bytes(b"\x00\x01 not a record\n{")
+
+    code = record.main(["report", str(path)])
+
+    assert (code, "record line 1 is torn" in capsys.readouterr().out) == (0, True)
+
+
+def test_report_exits_zero_on_bytes_that_are_not_text(tmp_path, capsys):
+    path = tmp_path / "scenarios.jsonl"
+    path.write_bytes(b"\xff\xfe")
 
     code = record.main(["report", str(path)])
 

@@ -376,15 +376,19 @@ def require_known(inputs: LoopInputs, request: str) -> None:
     if request in pending or any(record.request == request for record in inputs.records):
         return
     if len(pending) > 1:
-        state = f"the pending requests are {', '.join(pending)}"
-        fix = "record the request whose agent returned"
-    else:
-        state = f"the pending request is {pending[0]}" if pending else "none is pending"
-        fix = "record the pending request"
+        # Several outstanding lines stop every call, so the recovery is the one the
+        # several-outstanding refusal gives, not a record or a next.
+        raise RecordRefusedError(
+            "request-not-pending",
+            f"record failed because {request} is neither pending nor recorded (the pending"
+            f" requests are {', '.join(pending)}). To fix: keep the request whose agent ran,"
+            " remove request=<id> from the other lines in WIP.md, then record the one kept.",
+        )
+    state = f"the pending request is {pending[0]}" if pending else "none is pending"
     raise RecordRefusedError(
         "request-not-pending",
         f"record failed because {request} is neither pending nor recorded ({state})."
-        f" To fix: {fix}, or run next to get one.",
+        " To fix: record the pending request, or run next to get one.",
     )
 
 

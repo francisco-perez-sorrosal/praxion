@@ -324,6 +324,7 @@ def test_an_unknown_request_while_several_are_outstanding_is_refused_naming_each
     named = re.findall(r"(?<![\w-])s\d+-a\d+-implement(?![\w-])", message)
     assert reply.doc["error"]["code"] == "request-not-pending"
     assert sorted(set(named)) == ["s1-a1-implement", "s2-a1-implement", "s9-a1-implement"], message
+    assert ("run next" in message, "remove request=" in message) == (False, True), message
 
 
 def test_the_withdrawn_envelope_prints_the_next_call_and_exits_zero():

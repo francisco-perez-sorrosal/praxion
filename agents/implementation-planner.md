@@ -171,7 +171,7 @@ Tests run in two loops — procedure in [`coordination-details.md § BDD/TDD Exe
 
 - **Driver-binding step first** — when a Boundary Assumption in `ACCEPTANCE_TESTS.md` is unbound, add a `test-engineer` step for driver files only, ordered before any production step. Bad-case: an unbound assumption with a production step ahead of its binding step.
 - **Footprint measurement steps** -- when the spec carries footprint tables, add baseline and final measurement steps per [`document-templates.md`](../skills/software-planning/references/document-templates.md) and run `check_footprint_criteria.py <task-slug> --stage plan --paths <union of the plan's Files>` (`python3 scripts/check_footprint_criteria.py` when self-hosting). An FP01 (a moved footprint the spec neither bounds nor declares) is a Spec Question to the orchestrator; do not proceed past it silently. Bad-case: a criterion with no step that runs its command after the last step whose `Files` match its footprint.
-- **`**Read-only**:` field** — every implementer step that turns outer-loop tests green lists those nodes there (schema: [`document-templates.md`](../skills/software-planning/references/document-templates.md)) and edits no outer-loop file; keep it off `Files`. Each scenario node appears in exactly one step's field; a `contract:` entry may appear in several. Bad-case: a scenario node in no step's field, or in two.
+- **`**Read-only**:` field** — every implementer step that turns outer-loop tests green lists those nodes there, and so does a step that fixes a red unit-test node an earlier step left (it lists the node there and the node's file in `Files`; schema: [`document-templates.md`](../skills/software-planning/references/document-templates.md)); no step edits an outer-loop file, and outer-loop files stay off `Files`. Each scenario node appears in exactly one step's field; a `contract:` entry may appear in several. Bad-case: a scenario node in no step's field, or in two.
 
 **Triple step structure (with doc step):** when a parallel group has documentation impact, add a doc step (assignee `doc-engineer`, documentation files) with a `Documentation` field naming the READMEs, catalogs or architecture docs to update. Implementation, test and doc steps in one `[parallel-group: X]` have disjoint file sets by construction.
 
@@ -345,7 +345,7 @@ When the completed feature used a behavioral specification (medium/large task), 
 
 ### With the Implementer
 
-- Provide each step with: one-sentence description, `Implementation` field, `Done when` field, `Files` field, and the `Read-only` field when the step turns outer-loop tests green
+- Provide each step with: one-sentence description, `Implementation` field, `Done when` field, `Files` field, and the `Read-only` field when the step turns outer-loop tests green or fixes a red unit-test node an earlier step left
 - Expect back one of: `[COMPLETE]` (step done, WIP.md updated), `[BLOCKED]` (blocker described with evidence), `[CONFLICT]` (file outside declared set needed, parallel mode only)
 - **Sequential invocation**: invoke one implementer at a time, review result, advance WIP.md, invoke next
 - **Paired invocation** (when a step is paired): invoke the test-engineer first and the implementer only after its RED handshake; after both complete, invoke the implementer for the integration checkpoint (run all tests, fix failures). Different pairs may overlap only on disjoint file sets with pathspec commits

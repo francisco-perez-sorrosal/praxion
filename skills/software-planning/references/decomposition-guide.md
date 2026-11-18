@@ -128,6 +128,8 @@ Full procedure and composition table: [`intra-step-review.md`](intra-step-review
 
 ### `mutation: on` / `mutation: off` — per-step mutation sensor
 
+Leave `mutation: off`, with the reason in the step, when the step's test file starts real subprocesses in its tests: mutmut runs that file once per mutant and exhausts the process table (`os.fork` fails with errno 35), so the sensor cannot finish and the step blocks; its forced review reads the change instead (observed 2026-11-18).
+
 Add `mutation: on` to a step when its production change is exactly the shape a passing-but-empty test would hide: any RISKY step (`tier: H`, one-way-door, or `review: force`), plus any step whose `Files:` wrap a function that performs a world read — a subprocess call, a git operation, a filesystem read, a network call, an environment-variable read, or a clock read. These are the functions where a test can assert the right shape on a stubbed return and still pass with the real read silently deleted; the sensor exists to catch exactly that gap.
 
 ```markdown

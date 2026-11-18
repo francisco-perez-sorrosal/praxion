@@ -477,6 +477,10 @@ class TestRun:
 
 
 def run_tests(copy: RepoCopy, files: list[str]) -> TestRun:
+    # pytest given no path runs the whole suite of the copy: once per broken property, that is
+    # hours of a gate spent proving nothing, so an empty list is the test's failure, not a run.
+    if not files:
+        raise AssertionError("no test file to run: an empty list would run the copy's whole suite")
     command = [_interpreter(copy.root), "-m", "pytest", *files, "-q", "--tb=short", "-n", "0"]
     command += ["--no-cov", "-p", "no:cacheprovider"]
     env = isolated_env()

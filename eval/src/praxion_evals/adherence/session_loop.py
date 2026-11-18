@@ -34,11 +34,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, assert_never, overload
+from typing import Any, assert_never, cast, overload
 
 from praxion_evals.adherence import arms, report, results, run_index, tasks
 from praxion_evals.adherence.axis import (
     ARMS_BY_AXIS,
+    AXES,
     DEFAULT_AXIS,
     Axis,
     SessionArm,
@@ -278,7 +279,7 @@ def begin(
     refuse_unaccepted_settings(planned, config.session_oauth_token_file)
     started = datetime.now(UTC)
     run_id = results.new_run_id(started)
-    output = config.output or _default_output(run_id)
+    output = config.output or _default_output(config, run_id)
     results.refuse_existing(output, config.overwrite)
     provisional = _provisional(
         config, checkout, planned, settings, run_id, version, started, output, continuation
@@ -335,17 +336,41 @@ def _open_judge(config: RunConfig) -> JudgeClient | None:
         ) from error
 
 
-def _default_output(run_id: str) -> Path:
-    return _default_results_dir() / f"{run_id}.json"
-
-
-def _default_results_dir() -> Path:
-    return Path(_git(Path.cwd(), "rev-parse", "--show-toplevel").strip()) / OUTPUT_DIR
+def _default_output(config: RunConfig, run_id: str) -> Path:
+    return results_dir(config) / _results_name(run_id)
 
 
 def results_dir(config: RunConfig) -> Path:
     """The directory holding the runs a run is listed beside: where its results file goes."""
-    return config.output.parent if config.output else _default_results_dir()
+    if config.output:
+        return config.output.parent
+    return _axis_results_dir(_results_root(), config.axis)
+
+
+def run_directory(config: RunConfig, run_id: str) -> Path:
+    """Where the run ``run_id`` is read from: the parent of ``--output``, else the first axis
+    directory holding its results file (``config.axis``'s, then the others in their order), else
+    ``config.axis``'s directory, where a run held nowhere is refused as it always was."""
+    if config.output:
+        return config.output.parent
+    root = _results_root()
+    # A stable sort: the run's own axis first, the others in their declared order.
+    axes = sorted(cast(tuple[Axis, ...], AXES), key=lambda axis: axis != config.axis)
+    directories = [_axis_results_dir(root, axis) for axis in axes]
+    holding = (where for where in directories if (where / _results_name(run_id)).is_file())
+    return next(holding, directories[0])
+
+
+def _results_root() -> Path:
+    return Path(_git(Path.cwd(), "rev-parse", "--show-toplevel").strip()) / OUTPUT_DIR
+
+
+def _axis_results_dir(root: Path, axis: Axis) -> Path:
+    return root / axis_run(axis).results_subdir
+
+
+def _results_name(run_id: str) -> str:
+    return f"{run_id}.json"
 
 
 def _provisional(

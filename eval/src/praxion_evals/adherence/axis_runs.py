@@ -4,7 +4,7 @@ The run's loop, launch and arm module read an ``AxisRun`` where each used to cal
 axis's function, so a second axis overrides one field at a time instead of branching in them.
 ``DEFAULT_RUN`` holds in every field the function that runs today for ``inherited-context``;
 ``refactoring-delivery`` is that record with its own name, positions, plan, staging, assessment,
-catalog and refusals.
+catalog, refusals and results directory.
 
 Imports nothing from ``session_launch``, ``session_arms``, ``session_loop`` or ``cli`` at run
 time: they import this module, and the types it needs from them come in under TYPE_CHECKING.
@@ -75,6 +75,9 @@ class AxisRun:
     ]
     catalog: Callable[[Role], tuple[results.CatalogEntry, ...]]
     refusals: Callable[[RunConfig], tuple[str, ...]]
+    # Under the adherence results directory, where a run without --output writes. The default
+    # axis's runs stay at its top, the directory the kernel adoption gate's reader parses.
+    results_subdir: str
 
 
 def plan_producible(role: Role, seed: int, wanted: int) -> list[TaskSpec]:
@@ -159,6 +162,7 @@ DEFAULT_RUN = AxisRun(
     assess=assess_session,
     catalog=catalog_entries,
     refusals=no_refusals,
+    results_subdir="",
 )
 
 
@@ -183,6 +187,7 @@ def axis_run(axis: Axis) -> AxisRun:
                 assess=assess_refactoring_session,
                 catalog=refactoring_catalog_entries,
                 refusals=refuse_calibration,
+                results_subdir="refactoring-delivery",
             )
         case _:
             assert_never(axis)

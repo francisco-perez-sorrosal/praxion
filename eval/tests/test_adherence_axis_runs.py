@@ -4,17 +4,22 @@ behaviour in every field, and the plan routed through it."""
 from __future__ import annotations
 
 import dataclasses
+import subprocess
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
-from praxion_evals.adherence import arms, axis, axis_runs, cli, results, tasks
+from praxion_evals.adherence import arms, axis, axis_runs, cli, results, session_loop, tasks
 from praxion_evals.adherence.catalog import check_catalog
 from praxion_evals.adherence.model import EarlyStop, SessionSetup, Standard
-from praxion_evals.adherence.session_loop import RunConfig
+from praxion_evals.adherence.session_loop import OUTPUT_DIR, RunConfig
 
 ROLES = ("implementer", "test-engineer")
 DEFAULT = axis_runs.DEFAULT_RUN
+PAIRED = "refactoring-delivery"
+PAIRED_ARMS = ("preloaded", "delivered")
+RUN_ID = "2026-11-18T10-00-00Z"
 
 
 def _config(*options: str) -> RunConfig:
@@ -125,6 +130,7 @@ def test_the_new_axis_overrides_only_the_fields_that_differ_between_axes():
         "assess",
         "catalog",
         "refusals",
+        "results_subdir",
     }
     assert other.positions == axis.POSITIONS["refactoring-delivery"]
 
@@ -168,3 +174,80 @@ def test_a_run_config_refuses_an_arm_of_the_other_axis(axis_name, arms_named):
 
 def test_a_run_config_declares_the_default_axis_unless_told_otherwise():
     assert _config().axis == axis.DEFAULT_AXIS
+
+
+# --- where an axis's runs are written and read ---
+
+
+@pytest.fixture
+def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A repository the run is started from: its results directories hang off its top level."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path.resolve()
+
+
+def _paired_config(*options: str) -> RunConfig:
+    return replace(_config(*options), axis=PAIRED, arms=PAIRED_ARMS)
+
+
+def _hold_run(directory: Path) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{RUN_ID}.json"
+    path.write_text("{}", encoding="utf-8")
+    return directory
+
+
+@pytest.mark.parametrize(("axis_name", "subdir"), [(axis.DEFAULT_AXIS, ""), (PAIRED, PAIRED)])
+def test_each_axis_names_the_subdirectory_its_results_go_to(axis_name, subdir):
+    assert axis_runs.axis_run(axis_name).results_subdir == subdir
+
+
+def test_an_ordinary_run_without_output_writes_in_the_adherence_results_directory(repository):
+    assert session_loop.results_dir(_config()) == repository / OUTPUT_DIR
+
+
+def test_a_paired_run_without_output_writes_in_the_paired_results_directory(repository):
+    assert session_loop.results_dir(_paired_config()) == repository / OUTPUT_DIR / PAIRED
+
+
+@pytest.mark.parametrize("make_config", [_config, _paired_config])
+def test_output_names_the_results_directory_of_a_run_of_any_axis(make_config, tmp_path):
+    config = make_config("--output", str(tmp_path / "elsewhere" / "run.json"))
+
+    assert session_loop.results_dir(config) == tmp_path / "elsewhere"
+
+
+def test_a_run_is_read_from_the_parent_of_output_wherever_else_it_is_held(repository):
+    _hold_run(repository / OUTPUT_DIR / PAIRED)
+    config = _paired_config("--output", str(repository / "named" / "run.json"))
+
+    assert session_loop.run_directory(config, RUN_ID) == repository / "named"
+
+
+@pytest.mark.parametrize("make_config", [_config, _paired_config])
+def test_a_paired_run_is_found_in_its_directory_whatever_axis_is_named(make_config, repository):
+    held = _hold_run(repository / OUTPUT_DIR / PAIRED)
+
+    assert session_loop.run_directory(make_config(), RUN_ID) == held
+
+
+@pytest.mark.parametrize("make_config", [_config, _paired_config])
+def test_an_ordinary_run_is_found_in_its_directory_whatever_axis_is_named(make_config, repository):
+    held = _hold_run(repository / OUTPUT_DIR)
+
+    assert session_loop.run_directory(make_config(), RUN_ID) == held
+
+
+def test_a_run_held_in_two_axis_directories_is_read_from_the_named_axis_first(repository):
+    _hold_run(repository / OUTPUT_DIR)
+    paired = _hold_run(repository / OUTPUT_DIR / PAIRED)
+
+    assert session_loop.run_directory(_paired_config(), RUN_ID) == paired
+
+
+@pytest.mark.parametrize(("make_config", "subdir"), [(_config, ""), (_paired_config, PAIRED)])
+def test_a_run_held_nowhere_is_looked_for_in_the_named_axis_directory(
+    make_config, subdir, repository
+):
+    assert session_loop.run_directory(make_config(), RUN_ID) == repository / OUTPUT_DIR / subdir

@@ -108,8 +108,9 @@ dev = [
 # (needed for --pdb). `large` tests (live external services) are deselected;
 # run them with `-m large`. `liveness` tests (the whole-suite gate-liveness
 # scenarios, minutes each, and the dead-gate canaries kept off the per-push
-# run for its runtime) are deselected too, and run only by the scheduled
-# liveness job with `-m liveness` -- never in the default suite or `-m large`.
+# run for its runtime) are deselected too, and run only by the `Gate liveness`
+# workflow (`gate-liveness.yml`) with `-m liveness` -- never in the default suite
+# or `-m large`.
 addopts = "-ra --strict-markers -n auto --dist load -m 'not large and not liveness'"
 # `hooks` joined `tests`/`scripts` on 2026-08-06. It was previously excluded and
 # invoked as a separate `pytest hooks/ --no-cov` CI step, which made the canonical
@@ -125,7 +126,7 @@ addopts = "-ra --strict-markers -n auto --dist load -m 'not large and not livene
 testpaths = ["tests", "scripts", "hooks", "skills"]
 markers = [
     "large: needs live external services (daemons, network); deselected by default, run with -m large",
-    "liveness: gate-liveness scenarios (whole-suite audits and dead-gate canaries); deselected by default; run only by the scheduled gate-liveness-canaries job with -m liveness",
+    "liveness: gate-liveness scenarios (whole-suite audits and dead-gate canaries); deselected by default; run only by the Gate liveness workflow (gate-liveness.yml) with -m liveness",
 ]
 # Repo root on sys.path so tests can import `scripts.project_metrics.*`
 # without requiring PYTHONPATH to be set by the invoker. scripts/ is not
@@ -202,9 +203,8 @@ venv = ".venv"
 # --- end static type-check baseline -----------------------------------------
 
 # The step-loop gate runs the whole root suite when a runner config changes: 930 s measured, so
-# 1500 s leaves 61 percent headroom (the driver default is 540 s). The selection audit holds its
-# traced run of the same suite to this bound (1,240 s measured locally on 2026-10-26); on CI that
-# run also sits inside the gate-liveness step's 20-minute limit (dec-419).
+# 1500 s leaves 61 percent headroom (the driver default is 540 s). The selection audit does not
+# read this bound: it has its own, declared under `[tool.praxion.gate-liveness]` below.
 [tool.praxion.step-loop]
 gate-timeout-seconds = 1500
 

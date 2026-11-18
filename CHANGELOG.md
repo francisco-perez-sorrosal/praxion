@@ -1,3 +1,36 @@
+## v0.66.0 (2026-11-18)
+
+### Feat
+
+- Tell the agent where a Bash call left the session, with a shell hook that costs nothing when silent
+
+### Fix
+
+- **test**: Read a frozen fixture's root the same way on every machine
+- Judge a commit that for-each-repo or difftool runs
+- Close the second verification pass's two code findings
+- Tell the agent of a move made by a Bash call that fails, and close the verifier's findings
+- Make the commit gate's first test linear and close the two hooks' review remarks
+- Close the review remarks that needed a probe first
+- Close the step loop's review remarks on five of its repairs
+- Refuse a plan whose Check cannot collect before its first request spends an attempt
+- **test**: Build fixture repositories with git's background work off
+- Skip the commit gate's checkers for a command that is not a commit, deciding in shell where it can
+- Hold an OS lock for a `record` call's whole run so a second record and the Stop guard can see it
+- Stop under a cause of its own when a plan field cannot be read
+- Print every command with the location options the caller gave and tell the relay to give the base once
+- Copy a return's `Follow-ups:` line into the follow-up record when the driver records the return
+- **test**: Read the validator's listing of what a file provides as no finding
+- Say in the rendered implement and revise prompts that the driver runs the derived scope and the agent its Check
+- Read a review file's current round above its superseded-record heading
+- Match a red node in the pocket's own repository-relative form and retire the two Read-only workarounds
+- Make a withdrawal issue nothing and let the plan be amended while no request is out
+- Cut a result block's `Command:` line at 200 characters and keep the whole command in a file
+
+### Refactor
+
+- Move the ownership rule into one module and make a node entry own a node without withholding its file
+
 ## v0.65.1 (2026-11-16)
 
 ### Perf

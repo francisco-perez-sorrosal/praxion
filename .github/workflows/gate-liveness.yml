@@ -1,0 +1,165 @@
+# Gate liveness — the weekly proof that the gates still bite on known input.
+# Four jobs, one per kind of check, so each gets a time limit that fits it and
+# none hides another's conclusion (no job waits on, or is conditional on, another):
+#
+#   fast-probes           three quick probes of `scripts/check_gates_bite.py`
+#                         (mutation-sensor, observation-hooks, spawn-count)
+#   selection-audit       the fourth probe, the selection audit, which runs the
+#                         traced default suite and so needs a limit of its own
+#   scenarios-quick       the `liveness`-marked scenarios under tests/acceptance
+#   scenarios-whole-suite the `liveness`-marked scenarios under tests/e2e, each
+#                         of which runs the whole traced suite
+#
+# Every job holds a read-only grant and no secret, starts no assistant session,
+# and gives each pytest invocation one tree (tests/ and fitness/tests/ never
+# share one, td-302). A scenarios job records each scenario's duration and the
+# free disk through `scripts/liveness_scenario_record.py`, and its report step
+# runs whatever happened to the scenarios, so a scenario cut by a time limit
+# still shows how long it ran.
+#
+# Each job's limit carries one comment line directly above it, naming the
+# reading it was sized from:
+#   # sized: measured=<date> commit=<12 hex> where=<local|runner> step=<s>s
+#   #        scale=<factor> setup=<s>s fixed=<s>s margin=1.5 limit=<n>min
+# (one physical line in practice). The limit is 1.5 times the measured step
+# (scaled to the runner) plus setup, plus any fixed allowance, rounded up to
+# whole minutes, and at most 240. A run in which a job used more than 80
+# percent of its limit re-sizes that limit from that run's own readings; a job
+# whose limit would pass 240 minutes is split. Until the measurement step the
+# line reads `pending`, which `tests/test_gate_liveness_workflow_invariants.py`
+# refuses, so a placeholder cannot survive to merge.
+#
+# No workflow watches this one: `ci-autofix.yml` watches exactly Test,
+# Architecture and Test (scheduled). A red liveness run says a gate no longer
+# bites, a finding for a person to read, not a failure to patch automatically.
+#
+# Actions are SHA-pinned per security convention (dec-024).
+
+name: Gate liveness
+
+on:
+  schedule:
+    - cron: "47 5 * * 1"  # weekly, Monday 05:47 UTC — off the top of the hour
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-liveness
+  cancel-in-progress: false
+
+jobs:
+  fast-probes:
+    name: Gate liveness, fast probes
+    runs-on: ubuntu-latest
+    # sized: pending the measurement step
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # Exit 1 when any of these gates no longer bites, naming what each probe
+      # expected and observed.
+      - name: Prove each fast gate still bites
+        run: .venv/bin/python scripts/check_gates_bite.py --gate mutation-sensor --gate observation-hooks --gate spawn-count
+
+  selection-audit:
+    name: Gate liveness, selection audit
+    runs-on: ubuntu-latest
+    # sized: pending the measurement step
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # The command holds the audit to the bound declared in pyproject.toml;
+      # a red here is the job's red and the run's red.
+      - name: Prove the selection audit still bites
+        run: .venv/bin/python scripts/check_gates_bite.py --gate selection-audit
+
+  scenarios-quick:
+    name: Gate liveness, quick scenarios
+    runs-on: ubuntu-latest
+    # sized: pending the measurement step
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Free disk space before the scenarios
+        run: python3 scripts/liveness_scenario_record.py disk
+
+      # The last -m wins over the runner config's -m 'not large and not liveness'.
+      # The step limit sits two minutes under the job's, so a cut leaves time
+      # for the report.
+      - name: Run the quick liveness scenarios
+        timeout-minutes: 358
+        run: .venv/bin/python -m pytest -m liveness tests/acceptance -n 0 --no-cov -p no:cacheprovider -p scripts.liveness_scenario_record --liveness-record=tmp/liveness-scenarios.jsonl
+
+      - name: Report each scenario's duration and the free disk
+        if: always()
+        run: python3 scripts/liveness_scenario_record.py report tmp/liveness-scenarios.jsonl
+
+  scenarios-whole-suite:
+    name: Gate liveness, whole-suite scenarios
+    runs-on: ubuntu-latest
+    # sized: pending the measurement step
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv (manages Python 3.11)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Free disk space before the scenarios
+        run: python3 scripts/liveness_scenario_record.py disk
+
+      # The last -m wins over the runner config's -m 'not large and not liveness'.
+      # The step limit sits two minutes under the job's, so a cut leaves time
+      # for the report.
+      - name: Run the whole-suite liveness scenarios
+        timeout-minutes: 358
+        run: .venv/bin/python -m pytest -m liveness tests/e2e -n 0 --no-cov -p no:cacheprovider -p scripts.liveness_scenario_record --liveness-record=tmp/liveness-scenarios.jsonl
+
+      - name: Report each scenario's duration and the free disk
+        if: always()
+        run: python3 scripts/liveness_scenario_record.py report tmp/liveness-scenarios.jsonl

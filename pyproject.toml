@@ -207,3 +207,9 @@ venv = ".venv"
 # run also sits inside the gate-liveness step's 20-minute limit (dec-419).
 [tool.praxion.step-loop]
 gate-timeout-seconds = 1500
+
+# The selection audit holds its traced run of the default suite to its own bound, declared here
+# and read through `scripts/gate_probes/suite_bound.py`; it is not the step loop's bound above.
+[tool.praxion.gate-liveness]
+# sized: pending the measurement step
+selection-audit-timeout-seconds = 5400

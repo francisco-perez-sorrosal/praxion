@@ -259,7 +259,12 @@ def _parser() -> argparse.ArgumentParser:
         choices=SESSION_ARMS,
         help="repeatable; an arm of the axis, default both",
     )
-    add("--output", type=Path, help=f"default: <repo>/{OUTPUT_DIR}/<run-id>.json")
+    add(
+        "--output",
+        type=Path,
+        help=f"default: <repo>/{OUTPUT_DIR}/<run-id>.json; a run of the refactoring-delivery axis"
+        f" defaults to <repo>/{OUTPUT_DIR}/refactoring-delivery/<run-id>.json",
+    )
     add("--seed", type=int, default=DEFAULT_SEED)
     add(
         "--max-total-usd",
@@ -427,7 +432,7 @@ def _refuse_beside_stopped_run(config: RunConfig) -> None:
 
 def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) -> int:
     """Write the closed ending into the stopped run's own results file."""
-    tip, files, _ = _read_part(session_loop.results_dir(config), run_id, checkout.path)
+    tip, files, _ = _read_part(session_loop.run_directory(config, run_id), run_id, checkout.path)
     path = files[-1]
     ending = close(tip, reason, datetime.now(UTC))
     recorded = tip.results
@@ -441,9 +446,12 @@ def _close_run(config: RunConfig, checkout: Checkout, run_id: str, reason: str) 
 
 
 def _reindex(config: RunConfig) -> int:
-    """Rebuild the run index beside the results files of the checkout named, or of this one."""
+    """Rebuild the run index beside the results files of the axis named, in the checkout named or
+    in this one."""
     directory = (
-        config.checkout / OUTPUT_DIR if config.checkout else session_loop.results_dir(config)
+        config.checkout / OUTPUT_DIR / axis_run(config.axis).results_subdir
+        if config.checkout
+        else session_loop.results_dir(config)
     )
     index = run_index.write_index(directory)
     print(f"indexed {directory}: {index.name}")
@@ -480,7 +488,7 @@ def _begin_continuation(
     """
     run_id, repo = config.continue_run, checkout.path
     assert run_id is not None  # main hands over only a config that names the run to continue
-    tip, files, parts = _read_tip(session_loop.results_dir(config), run_id, repo)
+    tip, files, parts = _read_tip(session_loop.run_directory(config, run_id), run_id, repo)
     if isinstance(tip, UnreadableTip):
         raise _refused(run_id, continuation_refusals(tip, identity_now(config, {}, repo), ()))
     if (axis := results.run_axis(tip.results.run)) != DEFAULT_AXIS:

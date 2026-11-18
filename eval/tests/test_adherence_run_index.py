@@ -18,6 +18,7 @@ from praxion_evals.adherence.lineage import parts_before
 from praxion_evals.adherence.model import Errored, Measured, Passed
 from praxion_evals.adherence.session_loop import OUTPUT_DIR
 from tests.adherence_run_support import (
+    PAIRED,
     REASON,
     ROLE,
     STOPPED_BOTH_ARMS,
@@ -297,6 +298,40 @@ def test_reindex_replaces_a_stale_index_and_is_idempotent_byte_for_byte(tmp_path
 
     assert (directory / INDEX).read_bytes() == first
     assert b"stale.json" not in first
+
+
+@pytest.mark.parametrize(
+    ("axis", "named", "other"), [("inherited-context", "", PAIRED), (PAIRED, PAIRED, "")]
+)
+def test_reindex_rebuilds_the_index_of_the_directory_of_the_axis_it_names(
+    tmp_path: Path, axis: str, named: str, other: str
+) -> None:
+    ordinary = checkout_with_a_run(tmp_path)
+    paired = ordinary / PAIRED
+    paired.mkdir()
+    write_run(paired, "run-p", [*pair_of_sessions("t1")])
+
+    code = cli.main([str(tmp_path), "--axis", axis, "--reindex"])
+
+    assert code == 0
+    assert list(json.loads((ordinary / named / INDEX).read_text())["runs"]) == [
+        "run-p" if named else "run-a"
+    ]
+    assert not (ordinary / other / INDEX).exists()
+
+
+def test_reindex_of_the_committed_paired_runs_writes_the_index_they_hold(tmp_path: Path) -> None:
+    held = RECORDED / PAIRED
+    directory = tmp_path / OUTPUT_DIR / PAIRED
+    directory.mkdir(parents=True)
+    for path in held.glob("*.json"):
+        if path.name != INDEX:
+            shutil.copy(path, directory / path.name)
+
+    code = cli.main([str(tmp_path), "--axis", PAIRED, "--reindex"])
+
+    assert code == 0
+    assert (directory / INDEX).read_bytes() == (held / INDEX).read_bytes()
 
 
 @pytest.mark.parametrize(

@@ -3,6 +3,8 @@ in the run's own results file, and a fresh run beside a continuable stopped run 
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,18 +17,24 @@ from praxion_evals.adherence import (
 from praxion_evals.adherence.lineage import (
     Closed,
     Finished,
+    SpendRefused,
     ending_of,
 )
+from praxion_evals.adherence.session_loop import OUTPUT_DIR
 from tests.adherence_run_support import (
+    PAIRED,
+    PAIRED_ROLE,
     REASON,
     ROLE,
     SMALL_RUN,
     STOPPED_BOTH_ARMS,
     STOPPED_ONE_ARM,
+    TASKS,
     Script,
     close_run,
     dry_run,
     ended_as,
+    planted,
     scripted_checkout,
 )
 
@@ -161,3 +169,53 @@ def test_a_closed_run_is_listed_by_the_next_run_as_a_not_clear_interim_draw(
     listed = results.earlier_listed(results.load(tmp_path / "fresh.json").run, ROLE)
     assert listed is not None
     assert listed.draws == (results.Draw((stopped.run.id,), "not clear", interim=True),)
+
+
+# ---------------------------------------------------------------------------
+# A stopped paired run is closed from its own directory, without --axis or --output
+# ---------------------------------------------------------------------------
+
+
+def in_repository(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A repository the command runs from: the results directories it reads hang off its top."""
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    monkeypatch.chdir(root)
+    return root.resolve()
+
+
+def paired_run_held(repository: Path, run_id: str) -> Path:
+    """The paired results directory of ``repository``, holding one stopped run of that axis."""
+    directory = repository / OUTPUT_DIR / PAIRED
+    directory.mkdir(parents=True)
+    planted_in = planted(repository / "scratch", run_id, PAIRED, SpendRefused(TASKS))
+    shutil.move(planted_in / f"{run_id}.json", directory / f"{run_id}.json")
+    return directory
+
+
+def test_a_stopped_paired_run_is_closed_without_naming_its_axis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = paired_run_held(in_repository(tmp_path, monkeypatch), "paired-1")
+
+    code = cli.main([str(scripted_checkout()), "--close", "paired-1", "--reason", REASON])
+
+    closed = ending_of(results.load(directory / "paired-1.json"))
+    assert code == 0
+    assert isinstance(closed, Closed)
+    assert closed.reason == REASON
+    assert "paired-1" in (directory / results.RUN_INDEX_NAME).read_text()
+
+
+def test_a_stopped_paired_run_still_blocks_a_fresh_paired_run_until_it_is_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory = paired_run_held(in_repository(tmp_path, monkeypatch), "paired-1")
+    fresh = ["--role", PAIRED_ROLE, "--axis", PAIRED]
+
+    config = cli.parse_config([str(scripted_checkout()), *fresh])
+    with pytest.raises(ValueError, match="paired-1 of implementer stopped and was neither"):
+        cli._refuse_beside_stopped_run(config)
+    cli.main([str(scripted_checkout()), "--close", "paired-1", "--reason", REASON])
+
+    cli._refuse_beside_stopped_run(config)
+    assert (directory / "paired-1.json").is_file()

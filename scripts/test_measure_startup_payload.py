@@ -174,6 +174,19 @@ def test_a_denial_in_the_result_event_is_a_refusal_when_no_error_result_gave_one
     assert seen.refusals == {SUBAGENT: msp.DENIED_WITHOUT_TEXT}
 
 
+@pytest.mark.parametrize("content", ["", [], None, [{"type": "image"}]])
+def test_an_error_result_without_text_is_a_refusal_the_stream_gives_no_text_for(content: object):
+    reading = _agent_reading([_agent_call(), _tool_result("tu_1", content), _result()])
+
+    assert reading.withheld == REFUSED_PREFIX + msp.DENIED_WITHOUT_TEXT
+
+
+def test_a_denial_alone_names_the_refusal_without_a_text():
+    reading = _agent_reading([_agent_call(), _result([_denial()])])
+
+    assert reading.withheld == REFUSED_PREFIX + msp.DENIED_WITHOUT_TEXT
+
+
 def test_a_refusal_the_error_result_gave_outranks_the_denial_entry():
     seen = msp.parse_stream([_agent_call(), _tool_result("tu_1", REFUSAL), _result([_denial()])])
 
@@ -233,6 +246,13 @@ def test_a_session_that_ended_without_spawning_is_not_said_to_have_timed_out():
     reading = _agent_reading([_assistant((1, 1, 1), "m"), _result()], timeout=9)
 
     assert reading.withheld == f"the session ended without spawning {SUBAGENT}"
+
+
+def test_a_spawn_is_no_reason_to_withhold():
+    spawned = msp.Spawned(msp.FirstRequest.from_usage({}, "m"))
+
+    with pytest.raises(AssertionError):
+        msp.withheld_reason(spawned, SUBAGENT, ended=True, timeout=9)
 
 
 def test_a_session_that_has_not_ended_is_withheld_for_the_timeout():
@@ -585,10 +605,10 @@ sys.stderr.write("x" * {pad} + token + "\\n")
 """
 
 
-def _stand_in_claude(tmp_path: Path, monkeypatch, pad: int) -> None:
+def _stand_in_claude(tmp_path: Path, monkeypatch, template: str = _STAND_IN, **fields) -> None:
     script = tmp_path / "bin" / "claude"
     script.parent.mkdir()
-    script.write_text(_STAND_IN.format(python=sys.executable, pad=pad))
+    script.write_text(template.format(python=sys.executable, **fields))
     script.chmod(0o755)
     monkeypatch.setenv("PATH", f"{script.parent}{os.pathsep}{os.environ['PATH']}")
 
@@ -597,7 +617,7 @@ def _stand_in_claude(tmp_path: Path, monkeypatch, pad: int) -> None:
 def test_a_token_a_session_echoes_is_in_no_part_of_the_stderr_tail(
     tmp_path: Path, monkeypatch, pad: int
 ):
-    _stand_in_claude(tmp_path, monkeypatch, pad)
+    _stand_in_claude(tmp_path, monkeypatch, pad=pad)
 
     _, tail = msp.run_target(
         msp.MAIN_TARGET, msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", 30, TOKEN
@@ -608,7 +628,7 @@ def test_a_token_a_session_echoes_is_in_no_part_of_the_stderr_tail(
 
 
 def test_the_session_receives_the_token_in_its_environment(tmp_path: Path, monkeypatch):
-    _stand_in_claude(tmp_path, monkeypatch, 0)
+    _stand_in_claude(tmp_path, monkeypatch, pad=0)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "operator-key")
 
     _, tail = msp.run_target(
@@ -636,11 +656,7 @@ print(json.dumps({{"type": "result", "subtype": "success"}}), flush=True)
 def test_a_result_event_ends_the_session_only_when_it_came_inside_the_timeout(
     tmp_path: Path, monkeypatch, pause: int, timeout: int, ended: bool
 ):
-    script = tmp_path / "bin" / "claude"
-    script.parent.mkdir()
-    script.write_text(_SLOW_STAND_IN.format(python=sys.executable, pause=pause))
-    script.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{script.parent}{os.pathsep}{os.environ['PATH']}")
+    _stand_in_claude(tmp_path, monkeypatch, _SLOW_STAND_IN, pause=pause)
 
     seen, _ = msp.run_target(
         "agent:verifier", msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", timeout

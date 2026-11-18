@@ -276,7 +276,8 @@ def _fold_tool_results(seen: StreamObservation, event: dict) -> None:
     for block in _content_blocks(event.get("message") or {}):
         subagent = seen.agent_calls.get(str(block.get("tool_use_id")))
         if block.get("type") == "tool_result" and block.get("is_error") and subagent is not None:
-            seen.refusals.setdefault(subagent, _result_text(block.get("content")))
+            text = _result_text(block.get("content")) or DENIED_WITHOUT_TEXT
+            seen.refusals.setdefault(subagent, text)
 
 
 def _fold_denials(seen: StreamObservation, event: dict) -> None:
@@ -331,6 +332,7 @@ def withheld_reason(outcome: SpawnOutcome, subagent: str, ended: bool, timeout: 
         return reason if ended else f"{reason}; no spawn within {timeout}s"
     if isinstance(outcome, EndedWithoutSpawn):
         return f"the session ended without spawning {subagent}"
+    assert isinstance(outcome, TimedOut), f"{outcome!r} is a reading, not a reason to withhold"
     return f"the session spawned no {subagent} within {timeout}s"
 
 

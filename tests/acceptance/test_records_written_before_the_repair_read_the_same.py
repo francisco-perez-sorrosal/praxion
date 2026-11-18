@@ -9,6 +9,7 @@ run over the same records, prints the same and leaves every record byte for byte
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tarfile
@@ -77,8 +78,7 @@ def _read_back(tmp_path: Path, root: Path, case: str):
         )
         return json.loads(done.stdout)
 
-    old_roots = (frozen["written_at"], str(Path(frozen["written_at"]).resolve()))
-    roots = (str(root), *old_roots)
+    roots = (str(root), *_recorded_roots(case))
     return _normalized(run("status", "--json"), *roots), _normalized(run("next"), *roots)
 
 
@@ -89,10 +89,21 @@ def _records(root: Path) -> dict[str, bytes]:
     }
 
 
+def _recorded_roots(case: str) -> tuple[str, ...]:
+    """Every spelling of the root the records were written under, read from the fixture itself.
+
+    The recording machine resolved its root through a symlink (macOS puts `/private` before
+    `/var`), so the frozen readings hold a prefixed spelling too. Resolving the root on the
+    machine that runs the test finds that spelling only where the same symlink exists, so on
+    Linux the prefix was left behind; the prefixes are taken from what was recorded instead."""
+    old = FROZEN["cases"][case]["written_at"]
+    recorded = json.dumps(FROZEN["cases"][case])
+    prefixed = {m.group(0) for m in re.finditer(r"(?:/[^/\"\s]+)+?" + re.escape(old), recorded)}
+    return (old, str(Path(old).resolve()), *sorted(prefixed))
+
+
 def _frozen(case: str, key: str):
-    frozen = FROZEN["cases"][case]
-    old = frozen["written_at"]
-    return _normalized(frozen[key], old, str(Path(old).resolve()))
+    return _normalized(FROZEN["cases"][case][key], *_recorded_roots(case))
 
 
 @pytest.mark.parametrize("case", CASES)

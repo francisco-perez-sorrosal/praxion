@@ -1263,7 +1263,7 @@ class TestTimeoutClassificationAndFloor:
 # subprocess boundary; this is the deliberate exception -- the coverage
 # isolation claim below is about mutmut's *own* pytest sub-invocations, which
 # no fake can exercise. Needs `uv` on PATH and network access to resolve
-# mutmut==3.8.0 on a cold cache; a two-mutant fixture module is expected to run
+# mutmut==3.8.1 on a cold cache; a two-mutant fixture module is expected to run
 # in low single-digit seconds once cached.
 # ---------------------------------------------------------------------------
 

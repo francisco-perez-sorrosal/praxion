@@ -139,7 +139,7 @@ from _step_schema import MutationRan, MutationRefused, render_mutation_line
 EXIT_OK = 0
 EXIT_ERROR = 2
 
-MUTMUT_VERSION = "3.8.0"
+MUTMUT_VERSION = "3.8.1"
 DEFAULT_TIMEOUT_SECONDS = 600.0
 GIT_TIMEOUT_SECONDS = 30.0
 
@@ -385,7 +385,7 @@ def _bootstrap_probe(
     target_root: Path, target_dir: Path, timeout: float, *, no_project: bool
 ) -> Refused | None:
     """A cheap `mutmut --version` call, before `mutmut run` is ever reached, so
-    a failure to even resolve/install `mutmut==3.8.0` (no network, no `uv`
+    a failure to even resolve/install `mutmut==3.8.1` (no network, no `uv`
     lockfile) is told apart from a real `mutmut run` failure (toolchain-missing
     vs run-failed). A wall-clock exhaustion here is `run-timeout`, same as any
     other of the four mutmut calls -- never folded into `toolchain-missing`,

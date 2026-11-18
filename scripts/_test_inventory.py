@@ -393,6 +393,7 @@ class Pocket:
     runner_prefix: tuple[str, ...]
     collection: CollectionScope
     xdist: bool = False
+    installs_first: bool = False
 
 
 def project_files(root: Path) -> list[str]:
@@ -452,12 +453,14 @@ def _build_pocket(repo_root: Path, root: str, ecosystem: str) -> Pocket:
     pocket_dir = repo_root / root
     if ecosystem != "python":
         framework = _framework(pocket_dir, ecosystem)
+        prefix = _runner_prefix(pocket_dir, ecosystem)
         return Pocket(
             root,
             ecosystem,
             framework,
-            _runner_prefix(pocket_dir, ecosystem),
+            prefix,
             CollectionScope((join_rel(root, "**"),)),
+            installs_first=_installs_first(pocket_dir, prefix),
         )
     options = read_pytest_options(pocket_dir)
     addopts = _as_list((options or {}).get("addopts"))
@@ -500,6 +503,15 @@ def _runner_prefix(pocket_dir: Path, ecosystem: str) -> tuple[str, ...]:
             return ("yarn",)
         return ("npx",)
     return ()
+
+
+_JS_PACKAGE_RUNNERS = frozenset({("pnpm", "exec"), ("yarn",), ("npx",)})
+
+
+def _installs_first(pocket_dir: Path, prefix: tuple[str, ...]) -> bool:
+    """Does the pocket's command install before it tests? A package manager's runner in a
+    pocket with no `node_modules` (a fresh worktree) installs the dependencies first."""
+    return prefix in _JS_PACKAGE_RUNNERS and not (pocket_dir / "node_modules").is_dir()
 
 
 def _framework(pocket_dir: Path, ecosystem: str) -> str:

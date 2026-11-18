@@ -109,7 +109,7 @@ Exactly one input mode per invocation: `--changed PATH…` (explicit paths), `--
 }
 ```
 
-`argv` is runner-prefixed per pocket (`uv run` / `pixi run` / `poetry run` / `pnpm exec` / `yarn` / `npx` / `cargo` / `go`, etc.); `cwd` is relative to the repo root. Exit codes: `0` resolved (including widened); `2` usage or internal error — callers treat `2` as "run the full suite."
+`argv` is runner-prefixed per pocket (`uv run` / `pixi run` / `poetry run` / `pnpm exec` / `yarn` / `npx` / `cargo` / `go`, etc.); `cwd` is relative to the repo root. A pocket entry carries an optional `notes` list only when there is something to say: a JavaScript pocket with no `node_modules`, as in a fresh worktree, says its package manager's runner installs the dependencies before the tests run (the human form prints it as `# NOTE`). Install on purpose first, or expect the install in the run's output. Exit codes: `0` resolved (including widened); `2` usage or internal error — callers treat `2` as "run the full suite."
 
 ## `Tests:` Is Override-Only
 

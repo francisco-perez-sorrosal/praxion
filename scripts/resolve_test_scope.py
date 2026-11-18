@@ -66,7 +66,10 @@ one process: one single-line schema-2 object per distinct path, in sorted
 order, each exactly what `--changed <path> --json` prints for that path alone
 (the same payload, compactly serialized). Selected tests that cannot share one
 pytest process (`_import_claims`) come out as several invocations; a selection
-without such a clash is one. Any other combination is a usage error. Exit codes:
+without such a clash is one. A pocket entry carries `notes` only when it has
+something to say: a JavaScript pocket with no `node_modules` (a fresh worktree)
+says its package manager's runner installs before the tests run, and the human
+form prints that as a `# NOTE` line. Any other combination is a usage error. Exit codes:
 0 resolved (widened included), 2 usage or internal error -- callers treat 2 as
 "run the full suite".
 
@@ -605,7 +608,7 @@ def to_payload(resolution: Resolution) -> dict[str, object]:
 def _pocket_payload(result: PocketResult) -> dict[str, object]:
     pocket, selection = result.pocket, result.selection
     tests = selection.tests if isinstance(selection, Tests) else ()
-    return {
+    payload: dict[str, object] = {
         "root": pocket.root,
         "ecosystem": pocket.ecosystem,
         "adapter": _adapter_name(pocket),
@@ -613,6 +616,14 @@ def _pocket_payload(result: PocketResult) -> dict[str, object]:
         "tests": [{"path": t.path, "via": t.via, "because": t.because} for t in tests],
         "invocations": [{"cwd": pocket.root, "argv": list(argv)} for argv in _invocations(result)],
     }
+    # Present only when there is something to say, so every other entry keeps its shape.
+    if pocket.installs_first and payload["invocations"]:
+        runner = " ".join(pocket.runner_prefix)
+        payload["notes"] = [
+            f"no node_modules in {pocket.root}: `{runner}` installs its dependencies before"
+            " the tests run"
+        ]
+    return payload
 
 
 def _adapter_name(pocket: Pocket) -> str:
@@ -673,6 +684,8 @@ def print_human(payload: dict[str, object]) -> None:
     commands = 0
     for pocket in payload["pockets"]:
         note(f"# pocket {pocket['root']} ({pocket['ecosystem']}): {pocket['selection']}")
+        for text in pocket.get("notes", ()):
+            note(f"# NOTE {text}")
         for test in pocket["tests"]:
             note(f"#   {test['path']}  [{test['via']} <- {test['because']}]")
         for invocation in pocket["invocations"]:

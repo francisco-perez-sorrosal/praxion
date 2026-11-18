@@ -18,13 +18,16 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
 - a shell (`bash`, `sh`, `zsh`, `dash`, `ksh`, by basename, in any position) given `-c`
   is its script's verdict, read the same way, to a depth of two shells;
 - every word that is `git` or ends `/git` starts an invocation: its global options are
-  skipped, then `commit` is a commit; a `-c` or `--config-env` value that names a commit
-  (it can define an alias, a pager or a tool) makes any other subcommand `uncertain`; a
-  built-in that runs a command the caller hands it (`rebase -x`, `bisect run`,
-  `for-each-repo`, `difftool`, `hook run`) is `uncertain` when a later word names a commit,
-  as is one given a command through an option (`--upload-pack`, `--receive-pack`, `--exec`,
-  `clone -u`) whose value names one; any other built-in is not; anything else (an alias, an
-  unknown option, a word holding `$`, no subcommand at all) is `uncertain`;
+  skipped, then `commit` is a commit; configuration that can run what the text does not
+  show makes any other subcommand `uncertain`: a `-c` value that names a commit (it can
+  define an alias, a pager or a tool), any `--config-env` (its value is in the environment),
+  or an assignment in the same simple command whose value names one
+  (`GIT_SSH_COMMAND=./commit.sh git fetch`); a built-in that runs a program it is handed
+  (`rebase -x`, `bisect run`, `for-each-repo`, `difftool`, `hook run`, and the transports
+  `fetch`, `pull`, `push`, `clone`, `ls-remote` and `archive` through their pack, exec and
+  ssh options) is `uncertain` when any later word names a commit, whatever spelling of the
+  option carries it; any other built-in is not; anything else (an alias, an unknown option,
+  a word holding `$`, no subcommand at all) is `uncertain`;
 - what no rule above can follow keeps the checkers running: a word that holds a whole
   `git ... commit` script for another program, or, in a simple command with no
   invocation or script of its own, any word that holds `commit`: the bare word
@@ -32,8 +35,9 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
   or a script or file named for the act (`./scripts/commit.sh`, `cat commit-notes.md`),
   whose contents the reader cannot see.
 
-Declared limit: the gate's shell stage answers a plain `git grep` before this reader is
-asked, so a pager `grep -O` runs is not read.
+Declared limit: the pager `git grep -O` runs is not read (this reader reads `grep` as a
+built-in that runs nothing, and the gate's shell stage answers a plain `git grep` before
+asking it), because `git grep commit` is the read-only search the gate exists to let through.
 
 Runs on the gate's path as `python -I -S`: `json` and `shlex` only, Python 3.9 syntax.
 """
@@ -97,24 +101,17 @@ GIT_BUILTINS = frozenset(
     upload-archive--writer upload-pack url-parse var verify-commit verify-pack verify-tag
     version whatchanged worktree write-tree""".split()
 )
-# Built-ins that run a command the caller hands them (`rebase -x`, `bisect run`, a git command
-# `for-each-repo` runs in each repository, a `difftool -x` tool, the hooks `hook run` names):
-# what that command does cannot be read from here, so one that names a commit keeps the checkers
-# running. `submodule foreach` and `filter-branch` are not built-ins, so they read `uncertain`
-# before this set is asked.
-GIT_RUNS_A_COMMAND = frozenset({"rebase", "bisect", "for-each-repo", "difftool", "hook"})
-# Built-ins whose other words are often branch names or patterns, where only the value of an
-# option that names a program to run can start a commit; only that value is read.
-GIT_COMMAND_OPTIONS = {
-    "fetch": ("--upload-pack",),
-    "pull": ("--upload-pack",),
-    "ls-remote": ("--upload-pack",),
-    "clone": ("--upload-pack", "-u"),
-    "push": ("--receive-pack", "--exec"),
-    "archive": ("--exec",),
-}
-# Global options whose value is configuration, which can define what a later word runs.
-GIT_CONFIG_OPTIONS = frozenset({"-c", "--config-env"})
+# Built-ins that run a program the caller hands them (`rebase -x`, `bisect run`, a git command
+# `for-each-repo` runs in each repository, a `difftool -x` tool, the hooks `hook run` names, and
+# the transports' upload-pack, receive-pack, exec and ssh commands): what that program does
+# cannot be read from here, so any later word that names a commit keeps the checkers running.
+# Reading only the option that carries the program would miss git's abbreviations, bundled short
+# flags and synonyms; a branch named for a commit costs one checker run. `submodule foreach` and
+# `filter-branch` are not built-ins, so they read `uncertain` before this set is asked.
+GIT_RUNS_A_COMMAND = frozenset(
+    {"rebase", "bisect", "for-each-repo", "difftool", "hook"}
+    | {"fetch", "pull", "push", "clone", "ls-remote", "archive"}
+)
 
 
 def main() -> int:
@@ -181,6 +178,8 @@ def _simple_verdict(words: Sequence[str], depth: int) -> Verdict:
         _git_verdict(words[index + 1 :]) for index, word in enumerate(words) if _is_git(word)
     ]
     readings = scripts + invocations
+    if invocations and any(_assigns_a_commit(word) for word in words):
+        readings.append("uncertain")
     if not scripts and any(_holds_a_commit_script(word) for word in words):
         readings.append("uncertain")
     if not readings and any("commit" in word for word in words):
@@ -218,9 +217,7 @@ def _git_verdict(args: Sequence[str]) -> Verdict:
             index += 1
         elif name in GIT_VALUE_OPTIONS:
             value = joined if equals else (args[index + 1] if index + 1 < len(args) else "")
-            configured_a_commit = configured_a_commit or (
-                name in GIT_CONFIG_OPTIONS and "commit" in value
-            )
+            configured_a_commit = configured_a_commit or _configures_a_commit(name, value)
             index += 1 if equals else 2
         else:
             return "uncertain"
@@ -233,23 +230,15 @@ def _git_verdict(args: Sequence[str]) -> Verdict:
         return "uncertain"
     if subcommand in GIT_RUNS_A_COMMAND and any("commit" in word for word in rest):
         return "uncertain"
-    if any(
-        "commit" in value for value in _option_values(rest, GIT_COMMAND_OPTIONS.get(subcommand, ()))
-    ):
-        return "uncertain"
     return "not-a-commit" if subcommand in GIT_BUILTINS else "uncertain"
 
 
-def _option_values(words: Sequence[str], options: Sequence[str]) -> list[str]:
-    """The values `words` give `options`: `--opt=v`, `--opt v`, and a short option's `-ov`."""
-    values = []
-    for position, word in enumerate(words):
-        for option in options:
-            if word == option:
-                values.append(words[position + 1] if position + 1 < len(words) else "")
-            elif word.startswith(option + "=") or (len(option) == 2 and word.startswith(option)):
-                values.append(word[len(option) :].removeprefix("="))
-    return values
+def _configures_a_commit(option: str, value: str) -> bool:
+    """Whether a global option's value can make git run a commit the text does not show: a `-c`
+    whose value (after its key) names one, or any `--config-env`, whose value is elsewhere."""
+    if option == "--config-env":
+        return True
+    return option == "-c" and "commit" in value.partition("=")[2]
 
 
 def _strongest(verdicts: Sequence[Verdict]) -> Verdict:
@@ -258,6 +247,11 @@ def _strongest(verdicts: Sequence[Verdict]) -> Verdict:
 
 def _is_operator(token: str) -> bool:
     return bool(token) and all(char in SEPARATOR_CHARS or char in REDIRECT_CHARS for char in token)
+
+
+def _assigns_a_commit(word: str) -> bool:
+    """An assignment whose value names a commit: the variable can tell git what to run."""
+    return _is_assignment(word) and "commit" in word.partition("=")[2]
 
 
 def _is_assignment(word: str) -> bool:

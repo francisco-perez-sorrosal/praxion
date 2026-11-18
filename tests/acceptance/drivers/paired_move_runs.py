@@ -88,10 +88,30 @@ def grading_material(role: str, template: str) -> set[str]:
     return ends - start
 
 
+def paired_results_dir(checkout: Path) -> Path:
+    """Where a paired run's results file and run index go when no `--output` is given."""
+    return adherence_runs.results_dir(checkout) / AXIS
+
+
 def results_snapshot(checkout: Path) -> dict[str, str]:
+    """Every file under the checkout's adherence results tree, the paired directory included."""
     directory = adherence_runs.results_dir(checkout)
-    files = sorted(directory.glob("*")) if directory.is_dir() else []
-    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()}
+    files = sorted(directory.rglob("*")) if directory.is_dir() else []
+    return {
+        p.relative_to(directory).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in files
+        if p.is_file()
+    }
+
+
+def _results_files(checkout: Path) -> set[Path]:
+    return {
+        path
+        for directory in (adherence_runs.results_dir(checkout), paired_results_dir(checkout))
+        if directory.is_dir()
+        for path in directory.glob("*.json")
+        if path.name != "index.json"
+    }
 
 
 # -- Running it ----------------------------------------------------------------------------------
@@ -168,15 +188,22 @@ def run_paired(
         templates=templates(role),
         script=script or Script(),
     )
-    directory = adherence_runs.results_dir(checkout)
-    before = set(directory.glob("*.json")) if directory.is_dir() else set()
+    before = _results_files(checkout)
     args = [*_run_options(checkout, role, arms), *extra_args]
     done = adherence_runs._console(checkout, claude.bin_dir, args)
+    wrote = adherence_runs.WROTE_LINE.search(done.stdout)
+    appeared = sorted(_results_files(checkout) - before)
+    if wrote:
+        results_path = Path(wrote["path"])
+    elif appeared:
+        results_path = appeared[-1]
+    else:
+        results_path = paired_results_dir(checkout) / adherence_runs.NO_RESULTS_FILE
     return PairedRun(
         exit_code=done.returncode,
         stdout=done.stdout,
         stderr=done.stderr,
-        results_path=adherence_runs._results_path(checkout, before, done.stdout),
+        results_path=results_path,
         launches=claude.launches(),
     )
 

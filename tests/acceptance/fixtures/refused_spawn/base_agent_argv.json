@@ -1,0 +1,15 @@
+{
+  "base_commit": "a967b454616d992d0cfb8773a3c9fe9d973173f5",
+  "how": "scripts/measure_startup_payload.py agent:implementer --empty-dir --json --timeout 5, run at the base commit against the startup_probe stand-in; the agent session's arguments",
+  "argv": [
+    "-p",
+    "Use the Agent tool exactly once, with subagent_type \"praxion:implementer\" and exactly this prompt: \"Reply with the single word ok.\" Then reply with the single word ok.",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--model",
+    "sonnet",
+    "--max-turns",
+    "4"
+  ]
+}

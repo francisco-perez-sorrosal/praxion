@@ -18,6 +18,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
+from tests.acceptance.drivers.audit_bound import declared_audit_bound_seconds
 from tests.acceptance.drivers.dead_gates import (
     RESOLVER,
     mutation_sensor_parallel_inheritance_failure,
@@ -26,6 +27,7 @@ from tests.acceptance.drivers.dead_gates import (
 from tests.acceptance.drivers.gate_liveness import (
     ALL_GATES,
     PROJECT_LOG,
+    REPO_ROOT,
     Gate,
     LivenessRun,
     RepoCopy,
@@ -46,10 +48,18 @@ __all__ = [
     "mutation_sensor_parallel_inheritance_failure",
     "resolver_selects_nothing",
     "run_liveness",
-    "WHOLE_SUITE_TIMEOUT",
+    "whole_suite_timeout",
 ]
 
-WHOLE_SUITE_TIMEOUT = 1800
+# What the liveness command needs beyond the audit's traced run: the three fast probes, the
+# resolver queries and the report. The traced run itself is held by the audit to its own bound.
+REPORT_ALLOWANCE_SECONDS = 300
+
+
+def whole_suite_timeout() -> int:
+    """A whole-suite scenario's backstop: the audit's declared bound, read where it is declared."""
+    return declared_audit_bound_seconds(REPO_ROOT) + REPORT_ALLOWANCE_SECONDS
+
 
 CANARY_TEST = "tests/test_liveness_canary_unrouted_reads.py"
 READ_DIRECTLY = "docs/liveness-canary/read-directly.txt"

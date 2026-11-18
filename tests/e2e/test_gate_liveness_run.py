@@ -7,10 +7,11 @@ oracle is the reads it observed, not a list of known cases: a read nobody listed
 fails it, and two runs over the same commit give the same verdict and the same
 unselected pairs. Run against this change's own state, every check passes.
 
-Each of these runs the whole default suite at least once (about two minutes), so
-they carry the `large` marker: deselected from the default run, which they would
-otherwise slow down and which they cannot sit inside without running the suite
-from within itself; run them with `-m large`.
+Each of these runs the whole default suite at least once, so they carry the
+`liveness` marker: deselected from the default run, which they would otherwise
+slow down and which they cannot sit inside without running the suite from within
+itself. Each run is held to the selection audit's own bound, read from the one
+place it is declared, plus the time the rest of the command needs.
 """
 
 from __future__ import annotations
@@ -21,13 +22,13 @@ from tests.e2e.drivers.selection_audit import (
     ALL_GATES,
     PROJECT_LOG,
     RESOLVER,
-    WHOLE_SUITE_TIMEOUT,
     Gate,
     add_tests_reading_unrouted_files,
     make_copy,
     mutation_sensor_parallel_inheritance_failure,
     resolver_selects_nothing,
     run_liveness,
+    whole_suite_timeout,
 )
 
 pytestmark = pytest.mark.liveness
@@ -36,7 +37,7 @@ pytestmark = pytest.mark.liveness
 def test_every_liveness_check_passes_on_this_change_and_leaves_no_trace(tmp_path):
     copy = make_copy(tmp_path)
 
-    run = run_liveness(copy, ALL_GATES, timeout=WHOLE_SUITE_TIMEOUT)
+    run = run_liveness(copy, ALL_GATES, timeout=whole_suite_timeout())
 
     assert run.exit_code == 0, run.describe()
     assert all(run.verdict(gate).passed for gate in ALL_GATES), run.describe()
@@ -48,8 +49,8 @@ def test_audit_fails_on_unanticipated_reads_and_repeats_its_findings_exactly(tmp
     copy = make_copy(tmp_path)
     reads = add_tests_reading_unrouted_files(copy)
 
-    first = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=WHOLE_SUITE_TIMEOUT)
-    second = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=WHOLE_SUITE_TIMEOUT)
+    first = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=whole_suite_timeout())
+    second = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=whole_suite_timeout())
 
     first_audit = first.verdict(Gate.SELECTION_AUDIT)
     second_audit = second.verdict(Gate.SELECTION_AUDIT)
@@ -69,7 +70,7 @@ def test_resolver_that_selects_nothing_fails_the_audit(tmp_path):
     resolver_selects_nothing(copy)
     copy.commit("dead test-scope resolver")
 
-    run = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=WHOLE_SUITE_TIMEOUT)
+    run = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=whole_suite_timeout())
 
     audit = run.verdict(Gate.SELECTION_AUDIT)
     assert not audit.passed, run.describe()
@@ -81,7 +82,7 @@ def test_missing_resolver_fails_the_audit_and_says_why(tmp_path):
     copy.remove(RESOLVER)
     copy.commit("missing test-scope resolver")
 
-    run = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=WHOLE_SUITE_TIMEOUT)
+    run = run_liveness(copy, [Gate.SELECTION_AUDIT], timeout=whole_suite_timeout())
 
     audit = run.verdict(Gate.SELECTION_AUDIT)
     assert not audit.passed, run.describe()
@@ -94,7 +95,7 @@ def test_a_dead_gate_fails_its_own_check_while_the_other_three_still_run_and_pas
     mutation_sensor_parallel_inheritance_failure(copy)
     copy.commit("dead mutation sensor")
 
-    run = run_liveness(copy, ALL_GATES, timeout=WHOLE_SUITE_TIMEOUT)
+    run = run_liveness(copy, ALL_GATES, timeout=whole_suite_timeout())
 
     assert run.exit_code != 0, run.describe()
     assert not run.verdict(Gate.MUTATION_SENSOR).passed, run.describe()

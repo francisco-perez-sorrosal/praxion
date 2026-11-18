@@ -46,15 +46,13 @@ SHA_PIN = re.compile(r"@[0-9a-f]{40}$")
 # minute hour day-of-month month day-of-week, with one named weekday: once a week.
 WEEKLY_CRON = re.compile(r"^\d{1,2} \d{1,2} \* \* (?:[0-7]|[A-Za-z]{3})$")
 PYTEST_LINE = re.compile(r"\bpytest\b")
+SHELL_OPERATOR = re.compile(r"&&|\|\||;|\|")
 CLAUDE_COMMAND = re.compile(r"(?:^|[\s;&|(])claude(?:\s|$)")
-SECRET_OR_SESSION_TOKENS = (
-    "secrets.",
-    "github.token",
-    "GITHUB_TOKEN",
-    "GH_TOKEN",
-    "ANTHROPIC_",
-    "claude-code-action",
-    "anthropics/",
+# Matched against the YAML dump, which has no comments, so prose cannot trip it. `\bsecrets\b`
+# and `github\W+token` also catch `secrets['X']`, `toJSON(secrets)`, `secrets: inherit` and
+# `github['token']`, not only the dotted forms.
+SECRET_OR_SESSION = re.compile(
+    r"\bsecrets\b|github\W+token|GITHUB_TOKEN|GH_TOKEN|ANTHROPIC_|claude-code-action|anthropics/"
 )
 
 # The `# sized:` arithmetic. The runner's own setup varies by minutes, so no limit is under the
@@ -115,7 +113,7 @@ def test_every_permission_grant_is_contents_read_and_nothing_more() -> None:
 
 def test_no_job_reaches_a_secret_or_token_or_starts_an_assistant_session() -> None:
     workflow = _workflow()
-    reached = [token for token in SECRET_OR_SESSION_TOKENS if token in yaml.safe_dump(workflow)]
+    reached = sorted(set(SECRET_OR_SESSION.findall(yaml.safe_dump(workflow, width=math.inf))))
     sessions = [
         line
         for job in workflow["jobs"].values()
@@ -135,9 +133,11 @@ def test_every_job_has_a_timeout_of_its_own() -> None:
     assert not unbounded, f"jobs without a job-level timeout-minutes: {unbounded}"
 
 
-def test_no_job_waits_for_another() -> None:
+def test_no_job_declares_needs_on_another() -> None:
     waiting = [job_id for job_id, job in _workflow()["jobs"].items() if "needs" in job]
-    assert not waiting, f"no job may need another, so none hides another's conclusion: {waiting}"
+    assert not waiting, (
+        f"no job may declare needs: on another, so none hides its conclusion: {waiting}"
+    )
 
 
 # -- What the jobs run -------------------------------------------------------------------------
@@ -244,10 +244,16 @@ def _workflow() -> dict:
 
 
 def _command_lines(run_text: str) -> list[str]:
-    """Each non-comment line of a `run:` text, continuations joined."""
+    """Each command of a `run:` text: comments dropped, continuations joined, split at operators."""
     joined = re.sub(r"\\\n\s*", " ", run_text)
     lines = (line.strip() for line in joined.splitlines())
-    return [line for line in lines if line and not line.startswith("#")]
+    return [
+        command
+        for line in lines
+        if line and not line.startswith("#")
+        for command in map(str.strip, SHELL_OPERATOR.split(line))
+        if command
+    ]
 
 
 def _run_lines(job: dict) -> list[str]:
@@ -295,7 +301,12 @@ def _gate_misruns(job: dict) -> list[str]:
 
 def _selects_the_marker_in_scenario_trees(line: str) -> bool:
     arguments = shlex.split(line)
-    options = iter(arguments[arguments.index("pytest") + 1 :])
+    runner = next(
+        (at for at, argument in enumerate(arguments) if Path(argument).name == "pytest"), None
+    )
+    if runner is None:  # `uv pip install pytest-cov` mentions pytest without running it
+        return False
+    options = iter(arguments[runner + 1 :])
     marker: str | None = None  # the last -m wins over the runner config's own
     paths: set[str] = set()
     for argument in options:
@@ -438,7 +449,7 @@ def _audit_limit_problems(
     return [f"{job_id}: {why}" for why, is_broken in broken.items() if is_broken]
 
 
-def _declared_bound_problems(sizing: JobSizing | Unsized, declared: int) -> list[str]:
+def _declared_bound_problems(sizing: BoundSizing | Unsized, declared: int) -> list[str]:
     if isinstance(sizing, Unsized):
         return [f"{BOUND_KEY}: {sizing.reason}"]
     expected = math.ceil(sizing.margin * sizing.step * sizing.scale / 60) * 60
@@ -457,6 +468,7 @@ def _declared_bound_problems(sizing: JobSizing | Unsized, declared: int) -> list
 def _sized_comments_by_job(workflow_text: str) -> dict[str, str]:
     """The sized comment directly above each job's own `timeout-minutes:` line."""
     lines = workflow_text.splitlines()
+    assert "jobs:" in lines, f"{WORKFLOW_FILE.name} has no top-level 'jobs:' line"
     comments: dict[str, str] = {}
     job_id = ""
     for index in range(lines.index("jobs:") + 1, len(lines)):
@@ -470,7 +482,8 @@ def _sized_comments_by_job(workflow_text: str) -> dict[str, str]:
 
 def _declared_bound_sized_comment() -> str:
     lines = PYPROJECT_FILE.read_text(encoding="utf-8").splitlines()
-    index = next(i for i, line in enumerate(lines) if line.startswith(f"{BOUND_KEY} "))
+    index = next((i for i, line in enumerate(lines) if line.startswith(f"{BOUND_KEY} ")), None)
+    assert index is not None, f"{PYPROJECT_FILE.name} has no '{BOUND_KEY}' key"
     return _sized_comment_above(lines, index)
 
 

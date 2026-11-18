@@ -14,6 +14,8 @@ The probe fails, with a reason of the form `expected ...; observed ...`, when:
 - the resolver canary misses: a change to the first co-located `scripts/<name>.py`
   does not select its `scripts/test_<name>.py`, the most basic layout edge, so a
   dead resolver fails before any tracing, with the canary pair listed unselected;
+- the audit's own bound (`selection-audit-timeout-seconds`) is undeclared, or the
+  traced suite outlasts it;
 - the tracer is shadowed, the suite does not run (pytest exit other than 0 or 1),
   or no reads are recorded at all (a dead tracer must not pass as an empty audit);
 - a test file fails to collect (the tracer's plugin records each failed collection
@@ -56,9 +58,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-from _step_loop_pocket_runs import pocket_bound
-
 import gate_probes
+from gate_probes.suite_bound import DECLARATION_KEY, Declared, read_audit_bound
 from gate_probes.verdict import GateId, Verdict
 
 RESOLVER = "scripts/resolve_test_scope.py"
@@ -84,7 +85,6 @@ FIXED_EFFECT_LIMITS_S = (
     CANARY_TIMEOUT_S,
     RESOLVER_TIMEOUT_S,
 )
-SUITE_POCKET = "."
 RESOLVER_PROCESSES = min(8, os.cpu_count() or 1)
 SUITE_EXIT_CODES = (0, 1)  # 1 = failing tests, a note; anything else means the suite did not run
 
@@ -377,13 +377,21 @@ def _check_resolver(repo_root: Path, env: Mapping[str, str]) -> None:
         )
 
 
-def suite_timeout_s(repo_root: Path, env: Mapping[str, str]) -> float:
-    """The traced suite's bound: the one the root pocket declares for its gate runs.
+def suite_timeout_s(repo_root: Path) -> float:
+    """The traced suite's bound: the audit's own, declared once for it and nothing else.
 
-    The step loop holds the same default suite to it, so both read one declaration
-    (`gate-timeout-seconds`), and a checkout that declares none gets the step loop's default.
+    No other bound stands in when it is missing; the verdict fails naming the key instead.
     """
-    return pocket_bound(repo_root, SUITE_POCKET, env).bound.seconds
+    match read_audit_bound(repo_root):
+        case Declared(seconds):
+            return float(seconds)
+        case undeclared:
+            raise ProbeError(
+                _failure(
+                    f"`{DECLARATION_KEY}` declared as the selection audit's own time bound",
+                    undeclared.reason,
+                )
+            )
 
 
 def _traced_suite(repo_root: Path, env: Mapping[str, str]) -> tuple[ObservedReads, tuple[str, ...]]:
@@ -396,12 +404,14 @@ def _traced_suite(repo_root: Path, env: Mapping[str, str]) -> tuple[ObservedRead
             sys.executable, "-m", "pytest", "--no-cov", "-p", "no:cacheprovider",
             "-p", "selection_trace_plugin", "--continue-on-collection-errors", "--color=no",
         ]  # fmt: skip
-        bound = suite_timeout_s(repo_root, env)
+        bound = suite_timeout_s(repo_root)
+        started = time.monotonic()
         done = _capture(argv, repo_root, traced, bound, "the traced default suite")
+        elapsed = time.monotonic() - started
         if done.returncode not in SUITE_EXIT_CODES:
             observed = f"pytest exit code {done.returncode}: {_tail(done.stderr or done.stdout)}"
             raise ProbeError(_failure("the default suite to run under the tracer", observed))
-        return _read_trace(out_dir), suite_notes(done.returncode)
+        return _read_trace(out_dir), suite_notes(done.returncode, elapsed, bound)
     finally:
         shutil.rmtree(out_dir, ignore_errors=True)
 
@@ -442,10 +452,12 @@ def _read_trace(out_dir: Path) -> ObservedReads:
         raise ProbeError(_failure("readable trace records", str(exc))) from exc
 
 
-def suite_notes(exit_code: int) -> tuple[str, ...]:
+def suite_notes(exit_code: int, elapsed_s: float, bound_s: float) -> tuple[str, ...]:
+    """What a finished traced suite reports; the run against its bound is the weekly reading."""
+    ran = f"the traced default suite ran {elapsed_s:.0f} s of its {bound_s:g} s bound"
     if exit_code == 1:
-        return ("the suite exited 1 (failing tests); its health belongs to other jobs",)
-    return ()
+        return (ran, "the suite exited 1 (failing tests); its health belongs to other jobs")
+    return (ran,)
 
 
 def _tracked_files(repo_root: Path, env: Mapping[str, str]) -> frozenset[str]:

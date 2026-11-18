@@ -23,13 +23,14 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import selection  # noqa: E402
-from _step_loop_pocket_runs import DEFAULT_BOUND_SECONDS  # noqa: E402
+from suite_bound import DECLARATION_KEY  # noqa: E402
 
 from gate_probes.verdict import GateId  # noqa: E402
 
 TEST = "tests/test_a.py"
 OTHER_TEST = "tests/test_b.py"
 DATA = "docs/data.txt"
+SCRATCH_BOUND_SECONDS = 600
 
 
 def _record(test: str, path: str, channel: str) -> str:
@@ -366,9 +367,14 @@ def _scratch_repo(tmp_path: Path, resolver: str | None, test_body: str | None = 
     if resolver is not None:
         (root / "scripts").mkdir()
         (root / "scripts" / "resolve_test_scope.py").write_text(resolver)
+    (root / "pyproject.toml").write_text(_declaring(SCRATCH_BOUND_SECONDS), encoding="utf-8")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
     return root
+
+
+def _declaring(seconds: int) -> str:
+    return f"[tool.praxion.gate-liveness]\n{DECLARATION_KEY} = {seconds}\n"
 
 
 def _env() -> dict[str, str]:
@@ -555,11 +561,6 @@ def test_a_resolver_that_answers_no_path_fails_naming_the_unanswered_reads(tmp_p
     assert DATA in verdict.reason
 
 
-def test_a_failing_test_exit_is_a_note_and_a_clean_exit_is_none():
-    assert len(selection.suite_notes(1)) == 1
-    assert selection.suite_notes(0) == ()
-
-
 @pytest.mark.parametrize(
     ("name", "body"),
     [
@@ -577,7 +578,14 @@ def test_an_uncollectable_test_file_fails_the_audit_even_when_every_read_is_sele
     tmp_path, name, body
 ):
     root = _scratch_repo(tmp_path, resolver=_SELECTS_ALL)
-    _add_files(root, {name: body, "pyproject.toml": '[tool.pytest.ini_options]\naddopts = "-rN"\n'})
+    _add_files(
+        root,
+        {
+            name: body,
+            "pyproject.toml": '[tool.pytest.ini_options]\naddopts = "-rN"\n'
+            + _declaring(SCRATCH_BOUND_SECONDS),
+        },
+    )
 
     verdict = selection.run(root, {**_env(), "FORCE_COLOR": "1"})
 
@@ -585,9 +593,10 @@ def test_an_uncollectable_test_file_fails_the_audit_even_when_every_read_is_sele
     assert name in verdict.reason
 
 
-def test_the_traced_suite_is_held_to_the_bound_the_root_pocket_declares(tmp_path, monkeypatch):
+def test_the_traced_suite_is_held_to_the_bound_declared_for_the_audit(tmp_path, monkeypatch):
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.praxion.step-loop]\ngate-timeout-seconds = 77\n", encoding="utf-8"
+        "[tool.praxion.step-loop]\ngate-timeout-seconds = 1500\n" + _declaring(77),
+        encoding="utf-8",
     )
     real_capture = selection._capture
     bounds: dict[str, float] = {}
@@ -600,10 +609,50 @@ def test_the_traced_suite_is_held_to_the_bound_the_root_pocket_declares(tmp_path
 
     monkeypatch.setattr(selection, "_capture", capture)
 
-    selection._traced_suite(tmp_path, {**_env(), "PRAXION_STEP_LOOP_POCKET_TIMEOUTS": ""})
+    selection._traced_suite(tmp_path, _env())
 
     assert bounds == {"the traced default suite": 77}
 
 
-def test_a_checkout_that_declares_no_bound_holds_the_suite_to_the_step_loops_default(tmp_path):
-    assert selection.suite_timeout_s(tmp_path, {}) == DEFAULT_BOUND_SECONDS
+def test_a_checkout_that_declares_no_audit_bound_fails_the_verdict_naming_the_key(tmp_path):
+    root = _scratch_repo(tmp_path, resolver=_SELECTS_ALL)
+    (root / "pyproject.toml").write_text(
+        "[tool.praxion.step-loop]\ngate-timeout-seconds = 1500\n", encoding="utf-8"
+    )
+
+    verdict = selection.run(root, _env())
+
+    assert not verdict.passed
+    assert DECLARATION_KEY in verdict.reason
+    assert verdict.reason.startswith("expected ")
+    assert "; observed " in verdict.reason
+
+
+def test_a_finished_traced_suite_notes_how_long_it_ran_against_its_bound():
+    assert selection.suite_notes(0, 1234.4, 5400) == (
+        "the traced default suite ran 1234 s of its 5400 s bound",
+    )
+
+
+def test_a_suite_with_failing_tests_adds_its_exit_note_after_the_bound_note():
+    notes = selection.suite_notes(1, 10, 60)
+
+    assert notes[0] == "the traced default suite ran 10 s of its 60 s bound"
+    assert len(notes) == 2
+
+
+def test_a_suite_that_outlasts_its_bound_fails_stating_the_bound_and_that_it_was_running(tmp_path):
+    root = _scratch_repo(
+        tmp_path,
+        resolver=_SELECTS_ALL,
+        test_body="import time\n\n\ndef test_slow():\n    time.sleep(60)\n",
+    )
+    (root / "pyproject.toml").write_text(_declaring(3), encoding="utf-8")
+
+    verdict = selection.run(root, _env())
+
+    assert not verdict.passed
+    assert (
+        "expected the traced default suite to finish within 3 s; observed it was still running"
+        in verdict.reason
+    )

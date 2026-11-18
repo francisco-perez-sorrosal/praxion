@@ -315,32 +315,46 @@ def test_human_output_prints_each_verdicts_notes(
 def test_the_selection_probes_own_limits_fit_inside_the_time_the_cli_gives_it() -> None:
     # Else the CLI's kill lands first, on a probe whose children run in their own sessions.
     assert sum(selection.FIXED_EFFECT_LIMITS_S) < cgb.TIME_LIMITS_S[GateId.SELECTION_AUDIT]
-    assert cgb.SUITE_POCKET == selection.SUITE_POCKET
 
 
-def test_the_selection_audits_limit_adds_the_suite_bound_the_root_pocket_declares(
+def test_the_selection_audits_limit_adds_the_bound_declared_for_it(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.praxion.gate-liveness]\nselection-audit-timeout-seconds = 1234\n", encoding="utf-8"
+    )
+
+    limit = cgb.time_limit_s(GateId.SELECTION_AUDIT, tmp_path)
+
+    assert limit == 1234 + cgb.TIME_LIMITS_S[GateId.SELECTION_AUDIT]
+    assert limit - selection.suite_timeout_s(tmp_path) == cgb.TIME_LIMITS_S[GateId.SELECTION_AUDIT]
+
+
+def test_the_step_loops_gate_bound_does_not_stretch_the_selection_audits_limit(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.praxion.step-loop]\ngate-timeout-seconds = 1234\n", encoding="utf-8"
+        "[tool.praxion.step-loop]\ngate-timeout-seconds = 1500\n"
+        "[tool.praxion.gate-liveness]\nselection-audit-timeout-seconds = 5400\n",
+        encoding="utf-8",
     )
 
-    limit = cgb.time_limit_s(GateId.SELECTION_AUDIT, tmp_path, {})
+    assert cgb.time_limit_s(GateId.SELECTION_AUDIT, tmp_path) == 5400 + 360
 
-    assert limit == 1234 + cgb.TIME_LIMITS_S[GateId.SELECTION_AUDIT]
+
+def test_an_undeclared_audit_bound_leaves_the_allowance_alone_so_the_probe_can_report_it(
+    tmp_path: Path,
+) -> None:
     assert (
-        limit - selection.suite_timeout_s(tmp_path, {}) == cgb.TIME_LIMITS_S[GateId.SELECTION_AUDIT]
+        cgb.time_limit_s(GateId.SELECTION_AUDIT, tmp_path)
+        == cgb.TIME_LIMITS_S[GateId.SELECTION_AUDIT]
     )
 
 
 def test_a_probe_that_runs_no_suite_keeps_its_own_allowance(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.praxion.step-loop]\ngate-timeout-seconds = 1234\n", encoding="utf-8"
+        "[tool.praxion.gate-liveness]\nselection-audit-timeout-seconds = 1234\n", encoding="utf-8"
     )
 
-    assert (
-        cgb.time_limit_s(GateId.SPAWN_COUNT, tmp_path, {}) == cgb.TIME_LIMITS_S[GateId.SPAWN_COUNT]
-    )
+    assert cgb.time_limit_s(GateId.SPAWN_COUNT, tmp_path) == cgb.TIME_LIMITS_S[GateId.SPAWN_COUNT]
 
 
 def test_repo_root_comes_from_git_when_no_flag_is_given(

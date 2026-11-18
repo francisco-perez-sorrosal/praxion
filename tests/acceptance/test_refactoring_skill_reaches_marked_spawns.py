@@ -390,9 +390,12 @@ def test_without_the_delivery_a_marked_spawn_holds_no_copy(
 def test_the_move_drops_only_the_refactoring_preload_from_each_definition(
     installation: Installation, role: str
 ) -> None:
+    rd.before_the_move(installation)
+    preloaded = rd.preloaded_skills(installation.root, role)
     rd.apply_the_move(installation)
 
-    expected = tuple(s for s in rd.base_preloads()[role] if s != rd.SKILL_NAME)
+    expected = tuple(s for s in preloaded if s != rd.SKILL_NAME)
+    assert rd.SKILL_NAME in preloaded, "the installation did not start from the preloaded state"
     assert rd.preloaded_skills(installation.root, role) == expected
 
 

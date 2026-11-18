@@ -21,6 +21,10 @@ WRAPPER_END_MARKER = "<!-- codex-wrapper:end -->"
 # Frontmatter keys that steer only Claude's own loading of a definition; Codex has no
 # use for them, and a definition must export the same with or without them.
 CLAUDE_ONLY_FRONTMATTER_KEYS = ("omitClaudeMd",)
+# A Claude Code definition names a skill of its own plugin qualified (`praxion:code-review`), since a
+# bare name resolves to whatever command already holds it there. Codex installs the same skills under
+# their bare names, so the capsule's `skills:` line drops the namespace.
+CLAUDE_SKILL_NAMESPACE = "praxion:"
 
 # Keep the agent wrapper on current Codex model families while preserving the
 # canonical Praxion routing table as the source of truth for which agents get
@@ -175,9 +179,18 @@ def toml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+def _as_codex_names(line: str) -> str:
+    """A frontmatter line with its skill names as Codex installs them."""
+    return line.replace(CLAUDE_SKILL_NAMESPACE, "") if line.startswith("skills:") else line
+
+
 def render_frontmatter_capsule(frontmatter_lines: list[str]) -> str:
     claude_only_prefixes = tuple(f"{key}:" for key in CLAUDE_ONLY_FRONTMATTER_KEYS)
-    kept = [line for line in frontmatter_lines if not line.startswith(claude_only_prefixes)]
+    kept = [
+        _as_codex_names(line)
+        for line in frontmatter_lines
+        if not line.startswith(claude_only_prefixes)
+    ]
     frontmatter_block = "\n".join([FRONTMATTER_BOUNDARY, *kept, FRONTMATTER_BOUNDARY])
     return "\n".join(
         [

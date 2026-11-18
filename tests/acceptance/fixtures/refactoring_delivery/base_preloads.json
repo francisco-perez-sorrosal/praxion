@@ -1,8 +1,0 @@
-{
-  "base_commit": "095da2ee9ee93750e761ca518b1d10a90eb45e57",
-  "taken_from": "the `skills:` frontmatter of agents/implementer.md and agents/test-engineer.md at the base commit",
-  "preloaded_skills": {
-    "implementer": ["software-planning", "code-review", "refactoring"],
-    "test-engineer": ["software-planning", "code-review", "refactoring"]
-  }
-}

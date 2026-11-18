@@ -369,12 +369,21 @@ def _plan_step(inputs: LoopInputs, step_id: str) -> PlanStep:
 
 
 def require_known(inputs: LoopInputs, request: str) -> None:
-    """Refuse a request that is neither pending nor recorded, naming the one that is pending."""
+    """Refuse a request that is neither pending nor recorded, naming every one that is pending."""
     pending = sorted(
         a.request for a in inputs.attempts.values() if isinstance(a, OutstandingAttempt)
     )
     if request in pending or any(record.request == request for record in inputs.records):
         return
+    if len(pending) > 1:
+        # Several outstanding lines stop every call, so the recovery is the one the
+        # several-outstanding refusal gives, not a record or a next.
+        raise RecordRefusedError(
+            "request-not-pending",
+            f"record failed because {request} is neither pending nor recorded (the pending"
+            f" requests are {', '.join(pending)}). To fix: keep the request whose agent ran,"
+            " remove request=<id> from the other lines in WIP.md, then record the one kept.",
+        )
     state = f"the pending request is {pending[0]}" if pending else "none is pending"
     raise RecordRefusedError(
         "request-not-pending",

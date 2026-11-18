@@ -50,6 +50,7 @@ from _step_loop_io import (
     check_pocket,
     head_sha,
     paths_differing_from_head,
+    repository_pocket,
     run_bounded_check,
     run_check,
     run_derived_scope,
@@ -484,19 +485,9 @@ def check_run(
     if not isinstance(step.check, Check):
         return GateRun("Check:", NoRun(f"the Check: line cannot be read: {step.check.reason}"))
     ran = bounded_check(repo, run_dir, step.check.command, give_up_at)
-    pocket = _relative_pocket(repo, check_pocket(ran.argv))
+    pocket = repository_pocket(repo, check_pocket(ran.argv))
     run = classified(ran, _asked_in(rule, pocket), step.check.command)
     return _in_repository(pocket, run)
-
-
-def _relative_pocket(repo: Path, pocket: str) -> str:
-    """`pocket` as the repository names it: an absolute path inside `repo` is made relative to
-    it; any other spelling is kept (a pocket outside the repository holds no entry's node)."""
-    path = Path(pocket)
-    if not path.is_absolute():
-        return pocket
-    resolved, root = path.resolve(), repo.resolve()
-    return str(resolved.relative_to(root)) if resolved.is_relative_to(root) else pocket
 
 
 def check_collects(repo: Path, step: PlanStep) -> str | None:

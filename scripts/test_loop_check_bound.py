@@ -85,6 +85,19 @@ def test_a_check_naming_a_pocket_is_held_to_that_pockets_bound_not_the_roots(tmp
     assert bound == PocketBound("eval", 1200.0, "declared")
 
 
+def test_a_check_naming_its_pocket_by_an_absolute_path_keeps_the_pockets_override(tmp_path):
+    (tmp_path / "eval").mkdir()
+    pocket = str(tmp_path / "eval")
+
+    bound = check_bound(
+        tmp_path,
+        ("uv", "run", "--directory", pocket, "pytest"),
+        {POCKET_TIMEOUTS_VARIABLE: "eval=2000"},
+    )
+
+    assert bound == PocketBound("eval", 2000.0, "override")
+
+
 def test_the_environment_override_beats_the_pockets_declaration_for_a_check(tmp_path):
     declare(tmp_path, ROOT_DECLARES_1500)
 

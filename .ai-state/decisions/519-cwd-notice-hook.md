@@ -1,7 +1,8 @@
 ---
-id: dec-draft-5310f592
+id: dec-519
+draft_id: dec-draft-5310f592
 title: A shipped shell hook tells the main conversation, once per move, that a Bash command left it in another directory
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-16
 summary: hooks/notice_working_directory.sh, registered under PreToolUse for every tool and, for Bash, under PostToolUse and PostToolUseFailure, keeps one three-state record per main-conversation session and adds one additionalContext line when a Bash command leaves the session away from its home (its start directory, or the worktree the harness moved it into); POSIX sh only, fail-open, correct whether or not the moving call's PostToolUse payload already shows the new directory.

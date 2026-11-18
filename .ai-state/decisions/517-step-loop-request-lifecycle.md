@@ -1,7 +1,8 @@
 ---
-id: dec-draft-edd3724f
+id: dec-517
+draft_id: dec-draft-edd3724f
 title: The step-loop request lifecycle is read as one sum type, and a record in flight holds an OS lock
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-16
 summary: The driver reads a step's outstanding request against the plan as one sum type; a withdrawal takes the request back and issues nothing (outcome withdrawn); a misplaced next stops; a record call holds an flock that the Stop guard and a second record probe, in a new leaf module _step_loop_recording.py.

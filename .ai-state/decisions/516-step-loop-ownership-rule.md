@@ -1,7 +1,8 @@
 ---
-id: dec-draft-42477a36
+id: dec-516
+draft_id: dec-draft-42477a36
 title: One ownership rule for Read-only entries, in a leaf module the gate, the commit and the prompt read
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-16
 summary: The meaning of a Read-only entry (a bare path withholds its file and owns its nodes; a path::node entry owns its node's verdict and withholds nothing), matched by repository-relative node id in every pocket, moves from _step_loop_gate.py and _step_loop_io.py into _step_loop_ownership.py.

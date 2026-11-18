@@ -1,7 +1,8 @@
 ---
-id: dec-draft-c02617e5
+id: dec-518
+draft_id: dec-draft-c02617e5
 title: The commit gate asks a stdlib reader of the command field, after its word tests, whether a Bash call is a commit
-status: proposed
+status: accepted
 category: implementation
 date: 2026-11-16
 summary: hooks/commit_gate.sh passes a payload that lacks either word, git or commit, with two shell builtins and no forked process, cuts the exact extent of tool_input.command with one sed (escaped backslashes and quotes dropped) and passes a command without the word commit at no interpreter cost, settles one simple git built-in command in shell, and otherwise runs hooks/_commit_command.py (json and shlex, python3 -I -S through PRAXION_PYTHON, the project's .venv interpreter, else python3), which prints commit, not-a-commit or uncertain; only the exact word not-a-commit skips the gated checkers, so a crash or any doubt runs them.

@@ -83,6 +83,170 @@ def test_malformed_and_unrelated_lines_are_skipped():
     assert seen.claude_code_version is None
 
 
+# -- refused spawns --------------------------------------------------------------
+
+REFUSAL = "The server-side auto mode classifier gave no verdict (error)"
+SUBAGENT = "praxion:verifier"
+REFUSED_PREFIX = f"the harness refused the session's Agent call for {SUBAGENT}: "
+
+
+def _agent_call(call_id: str = "tu_1", subagent: str = SUBAGENT, name: str = "Agent") -> str:
+    block = {"type": "tool_use", "id": call_id, "name": name, "input": {"subagent_type": subagent}}
+    return _line({"type": "assistant", "message": {"content": [block]}})
+
+
+def _tool_result(call_id: str, content: object, is_error: bool = True) -> str:
+    block = {
+        "type": "tool_result",
+        "tool_use_id": call_id,
+        "is_error": is_error,
+        "content": content,
+    }
+    return _line({"type": "user", "message": {"content": [block]}})
+
+
+def _result(denials: list | None = None) -> str:
+    return _line({"type": "result", "subtype": "success", "permission_denials": denials or []})
+
+
+def _denial(call_id: str = "tu_1", tool: str = "Agent") -> dict:
+    return {"tool_name": tool, "tool_use_id": call_id}
+
+
+def _agent_reading(lines: list, timeout: int = 5):
+    seen = msp.parse_stream(lines)
+    return msp.readings_for(seen, "agent:verifier", "praxion", timeout)["agent:verifier"]
+
+
+def test_an_error_result_answering_an_agent_call_is_the_subagents_refusal():
+    seen = msp.parse_stream([_agent_call(), _tool_result("tu_1", REFUSAL)])
+
+    assert seen.agent_calls == {"tu_1": SUBAGENT}
+    assert seen.refusals == {SUBAGENT: REFUSAL}
+
+
+def test_only_the_first_refusal_of_a_subagent_is_kept():
+    seen = msp.parse_stream(
+        [
+            _agent_call("tu_1"),
+            _tool_result("tu_1", "first"),
+            _agent_call("tu_2"),
+            _tool_result("tu_2", "second"),
+        ]
+    )
+
+    assert seen.refusals == {SUBAGENT: "first"}
+
+
+def test_a_refusal_text_in_text_blocks_is_joined_on_one_line():
+    blocks = [{"type": "text", "text": "line one\n  line two"}, {"type": "text", "text": "three"}]
+
+    seen = msp.parse_stream([_agent_call(), _tool_result("tu_1", blocks)])
+
+    assert seen.refusals == {SUBAGENT: "line one line two three"}
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        pytest.param(_tool_result("tu_1", "fine", is_error=False), id="a successful result"),
+        pytest.param(_tool_result("tu_other", REFUSAL), id="an error answering another call"),
+    ],
+)
+def test_a_result_that_refuses_no_agent_call_records_no_refusal(answer: str):
+    seen = msp.parse_stream([_agent_call(), answer])
+
+    assert seen.refusals == {}
+
+
+def test_an_error_answering_a_call_to_another_tool_is_not_a_refusal():
+    seen = msp.parse_stream([_agent_call(name="Bash"), _tool_result("tu_1", REFUSAL)])
+
+    assert seen.agent_calls == {}
+    assert seen.refusals == {}
+
+
+def test_a_denial_in_the_result_event_is_a_refusal_when_no_error_result_gave_one():
+    denials = [_denial(), _denial("tu_9"), _denial(tool="Bash")]
+
+    seen = msp.parse_stream([_agent_call(), _result(denials)])
+
+    assert seen.refusals == {SUBAGENT: msp.DENIED_WITHOUT_TEXT}
+
+
+def test_a_refusal_the_error_result_gave_outranks_the_denial_entry():
+    seen = msp.parse_stream([_agent_call(), _tool_result("tu_1", REFUSAL), _result([_denial()])])
+
+    assert seen.refusals == {SUBAGENT: REFUSAL}
+
+
+def test_the_session_has_ended_only_once_the_result_event_arrived():
+    assert not msp.parse_stream([_assistant((1, 1, 1), "m")]).ended
+    assert msp.parse_stream([_assistant((1, 1, 1), "m"), _result()]).ended
+
+
+def test_a_spawn_that_follows_a_refused_call_is_a_reading():
+    lines = [
+        _agent_call("tu_1"),
+        _tool_result("tu_1", REFUSAL),
+        _agent_call("tu_2"),
+        _assistant((2, 2, 2), "s", parent="tu_2", subagent=SUBAGENT),
+        _result(),
+    ]
+
+    reading = _agent_reading(lines)
+
+    assert reading.first_request.tokens == 6
+    assert reading.withheld is None
+
+
+def test_a_refused_spawn_names_the_refusal_and_its_text_and_not_the_timeout_once_ended():
+    reading = _agent_reading([_agent_call(), _tool_result("tu_1", REFUSAL), _result()])
+
+    assert reading.first_request is None
+    assert reading.withheld == REFUSED_PREFIX + REFUSAL
+
+
+def test_a_refused_spawn_in_a_session_still_running_also_names_the_timeout():
+    reading = _agent_reading([_agent_call(), _tool_result("tu_1", REFUSAL)], timeout=9)
+
+    assert reading.withheld == REFUSED_PREFIX + REFUSAL + "; no spawn within 9s"
+
+
+def test_a_refusal_longer_than_the_bound_is_cut_with_a_visible_mark():
+    long_text = "x" * (msp.REFUSAL_TEXT_CHARS + 50)
+
+    reading = _agent_reading([_agent_call(), _tool_result("tu_1", long_text), _result()])
+
+    assert reading.withheld == REFUSED_PREFIX + "x" * msp.REFUSAL_TEXT_CHARS + msp.CUT_MARK
+
+
+def test_a_refusal_exactly_at_the_bound_is_carried_whole():
+    text = "y" * msp.REFUSAL_TEXT_CHARS
+
+    reading = _agent_reading([_agent_call(), _tool_result("tu_1", text), _result()])
+
+    assert reading.withheld == REFUSED_PREFIX + text
+
+
+def test_a_session_that_ended_without_spawning_is_not_said_to_have_timed_out():
+    reading = _agent_reading([_assistant((1, 1, 1), "m"), _result()], timeout=9)
+
+    assert reading.withheld == f"the session ended without spawning {SUBAGENT}"
+
+
+def test_a_session_that_has_not_ended_is_withheld_for_the_timeout():
+    reading = _agent_reading([_assistant((1, 1, 1), "m")], timeout=9)
+
+    assert reading.withheld == f"the session spawned no {SUBAGENT} within 9s"
+
+
+def test_a_main_target_whose_session_ended_without_a_first_request_is_not_said_to_have_timed_out():
+    readings = msp.readings_for(msp.parse_stream([_result()]), "main", "praxion", timeout=7)
+
+    assert readings["main"].withheld == "the session ended without a first request"
+
+
 # -- target selection ------------------------------------------------------------
 
 
@@ -452,6 +616,37 @@ def test_the_session_receives_the_token_in_its_environment(tmp_path: Path, monke
     )
 
     assert tail.strip() == msp.REDACTED, "the stand-in saw no token in its environment"
+
+
+_SLOW_STAND_IN = """#!{python}
+import json, time
+print(json.dumps({{"type": "assistant", "message": {{"model": "m", "usage": {{}}}}}}), flush=True)
+time.sleep({pause})
+print(json.dumps({{"type": "result", "subtype": "success"}}), flush=True)
+"""
+
+
+@pytest.mark.parametrize(
+    ("pause", "timeout", "ended"),
+    [
+        pytest.param(0, 30, True, id="a result inside the timeout ends the session"),
+        pytest.param(3, 1, False, id="a result after the timeout does not"),
+    ],
+)
+def test_a_result_event_ends_the_session_only_when_it_came_inside_the_timeout(
+    tmp_path: Path, monkeypatch, pause: int, timeout: int, ended: bool
+):
+    script = tmp_path / "bin" / "claude"
+    script.parent.mkdir()
+    script.write_text(_SLOW_STAND_IN.format(python=sys.executable, pause=pause))
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{script.parent}{os.pathsep}{os.environ['PATH']}")
+
+    seen, _ = msp.run_target(
+        "agent:verifier", msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", timeout
+    )
+
+    assert seen.ended is ended
 
 
 def _run_main(tmp_path: Path, monkeypatch, capsys, *extra: str):

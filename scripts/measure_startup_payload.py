@@ -32,7 +32,9 @@ baseline (``.ai-state/startup_baseline.json``, one entry per profile, newest
 wins); ``--compare`` diffs today's reading against that entry and names every
 target that grew past the tolerance. A target the probe could not read (no
 first request within the timeout, a session that never spawned the agent) is
-**withheld with a reason**, never reported as zero and never compared.
+**withheld with a reason**, never reported as zero and never compared. The reason
+names what the stream shows: the harness refusing the session's ``Agent`` call (with its
+text, cut), the session ending without the spawn, or the timeout running out.
 
 Cost: one headless session per target, each paying its own startup (tens of
 thousands of input tokens) and, for an agent target, one spawn. The run stops
@@ -69,6 +71,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import Union
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 
@@ -94,6 +97,11 @@ API_CREDENTIAL_VARIABLES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 SUBSCRIPTION_CREDENTIAL = "subscription"
 REDACTED = "[redacted]"
 STDERR_TAIL_CHARS = 600
+REFUSAL_TEXT_CHARS = 200
+CUT_MARK = " [cut]"
+# Stands in for the text of a refusal the stream records only as a denial entry.
+DENIED_WITHOUT_TEXT = "the call was denied and the stream gives no text"
+AGENT_TOOL = "Agent"
 
 MAIN_PROMPT = "Reply with the single word ok."
 AGENT_PROMPT = (
@@ -173,6 +181,33 @@ class StreamObservation:
     mcp_servers: dict = field(default_factory=dict)  # name -> status, from the init event
     main: FirstRequest | None = None
     agents: dict = field(default_factory=dict)  # subagent_type -> FirstRequest
+    agent_calls: dict = field(default_factory=dict)  # Agent tool_use id -> subagent_type
+    refusals: dict = field(default_factory=dict)  # subagent_type -> text of its first refusal
+    ended: bool = False  # the `result` event arrived: the session is over
+
+
+@dataclass(frozen=True)
+class Spawned:
+    request: FirstRequest
+
+
+@dataclass(frozen=True)
+class Refused:
+    text: str
+
+
+@dataclass(frozen=True)
+class EndedWithoutSpawn:
+    pass
+
+
+@dataclass(frozen=True)
+class TimedOut:
+    pass
+
+
+# `|` between classes would fail at runtime on 3.9, so the alias spells a `Union`.
+SpawnOutcome = Union[Spawned, Refused, EndedWithoutSpawn, TimedOut]  # noqa: UP007
 
 
 # ---------------------------------------------------------------------------
@@ -181,12 +216,16 @@ class StreamObservation:
 
 
 def parse_stream(lines: Iterable[str]) -> StreamObservation:
-    """Fold a stream-json transcript into first requests. Malformed lines are skipped.
+    """Fold a stream-json transcript into first requests and the fate of `Agent` calls.
 
     The first `assistant` message without `parent_tool_use_id` is the session's
     first request; the first one carrying `parent_tool_use_id` is the first
     request of the subagent named by `subagent_type`. Later messages of either
-    are ignored: the instrument reads startup, not the run.
+    are ignored: the instrument reads startup, not the run. Alongside, each
+    `Agent` call is remembered by id, the first refusal per subagent is kept (an
+    error result answering such a call, else a denial the final `result` event
+    lists) and the `result` event marks the session as ended. Malformed lines
+    are skipped.
     """
     seen = StreamObservation()
     for line in lines:
@@ -194,29 +233,70 @@ def parse_stream(lines: Iterable[str]) -> StreamObservation:
             event = json.loads(line)
         except (ValueError, TypeError):
             continue
-        if not isinstance(event, dict):
-            continue
-        if event.get("type") == "system" and event.get("subtype") == "init":
-            seen.claude_code_version = event.get("claude_code_version")
-            seen.mcp_servers = {
-                str(s.get("name")): str(s.get("status"))
-                for s in event.get("mcp_servers") or []
-                if isinstance(s, dict)
-            }
-            continue
-        if event.get("type") != "assistant":
-            continue
-        message = event.get("message") or {}
-        usage = message.get("usage")
-        if not isinstance(usage, dict):
-            continue
-        request = FirstRequest.from_usage(usage, str(message.get("model", "")))
-        if event.get("parent_tool_use_id"):
-            subagent = str(event.get("subagent_type") or "")
-            seen.agents.setdefault(subagent, request)
-        elif seen.main is None:
-            seen.main = request
+        if isinstance(event, dict):
+            _fold_event(seen, event)
     return seen
+
+
+def _fold_event(seen: StreamObservation, event: dict) -> None:
+    kind = event.get("type")
+    if kind == "system" and event.get("subtype") == "init":
+        seen.claude_code_version = event.get("claude_code_version")
+        seen.mcp_servers = {
+            str(s.get("name")): str(s.get("status"))
+            for s in event.get("mcp_servers") or []
+            if isinstance(s, dict)
+        }
+    elif kind == "assistant":
+        _fold_assistant(seen, event)
+    elif kind == "user":
+        _fold_tool_results(seen, event)
+    elif kind == "result":
+        seen.ended = True
+        _fold_denials(seen, event)
+
+
+def _fold_assistant(seen: StreamObservation, event: dict) -> None:
+    message = event.get("message") or {}
+    for block in _content_blocks(message):
+        if block.get("type") == "tool_use" and block.get("name") == AGENT_TOOL:
+            subagent = (block.get("input") or {}).get("subagent_type")
+            seen.agent_calls[str(block.get("id"))] = str(subagent or "")
+    usage = message.get("usage")
+    if not isinstance(usage, dict):
+        return
+    request = FirstRequest.from_usage(usage, str(message.get("model", "")))
+    if event.get("parent_tool_use_id"):
+        seen.agents.setdefault(str(event.get("subagent_type") or ""), request)
+    elif seen.main is None:
+        seen.main = request
+
+
+def _fold_tool_results(seen: StreamObservation, event: dict) -> None:
+    for block in _content_blocks(event.get("message") or {}):
+        subagent = seen.agent_calls.get(str(block.get("tool_use_id")))
+        if block.get("type") == "tool_result" and block.get("is_error") and subagent is not None:
+            seen.refusals.setdefault(subagent, _result_text(block.get("content")))
+
+
+def _fold_denials(seen: StreamObservation, event: dict) -> None:
+    for denial in event.get("permission_denials") or []:
+        if isinstance(denial, dict) and denial.get("tool_name") == AGENT_TOOL:
+            subagent = seen.agent_calls.get(str(denial.get("tool_use_id")))
+            if subagent is not None:
+                seen.refusals.setdefault(subagent, DENIED_WITHOUT_TEXT)
+
+
+def _content_blocks(message: dict) -> list:
+    content = message.get("content")
+    return [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
+
+
+def _result_text(content: object) -> str:
+    """A tool result's text: the string itself, or the text blocks of a list, on one line."""
+    if isinstance(content, list):
+        content = " ".join(str(b.get("text", "")) for b in content if isinstance(b, dict))
+    return " ".join(str(content or "").split())
 
 
 def target_satisfied(seen: StreamObservation, target: str, namespace: str) -> bool:
@@ -230,20 +310,55 @@ def subagent_type_for(target: str, namespace: str) -> str:
     return f"{namespace}:{target[len(AGENT_TARGET_PREFIX) :]}"
 
 
+def spawn_outcome(seen: StreamObservation, subagent: str) -> SpawnOutcome:
+    """What became of the session's attempt to spawn `subagent`, first match wins.
+
+    A spawn that follows a refused and retried call is a reading, so it outranks the refusal.
+    """
+    if subagent in seen.agents:
+        return Spawned(seen.agents[subagent])
+    if subagent in seen.refusals:
+        return Refused(seen.refusals[subagent])
+    return EndedWithoutSpawn() if seen.ended else TimedOut()
+
+
+def withheld_reason(outcome: SpawnOutcome, subagent: str, ended: bool, timeout: int) -> str:
+    """The reason an agent target is withheld; a session that ended is never said to have timed out."""
+    if isinstance(outcome, Refused):
+        reason = (
+            f"the harness refused the session's Agent call for {subagent}: {_cut(outcome.text)}"
+        )
+        return reason if ended else f"{reason}; no spawn within {timeout}s"
+    if isinstance(outcome, EndedWithoutSpawn):
+        return f"the session ended without spawning {subagent}"
+    return f"the session spawned no {subagent} within {timeout}s"
+
+
+def _cut(text: str) -> str:
+    return text if len(text) <= REFUSAL_TEXT_CHARS else text[:REFUSAL_TEXT_CHARS] + CUT_MARK
+
+
 def readings_for(seen: StreamObservation, target: str, namespace: str, timeout: int) -> dict:
     """The target readings one stream contributes: the target and, for an agent, `main` too."""
     out = {}
     if seen.main is not None:
         out[MAIN_TARGET] = TargetReading(first_request=seen.main)
     elif target == MAIN_TARGET:
-        out[MAIN_TARGET] = TargetReading(withheld=f"no first request within {timeout}s")
+        out[MAIN_TARGET] = TargetReading(
+            withheld=(
+                "the session ended without a first request"
+                if seen.ended
+                else f"no first request within {timeout}s"
+            )
+        )
     if target != MAIN_TARGET:
         subagent = subagent_type_for(target, namespace)
-        if subagent in seen.agents:
-            out[target] = TargetReading(first_request=seen.agents[subagent])
+        outcome = spawn_outcome(seen, subagent)
+        if isinstance(outcome, Spawned):
+            out[target] = TargetReading(first_request=outcome.request)
         else:
             out[target] = TargetReading(
-                withheld=f"the session spawned no {subagent} within {timeout}s"
+                withheld=withheld_reason(outcome, subagent, seen.ended, timeout)
             )
     return out
 
@@ -442,7 +557,12 @@ def run_target(
             if target_satisfied(seen, target, namespace) or time.monotonic() > deadline:
                 break
     finally:
+        out_of_time = time.monotonic() > deadline
         _stop(process)
+    if out_of_time:
+        seen.ended = (
+            False  # a `result` that came after the timeout did not end the session within it
+        )
     stderr_tail = ""
     if process.stderr is not None:
         try:

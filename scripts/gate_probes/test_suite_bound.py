@@ -47,6 +47,15 @@ def test_the_step_loops_bound_is_never_a_fallback(tmp_path):
     assert "[tool.praxion.gate-liveness]" in bound.reason
 
 
+def test_a_table_name_holding_a_value_instead_of_a_table_is_undeclared(tmp_path):
+    root = _project(tmp_path, '[tool]\npraxion = "not a table"\n')
+
+    bound = read_audit_bound(root)
+
+    assert isinstance(bound, Undeclared)
+    assert "[tool.praxion.gate-liveness]" in bound.reason
+
+
 def test_a_table_without_the_key_is_undeclared_and_names_it(tmp_path):
     root = _project(tmp_path, "[tool.praxion.gate-liveness]\nother = 1\n")
 

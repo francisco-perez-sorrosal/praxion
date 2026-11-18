@@ -181,6 +181,7 @@ Do **not** reach for a subagent for a quick targeted edit (spawn latency dwarfs 
 - Agents delegate specific workflows to a separate context window
 - Use the `skills` field to inject skill content into an agent
 - Agents do **not** inherit skills from the parent -- list them explicitly
+- **A bare name in `skills:` resolves to whatever command already holds that name**, the harness's bundled skills first: three Praxion agents preloaded a bundled `code-review` that asks for a JSON array of findings instead of Praxion's own methodology. Name a plugin's own skill qualified (`<plugin>:<skill>`) whenever its bare name can collide. Agent frontmatter is exported, so a change to the `skills:` line moves the exports' frozen copies too.
 - For creating or modifying skills that agents consume, see the `skill-crafting` skill
 
 ```yaml

@@ -121,7 +121,7 @@ An unreadable line, or a final state with a missing or misshapen argument, count
 
 Field definitions, enums, and `dedup_key` live in § Schema above. Each writer populates **all** fields from that table, then applies only its overlay below for triggers, finding-to-field mapping, and producer-specific defaults. Do not duplicate the schema table in agent prompts.
 
-**De-duplication at write time (all producers).** Before appending, scan the ledger pair for an existing row with the same `dedup_key`. If one exists, update its `last-seen` to today rather than appending a duplicate. Do not change its `status`, `notes`, or `owner-role` — consumers own those fields.
+**De-duplication at write time (all producers).** Before appending, scan the ledger pair for an existing row with the same `dedup_key`. If one exists, update its `last-seen` to today rather than appending a duplicate. Do not change its `status`, `notes`, or `owner-role` — consumers own those fields. The key is a granularity, not a search: before filing, also search the pair for the file, the symptom and any upstream issue, and read the project's known-limitations document where it keeps one (Praxion: `docs/claude-code-limitations.md`, each entry already tied to a row); a limitation already tracked there is not a new row.
 
 ### verifier (Phase 5 / 5.5)
 

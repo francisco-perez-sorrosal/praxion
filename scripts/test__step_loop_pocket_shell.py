@@ -534,6 +534,20 @@ def test_a_bound_too_large_for_the_shells_arithmetic_is_capped_before_it_reaches
     assert command[-len(spec.argv) - 1] == str(pocket_runs._MAX_LAUNCHER_BOUND_SECONDS)
 
 
+@pytest.fixture
+def started_with_default_handling():
+    """The launcher keeps the dispositions it inherits, so this test starts from the defaults it
+    assumes: a suite started as a background job of a non-interactive shell inherits SIGINT
+    ignored, and an ignore survives exec where a handler does not."""
+    saved = {number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)}
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    yield
+    for number, handler in saved.items():
+        signal.signal(number, handler)
+
+
+@pytest.mark.usefixtures("started_with_default_handling")
 def test_a_command_run_through_the_launcher_keeps_the_default_interrupt_and_terminate_handling(
     make_spec,
 ):

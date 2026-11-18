@@ -24,7 +24,7 @@ from praxion_evals.adherence import (
     tasks,
 )
 from praxion_evals.adherence.axis_runs import DEFAULT_RUN
-from praxion_evals.adherence.dry_run import planned_copy
+from praxion_evals.adherence.dry_run import PlannedLaunches, planned_copy
 from praxion_evals.adherence.infra_stop import COUNTING_KINDS
 from praxion_evals.live.report import CREDENTIAL_KEYS
 from tests.adherence_run_support import (
@@ -306,6 +306,70 @@ def test_a_capped_dry_run_plans_that_many_tasks_per_role_per_arm_and_keeps_the_t
     assert len(lines) == 2 * 2
     assert len({line["task_id"] for line in lines}) == 2
     assert f"{ROLE}: 2 tasks (target 20)" in captured.err
+
+
+BUDGET = 1.25
+
+
+def _dry_run_stderr(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, *options: str, budget: float = BUDGET
+) -> str:
+    argv = [str(scripted_checkout()), "--output", str(tmp_path / "out.json"), "--dry-run"]
+    assert cli.main([*argv, "--session-budget-usd", f"{budget:g}", *options]) == 0
+    return capsys.readouterr().err
+
+
+def test_the_smallest_cap_is_every_session_times_its_budget() -> None:
+    launches = PlannedLaunches(task_sessions=4, proof_sessions=2)
+
+    assert launches.total == 6
+    assert launches.smallest_cap(BUDGET) == 7.5
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_states_its_sessions_the_proofs_among_them_and_the_cap_they_need(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    err = _dry_run_stderr(capsys, tmp_path, "--role", ROLE, "--max-tasks", "2")
+
+    # two tasks on two arms, plus one proof per arm
+    assert "6 sessions reserve against the run cap, 2 of them proofs" in err
+    assert "6 x 1.25 = 7.5 USD admits every one launched once" in err
+    assert "a launch tried again reserves its budget again" in err
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_dry_run_counts_the_two_slots_of_each_calibration_task(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    err = _dry_run_stderr(capsys, tmp_path, "--role", ROLE, "--calibration", "--max-tasks", "2")
+
+    # two tasks of two slots each, plus the full arm's proof
+    assert "5 sessions reserve against the run cap, 1 of them proofs" in err
+
+
+@pytest.mark.usefixtures("no_launch")
+def test_a_cap_below_the_smallest_warns_of_refusals_and_names_the_cap_that_admits_all(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    err = _dry_run_stderr(
+        capsys, tmp_path, "--role", ROLE, "--max-tasks", "2", "--max-total-usd", "7"
+    )
+
+    assert "later launches may then be refused" in err
+    assert "--max-total-usd 7.5 admits them all" in err
+
+
+@pytest.mark.usefixtures("no_launch")
+@pytest.mark.parametrize("cap", ["7.5", "1000"])
+def test_a_cap_that_admits_every_session_draws_no_refusal_warning(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, cap: str
+) -> None:
+    err = _dry_run_stderr(
+        capsys, tmp_path, "--role", ROLE, "--max-tasks", "2", "--max-total-usd", cap
+    )
+
+    assert "refus" not in err
 
 
 def test_a_cap_above_the_target_plus_slack_changes_nothing() -> None:

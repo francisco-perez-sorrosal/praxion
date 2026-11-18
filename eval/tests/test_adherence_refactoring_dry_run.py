@@ -14,7 +14,7 @@ from praxion_evals.adherence import refactoring_tasks as pool
 from praxion_evals.adherence.axis import ARMS_BY_AXIS, patched_paths
 from praxion_evals.adherence.axis_runs import DEFAULT_RUN, axis_run
 from praxion_evals.adherence.dry_run import planned_copy
-from tests.adherence_run_support import dry_run
+from tests.adherence_run_support import dry_run, scripted_checkout
 
 AXIS = "refactoring-delivery"
 PAIRED = ["--axis", AXIS]
@@ -65,6 +65,40 @@ def test_a_run_capped_at_two_tasks_still_holds_two_templates(capsys, tmp_path, r
     assert len(task_ids) == 2
     assert len(templates) == 2
     assert len(lines) == 4
+
+
+def _paired_stderr(capsys, tmp_path, role: str, *options: str) -> str:
+    argv = [str(scripted_checkout()), "--output", str(tmp_path / "out.json"), "--dry-run"]
+    argv += ["--role", role, *PAIRED, "--session-budget-usd", "1.25", *options]
+    assert cli.main(argv) == 0
+    return capsys.readouterr().err
+
+
+@pytest.mark.parametrize("role", POOL_ROLES)
+def test_a_paired_dry_run_states_its_sessions_and_the_cap_that_admits_them(capsys, tmp_path, role):
+    err = _paired_stderr(capsys, tmp_path, role, "--max-tasks", "2")
+
+    # two tasks on two arms, plus one proof per arm
+    assert "6 sessions reserve against the run cap, 2 of them proofs" in err
+    assert "6 x 1.25 = 7.5 USD admits every one launched once" in err
+    assert "a launch tried again reserves its budget again" in err
+
+
+@pytest.mark.parametrize("role", POOL_ROLES)
+def test_a_paired_cap_below_the_smallest_warns_of_refusals_and_names_the_cap(
+    capsys, tmp_path, role
+):
+    err = _paired_stderr(capsys, tmp_path, role, "--max-tasks", "2", "--max-total-usd", "7")
+
+    assert "later launches may then be refused" in err
+    assert "--max-total-usd 7.5 admits them all" in err
+
+
+@pytest.mark.parametrize("role", POOL_ROLES)
+def test_a_paired_cap_that_admits_every_session_draws_no_refusal_warning(capsys, tmp_path, role):
+    err = _paired_stderr(capsys, tmp_path, role, "--max-tasks", "2", "--max-total-usd", "7.5")
+
+    assert "refus" not in err
 
 
 @pytest.mark.parametrize("role", POOL_ROLES)

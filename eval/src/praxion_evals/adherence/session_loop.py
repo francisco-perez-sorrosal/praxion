@@ -558,7 +558,7 @@ def _measure_role(
         if state.stop is not None:
             return state
         state = _record_launch_order(context, state, role, task)
-        for slot, copy_arm in _slots(config, runnable, task):
+        for slot, copy_arm in session_slots(config, runnable, task):
             if state.stop is not None:
                 return state
             build = builds[(copy_arm, tasks.turn_cap_of(task))]
@@ -633,7 +633,9 @@ def planned_order(config: RunConfig, task_id: str) -> tuple[SessionArm, SessionA
     return arm_on(config.axis, first), arm_on(config.axis, second)
 
 
-def _slots(config: RunConfig, runnable: Sequence[Arm], task: TaskSpec) -> list[tuple[Arm, Arm]]:
+def session_slots(
+    config: RunConfig, runnable: Sequence[Arm], task: TaskSpec
+) -> list[tuple[Arm, Arm]]:
     """(the arm a session is recorded under, the arm whose copy it runs), in launch order.
 
     A calibration run records its second run of the full copy in the lean slot, so the

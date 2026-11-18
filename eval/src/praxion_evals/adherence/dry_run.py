@@ -12,7 +12,7 @@ import os
 import sys
 import tempfile
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from praxion_evals.adherence import managed_fixture, tasks
@@ -27,8 +27,38 @@ from praxion_evals.adherence.session_loop import (
     RunConfig,
     ordered_arms,
     session_env,
+    session_slots,
 )
 from praxion_evals.live.session import SandboxPaths, SessionSpec, build_argv
+
+
+@dataclass(frozen=True)
+class PlannedLaunches:
+    """The sessions a run would launch that each reserve their budget against the run cap.
+
+    The proofs are the upper bound: one per arm and role, if every arm builds.
+    """
+
+    task_sessions: int
+    proof_sessions: int
+
+    @property
+    def total(self) -> int:
+        return self.task_sessions + self.proof_sessions
+
+    def smallest_cap(self, budget: float) -> float:
+        """The least cap that admits every session launched once, each costing up to its budget."""
+        return self.total * budget
+
+
+def planned_launches(config: RunConfig, planned: Mapping[Role, list[TaskSpec]]) -> PlannedLaunches:
+    # The paid loop's own slot function, so calibration's two slots per task are counted.
+    task_sessions = sum(
+        len(session_slots(config, config.arms, task))
+        for role_tasks in planned.values()
+        for task in role_tasks
+    )
+    return PlannedLaunches(task_sessions, len(config.arms) * len(planned))
 
 
 def print_dry_run(
@@ -37,6 +67,8 @@ def print_dry_run(
     run_root = Path(tempfile.gettempdir()) / f"{SANDBOX_PREFIX}<run>"
     for role, role_tasks in planned.items():
         print(f"{role}: {len(role_tasks)} tasks (target {config.required_pairs})", file=sys.stderr)
+    _state_smallest_cap(config, planned_launches(config, planned))
+    for role, role_tasks in planned.items():
         for index, task in enumerate(role_tasks):
             for arm in ordered_arms(config.arms, config.seed, task.task_id, config.axis):
                 sandbox = SandboxPaths(run_root / role / f"{index:03d}-{arm}")
@@ -65,6 +97,23 @@ def print_dry_run(
                     line["program_order"] = list(confinement.program_order)
                 print(json.dumps(line))
     return EXIT_COMPLETE
+
+
+def _state_smallest_cap(config: RunConfig, launches: PlannedLaunches) -> None:
+    budget = config.session_budget_usd
+    needed = launches.smallest_cap(budget)
+    print(
+        f"{launches.total} sessions reserve against the run cap, {launches.proof_sessions} of them "
+        f"proofs; session budget {budget:g} USD each; {launches.total} x {budget:g} = {needed:g} "
+        "USD admits every one launched once; a launch tried again reserves its budget again",
+        file=sys.stderr,
+    )
+    if config.run_cap_usd < needed:
+        print(
+            f"--max-total-usd {config.run_cap_usd:g} is below that, so later launches may then be "
+            f"refused; --max-total-usd {needed:g} admits them all",
+            file=sys.stderr,
+        )
 
 
 def _planned_switches(task: TaskSpec) -> Mapping[str, str]:

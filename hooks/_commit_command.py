@@ -22,11 +22,11 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
   show makes any other subcommand `uncertain`: a `-c` value that names a commit (it can
   define an alias, a pager or a tool), any `--config-env` (its value is in the environment),
   or an assignment in the same simple command whose value names one
-  (`GIT_SSH_COMMAND=./commit.sh git fetch`); a built-in that runs a program it is handed
-  (`rebase -x`, `bisect run`, `for-each-repo`, `difftool`, `hook run`, and the transports
-  `fetch`, `pull`, `push`, `clone`, `ls-remote` and `archive` through their pack, exec and
-  ssh options) is `uncertain` when any later word names a commit, whatever spelling of the
-  option carries it; any other built-in is not; anything else (an alias, an unknown option,
+  (`GIT_SSH_COMMAND=./commit.sh git fetch`, also before a shell that runs git); a built-in that runs a program it is handed
+  (`rebase`, `bisect`, `for-each-repo`, `difftool`, `hook`, and the transports `fetch`,
+  `pull`, `push`, `clone`, `ls-remote`, `archive`, `fetch-pack`, `send-pack` and
+  `remote-ext`, whose pack and exec options name a program) is `uncertain` when any later
+  word names a commit, whatever spelling of the option carries it; any other built-in is not; anything else (an alias, an unknown option,
   a word holding `$`, no subcommand at all) is `uncertain`;
 - what no rule above can follow keeps the checkers running: a word that holds a whole
   `git ... commit` script for another program, or, in a simple command with no
@@ -35,9 +35,10 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
   or a script or file named for the act (`./scripts/commit.sh`, `cat commit-notes.md`),
   whose contents the reader cannot see.
 
-Declared limit: the pager `git grep -O` runs is not read (this reader reads `grep` as a
-built-in that runs nothing, and the gate's shell stage answers a plain `git grep` before
-asking it), because `git grep commit` is the read-only search the gate exists to let through.
+Declared limit: the pager `git grep` runs with `-O` or `--open-files-in-pager` is not
+read: `grep` is read as a built-in that runs nothing, because `git grep commit` is the
+read-only search the gate exists to let through (and the gate's shell stage answers a plain
+`git grep` before asking this reader).
 
 Runs on the gate's path as `python -I -S`: `json` and `shlex` only, Python 3.9 syntax.
 """
@@ -111,6 +112,7 @@ GIT_BUILTINS = frozenset(
 GIT_RUNS_A_COMMAND = frozenset(
     {"rebase", "bisect", "for-each-repo", "difftool", "hook"}
     | {"fetch", "pull", "push", "clone", "ls-remote", "archive"}
+    | {"fetch-pack", "send-pack", "remote-ext"}
 )
 
 
@@ -178,7 +180,7 @@ def _simple_verdict(words: Sequence[str], depth: int) -> Verdict:
         _git_verdict(words[index + 1 :]) for index, word in enumerate(words) if _is_git(word)
     ]
     readings = scripts + invocations
-    if invocations and any(_assigns_a_commit(word) for word in words):
+    if (invocations or scripts) and any(_assigns_a_commit(word) for word in words):
         readings.append("uncertain")
     if not scripts and any(_holds_a_commit_script(word) for word in words):
         readings.append("uncertain")

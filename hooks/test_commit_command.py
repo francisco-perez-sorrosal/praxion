@@ -143,6 +143,12 @@ OTHER_ROUTES = {
     "exec-synonym-for-ls-remote": "git ls-remote --exec=./commit.sh .",
     "ssh-command-from-config-env": "CMD=./commit.sh git --config-env=core.sshCommand=CMD fetch ssh://h/x",
     "ssh-command-from-the-environment": "GIT_SSH_COMMAND=./commit.sh git fetch ssh://h/x",
+    "ssh-command-from-the-environment-of-a-shell": (
+        "GIT_SSH_COMMAND=./commit.sh bash -c 'git fetch ssh://h/x'"
+    ),
+    "exec-for-fetch-pack": "git fetch-pack --exec=./commit.sh .",
+    "exec-for-send-pack": "git send-pack --exec=./commit.sh . main",
+    "command-for-remote-ext": 'git remote-ext . "./commit.sh"',
     "commit-named-script-for-git-submodule": "git submodule foreach ./commit.sh",
     "commit-named-filter-for-git-filter-branch": "git filter-branch --tree-filter ./commit.sh HEAD",
     "dashed-git-commit": "git-commit -m x",

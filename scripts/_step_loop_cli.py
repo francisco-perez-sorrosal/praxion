@@ -257,8 +257,6 @@ def location_echo(argv: Sequence[str]) -> tuple[str, ...]:
 def _full_location_option(spelled: str) -> str | None:
     """The location option `spelled` names in full or as the one option it begins; the parser
     refuses a prefix several of its options share, so no call echoes one."""
-    if not spelled.startswith("--") or len(spelled) <= len("--"):
-        return None
     named = [option for option in LOCATION_OPTIONS if option.startswith(spelled)]
     return named[0] if len(named) == 1 else None
 

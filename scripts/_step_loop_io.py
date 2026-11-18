@@ -619,11 +619,22 @@ def run_bounded_check(
 
 
 def check_bound(repo: Path, argv: tuple[str, ...], environ: Mapping[str, str]) -> PocketBound:
-    """The bound a `Check:` command is held to: that of the pocket it names, else the root's."""
-    reading = pocket_bound(repo, check_pocket(argv), environ)
+    """The bound a `Check:` command is held to: that of the pocket it names, as the repository
+    names it, else the root's."""
+    reading = pocket_bound(repo, repository_pocket(repo, check_pocket(argv)), environ)
     for warning in reading.warnings:
         print(f"step-loop: {warning}", file=sys.stderr)
     return reading.bound
+
+
+def repository_pocket(repo: Path, pocket: str) -> str:
+    """`pocket` as the repository names it: an absolute path inside `repo` is made relative to
+    it; any other spelling is kept (a pocket outside the repository holds no entry's node)."""
+    path = Path(pocket)
+    if not path.is_absolute():
+        return pocket
+    resolved, root = path.resolve(), repo.resolve()
+    return str(resolved.relative_to(root)) if resolved.is_relative_to(root) else pocket
 
 
 def check_pocket(argv: tuple[str, ...]) -> str:

@@ -369,17 +369,22 @@ def _plan_step(inputs: LoopInputs, step_id: str) -> PlanStep:
 
 
 def require_known(inputs: LoopInputs, request: str) -> None:
-    """Refuse a request that is neither pending nor recorded, naming the one that is pending."""
+    """Refuse a request that is neither pending nor recorded, naming every one that is pending."""
     pending = sorted(
         a.request for a in inputs.attempts.values() if isinstance(a, OutstandingAttempt)
     )
     if request in pending or any(record.request == request for record in inputs.records):
         return
-    state = f"the pending request is {pending[0]}" if pending else "none is pending"
+    if len(pending) > 1:
+        state = f"the pending requests are {', '.join(pending)}"
+        fix = "record the request whose agent returned"
+    else:
+        state = f"the pending request is {pending[0]}" if pending else "none is pending"
+        fix = "record the pending request"
     raise RecordRefusedError(
         "request-not-pending",
         f"record failed because {request} is neither pending nor recorded ({state})."
-        " To fix: record the pending request, or run next to get one.",
+        f" To fix: {fix}, or run next to get one.",
     )
 
 

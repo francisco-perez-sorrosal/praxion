@@ -7,6 +7,7 @@ the withdrawal and the refusals go through the command, which owns the files the
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -310,6 +311,19 @@ def test_a_return_met_by_several_outstanding_requests_is_refused_naming_each_of_
     assert ("s1-a1-implement" in message, "s2-a1-implement" in message) == (True, True), message
     assert ("run status" in message, "remove request=" in message) == (False, True), message
     assert wip_text(root) == before
+
+
+def test_an_unknown_request_while_several_are_outstanding_is_refused_naming_each_of_them(
+    tmp_path,
+):
+    root = build(tmp_path, plan(1, 2), several("count=1 request=s2-a1-implement"))
+
+    reply = withdraw(root, "s9-a1-implement")
+
+    message = reply.doc["error"]["message"]
+    named = re.findall(r"(?<![\w-])s\d+-a\d+-implement(?![\w-])", message)
+    assert reply.doc["error"]["code"] == "request-not-pending"
+    assert sorted(set(named)) == ["s1-a1-implement", "s2-a1-implement", "s9-a1-implement"], message
 
 
 def test_the_withdrawn_envelope_prints_the_next_call_and_exits_zero():

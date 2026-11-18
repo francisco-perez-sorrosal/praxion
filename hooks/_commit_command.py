@@ -89,10 +89,11 @@ GIT_BUILTINS = frozenset(
     upload-archive--writer upload-pack url-parse var verify-commit verify-pack verify-tag
     version whatchanged worktree write-tree""".split()
 )
-# Built-ins that run a command the caller hands them (`rebase -x`, `bisect run`, `submodule
-# foreach`, a `filter-branch` filter): what that command does cannot be read from here, so one
-# that names a commit keeps the checkers running.
-GIT_RUNS_A_COMMAND = frozenset({"rebase", "bisect", "submodule", "filter-branch"})
+# Built-ins that run a command the caller hands them (`rebase -x`, `bisect run`, a git command
+# `for-each-repo` runs in each repository, a `difftool -x` tool): what that command does cannot
+# be read from here, so one that names a commit keeps the checkers running. `submodule foreach`
+# and `filter-branch` are not built-ins, so they read `uncertain` before this set is asked.
+GIT_RUNS_A_COMMAND = frozenset({"rebase", "bisect", "for-each-repo", "difftool"})
 
 
 def main() -> int:

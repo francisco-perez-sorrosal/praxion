@@ -26,6 +26,8 @@ pytest discovers tests by scanning for `test_*.py` / `*_test.py` files, collecti
 
 **Exit codes**: 0 = passed, 1 = failed, 2 = interrupted, 3 = internal error, 4 = usage error, 5 = no tests collected.
 
+**Background runs**: never start a test run as a shell background job (a trailing `&`): a non-interactive shell starts it with SIGINT ignored and the run inherits that, so a timeout's interrupt or a Ctrl-C cannot stop it. Use the harness's own background run (the Bash tool's `run_in_background`) and read its output when it ends.
+
 ## Fixture Architecture
 
 ### Scope Hierarchy

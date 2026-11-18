@@ -47,6 +47,11 @@ A canary can be vacuous: green for a reason other than the defect it names. Befo
 
 **Measure the thing, not a proxy.** A canary and its break must act on the quantity the gate actually judges. A gate that bounds UTF-8 bytes is not exercised by an input sized in characters; `head` output read as a count is not a count. After breaking the gate, assert that the probe mutated something (the replace matched once, the hash changed) before trusting a red or green: a probe that silently did nothing proves nothing.
 
+## Oracles that match text
+
+- **An id matched as a substring passes for the wrong reasons.** `id in line` is true when the id sits elsewhere on the line (a path, a message) or is a prefix of a wrong one (`id-1` inside `id-12`). Match the whole word, in the field that should carry it and away from anything else that carries it, and run the mutation against the sharpened oracle: the canary that proved the loose oracle bites says nothing about the new one.
+- **Before narrowing a match to an exact reader, list what the old match caught by accident.** A loose match also catches shapes nobody designed for (a renamed field, a quoted form, a continuation line). Write that list from the old matcher's output over the real tree, decide each class on purpose (keep, drop, or refuse loudly), and give each kept class a canary of its own.
+
 ## How coverage is enforced
 
 A fitness meta-test globs the gate set (`scripts/check_*.py`, `scripts/validate_*.py`, `fitness/tests/test_*.py`, `hooks/*_gate.py`, `hooks/*_guard.py`) and asserts each gate has a sibling test with at least one negative-case-named test. A new gate without a canary fails the suite — the meta-test is itself a gate, so it ships with its own canary (a fixture gate lacking a negative-case test, which the meta-test must flag).

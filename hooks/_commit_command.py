@@ -18,7 +18,12 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
 - a shell (`bash`, `sh`, `zsh`, `dash`, `ksh`, by basename, in any position) given `-c`
   is its script's verdict, read the same way, to a depth of two shells;
 - every word that is `git` or ends `/git` starts an invocation: its global options are
-  skipped, then `commit` is a commit, a built-in is not, anything else (an alias, an
+  skipped, then `commit` is a commit; a `-c` or `--config-env` value that names a commit
+  (it can define an alias, a pager or a tool) makes any other subcommand `uncertain`; a
+  built-in that runs a command the caller hands it (`rebase -x`, `bisect run`,
+  `for-each-repo`, `difftool`, `hook run`) is `uncertain` when a later word names a commit,
+  as is one given a command through an option (`--upload-pack`, `--receive-pack`, `--exec`,
+  `clone -u`) whose value names one; any other built-in is not; anything else (an alias, an
   unknown option, a word holding `$`, no subcommand at all) is `uncertain`;
 - what no rule above can follow keeps the checkers running: a word that holds a whole
   `git ... commit` script for another program, or, in a simple command with no
@@ -26,6 +31,9 @@ verdict is the strongest of its simple commands' (`commit` over `uncertain` over
   (`make commit`, `$GIT commit`, `xargs git` fed the word), a dashed `git-commit -m x`,
   or a script or file named for the act (`./scripts/commit.sh`, `cat commit-notes.md`),
   whose contents the reader cannot see.
+
+Declared limit: the gate's shell stage answers a plain `git grep` before this reader is
+asked, so a pager `grep -O` runs is not read.
 
 Runs on the gate's path as `python -I -S`: `json` and `shlex` only, Python 3.9 syntax.
 """
@@ -90,10 +98,23 @@ GIT_BUILTINS = frozenset(
     version whatchanged worktree write-tree""".split()
 )
 # Built-ins that run a command the caller hands them (`rebase -x`, `bisect run`, a git command
-# `for-each-repo` runs in each repository, a `difftool -x` tool): what that command does cannot
-# be read from here, so one that names a commit keeps the checkers running. `submodule foreach`
-# and `filter-branch` are not built-ins, so they read `uncertain` before this set is asked.
-GIT_RUNS_A_COMMAND = frozenset({"rebase", "bisect", "for-each-repo", "difftool"})
+# `for-each-repo` runs in each repository, a `difftool -x` tool, the hooks `hook run` names):
+# what that command does cannot be read from here, so one that names a commit keeps the checkers
+# running. `submodule foreach` and `filter-branch` are not built-ins, so they read `uncertain`
+# before this set is asked.
+GIT_RUNS_A_COMMAND = frozenset({"rebase", "bisect", "for-each-repo", "difftool", "hook"})
+# Built-ins whose other words are often branch names or patterns, where only the value of an
+# option that names a program to run can start a commit; only that value is read.
+GIT_COMMAND_OPTIONS = {
+    "fetch": ("--upload-pack",),
+    "pull": ("--upload-pack",),
+    "ls-remote": ("--upload-pack",),
+    "clone": ("--upload-pack", "-u"),
+    "push": ("--receive-pack", "--exec"),
+    "archive": ("--exec",),
+}
+# Global options whose value is configuration, which can define what a later word runs.
+GIT_CONFIG_OPTIONS = frozenset({"-c", "--config-env"})
 
 
 def main() -> int:
@@ -189,22 +210,46 @@ def _shell_verdict(args: Sequence[str], depth: int) -> Verdict | None:
 def _git_verdict(args: Sequence[str]) -> Verdict:
     """The verdict on one git invocation, given the words that follow the `git` word."""
     index = 0
+    configured_a_commit = False
     while index < len(args) and args[index].startswith("-"):
         option = args[index]
+        name, equals, joined = option.partition("=")
         if option in GIT_FLAGS:
             index += 1
-        elif option.split("=", 1)[0] in GIT_VALUE_OPTIONS:
-            index += 1 if "=" in option else 2
+        elif name in GIT_VALUE_OPTIONS:
+            value = joined if equals else (args[index + 1] if index + 1 < len(args) else "")
+            configured_a_commit = configured_a_commit or (
+                name in GIT_CONFIG_OPTIONS and "commit" in value
+            )
+            index += 1 if equals else 2
         else:
             return "uncertain"
     if index >= len(args):
         return "uncertain"
-    subcommand = args[index]
+    subcommand, rest = args[index], args[index + 1 :]
     if subcommand == "commit":
         return "commit"
-    if subcommand in GIT_RUNS_A_COMMAND and any("commit" in word for word in args[index + 1 :]):
+    if configured_a_commit:
+        return "uncertain"
+    if subcommand in GIT_RUNS_A_COMMAND and any("commit" in word for word in rest):
+        return "uncertain"
+    if any(
+        "commit" in value for value in _option_values(rest, GIT_COMMAND_OPTIONS.get(subcommand, ()))
+    ):
         return "uncertain"
     return "not-a-commit" if subcommand in GIT_BUILTINS else "uncertain"
+
+
+def _option_values(words: Sequence[str], options: Sequence[str]) -> list[str]:
+    """The values `words` give `options`: `--opt=v`, `--opt v`, and a short option's `-ov`."""
+    values = []
+    for position, word in enumerate(words):
+        for option in options:
+            if word == option:
+                values.append(words[position + 1] if position + 1 < len(words) else "")
+            elif word.startswith(option + "=") or (len(option) == 2 and word.startswith(option)):
+                values.append(word[len(option) :].removeprefix("="))
+    return values
 
 
 def _strongest(verdicts: Sequence[Verdict]) -> Verdict:

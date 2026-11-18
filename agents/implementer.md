@@ -7,7 +7,7 @@ description: >
   when an IMPLEMENTATION_PLAN.md has steps ready to execute, or when the
   implementation-planner delegates a step.
 tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch
-skills: [software-planning, code-review]
+skills: [software-planning, praxion:code-review]
 background: true
 model: sonnet
 effort: high

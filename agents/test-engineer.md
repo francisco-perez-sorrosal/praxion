@@ -8,7 +8,7 @@ description: >
   testing infrastructure. Operates at the implementer's pipeline level, receiving
   steps from the implementation-planner. In `Mode: acceptance-design` it designs outer-loop tests from the spec alone.
 tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch
-skills: [software-planning, code-review]
+skills: [software-planning, praxion:code-review]
 background: true
 model: sonnet
 effort: high

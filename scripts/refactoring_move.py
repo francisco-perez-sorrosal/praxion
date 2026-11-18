@@ -107,8 +107,8 @@ SITES: tuple[Site, ...] = tuple(
         Site(
             definition,
             "skills list",
-            "skills: [software-planning, code-review, refactoring]",
-            "skills: [software-planning, code-review]",
+            "skills: [software-planning, praxion:code-review, refactoring]",
+            "skills: [software-planning, praxion:code-review]",
         ),
         Site(
             definition,

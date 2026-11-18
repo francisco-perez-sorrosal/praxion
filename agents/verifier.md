@@ -10,7 +10,7 @@ model: opus
 effort: xhigh
 tools: Read, Glob, Grep, Bash, Write
 disallowedTools: Edit
-skills: [code-review, context-security-review]
+skills: [praxion:code-review, context-security-review]
 background: true
 memory: user
 maxTurns: 80

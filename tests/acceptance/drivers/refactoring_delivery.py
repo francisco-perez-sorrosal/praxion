@@ -60,7 +60,6 @@ import yaml
 from tests.acceptance.drivers.kernel_sandbox import isolated_env
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-FIXTURES = REPO_ROOT / "tests" / "acceptance" / "fixtures" / "refactoring_delivery"
 
 MARKER = "[Phase: Refactoring]"
 ROLES = ("implementer", "test-engineer")
@@ -207,12 +206,6 @@ def with_preload(installation: Installation, role: str) -> None:
     skills = preloaded_skills(installation.root, role)
     if SKILL_NAME not in skills:
         _set_preloads(installation, role, (*skills, SKILL_NAME))
-
-
-def base_preloads() -> dict[str, tuple[str, ...]]:
-    """Each role's preloaded skills at the base commit, frozen in a fixture."""
-    data = json.loads((FIXTURES / "base_preloads.json").read_text(encoding="utf-8"))
-    return {role: tuple(skills) for role, skills in data["preloaded_skills"].items()}
 
 
 def project_checkout(path: Path, *, managed: bool = True) -> Path:

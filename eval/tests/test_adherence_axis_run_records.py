@@ -224,7 +224,7 @@ def test_the_slots_of_the_new_axis_run_its_arms_in_the_planned_order():
     config = cli.parse_config(["--role", ROLE, *PAIRED_OPTIONS])
     task = SimpleNamespace(task_id="t1")
 
-    slots = session_loop._slots(config, list(PAIRED_ARMS), task)  # type: ignore[arg-type]
+    slots = session_loop.session_slots(config, list(PAIRED_ARMS), task)  # type: ignore[arg-type]
 
     assert [slot for slot, _ in slots] == list(session_loop.planned_order(config, "t1"))
     assert all(slot == copy for slot, copy in slots)

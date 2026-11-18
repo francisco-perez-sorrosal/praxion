@@ -376,8 +376,8 @@ def require_known(inputs: LoopInputs, request: str) -> None:
     if request in pending or any(record.request == request for record in inputs.records):
         return
     if len(pending) > 1:
-        # Several outstanding lines stop every call, so the recovery is the one the
-        # several-outstanding refusal gives, not a record or a next.
+        # With several outstanding lines a record and a next are refused until WIP.md holds
+        # one, so the recovery is the one the several-outstanding refusal gives.
         raise RecordRefusedError(
             "request-not-pending",
             f"record failed because {request} is neither pending nor recorded (the pending"

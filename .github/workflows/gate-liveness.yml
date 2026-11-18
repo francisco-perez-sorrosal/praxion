@@ -21,13 +21,17 @@
 # reading it was sized from:
 #   # sized: measured=<date> commit=<12 hex> where=<local|runner> step=<s>s
 #   #        scale=<factor> setup=<s>s fixed=<s>s margin=1.5 limit=<n>min
-# (one physical line in practice). The limit is 1.5 times the measured step
-# (scaled to the runner) plus setup, plus any fixed allowance, rounded up to
-# whole minutes, and at most 240. A run in which a job used more than 80
-# percent of its limit re-sizes that limit from that run's own readings; a job
-# whose limit would pass 240 minutes is split. Until the measurement step the
-# line reads `pending`, which `tests/test_gate_liveness_workflow_invariants.py`
-# refuses, so a placeholder cannot survive to merge.
+# (one physical line in practice; the audit job's line adds `bound=<s>s`, the
+# bound declared in pyproject.toml). The limit is
+#   max(10, ceil((1.5 x (step x scale + setup) + fixed) / 60))
+# minutes: the margin covers the scaled step and the runner's setup, `fixed` is
+# an unmeasured allowance added unmargined, and no limit is under 10 minutes
+# since the runner's own setup varies by minutes. No limit passes 240; a job
+# whose limit would is split. A run in which a job used more than 80 percent of
+# its limit re-sizes that limit from that run's own readings. Until the
+# measurement step the line reads `pending`, which
+# `tests/test_gate_liveness_workflow_invariants.py` refuses, so a placeholder
+# cannot survive to merge.
 #
 # No workflow watches this one: `ci-autofix.yml` watches exactly Test,
 # Architecture and Test (scheduled). A red liveness run says a gate no longer

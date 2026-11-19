@@ -91,7 +91,7 @@ Verify: `uv run pytest tests/acceptance/test_stopped_run_is_continued_or_closed.
 
 Every new run declares the allowance method `own-discordance-exact` before its first launch. A mechanical check regresses when `fails_lean - fails_full` exceeds its allowance, the exact one-sided quantile, at the declared confidence, of the net discordance at that check's own count of discordant pairs `d` (zero at `d = 0`, the count itself up to 4, then for example 3 at 5, 6 at 10, 8 at 20). Each role and check has its own allowance. No calibration file is an allowance source: `--calibration-run FILE` is accepted for old command lines and writes one stderr line saying it sets none, and `--calibration` is a diagnostic of the slot order that sizes nothing.
 
-The two arms of each task launch in an order drawn from the run's seed for that task, recorded with the task and kept by a continuation. `--dry-run` prints each task's arms in that order, and the same seed gives the same order. It lists the task sessions only, not the arm proofs; a run with one unproven arm goes on with the other arm alone.
+The two arms of each task launch in an order drawn from the run's seed for that task, recorded with the task and kept by a continuation. `--dry-run` prints each task's arms in that order, and the same seed gives the same order. Its session lines are the task sessions only, not the arm proofs; a run with one unproven arm goes on with the other arm alone. Beside the task counts it states what the run cap must admit: the sessions that reserve against it (the proofs counted and named apart, one per arm and role, the most a run launches if every arm builds), the session budget, their product, and a warning naming the smallest cap that admits every one launched once when `--max-total-usd` is below it.
 
 The report states, inside each mechanical check's block, the discordance and the allowance in pairs and in percentage points beside the declared margin. The coverage statement follows from it:
 
@@ -114,6 +114,8 @@ The commit gate does not import the eval. It reads `.ai-state/eval_ledger/adhere
 ```bash
 cd eval && uv run praxion-evals-adherence .. --reindex   # rebuild from the results files alone; launches nothing
 ```
+
+A paired run of the `refactoring-delivery` axis keeps its results and its own index in `.ai-state/eval_ledger/adherence/refactoring-delivery/` by default, so the directory the gate reads holds only files its reader parses. Rebuild that index with `--reindex --axis refactoring-delivery`; `--close` and `--continue` find a run in either axis's directory.
 
 The index is schema 2. Each entry holds a results file's name and sha256, its lineage root and ending, and per role the complete pairs, the flip label (lineage-level for a continued run, `not clear` for a closed one) and `scored_checks`, the checks that verdict scored. The gate reads it as a locator and a list of digests, not as evidence (see [What the gate derives, cross-checks and trusts](#what-the-gate-derives-cross-checks-and-trusts)). JSON files that are not results files are named apart. A gate that meets an index of another schema refuses it with a `--reindex` hint. Rebuild with `--reindex` and commit the regenerated `index.json` in the same commit as any change to its writer (`eval/src/praxion_evals/adherence/run_index.py`) and with the results files it lists; `--reindex` over a clean tree leaves it byte-identical.
 

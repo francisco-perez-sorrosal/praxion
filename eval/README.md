@@ -108,8 +108,9 @@ Before the first paid run of a new entry or kit, build its arms once on the real
 | Option | Meaning |
 |--------|---------|
 | `--role ROLE` | Repeatable; one of the 17 roles |
+| `--axis AXIS` | What the run compares: `inherited-context` (default; `full` against `lean`) or `refactoring-delivery` (`preloaded` against `delivered`; a paired run of it cannot be continued or calibrated) |
 | `--arm {full,lean}` | Repeatable; default both. A paired verdict needs both arms in one run |
-| `--output FILE` | Default `.ai-state/eval_ledger/adherence/<run-id>.json` under the repository root |
+| `--output FILE` | Default `.ai-state/eval_ledger/adherence/<run-id>.json` under the repository root; a paired run of the `refactoring-delivery` axis defaults to `.ai-state/eval_ledger/adherence/refactoring-delivery/<run-id>.json`, and `--close` and `--continue` find a run in either directory |
 | `--overwrite` | Replace an existing results file; without it the run refuses at start, before any session launches |
 | `--seed N` | Task-list seed (default 7); the same seed reproduces the same tasks |
 | `--max-total-usd`, `--session-budget-usd` | Run-level cap (default 50) and per-session budget (default 3) |
@@ -119,7 +120,7 @@ Before the first paid run of a new entry or kit, build its arms once on the real
 | `--stop-count N`, `--tail-chars N` | Stop the run after `N` identical infrastructure failures of one arm in a row (default 3, at least 3), and keep the last `N` characters of an errored session's output per stream as its evidence (default 2000). Declared in the results file before the first launch |
 | `--continue RUN` | Launch again the unfinished tasks of a stopped run, as it declared them. Only `--max-total-usd`, `--session-budget-usd`, `--keep-sandbox`, `--session-oauth-token-file` and `--output` may accompany it; refused before any launch, naming every reason, when the run is not continuable or the tree, model, seed, tasks or a declaration differ |
 | `--close RUN`, `--reason TEXT` | Give up on a stopped run, saying why (a reason is required). The run stays listed as a not-clear draw |
-| `--reindex` | Rebuild `.ai-state/eval_ledger/adherence/index.json` from the results files; launches nothing |
+| `--reindex` | Rebuild `.ai-state/eval_ledger/adherence/index.json` from the results files; launches nothing. `--reindex --axis refactoring-delivery` rebuilds the index of `.ai-state/eval_ledger/adherence/refactoring-delivery/` |
 | `--session-oauth-token-file FILE` | Bill the sessions to the subscription behind a `claude setup-token` file; the judge keeps the API key |
 | `--calibration` | Run the `full` arm against itself, a diagnostic of the slot order. It sets no allowance; mutually exclusive with `--calibration-run` |
 | `--calibration-run FILE` | Accepted for old command lines. It sets no allowance and writes one stderr line saying so: each run sizes its mechanical allowances from its own discordant pairs |
@@ -129,7 +130,7 @@ Before the first paid run of a new entry or kit, build its arms once on the real
 | `--keep-sandbox` | Keep each session's sandbox for inspection |
 | `--fixture-pages-base-url URL` | Directory URL that serves the C6 fixture page; without it C6 is withheld |
 | `--report FILE` | Render a results file as text; launch nothing |
-| `--dry-run` | Print the planned sessions; start none |
+| `--dry-run` | Print the planned sessions; start none. It also states the sessions that reserve against the run cap (proofs named apart), the session budget, the smallest cap that admits every one launched once, and a warning naming that cap when `--max-total-usd` is lower |
 
 Exit codes: 0 the run completed; 1 it is incomplete (a refused launch, an arm that could not be built or proven, an errored session; the results are still written); 2 usage error.
 

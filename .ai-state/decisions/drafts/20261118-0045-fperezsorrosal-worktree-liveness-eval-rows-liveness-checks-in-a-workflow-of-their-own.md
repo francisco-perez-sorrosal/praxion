@@ -4,7 +4,7 @@ title: The gate-liveness checks run in a workflow of their own, one job per kind
 status: proposed
 category: architectural
 date: 2026-11-18
-summary: "The liveness checks move from test-scheduled.yml to a new .github/workflows/gate-liveness.yml (name Gate liveness) with four independent jobs: the three fast probes, the selection audit, the quick scenarios (tests/acceptance) and the whole-suite scenarios (tests/e2e). The audit holds its traced suite to a bound of its own, [tool.praxion.gate-liveness] selection-audit-timeout-seconds in pyproject.toml, no longer the step loop's gate-timeout-seconds. Each job limit carries a machine-checked '# sized:' line (1.5 x the scaled reading, rounded up, at most 240 min; above that the job splits). A plugin records each scenario's duration and free disk space. The workflow is not on the autofix watch list."
+summary: "The liveness checks move from test-scheduled.yml to a new .github/workflows/gate-liveness.yml (name Gate liveness) with five independent jobs: the three fast probes, the selection audit, the quick scenarios (tests/acceptance) and the whole-suite scenarios (tests/e2e) split in two. The audit holds its traced suite to a bound of its own, [tool.praxion.gate-liveness] selection-audit-timeout-seconds in pyproject.toml, no longer the step loop's gate-timeout-seconds. Each job limit carries a machine-checked '# sized:' line (1.5 x the scaled reading, rounded up, never under 10 min, at most 240 min; above that the job splits). A plugin records each scenario's duration and free disk space. The workflow is not on the autofix watch list."
 tags: [gate-liveness, scheduled-ci, selection-audit, time-limits, canary, workflow]
 made_by: agent
 agent_type: systems-architect
@@ -38,17 +38,18 @@ The `gate-liveness` job also ended at its 20-minute step limit with no verdict. 
 ## Decision
 
 - **Host.** A new workflow file, `.github/workflows/gate-liveness.yml`, named `Gate liveness`. It is triggered weekly by cron and by `workflow_dispatch`. The workflow and every job hold exactly `contents: read`, reach no secret and start no assistant session.
-- **Four jobs, none waiting for another:**
+- **Five jobs, none waiting for another** (one per kind of check; the whole-suite scenarios are split in two by the 240-minute rule below):
   - `fast-probes`: `--gate mutation-sensor --gate observation-hooks --gate spawn-count`;
   - `selection-audit`: `--gate selection-audit`, with no `continue-on-error`;
   - `scenarios-quick`: `pytest -m liveness tests/acceptance`;
-  - `scenarios-whole-suite`: `pytest -m liveness tests/e2e`.
+  - `scenarios-whole-suite-first` and `scenarios-whole-suite-second`: `pytest -m liveness tests/e2e`, split by node id in collection order, each deselecting the other's nodes. Each starts by removing the runner's unused toolchains, since each scenario clones the checkout and the measured peak disk use (about 28 GiB locally) is past the runner's free space.
 
   `test-scheduled.yml` keeps exactly its four health jobs, so a week its health jobs pass is a green run again.
 - **The audit's own bound.** It is declared once, as `[tool.praxion.gate-liveness] selection-audit-timeout-seconds` in `pyproject.toml`. Three readers take it from there: `scripts/gate_probes/suite_bound.py`, the selection probe (which no longer reads `_step_loop_pocket_runs`), the CLI's limit for the probe (360 s plus the bound), and the whole-suite scenarios' driver. An undeclared bound fails the audit, naming the key; there is no fallback to the step loop's bound. `gate-timeout-seconds` stays 1500.
 - **Limits.** One `# sized:` line beside each job-level `timeout-minutes`:
   `measured=`, `commit=`, `where=local|runner`, `step=`, `scale=`, `setup=`, `fixed=`, `margin=1.5`, `limit=` (and `bound=` for the audit job).
-  - The limit is `ceil((1.5 × (step × scale + setup) + fixed) / 60)` minutes, at most 240.
+  - The limit is `max(10, ceil((1.5 × (step × scale + setup) + fixed) / 60))` minutes, at most 240; the 10-minute floor covers the runner's own setup variance.
+  - Sized from readings of 2026-11-19 on `ea85b08d52ea`, scaled 1.53 to the runner: `fast-probes` 10 (the floor), `selection-audit` 69 with a bound of 3540 s, `scenarios-quick` 47, the whole-suite jobs 198 and 138.
   - A job that would exceed 240 minutes is split by node id.
   - A scenarios step's own limit is two minutes under its job's.
   - For the audit job, `limit × 60 ≥ bound + 360 + setup`.
@@ -62,7 +63,7 @@ The `gate-liveness` job also ended at its 20-minute step limit with no verdict. 
 ### Option 1: a dedicated workflow, one job per kind of check (chosen)
 
 - **Pro:** a slow audit can never again cost the fast probes or the quick canaries their verdicts. The health workflow's green no longer depends on liveness. Each job is sized from its own reading.
-- **Con:** four runner setups, and a fourth workflow invariant to keep.
+- **Con:** five runner setups, and a fourth workflow invariant to keep.
 
 ### Option 2: keep both jobs in `test-scheduled.yml` with larger limits
 
@@ -87,7 +88,8 @@ The `gate-liveness` job also ended at its 20-minute step limit with no verdict. 
 
 - The audit job and two whole-suite scenarios are red every week until td-500 is answered. This is reported, not hidden.
 - Limits must be re-sized as the suite grows. The 80-percent trigger makes that a weekly-visible, one-line change.
-- The fast-probe job's rule-sized limit is about two minutes, which runner setup variance can approach.
+- The fast-probe job's scaled reading is under a minute, so its limit is the 10-minute floor, generous for a job that runs in seconds.
+- Placing a new whole-suite scenario takes a workflow edit: until it is placed in one job and the limits re-sized, it runs in both.
 - A second `[tool.praxion.*]` table in the root project file.
 
 ## Disconfirmation

@@ -11,8 +11,8 @@
 #   selection-audit       the fourth probe, the selection audit, which runs the
 #                         traced default suite and so needs a limit of its own
 #   scenarios-quick       the `liveness`-marked scenarios under tests/acceptance
-#   scenarios-whole-suite the `liveness`-marked scenarios under tests/e2e, each
-#                         of which runs the whole traced suite, except the two
+#   scenarios-whole-suite the `liveness`-marked scenarios under tests/e2e, most
+#                         of which run the whole traced suite, except the two
 #                         that need the audit to pass
 #   scenarios-whole-suite-audit-gated
 #                         those two, apart, so their red hides no other

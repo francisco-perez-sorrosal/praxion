@@ -43,7 +43,8 @@ READ_ONLY_GRANT = {"contents": "read"}
 PYTEST_OPTIONS_WITH_A_VALUE = frozenset({"-m", "-n", "-p", "-k", "-c", "-o"})
 
 SHA_PIN = re.compile(r"@[0-9a-f]{40}$")
-# minute hour day-of-month month day-of-week, with one named weekday: once a week.
+# minute hour day-of-month month day-of-week, one day of the week by number (0-7) or
+# three-letter name: once a week.
 WEEKLY_CRON = re.compile(r"^\d{1,2} \d{1,2} \* \* (?:[0-7]|[A-Za-z]{3})$")
 PYTEST_LINE = re.compile(r"\bpytest\b")
 SHELL_OPERATOR = re.compile(r"&&|\|\||;|\|")
@@ -95,8 +96,9 @@ def test_the_workflow_runs_weekly_on_a_cron_schedule() -> None:
     # PyYAML reads the bare `on:` key as boolean True.
     schedule = _workflow()[True].get("schedule") or []
     crons = [str(entry.get("cron", "")).strip() for entry in schedule]
-    assert crons, "the workflow needs a weekly cron schedule"
-    assert all(WEEKLY_CRON.match(cron) for cron in crons), f"not a weekly cron schedule: {crons}"
+    # Two weekly crons are a twice-weekly schedule, which is not weekly either.
+    assert len(crons) == 1, f"the workflow needs exactly one weekly cron schedule: {crons}"
+    assert WEEKLY_CRON.match(crons[0]), f"not a weekly cron schedule: {crons[0]}"
 
 
 def test_the_workflow_can_be_dispatched_by_hand() -> None:

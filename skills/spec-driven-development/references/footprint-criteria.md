@@ -50,6 +50,7 @@ The two tables as the architect writes them, with placeholder footprints. A test
 ## Reading a result
 
 - A reading the instrument labels `estimate` is not `measured`. Baseline and final must carry the same kind, or the pair is `incomparable`; copy the instrument's own label into `Reading`.
+- `Reading` holds that label and nothing else; a description of the reading goes in `Value`. A row with prose in `Reading` is a `bad-reading` FAIL for good, since rows are never edited: a later well-formed row is authoritative but cannot clear it (observed 2026-11-19, six such rows). Run the check right after writing a row.
 - A breach whose diff touches none of the footprint's paths is still a FAIL; say so in the finding so the user can decide whether to re-baseline.
 - A final row goes stale (`stale-final`) when a later commit touches a measured path. Take the final rows last, at the head you ask to merge: after every fix (a fix for a verifier's finding included), and then run the checker, so it reads the head that was measured.
 - A baseline is a reading of the base tree. After the branch takes the default branch in, the change is `<default-branch>..HEAD`: read the baselines on the main checkout at the base commit, and run the verify stage with `--base-ref <default-branch>`. A baseline re-taken on the branch after its own commits reads `late-baseline`.

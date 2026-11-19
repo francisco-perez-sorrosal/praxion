@@ -263,7 +263,8 @@ def _parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         help=f"default: <repo>/{OUTPUT_DIR}/<run-id>.json; a run of the refactoring-delivery axis"
-        f" defaults to <repo>/{OUTPUT_DIR}/refactoring-delivery/<run-id>.json",
+        f" defaults to <repo>/{OUTPUT_DIR}/{axis_run('refactoring-delivery').results_subdir}"
+        "/<run-id>.json",
     )
     add("--seed", type=int, default=DEFAULT_SEED)
     add(

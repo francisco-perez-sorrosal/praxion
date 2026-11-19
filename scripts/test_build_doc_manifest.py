@@ -463,3 +463,33 @@ def test_missing_pyyaml_message_names_the_consequence() -> None:
     stderr = _run_without_yaml().stderr
     assert "doc_manifest.yaml" in stderr
     assert "F11" in stderr, "must point at the check that catches the drift"
+
+
+def test_a_linked_worktree_names_the_project_not_the_worktree(tmp_path: Path) -> None:
+    """A pipeline refreshes the manifest inside its worktree, whose directory is named
+    for the pipeline; the committed manifest must still name the project (seen
+    2026-11-19: a refresh in a worktree wrote the pipeline's slug as `project_name`)."""
+    main = tmp_path / "proj"
+    (main / "docs").mkdir(parents=True)
+    (main / "docs" / "guide.md").write_text("# Guide\n", encoding="utf-8")
+    _git(main, "init", "-q")
+    _git(main, "add", "docs/guide.md")
+    _git(main, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "init")
+    worktree = main / ".claude" / "worktrees" / "some-pipeline"
+    _git(main, "worktree", "add", "-q", str(worktree))
+
+    manifest = bdm.build_manifest(worktree)
+
+    assert (manifest["project_name"], manifest["project_slug"]) == ("proj", "proj")
+
+
+def test_a_directory_outside_git_is_named_by_its_own_name(tmp_path: Path) -> None:
+    root = tmp_path / "Plain Project"
+    root.mkdir()
+
+    manifest = bdm.build_manifest(root)
+
+    assert (manifest["project_name"], manifest["project_slug"]) == (
+        "Plain Project",
+        "plain-project",
+    )

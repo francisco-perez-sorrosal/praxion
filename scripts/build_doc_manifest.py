@@ -540,6 +540,15 @@ def _strip_volatile_fields(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _project_name(root: Path) -> str:
+    """The main checkout's directory name, so a refresh inside a linked worktree
+    (named for its pipeline) still names the project; the root's own name outside git."""
+    common_dir = git_output(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if common_dir is not None and Path(common_dir).name == ".git":
+        return Path(common_dir).parent.name
+    return root.name
+
+
 def build_manifest(root: Path) -> dict[str, Any]:
     surfaces: list[dict[str, Any]] = []
 
@@ -610,7 +619,7 @@ def build_manifest(root: Path) -> dict[str, Any]:
     _resolve_referenced_paths_to_ids(surfaces)
 
     # Build manifest envelope
-    project_name = root.name
+    project_name = _project_name(root)
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "generator_version": GENERATOR_VERSION,

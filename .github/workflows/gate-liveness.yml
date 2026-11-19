@@ -35,10 +35,9 @@
 # whose limit would is split. A run in which a job used more than 80 percent of
 # its limit re-sizes that limit from that run's own readings. A line that reads
 # `pending` is refused by `tests/test_gate_liveness_workflow_invariants.py`, so a
-# placeholder cannot survive to merge. The readings, each taken locally and
-# scaled to the runner by the root suite's ratio, are in the measurement log of
-# the pipeline that sized them; the first run on GitHub is the reading these
-# limits answer to.
+# placeholder cannot survive to merge. Each reading, taken locally and scaled to
+# the runner by the root suite's ratio, is on its job's `# sized:` line; the
+# first run on GitHub is the reading these limits answer to.
 #
 # No workflow watches this one: `ci-autofix.yml` watches exactly Test,
 # Architecture and Test (scheduled). A red liveness run says a gate no longer
@@ -182,7 +181,8 @@ jobs:
         run: >-
           .venv/bin/python -m pytest -m liveness tests/e2e -n 0 --no-cov -p no:cacheprovider
           -p scripts.liveness_scenario_record --liveness-record=tmp/liveness-scenarios.jsonl
-          --deselect=tests/e2e/test_gate_liveness_run.py::test_a_dead_gate_fails_its_own_check_while_the_other_three_still_run_and_pass --deselect=tests/e2e/test_selection_audit_job_reports_its_red.py::test_a_failing_audit_job_logs_what_it_expected_what_it_observed_and_each_unselected_read
+          --deselect=tests/e2e/test_gate_liveness_run.py::test_a_dead_gate_fails_its_own_check_while_the_other_three_still_run_and_pass
+          --deselect=tests/e2e/test_selection_audit_job_reports_its_red.py::test_a_failing_audit_job_logs_what_it_expected_what_it_observed_and_each_unselected_read
 
       - name: Report each scenario's duration and the free disk
         if: always()
@@ -226,7 +226,10 @@ jobs:
         run: >-
           .venv/bin/python -m pytest -m liveness tests/e2e -n 0 --no-cov -p no:cacheprovider
           -p scripts.liveness_scenario_record --liveness-record=tmp/liveness-scenarios.jsonl
-          --deselect=tests/e2e/test_gate_liveness_run.py::test_every_liveness_check_passes_on_this_change_and_leaves_no_trace --deselect=tests/e2e/test_gate_liveness_run.py::test_audit_fails_on_unanticipated_reads_and_repeats_its_findings_exactly --deselect=tests/e2e/test_gate_liveness_run.py::test_resolver_that_selects_nothing_fails_the_audit --deselect=tests/e2e/test_gate_liveness_run.py::test_missing_resolver_fails_the_audit_and_says_why
+          --deselect=tests/e2e/test_gate_liveness_run.py::test_every_liveness_check_passes_on_this_change_and_leaves_no_trace
+          --deselect=tests/e2e/test_gate_liveness_run.py::test_audit_fails_on_unanticipated_reads_and_repeats_its_findings_exactly
+          --deselect=tests/e2e/test_gate_liveness_run.py::test_resolver_that_selects_nothing_fails_the_audit
+          --deselect=tests/e2e/test_gate_liveness_run.py::test_missing_resolver_fails_the_audit_and_says_why
 
       - name: Report each scenario's duration and the free disk
         if: always()

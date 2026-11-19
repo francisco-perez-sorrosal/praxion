@@ -42,14 +42,14 @@ The `gate-liveness` job also ended at its 20-minute step limit with no verdict. 
   - `fast-probes`: `--gate mutation-sensor --gate observation-hooks --gate spawn-count`;
   - `selection-audit`: `--gate selection-audit`, with no `continue-on-error`;
   - `scenarios-quick`: `pytest -m liveness tests/acceptance`;
-  - `scenarios-whole-suite-first` and `scenarios-whole-suite-second`: `pytest -m liveness tests/e2e`, split by node id in collection order, each deselecting the other's nodes. Each starts by removing the runner's unused toolchains, since each scenario clones the checkout and the measured peak disk use (about 28 GiB locally) is past the runner's free space.
+  - `scenarios-whole-suite` and `scenarios-whole-suite-audit-gated`: `pytest -m liveness tests/e2e`, split by node id, each deselecting the other's nodes. The two scenarios that need the audit to pass run apart from the rest, so while td-500 keeps them red no other scenario's result is hidden behind theirs. Each starts by removing the runner's unused toolchains, since each scenario clones the checkout and the measured peak disk use (about 28 GiB locally) is past the runner's free space.
 
   `test-scheduled.yml` keeps exactly its four health jobs, so a week its health jobs pass is a green run again.
 - **The audit's own bound.** It is declared once, as `[tool.praxion.gate-liveness] selection-audit-timeout-seconds` in `pyproject.toml`. Three readers take it from there: `scripts/gate_probes/suite_bound.py`, the selection probe (which no longer reads `_step_loop_pocket_runs`), the CLI's limit for the probe (360 s plus the bound), and the whole-suite scenarios' driver. An undeclared bound fails the audit, naming the key; there is no fallback to the step loop's bound. `gate-timeout-seconds` stays 1500.
 - **Limits.** One `# sized:` line beside each job-level `timeout-minutes`:
   `measured=`, `commit=`, `where=local|runner`, `step=`, `scale=`, `setup=`, `fixed=`, `margin=1.5`, `limit=` (and `bound=` for the audit job).
   - The limit is `max(10, ceil((1.5 × (step × scale + setup) + fixed) / 60))` minutes, at most 240; the 10-minute floor covers the runner's own setup variance.
-  - Sized from readings of 2026-11-19 on `ea85b08d52ea`, scaled 1.53 to the runner: `fast-probes` 10 (the floor), `selection-audit` 69 with a bound of 3540 s, `scenarios-quick` 47, the whole-suite jobs 198 and 138.
+  - Sized from readings of 2026-11-19 on `ea85b08d52ea`, scaled 1.53 to the runner: `fast-probes` 10 (the floor), `selection-audit` 69 with a bound of 3540 s, `scenarios-quick` 47, the whole-suite jobs 201 and 135 (the audit-gated one).
   - A job that would exceed 240 minutes is split by node id.
   - A scenarios step's own limit is two minutes under its job's.
   - For the audit job, `limit × 60 ≥ bound + 360 + setup`.

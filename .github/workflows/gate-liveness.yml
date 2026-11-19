@@ -1,17 +1,22 @@
 # Gate liveness — the weekly proof that the gates still bite on known input.
 # Five jobs, one per kind of check (the whole-suite scenarios are split in two to
 # stay under the 240-minute ceiling below), so each gets a time limit that fits it
-# and none hides another's conclusion (no job waits on, or is conditional on, another):
+# and none hides another's conclusion (no job waits on, or is conditional on, another).
+# Until td-500's copy-read question is answered, `selection-audit` and
+# `scenarios-whole-suite-audit-gated` are red every week by design; every other
+# job's red is news:
 #
 #   fast-probes           three quick probes of `scripts/check_gates_bite.py`
 #                         (mutation-sensor, observation-hooks, spawn-count)
 #   selection-audit       the fourth probe, the selection audit, which runs the
 #                         traced default suite and so needs a limit of its own
 #   scenarios-quick       the `liveness`-marked scenarios under tests/acceptance
-#   scenarios-whole-suite-first, scenarios-whole-suite-second
-#                         the `liveness`-marked scenarios under tests/e2e, each
-#                         of which runs the whole traced suite, split by node id
-#                         in collection order; each job deselects the other's
+#   scenarios-whole-suite the `liveness`-marked scenarios under tests/e2e, each
+#                         of which runs the whole traced suite, except the two
+#                         that need the audit to pass
+#   scenarios-whole-suite-audit-gated
+#                         those two, apart, so their red hides no other
+#                         scenario's; each whole-suite job deselects the other's
 #                         nodes, so a scenario added later runs in both until it
 #                         is placed in one and the limits are re-sized
 #
@@ -32,7 +37,7 @@
 # minutes: the margin covers the scaled step and the runner's setup, `fixed` is
 # an unmeasured allowance added unmargined, and no limit is under 10 minutes
 # since the runner's own setup varies by minutes. No limit passes 240; a job
-# whose limit would is split. A run in which a job used more than 80 percent of
+# whose limit would pass it is split. A run in which a job used more than 80 percent of
 # its limit re-sizes that limit from that run's own readings. A line that reads
 # `pending` is refused by `tests/test_gate_liveness_workflow_invariants.py`, so a
 # placeholder cannot survive to merge. Each reading, taken locally and scaled to
@@ -143,13 +148,13 @@ jobs:
         if: always()
         run: python3 scripts/liveness_scenario_record.py report tmp/liveness-scenarios.jsonl
 
-  scenarios-whole-suite-first:
-    name: Gate liveness, whole-suite scenarios (first)
+  scenarios-whole-suite:
+    name: Gate liveness, whole-suite scenarios
     runs-on: ubuntu-latest
     # fixed is the allowance for freeing the runner's toolchains, unmeasured and added unmargined;
     # step is the sum of this job's scenario durations plus the one pytest session overhead of 200.2 s.
-    # sized: measured=2026-11-19 commit=ea85b08d52ea where=local step=5079.2s scale=1.53 setup=10s fixed=180s margin=1.5 limit=198min
-    timeout-minutes: 198
+    # sized: measured=2026-11-19 commit=ea85b08d52ea where=local step=5164.8s scale=1.53 setup=10s fixed=180s margin=1.5 limit=201min
+    timeout-minutes: 201
     permissions:
       contents: read
     steps:
@@ -165,8 +170,9 @@ jobs:
         run: uv sync --frozen
 
       # Each scenario clones the checkout and runs the suite in the clone, and a clone
-      # holds its pytest roots after it ends: the measured peak (about 28 GiB) is past
-      # the runner's disk, so the preinstalled toolchains this repository never uses go first.
+      # holds its pytest roots after it ends: the local peak (an upper bound of about
+      # 28 GiB) is past the runner's free disk, so the preinstalled toolchains this
+      # repository never uses go first.
       - name: Remove the runner's unused toolchains
         run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
 
@@ -177,24 +183,24 @@ jobs:
       # The step limit sits two minutes under the job's, so a cut leaves time
       # for the report.
       - name: Run the whole-suite liveness scenarios
-        timeout-minutes: 196
+        timeout-minutes: 199
         run: >-
           .venv/bin/python -m pytest -m liveness tests/e2e -n 0 --no-cov -p no:cacheprovider
           -p scripts.liveness_scenario_record --liveness-record=tmp/liveness-scenarios.jsonl
+          --deselect=tests/e2e/test_gate_liveness_run.py::test_every_liveness_check_passes_on_this_change_and_leaves_no_trace
           --deselect=tests/e2e/test_gate_liveness_run.py::test_a_dead_gate_fails_its_own_check_while_the_other_three_still_run_and_pass
-          --deselect=tests/e2e/test_selection_audit_job_reports_its_red.py::test_a_failing_audit_job_logs_what_it_expected_what_it_observed_and_each_unselected_read
 
       - name: Report each scenario's duration and the free disk
         if: always()
         run: python3 scripts/liveness_scenario_record.py report tmp/liveness-scenarios.jsonl
 
-  scenarios-whole-suite-second:
-    name: Gate liveness, whole-suite scenarios (second)
+  scenarios-whole-suite-audit-gated:
+    name: Gate liveness, whole-suite scenarios that need a passing audit (red until td-500)
     runs-on: ubuntu-latest
     # fixed is the allowance for freeing the runner's toolchains, unmeasured and added unmargined;
     # step is the sum of this job's scenario durations plus the one pytest session overhead of 200.2 s.
-    # sized: measured=2026-11-19 commit=ea85b08d52ea where=local step=3512.0s scale=1.53 setup=10s fixed=180s margin=1.5 limit=138min
-    timeout-minutes: 138
+    # sized: measured=2026-11-19 commit=ea85b08d52ea where=local step=3426.4s scale=1.53 setup=10s fixed=180s margin=1.5 limit=135min
+    timeout-minutes: 135
     permissions:
       contents: read
     steps:
@@ -210,8 +216,9 @@ jobs:
         run: uv sync --frozen
 
       # Each scenario clones the checkout and runs the suite in the clone, and a clone
-      # holds its pytest roots after it ends: the measured peak (about 28 GiB) is past
-      # the runner's disk, so the preinstalled toolchains this repository never uses go first.
+      # holds its pytest roots after it ends: the local peak (an upper bound of about
+      # 28 GiB) is past the runner's free disk, so the preinstalled toolchains this
+      # repository never uses go first.
       - name: Remove the runner's unused toolchains
         run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
 
@@ -222,14 +229,14 @@ jobs:
       # The step limit sits two minutes under the job's, so a cut leaves time
       # for the report.
       - name: Run the whole-suite liveness scenarios
-        timeout-minutes: 136
+        timeout-minutes: 133
         run: >-
           .venv/bin/python -m pytest -m liveness tests/e2e -n 0 --no-cov -p no:cacheprovider
           -p scripts.liveness_scenario_record --liveness-record=tmp/liveness-scenarios.jsonl
-          --deselect=tests/e2e/test_gate_liveness_run.py::test_every_liveness_check_passes_on_this_change_and_leaves_no_trace
           --deselect=tests/e2e/test_gate_liveness_run.py::test_audit_fails_on_unanticipated_reads_and_repeats_its_findings_exactly
           --deselect=tests/e2e/test_gate_liveness_run.py::test_resolver_that_selects_nothing_fails_the_audit
           --deselect=tests/e2e/test_gate_liveness_run.py::test_missing_resolver_fails_the_audit_and_says_why
+          --deselect=tests/e2e/test_selection_audit_job_reports_its_red.py::test_a_failing_audit_job_logs_what_it_expected_what_it_observed_and_each_unselected_read
 
       - name: Report each scenario's duration and the free disk
         if: always()

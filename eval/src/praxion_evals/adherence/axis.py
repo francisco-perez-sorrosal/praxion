@@ -20,7 +20,7 @@ InheritedContextArm = Literal["full", "lean"]
 RefactoringDeliveryArm = Literal["preloaded", "delivered"]
 SessionArm = InheritedContextArm | RefactoringDeliveryArm
 
-AXES: tuple[str, ...] = get_args(Axis)
+AXES: tuple[Axis, ...] = get_args(Axis)
 DEFAULT_AXIS: Axis = "inherited-context"
 
 ARMS_BY_AXIS: MappingProxyType[str, tuple[SessionArm, ...]] = MappingProxyType(

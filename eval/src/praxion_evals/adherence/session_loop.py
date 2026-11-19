@@ -34,7 +34,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, assert_never, cast, overload
+from typing import Any, assert_never, overload
 
 from praxion_evals.adherence import arms, report, results, run_index, tasks
 from praxion_evals.adherence.axis import (
@@ -355,7 +355,7 @@ def run_directory(config: RunConfig, run_id: str) -> Path:
         return config.output.parent
     root = _results_root()
     # A stable sort: the run's own axis first, the others in their declared order.
-    axes = sorted(cast(tuple[Axis, ...], AXES), key=lambda axis: axis != config.axis)
+    axes = sorted(AXES, key=lambda axis: axis != config.axis)
     directories = [_axis_results_dir(root, axis) for axis in axes]
     holding = (where for where in directories if (where / _results_name(run_id)).is_file())
     return next(holding, directories[0])

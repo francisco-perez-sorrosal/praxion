@@ -1,7 +1,8 @@
 ---
-id: dec-draft-74fc06dd
+id: dec-520
+draft_id: dec-draft-74fc06dd
 title: The gate-liveness checks run in a workflow of their own, one job per kind of check, each limit sized from a measured reading
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-18
 summary: "The liveness checks move from test-scheduled.yml to a new .github/workflows/gate-liveness.yml (name Gate liveness) with five independent jobs: the three fast probes, the selection audit, the quick scenarios (tests/acceptance) and the whole-suite scenarios (tests/e2e) split in two. The audit holds its traced suite to a bound of its own, [tool.praxion.gate-liveness] selection-audit-timeout-seconds in pyproject.toml, no longer the step loop's gate-timeout-seconds. Each job limit carries a machine-checked '# sized:' line (1.5 x the scaled reading, rounded up, never under 10 min, at most 240 min; above that the job splits). A plugin records each scenario's duration and free disk space. The workflow is not on the autofix watch list."

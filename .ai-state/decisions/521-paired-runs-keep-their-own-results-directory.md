@@ -1,7 +1,8 @@
 ---
-id: dec-draft-626e3311
+id: dec-521
+draft_id: dec-draft-626e3311
 title: Paired refactoring-delivery runs keep a results directory of their own by default
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-18
 summary: "Without --output, a run of the refactoring-delivery axis writes, lists, closes and reindexes in .ai-state/eval_ledger/adherence/refactoring-delivery, named by a results_subdir field on the axis's AxisRun record; the ordinary comparison keeps .ai-state/eval_ledger/adherence. --close and --continue find a run in any axis's directory. The adoption gate's reader and its parity test are unchanged."

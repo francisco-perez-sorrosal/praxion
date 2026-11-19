@@ -23,7 +23,7 @@ affected_files:
   - .github/workflows/test-scheduled.yml
   - pyproject.toml
 affected_reqs: [REQ-01, REQ-02, REQ-03, REQ-06, REQ-07, REQ-08, REQ-09]
-superseded_in_part_by: [dec-draft-74fc06dd]
+superseded_in_part_by: [dec-520]
 ---
 
 ## Context

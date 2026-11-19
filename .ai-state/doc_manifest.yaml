@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-18T05:56:53Z'
+generated_at: '2026-11-19T16:55:07Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-16'
+  last_modified: '2026-11-18'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-15'
+  last_modified: '2026-11-19'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -150,7 +150,7 @@ surfaces:
   path: docs/claude-code-limitations.md
   type: markdown
   title: Known Claude Code Limitations
-  last_modified: '2026-11-15'
+  last_modified: '2026-11-18'
   renderer: default_markdown
 - id: docs-claude-ecosystem-learning-resources
   path: docs/claude-ecosystem-learning-resources.md
@@ -511,7 +511,7 @@ surfaces:
   path: docs/lean-spawn-how-to.md
   type: markdown
   title: Switch a role to its kernel
-  last_modified: '2026-11-17'
+  last_modified: '2026-11-19'
   diataxis: how-to
   audience: developer
   renderer: how_to_shell
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-17'
+  last_modified: '2026-11-19'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-17'
+  last_modified: '2026-11-19'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -676,13 +676,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-15'
+  last_modified: '2026-11-18'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-17'
+  last_modified: '2026-11-19'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3215,7 +3215,7 @@ surfaces:
   path: .ai-state/decisions/419-production-shaped-gate-liveness-probes.md
   type: markdown
   title: Production-shaped gate-liveness probes run behind one CLI in a read-only job of the scheduled test workflow
-  last_modified: '2026-10-02'
+  last_modified: '2026-11-18'
   renderer: adr_card
 - id: ai-state-decisions-420-selection-audit-oracle-from-traced-reads
   path: .ai-state/decisions/420-selection-audit-oracle-from-traced-reads.md
@@ -3819,11 +3819,23 @@ surfaces:
   title: A shipped shell hook tells the main conversation, once per move, that a Bash command left it in another directory
   last_modified: '2026-11-17'
   renderer: adr_card
+- id: ai-state-decisions-520-liveness-checks-in-a-workflow-of-their-own
+  path: .ai-state/decisions/520-liveness-checks-in-a-workflow-of-their-own.md
+  type: markdown
+  title: The gate-liveness checks run in a workflow of their own, one job per kind of check, each limit sized from a measured reading
+  last_modified: '2026-11-19'
+  renderer: adr_card
+- id: ai-state-decisions-521-paired-runs-keep-their-own-results-directory
+  path: .ai-state/decisions/521-paired-runs-keep-their-own-results-directory.md
+  type: markdown
+  title: Paired refactoring-delivery runs keep a results directory of their own by default
+  last_modified: '2026-11-19'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-15'
+  last_modified: '2026-11-17'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4125,6 +4137,12 @@ surfaces:
   type: markdown
   title: 'Spec: lean-writers (full process-adherence eval kits for the test-engineer and the systems-architect, each covering both of its major modes)'
   last_modified: '2026-11-07'
+  renderer: default_markdown
+- id: ai-state-specs-spec-liveness-eval-rows-2026-11-19
+  path: .ai-state/specs/SPEC_liveness-eval-rows_2026-11-19.md
+  type: markdown
+  title: 'Spec: liveness-eval-rows (the gates'' weekly check in a workflow of its own, the eval tool''s three rows, and sixteen lessons placed)'
+  last_modified: '2026-11-19'
   renderer: default_markdown
 - id: ai-state-specs-spec-loop-gate-followups-2026-10-22
   path: .ai-state/specs/SPEC_loop-gate-followups_2026-10-22.md
@@ -4840,6 +4858,8 @@ groups:
   - ai-state-decisions-517-step-loop-request-lifecycle
   - ai-state-decisions-518-commit-gate-command-reader
   - ai-state-decisions-519-cwd-notice-hook
+  - ai-state-decisions-520-liveness-checks-in-a-workflow-of-their-own
+  - ai-state-decisions-521-paired-runs-keep-their-own-results-directory
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
@@ -4891,6 +4911,7 @@ groups:
   - ai-state-specs-spec-lean-spawn-continuation-2026-10-20
   - ai-state-specs-spec-lean-spawn-pilot-2026-10-15
   - ai-state-specs-spec-lean-writers-2026-11-07
+  - ai-state-specs-spec-liveness-eval-rows-2026-11-19
   - ai-state-specs-spec-loop-gate-followups-2026-10-22
   - ai-state-specs-spec-loop-gate-hardening-2026-10-20
   - ai-state-specs-spec-main-session-adherence-2026-10-28

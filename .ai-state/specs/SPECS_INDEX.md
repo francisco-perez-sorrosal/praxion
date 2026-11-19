@@ -5,6 +5,7 @@ Regenerate: `python scripts/regenerate_specs_index.py`
 
 | Spec | Slug | Archived | Status | Tier | ADRs | Summary |
 |------|------|----------|--------|------|------|---------|
+| [SPEC_liveness-eval-rows_2026-11-19.md](SPEC_liveness-eval-rows_2026-11-19.md) | liveness-eval-rows | 2026-11-19 | completed -- the verifier's verdict was FAIL on one procedural finding | Standard | dec-419 | The gates' weekly check reports from a workflow of its own, the eval tool's three open rows are fixed or narrowed with a... |
 | [SPEC_driver-repairs_2026-11-17.md](SPEC_driver-repairs_2026-11-17.md) | driver-repairs | 2026-11-17 (at head `328ce460`; merged to main the same day as `3d5680e1` and released in v0.66.0) | completed -- verified: PASS WITH FINDINGS after two passes | Full | dec-517, dec-516, dec-518, dec-519 | Before this change every pipeline paid for the step-loop driver's gaps each time it ran through it. The three pipelines ... |
 | [SPEC_memory-to-artifacts_2026-11-15.md](SPEC_memory-to-artifacts_2026-11-15.md) | memory-to-artifacts | 2026-11-15 | completed -- every verification failure cleared | Full | dec-512 | The process knowledge held in memory now reaches every session through the artifact that governs its surface. |
 | [SPEC_refactoring-delivery_2026-11-15.md](SPEC_refactoring-delivery_2026-11-15.md) | refactoring-delivery | 2026-11-15 | completed -- final verdict PASS WITH FINDINGS | Full | dec-513, dec-514 | The refactoring skill's delivery to marked delegations is built and silent; the move that drops the preload is held. |

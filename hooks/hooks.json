@@ -330,30 +330,6 @@
             "async": false
           }
         ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/notice_working_directory.sh post",
-            "timeout": 5,
-            "async": false
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/notice_working_directory.sh post",
-            "timeout": 5,
-            "async": false
-          }
-        ]
       }
     ],
     "PreToolUse": [
@@ -466,17 +442,6 @@
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/remind_turn_budget.py 2>/dev/null",
-            "timeout": 5,
-            "async": false
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/notice_working_directory.sh pre",
             "timeout": 5,
             "async": false
           }

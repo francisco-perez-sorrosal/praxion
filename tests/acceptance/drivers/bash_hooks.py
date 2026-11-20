@@ -1,25 +1,17 @@
-"""Driver for the hooks that judge Bash calls: the commit gate and the working-directory notice.
+"""Driver for the hook that judges Bash calls before they run: the commit gate.
 
-Both are reached as the harness reaches a command hook: the event's JSON payload on stdin,
-the registered command line run through a shell, `${CLAUDE_PLUGIN_ROOT}` the plugin root.
+It is reached as the harness reaches a command hook: the event's JSON payload on stdin, the
+registered command line run with `${CLAUDE_PLUGIN_ROOT}` the plugin root.
 
-Bound here, because the base commit or the harness fixes them:
-
-- the commit gate is `hooks/commit_gate.sh [--blocking] <checker>`; whether it started its
-  checker is observed with a stand-in checker that records each start in a file;
-- the working-directory notice is any command hook registered in `hooks/hooks.json` under
-  `PreToolUse` or `PostToolUse` whose matcher reaches Bash, beyond the ones the base commit
-  registers (frozen below, so no scenario reads git history). Until one is registered the
-  notice scenarios stop on `NoticeNotRegisteredError`;
-- the context a hook adds is `hookSpecificOutput.additionalContext` (or a top-level
-  `additionalContext`) of the JSON object it prints; the project root is `CLAUDE_PROJECT_DIR`.
+Bound here, because the base commit or the harness fixes it: the commit gate is
+`hooks/commit_gate.sh [--blocking] <checker>`; whether it started its checker is observed with a
+stand-in checker that records each start in a file.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -27,25 +19,8 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-HOOKS_JSON = REPO_ROOT / "hooks" / "hooks.json"
 COMMIT_GATE = REPO_ROOT / "hooks" / "commit_gate.sh"
-PLUGIN_ROOT_VARIABLE = "${CLAUDE_PLUGIN_ROOT}"
 SESSION = "session-bash-hooks"
-
-BASE_BASH_COMMANDS = frozenset(
-    {
-        "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/hooks/check_code_quality.py",
-        "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/hooks/remind_adr.py",
-        "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh ${CLAUDE_PLUGIN_ROOT}/hooks/remind_calibration.py",
-        "${CLAUDE_PLUGIN_ROOT}/hooks/cleanup_gate.sh ${CLAUDE_PLUGIN_ROOT}/hooks/promote_learnings.py",
-        "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh --blocking ${CLAUDE_PLUGIN_ROOT}/scripts/check_id_citation_discipline.py",
-        "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh --blocking ${CLAUDE_PLUGIN_ROOT}/scripts/check_decision_records.py",
-        "${CLAUDE_PLUGIN_ROOT}/hooks/commit_gate.sh --blocking ${CLAUDE_PLUGIN_ROOT}/scripts/check_token_ratchet.py",
-        "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/send_event.py 2>/dev/null",
-        "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/remind_turn_budget.py 2>/dev/null",
-        "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/capture_observations.py 2>/dev/null",
-    }
-)
 
 
 def _env(home: Path, project: Path, shim: Path) -> dict[str, str]:
@@ -147,112 +122,3 @@ def run_commit_gate(workspace: Path, payload: str) -> GateRun:
     )
     starts = len(log.read_text().splitlines()) if log.exists() else 0
     return GateRun(result.returncode, result.stdout, result.stderr, starts)
-
-
-# -- The working-directory notice ------------------------------------------------------------------
-
-
-class NoticeNotRegisteredError(NotImplementedError):
-    """The plugin registers no Bash hook beyond the base's to say where the session moved."""
-
-
-def notice_registrations() -> list[tuple[str, str]]:
-    """(event, command) of each Bash-reaching PreToolUse/PostToolUse hook the base did not register."""
-    hooks = json.loads(HOOKS_JSON.read_text(encoding="utf-8"))["hooks"]
-    found = []
-    for event in ("PreToolUse", "PostToolUse"):
-        for group in hooks.get(event, []):
-            matcher = group.get("matcher", "")
-            if matcher and not re.fullmatch(matcher, "Bash"):
-                continue
-            for hook in group.get("hooks", []):
-                command = hook.get("command", "")
-                if hook.get("type") == "command" and command not in BASE_BASH_COMMANDS:
-                    found.append((event, command))
-    if not found:
-        raise NoticeNotRegisteredError(
-            "no PreToolUse or PostToolUse hook reaching Bash beyond the base's is registered in "
-            "hooks/hooks.json: nothing tells the agent the session's directory moved"
-        )
-    return found
-
-
-@dataclass(frozen=True)
-class HookCall:
-    event: str
-    command: str
-    cwd: Path
-
-
-def contexts(output: str) -> list[str]:
-    try:
-        doc = json.loads(output)
-    except json.JSONDecodeError:
-        return []
-    if not isinstance(doc, dict):
-        return []
-    found = [
-        doc.get("additionalContext"),
-        (doc.get("hookSpecificOutput") or {}).get("additionalContext"),
-    ]
-    return [c for c in found if c]
-
-
-@dataclass(frozen=True)
-class NoticeRun:
-    contexts: list[str]
-    exit_codes: list[int]
-
-
-def run_session(
-    workspace: Path, project: Path, calls: list[HookCall], raw: str | None = None
-) -> NoticeRun:
-    """Fire each call's Bash event, in order, at every notice hook; collect the context added."""
-    registrations = notice_registrations()
-    env = _env(workspace / "home", project, _shim(workspace))
-    added: list[str] = []
-    codes: list[int] = []
-    for call in calls:
-        payload = (
-            raw
-            if raw is not None
-            else json.dumps(
-                {
-                    "session_id": SESSION,
-                    "transcript_path": str(workspace / "transcript.jsonl"),
-                    "cwd": str(call.cwd),
-                    "hook_event_name": call.event,
-                    "tool_name": "Bash",
-                    "tool_input": {"command": call.command, "description": "Move around"},
-                    "tool_response": {"stdout": "", "stderr": "", "interrupted": False},
-                }
-            )
-        )
-        for event, command in registrations:
-            if event != call.event:
-                continue
-            result = subprocess.run(
-                ["/bin/sh", "-c", command.replace(PLUGIN_ROOT_VARIABLE, str(REPO_ROOT))],
-                input=payload,
-                cwd=call.cwd,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                env=env,
-            )
-            codes.append(result.returncode)
-            added += contexts(result.stdout)
-    return NoticeRun(added, codes)
-
-
-def moved(project: Path, command: str, after: Path, *, payload_shows_move: bool) -> list[HookCall]:
-    """A Bash call running `command` from the project root that leaves the session in `after`,
-    then the agent's next Bash call. Whether the moving call's own PostToolUse payload already
-    shows `after` is not established, so a scenario runs both answers."""
-    post_cwd = after if payload_shows_move else project
-    return [
-        HookCall("PreToolUse", command, project),
-        HookCall("PostToolUse", command, post_cwd),
-        HookCall("PreToolUse", "ls", after),
-        HookCall("PostToolUse", "ls", after),
-    ]

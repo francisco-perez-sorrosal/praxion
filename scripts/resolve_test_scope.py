@@ -259,13 +259,12 @@ class Resolution:
 
 
 def resolve_each(repo_root: Path, paths: Sequence[str], files: Sequence[str]) -> list[Resolution]:
-    """`resolve` of each path alone, over one import graph instead of one per path."""
-    declared, _ = _load_declared(repo_root, files)
-    graph = build_graph(
-        repo_root, files, declared, _python_roots(discover_pockets(repo_root, files))
-    )
+    """`resolve` of each path alone, over one reading of what no path changes (the repository's
+    facts and its import graph) instead of one per path."""
+    facts = _read_repo_facts(repo_root, files)
+    graph = build_graph(repo_root, files, facts.declared, _python_roots(facts.pockets))
     return [
-        resolve(repo_root, ChangedSet((path,), SOURCE_EXPLICIT), files, graph=graph)
+        _resolve_with(repo_root, ChangedSet((path,), SOURCE_EXPLICIT), files, facts, graph)
         for path in paths
     ]
 
@@ -277,16 +276,26 @@ def resolve(
 
     A `graph` over `files` (from `build_graph`) spares the derivation its rebuild.
     """
-    pockets = discover_pockets(repo_root, files)
     if changed.source == SOURCE_FULL:
         widen = (Widen(REASON_FULL, (), "full suite requested"),)
-        return _all_full(changed, widen, (), pockets)
-    declared, invalid = _load_declared(repo_root, files)
-    repo_widen = (*invalid, *_trigger_widens(changed.paths))
+        return _all_full(changed, widen, (), discover_pockets(repo_root, files))
+    return _resolve_with(repo_root, changed, files, _read_repo_facts(repo_root, files), graph)
+
+
+def _resolve_with(
+    repo_root: Path,
+    changed: ChangedSet,
+    files: Sequence[str],
+    facts: _RepoFacts,
+    graph: Graph | None,
+) -> Resolution:
+    pockets = facts.pockets
+    declared = facts.declared
+    repo_widen = (*facts.invalid, *_trigger_widens(changed.paths))
     config_widen = _pocket_config_widens(changed.paths, pockets)
     if repo_widen:  # every pocket runs in full already; deriving would change nothing
         return _all_full(changed, (*repo_widen, *config_widen.values()), (), pockets)
-    derivation = _derive(repo_root, changed.paths, files, pockets, declared, graph)
+    derivation = _derive(repo_root, changed.paths, files, facts, graph)
     # Config paths still feed the derivation (another pocket's test may read them),
     # but their own pocket is already widened, so they never count as unmapped.
     accounted = derivation.mapped | {p for w in config_widen.values() for p in w.paths}
@@ -305,22 +314,42 @@ def resolve(
     return Resolution(changed, (*config_widen.values(), *native_widen), ignored, results)
 
 
+@dataclass(frozen=True)
+class _RepoFacts:
+    """What every path's resolution reads and no changed path alters. Read once per process:
+    re-read per path, they made a many-path call cost about 0.17 s a path (the selection audit
+    asks about every file its suite read, several thousand, in one call)."""
+
+    pockets: tuple[Pocket, ...]
+    declared: DeclaredDeps
+    invalid: tuple[Widen, ...]
+    workflows: CollectionScope
+
+
+def _read_repo_facts(repo_root: Path, files: Sequence[str]) -> _RepoFacts:
+    declared, invalid = _load_declared(repo_root, files)
+    return _RepoFacts(
+        pockets=discover_pockets(repo_root, files),
+        declared=declared,
+        invalid=invalid,
+        workflows=workflow_collection_scope(repo_root / WORKFLOWS_DIR),
+    )
+
+
 def _derive(
     repo_root: Path,
     paths: tuple[str, ...],
     files: Sequence[str],
-    pockets: tuple[Pocket, ...],
-    declared: DeclaredDeps,
+    facts: _RepoFacts,
     graph: Graph | None,
 ) -> Derivation:
-    workflows = workflow_collection_scope(repo_root / WORKFLOWS_DIR)
     return derive(
         repo_root,
         paths,
-        declared,
+        facts.declared,
         files=files,
-        pocket_roots=_python_roots(pockets),
-        is_runnable=lambda test: _is_runnable(test, pockets, workflows),
+        pocket_roots=_python_roots(facts.pockets),
+        is_runnable=lambda test: _is_runnable(test, facts.pockets, facts.workflows),
         graph=graph,
     )
 

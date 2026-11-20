@@ -515,3 +515,30 @@ def test_per_path_builds_the_import_graph_once_for_every_inventory_path(
 
     assert len(lines) == len(inventory_paths)
     assert len(built) == 1
+
+
+@pytest.mark.parametrize(
+    "reader",
+    ["discover_pockets", "parse", "validate_against_inventory", "workflow_collection_scope"],
+)
+def test_per_path_reads_what_no_path_changes_as_often_for_many_paths_as_for_one(
+    per_path_repo: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, reader: str
+) -> None:
+    """The selection audit asks about every file its suite read in one call; a repo-wide read
+    repeated per path made that call's cost grow with the paths it was given."""
+    calls: list[int] = []
+    original = getattr(rts, reader)
+
+    def counting(*args: object, **kwargs: object) -> object:
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(rts, reader, counting)
+    inventory_paths = [p for p in PER_PATH_SAMPLE if p != "pkg/deleted.py"]
+
+    _per_path_lines(capsys, per_path_repo, inventory_paths[0])
+    for_one = len(calls)
+    calls.clear()
+    _per_path_lines(capsys, per_path_repo, *inventory_paths)
+
+    assert len(calls) == for_one

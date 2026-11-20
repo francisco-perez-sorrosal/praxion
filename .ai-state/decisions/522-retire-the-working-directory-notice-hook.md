@@ -1,7 +1,8 @@
 ---
-id: dec-draft-f27caf95
+id: dec-522
+draft_id: dec-draft-f27caf95
 title: "Retire the working-directory notice hook: the harness itself tells the session when a Bash command moves it"
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-20
 summary: "hooks/notice_working_directory.sh, its test and its three registrations in hooks/hooks.json are removed. On the Claude Code versions in use (2.1.326 and 2.1.327) the harness sends its own 'Environment update' naming the new and the previous directory after a Bash cd, so the hook's line duplicated it on every move while it started a shell on every tool call of every session; the harness also resets a cd that leaves the working directories, and a failing Bash command does not keep its cd, which the hook's PostToolUseFailure half guarded against. The decision that added it is retired."

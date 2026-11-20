@@ -4,7 +4,7 @@ draft_id: dec-draft-5310f592
 title: A shipped shell hook tells the main conversation, once per move, that a Bash command left it in another directory
 status: retired
 retired_by:
-  - dec-draft-f27caf95
+  - dec-522
 category: architectural
 date: 2026-11-16
 summary: hooks/notice_working_directory.sh, registered under PreToolUse for every tool and, for Bash, under PostToolUse and PostToolUseFailure, keeps one three-state record per main-conversation session and adds one additionalContext line when a Bash command leaves the session away from its home (its start directory, or the worktree the harness moved it into); POSIX sh only, fail-open, correct whether or not the moving call's PostToolUse payload already shows the new directory.
@@ -60,4 +60,4 @@ Negative: one `sh` and one `cat` per tool call (in parallel with hooks already r
 
 ## Prior Decision
 
-**What removed this decision's subject.** `dec-draft-f27caf95` removed `hooks/notice_working_directory.sh`, its test and its three registrations, on the user's word of 2026-11-20. The first live sessions after the hook shipped (Claude Code 2.1.326 and 2.1.327) showed the harness sending its own `Environment update` after a Bash `cd`, naming the new and the previous directory, so every move drew two notices; a failing Bash command did not keep its `cd`; and on 2026-11-20 the harness reset a `cd` that left the working directories. The hook's question (how to tell the session it moved) is answered by the harness, not by a different hook, so this record is retired rather than superseded. **What would bring it back:** a supported CLI that moves the session on a Bash `cd` without announcing it. The design above, with its as-built correction, is the starting point then.
+**What removed this decision's subject.** `dec-522` removed `hooks/notice_working_directory.sh`, its test and its three registrations, on the user's word of 2026-11-20. The first live sessions after the hook shipped (Claude Code 2.1.326 and 2.1.327) showed the harness sending its own `Environment update` after a Bash `cd`, naming the new and the previous directory, so every move drew two notices; a failing Bash command did not keep its `cd`; and on 2026-11-20 the harness reset a `cd` that left the working directories. The hook's question (how to tell the session it moved) is answered by the harness, not by a different hook, so this record is retired rather than superseded. **What would bring it back:** a supported CLI that moves the session on a Bash `cd` without announcing it. The design above, with its as-built correction, is the starting point then.

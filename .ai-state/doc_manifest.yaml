@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-19T16:55:07Z'
+generated_at: '2026-11-20T16:53:39Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-19'
+  last_modified: '2026-11-20'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-19'
+  last_modified: '2026-11-20'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -676,13 +676,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-18'
+  last_modified: '2026-11-20'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-19'
+  last_modified: '2026-11-20'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3215,7 +3215,7 @@ surfaces:
   path: .ai-state/decisions/419-production-shaped-gate-liveness-probes.md
   type: markdown
   title: Production-shaped gate-liveness probes run behind one CLI in a read-only job of the scheduled test workflow
-  last_modified: '2026-11-18'
+  last_modified: '2026-11-19'
   renderer: adr_card
 - id: ai-state-decisions-420-selection-audit-oracle-from-traced-reads
   path: .ai-state/decisions/420-selection-audit-oracle-from-traced-reads.md
@@ -3817,7 +3817,7 @@ surfaces:
   path: .ai-state/decisions/519-cwd-notice-hook.md
   type: markdown
   title: A shipped shell hook tells the main conversation, once per move, that a Bash command left it in another directory
-  last_modified: '2026-11-17'
+  last_modified: '2026-11-20'
   renderer: adr_card
 - id: ai-state-decisions-520-liveness-checks-in-a-workflow-of-their-own
   path: .ai-state/decisions/520-liveness-checks-in-a-workflow-of-their-own.md
@@ -3831,11 +3831,17 @@ surfaces:
   title: Paired refactoring-delivery runs keep a results directory of their own by default
   last_modified: '2026-11-19'
   renderer: adr_card
+- id: ai-state-decisions-522-retire-the-working-directory-notice-hook
+  path: .ai-state/decisions/522-retire-the-working-directory-notice-hook.md
+  type: markdown
+  title: 'Retire the working-directory notice hook: the harness itself tells the session when a Bash command moves it'
+  last_modified: '2026-11-20'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-17'
+  last_modified: '2026-11-19'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4142,7 +4148,7 @@ surfaces:
   path: .ai-state/specs/SPEC_liveness-eval-rows_2026-11-19.md
   type: markdown
   title: 'Spec: liveness-eval-rows (the gates'' weekly check in a workflow of its own, the eval tool''s three rows, and sixteen lessons placed)'
-  last_modified: '2026-11-19'
+  last_modified: '2026-11-20'
   renderer: default_markdown
 - id: ai-state-specs-spec-loop-gate-followups-2026-10-22
   path: .ai-state/specs/SPEC_loop-gate-followups_2026-10-22.md
@@ -4860,6 +4866,7 @@ groups:
   - ai-state-decisions-519-cwd-notice-hook
   - ai-state-decisions-520-liveness-checks-in-a-workflow-of-their-own
   - ai-state-decisions-521-paired-runs-keep-their-own-results-directory
+  - ai-state-decisions-522-retire-the-working-directory-notice-hook
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

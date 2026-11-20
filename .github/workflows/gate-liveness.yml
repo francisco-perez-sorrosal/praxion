@@ -38,11 +38,13 @@
 # an unmeasured allowance added unmargined, and no limit is under 10 minutes
 # since the runner's own setup varies by minutes. No limit passes 240; a job
 # whose limit would pass it is split. A run in which a job used more than 80 percent of
-# its limit re-sizes that limit from that run's own readings. A line that reads
+# its limit, or the audit's traced suite more than 80 percent of its bound, re-sizes
+# that limit from that run's own readings (`where=runner scale=1`). A line that reads
 # `pending` is refused by `tests/test_gate_liveness_workflow_invariants.py`, so a
-# placeholder cannot survive to merge. Each reading, taken locally and scaled to
-# the runner by the root suite's ratio, is on its job's `# sized:` line; the
-# first run on GitHub is the reading these limits answer to.
+# placeholder cannot survive to merge. Each reading is on its job's `# sized:` line:
+# taken locally and scaled to the runner by the root suite's ratio, or taken on the
+# runner when a run re-sized it (the audit's, 2026-11-20: its traced suite ran
+# 3075 s of the 3540 s bound sized locally).
 #
 # No workflow watches this one: `ci-autofix.yml` watches exactly Test,
 # Architecture and Test (scheduled). A red liveness run says a gate no longer
@@ -94,8 +96,8 @@ jobs:
     name: Gate liveness, selection audit
     runs-on: ubuntu-latest
     # fixed is the gate command's own allowance beyond the declared bound, added unmargined.
-    # sized: measured=2026-11-19 commit=ea85b08d52ea where=local step=1631.1s scale=1.53 setup=10s fixed=360s margin=1.5 limit=69min bound=3540s
-    timeout-minutes: 69
+    # sized: measured=2026-11-20 commit=627a82f221fd where=runner step=3200.1s scale=1 setup=14s fixed=360s margin=1.5 limit=87min bound=4620s
+    timeout-minutes: 87
     permissions:
       contents: read
     steps:

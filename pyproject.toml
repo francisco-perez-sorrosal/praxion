@@ -211,5 +211,5 @@ gate-timeout-seconds = 1500
 # The selection audit holds its traced run of the default suite to its own bound, declared here
 # and read through `scripts/gate_probes/suite_bound.py`; it is not the step loop's bound above.
 [tool.praxion.gate-liveness]
-# sized: measured=2026-11-19 commit=ea85b08d52ea where=local step=1527s scale=1.53 margin=1.5 bound=3540s
-selection-audit-timeout-seconds = 3540
+# sized: measured=2026-11-20 commit=627a82f221fd where=runner step=3075s scale=1 margin=1.5 bound=4620s
+selection-audit-timeout-seconds = 4620

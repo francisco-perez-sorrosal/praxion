@@ -115,7 +115,7 @@ Requirements are pipeline-local; never cite their ids in code, tests or docstrin
 
 - [x] AC-01 Every requirement under Behavioral Specification has outer-loop or unit evidence, or is listed by the acceptance design as verifier judgment.
 - [x] AC-02 The three fast probes pass on the pipeline head with `.venv/bin/python scripts/check_gates_bite.py --gate mutation-sensor --gate observation-hooks --gate spawn-count --json`, and the reading is compared with main's (all three pass, about 7 s together on this machine).
-- [ ] AC-03 Before the head is called verified it has run on Linux (a container run, if the user allows Docker) or its CI was read after the merge; the verification report says which. -- deferred by the user's choice to the first GitHub run after the merge (see Outcome)
+- [x] AC-03 Before the head is called verified it has run on Linux (a container run, if the user allows Docker) or its CI was read after the merge; the verification report says which. -- deferred by the user's choice to the first GitHub run after the merge (see Outcome); met 2026-11-20 (see Outcome)
 - [x] AC-04 Each liveness job's time limit is sized from a reading taken on the pipeline head, with its margin stated beside it (REQ-06), and the measurement log records each reading with the commit it was taken on.
 - [x] AC-05 A decision record amends dec-419's host choice, citing its reversal trigger as fired (the canaries job cancelled at 45.7, 45.3 and 45.3 minutes on 2026-11-02, -09 and -16) and its steelmanned runner-up as the design taken.
 - [x] AC-06 The tech-debt ledger ends with: td-499 resolved for its time-limit half (its disk half per SQ-06); td-500 still open, its note stating the copy-read question that remains and the bound this pipeline gave the audit; td-672 and td-674 resolved, naming what resolved them; td-673 narrowed to its pre-approval half and still open, its note giving the reason; and `python3 scripts/check_state_ledgers.py` exits 0 after every ledger edit (its backfill run when it names a key mismatch).
@@ -500,6 +500,8 @@ Counts: 17 requirements; 16 carry outer-loop acceptance nodes and 8 also carry u
 ### Deferred: AC-03, the head on Linux
 
 The user chose the CI after the merge as the Linux reading (the brief's KS-10: the previous pipeline's macOS checkpoint passed a fixture holding `/private/var/...` that failed on Linux CI). No container run was made, so the head has not run on Linux. AC-03 closes when the head's CI is read on the first GitHub run after the merge. The verifier noted that the fixtures re-pinned in `a56c3192` are digests, not paths, so the `/private/var` shape is not among them.
+
+**Met 2026-11-20.** The head's Test runs are green on Linux. The first `Gate liveness` run (44675937804, on `7d87e755`) found a Linux-only red: the audit's resolver call ran past its 180 s bound, fixed at its cause in `e9315f47`. The second (44707264220, on `627a82f2`) is red only by td-500: the audit's own verdict (39,753 unselected reads) and the two audit-gated scenarios. No job used more than 80 percent of its limit; the audit's traced suite used 87 percent of its bound, re-sized from that run's reading in `d8e8f803`.
 
 The first run of `Gate liveness` after the merge (on the user's go, or the Monday schedule) answers the rest of what a local run could not:
 - each job's time against its limit, with none above 80 percent (the re-size trigger), which also tests the scale of 1.53 taken from the parallel untraced suite and applied to serial scenarios and the traced audit;

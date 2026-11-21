@@ -253,6 +253,9 @@ def test_a_budget_stop_while_a_pocket_waits_names_the_pocket(tmp_path):
     task = _one_waiting_pocket_then(tmp_path, Step("42"))
     _exhaust_the_next_step(task)
     revise_step(task, "42", "Write `src/step_42.py` returning the step id, smaller this time.")
+    # The budget is two steps times the attempt cap; step 41 spent one iteration and step 42's
+    # first series two, so the revised series' first red attempt spends the last one.
+    attempt(task, Work(passes=False))
 
     stopped = next_action(task)
 

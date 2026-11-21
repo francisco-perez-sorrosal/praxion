@@ -8,7 +8,7 @@ hand-back, and a changed reconciler verdict clears a human verdict.
 
 Normative precedence, a total function of the inputs, first match wins:
 
-1. `Complete` when every step is done.
+1. When every step is done: `Checkpoint` if a pocket's whole suite still waits, else `Complete`.
 2. A human stop, in this order: the stop of the outstanding request's reading (below),
    `unnamed-attempts`, `dependency-defect`, `commit-disturbed-tree`, a marker, then the stop of
    the selected step, which is the earliest step in plan order that is not done.
@@ -77,6 +77,7 @@ from _step_loop_state import (
 )
 
 if TYPE_CHECKING:
+    from _step_loop_checkpoint import WaitingPocket
     from iteration_ledger import IterationRecord
 
 BUDGET_CAUSE = "iteration-budget"
@@ -87,9 +88,9 @@ HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed review-without-work not-driven
     dependency-defect commit-disturbed-tree loop-state-defect files-glob request-outstanding
-    attempts-disagree unreadable-plan-field check-cannot-collect""".split()
+    attempts-disagree unreadable-plan-field check-cannot-collect checkpoint-red""".split()
 )
-NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", BUDGET_CAUSE)
+NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", "checkpoint-red", BUDGET_CAUSE)
 REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound
 _REVIEW_STOPS = {
     RevisedTwice: ("review-revised-twice", "the light review asked for revision twice"),
@@ -118,6 +119,17 @@ class Complete:
 
 
 @dataclass(frozen=True)
+class Checkpoint:
+    """Every step is done and these pockets' whole suites still wait: run each once."""
+
+    waiting: tuple[WaitingPocket, ...]
+
+    def __post_init__(self) -> None:
+        if not self.waiting:
+            raise ValueError("a checkpoint runs at least one waiting pocket")
+
+
+@dataclass(frozen=True)
 class Stop:
     """The loop halts. `step` is None exactly for the causes that belong to no one step, and a
     replan request exists exactly for a step whose bound is spent."""
@@ -137,7 +149,7 @@ class Stop:
             raise ValueError("a replan request goes with attempts-exhausted or stalled, no other")
 
 
-Action = Union[Spawn, Complete, Stop]  # noqa: UP007 -- runtime value, 3.9 floor
+Action = Union[Spawn, Complete, Checkpoint, Stop]  # noqa: UP007 -- runtime value, 3.9 floor
 
 
 # --- The outstanding request, read against the plan -------------------------------------------
@@ -274,7 +286,7 @@ def next_action(inputs: LoopInputs) -> Action:
     """The one thing the loop does next."""
     selection = select_step(inputs)
     if isinstance(selection, AllDone):
-        return Complete()
+        return Checkpoint(inputs.waiting) if inputs.waiting else Complete()
     return _human_stop(inputs, selection) or _budget_stop(inputs, selection) or _spawn(selection)
 
 

@@ -52,12 +52,14 @@ __all__ = [
     "GREEN",
     "RED",
     "STEP_ID_RE",
+    "CHECKPOINT_HEADING_PREFIX",
     "Counts",
     "NoRun",
     "Malformed",
     "ResultLine",
     "StepBlock",
     "step_id_from_heading",
+    "is_checkpoint_heading",
     "step_sort_key",
     "parse_result_line",
     "split_step_blocks",
@@ -89,6 +91,10 @@ RED = "red"
 # (e.g. a stray "Nb1") is not a step id; letters after the digits sort a
 # lettered addendum after its parent (see step_sort_key).
 STEP_ID_RE = re.compile(r"^\d+[a-z]?$")
+
+# The text a checkpoint block's heading opens with (after its `##`). The block belongs to no step:
+# the loop's writer builds its heading from this prefix and the shape checker exempts it by it.
+CHECKPOINT_HEADING_PREFIX = "Checkpoint "
 
 _HEADING_STEP_RE = re.compile(r"^#{2,4}\s*Step\s+(\d+[a-z]?)\b")
 _ATX_HEADING_RE = re.compile(r"^(#{1,6})[ \t]")
@@ -171,6 +177,11 @@ def step_id_from_heading(line: str) -> str | None:
     """A step heading (`##`-`####`, `Step <id>`) -> its `"Step <id>"` label; any other line -> None."""
     match = _HEADING_STEP_RE.match(line)
     return f"Step {match.group(1)}" if match else None
+
+
+def is_checkpoint_heading(title: str) -> bool:
+    """A heading's text (no `#` marks) opens a checkpoint block."""
+    return title.startswith(CHECKPOINT_HEADING_PREFIX)
 
 
 def step_sort_key(step: str) -> tuple[int, str]:

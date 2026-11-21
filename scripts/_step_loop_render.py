@@ -447,6 +447,12 @@ _ACTIONS = {  # `{step}` is the stop's step id
         "correct the step's Check: in IMPLEMENTATION_PLAN.md so that its command collects tests"
         " (name the plugins and options its pocket has)"
     ),
+    "checkpoint-red": (
+        "read the red pocket's block in TEST_RESULTS.md and look first at the waiting steps the"
+        " evidence names for it, whose gates left that pocket unrun; fix what failed and commit"
+        " the fix, because a run is keyed by the commit and an uncommitted fix reads the old red"
+        " run"
+    ),
     "iteration-budget": "re-tier or split the remaining steps with the user",
 }
 

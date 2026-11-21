@@ -36,7 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from _step_schema import RED as _RED
@@ -45,8 +45,10 @@ from _step_schema import (
     Malformed,
     NoRun,
     StepBlock,
+    is_checkpoint_heading,
     non_step_headings,
     split_step_blocks,
+    step_id_from_heading,
 )
 
 DEFAULT_CEILING_BYTES = 1024
@@ -105,7 +107,7 @@ def _classify_block(block: StepBlock) -> tuple[str, str | None]:
 def _driver_block_decided_red(block: StepBlock) -> bool:
     """A block the step-loop driver wrote whose deciding (last) `Result:` line is red or no run:
     a crashed, never-started or cut-off run, whose `Failed:` lines the ceiling must not bound."""
-    if _DRIVER_GATE_MARK not in block.text.splitlines()[0] or not block.results:
+    if _DRIVER_GATE_MARK not in block.text.partition("\n")[0] or not block.results:
         return False
     _, deciding = block.results[-1]
     return isinstance(deciding, NoRun) or (isinstance(deciding, Counts) and deciding.status == _RED)
@@ -116,6 +118,33 @@ def _is_heading_only(block: StepBlock) -> bool:
     return "\n" not in block.text
 
 
+def _split_checkpoint_blocks(text: str) -> tuple[str, tuple[StepBlock, ...]]:
+    """`(the text without its checkpoint blocks, those blocks)`.
+
+    A checkpoint block runs from its heading to the next step heading or level-2 heading, the
+    same ends a step block has. Taking the blocks out keeps their lines from reaching the step
+    pass: a file whose only blocks are checkpoint blocks would otherwise read as one step-less
+    block of the whole text.
+    """
+    lines = text.splitlines()
+    headings = non_step_headings(text)
+    stops = sorted(
+        [line for line, _ in headings]
+        + [at + 1 for at, line in enumerate(lines) if step_id_from_heading(line)]
+        + [len(lines) + 1]
+    )
+    kept, blocks, cursor = [], [], 0
+    for first_line, title in headings:
+        if not is_checkpoint_heading(title):
+            continue
+        end = min(stop for stop in stops if stop > first_line)
+        kept.extend(lines[cursor : first_line - 1])
+        cursor = end - 1
+        block = split_step_blocks("\n".join(lines[first_line - 1 : cursor]))[0]
+        blocks.append(replace(block, title=title, first_line=first_line))
+    return "\n".join([*kept, *lines[cursor:]]), tuple(blocks)
+
+
 def find_findings(path: Path, ceiling: int) -> list[Finding]:
     text = path.read_text(encoding="utf-8")
     display = str(path)
@@ -124,9 +153,11 @@ def find_findings(path: Path, ceiling: int) -> list[Finding]:
             display, title, "non-step-heading", f"line {line}: `## {title}` closes the open step"
         )
         for line, title in non_step_headings(text)
+        if not is_checkpoint_heading(title)
     ]
 
-    for block in split_step_blocks(text):
+    step_text, checkpoint_blocks = _split_checkpoint_blocks(text)
+    for block in (*split_step_blocks(step_text), *checkpoint_blocks):
         kind, detail = _classify_block(block)
 
         if kind in ("empty", "red"):

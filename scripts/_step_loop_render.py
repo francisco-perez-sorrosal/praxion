@@ -17,7 +17,7 @@ import re
 import shlex
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, NamedTuple, cast, get_args
+from typing import TYPE_CHECKING, Literal, NamedTuple, cast, get_args
 
 from _loop_fields import GoalBudget
 from _markdown_tables import find_section, split_lines
@@ -26,6 +26,9 @@ from _step_loop_gate import GateEvidence
 from _step_loop_ownership import own_node_permissions
 from _step_loop_review import SUPERSEDED_HEADING
 from _step_schema import STEP_ID_RE
+
+if TYPE_CHECKING:  # the checkpoint module imports the files module, which imports this one
+    from _step_loop_checkpoint import WaitingPocket
 
 PROMPT_CEILING = 16_000
 DESCRIPTION_LIMIT = 40
@@ -406,6 +409,16 @@ class StopView(NamedTuple):
     attempts: tuple[PriorAttempt, ...]
     slug: str
     invoke: str | Invocation
+    waiting: tuple[WaitingPocket, ...] = ()
+
+
+def pocket_summary(root: str, steps: Sequence[str]) -> str:
+    """One waiting pocket as the status table and every stop name it."""
+    return f"{root} (steps {', '.join(steps)})"
+
+
+def waiting_summary(waiting: Sequence[WaitingPocket]) -> str:
+    return "; ".join(pocket_summary(pocket.root, pocket.steps) for pocket in waiting)
 
 
 _ACTIONS = {  # `{step}` is the stop's step id
@@ -465,6 +478,13 @@ def _action(stop: StopView) -> str:
     return _ACTIONS[stop.cause].format(step=stop.step)
 
 
+def _waiting_line(stop: StopView, indent: str) -> list[str]:
+    """The line naming the pockets that wait for the checkpoint; none when no pocket waits."""
+    if not stop.waiting:
+        return []
+    return [f"{indent}Waiting for the checkpoint: {waiting_summary(stop.waiting)}"]
+
+
 def stop_stderr(stop: StopView) -> str:
     """The block a person watching reads: what happened, why, what to do and where."""
     who = f"Step {stop.step}" if stop.step else "the loop"
@@ -477,6 +497,7 @@ def stop_stderr(stop: StopView) -> str:
         f"step_loop: stopped — {what} ({stop.cause}).",
         *("  " + "  ".join(attempt_columns(a, "")) for a in stop.attempts),
         f"  Why: {stop.evidence}",
+        *_waiting_line(stop, "  "),
         f"  Next: {action}, then run: {Invocation.of(stop.invoke).command('next', stop.slug)}",
         f"  Handoff: .ai-work/{stop.slug}/HANDOFF.md (§2 carries this stop)",
     ])  # fmt: skip
@@ -494,6 +515,7 @@ def stop_next_action(stop: StopView) -> str:
         f"The step-loop driver stopped{where}: {what} (exit {3 if budget else 2}).",
         stop.evidence,
         *(f"- {' · '.join(attempt_columns(a, 'agent '))}" for a in stop.attempts),
+        *_waiting_line(stop, ""),
         f"{owed}: {action}.",
         f"Then resume the loop: `/praxion:step-loop {stop.slug}` (it runs `{resume}`).",
     ])  # fmt: skip

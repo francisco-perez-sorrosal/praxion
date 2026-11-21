@@ -97,7 +97,7 @@ from _step_loop_action import (
     Stop,
     issuable_action,
 )
-from _step_loop_checkpoint import waiting_pockets
+from _step_loop_checkpoint import WaitingPocket, waiting_pockets
 from _step_loop_checkpoint_run import CheckpointRed, CheckpointRunning, run_checkpoint
 from _step_loop_cli import CallerError
 from _step_loop_files import (
@@ -293,8 +293,11 @@ def run_next(
     turned into `complete` or a stop before anything renders it, but only for a `next`: a
     `record` that chains into one stops `checkpoint-due` and starts no run."""
     action, counts = issuable_action(task.inputs), cli.iterations_of(task.inputs)
+    waiting = task.inputs.waiting
     if isinstance(action, Checkpoint):
-        action = _checkpoint_due(action) if took else _checkpoint_answer(task, action)
+        action, waiting = (
+            (_checkpoint_due(action), waiting) if took else _checkpoint_answer(task, action)
+        )
     frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
     if isinstance(action, Spawn):
         action = _first_request_refused(task, action) or action
@@ -303,7 +306,7 @@ def run_next(
     if isinstance(action, Complete):
         line = cli.complete_line(task.inputs.steps, counts)
         return Reply(cli.complete_envelope(frame), (line, *cli.warning_lines(frame.warnings)))
-    view = cli.stop_view(action, task.slug, invoke)
+    view = cli.stop_view(action, task.slug, invoke, waiting)
     try:
         write_stop_handoff(
             task.slug,
@@ -320,7 +323,7 @@ def run_next(
                 (HANDOFF_NOT_WRITTEN, f"{refused}. To fix: rename it, then call next again."),
             )
         )
-    doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
+    doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE, waiting)
     return Reply(doc, (stop_stderr(view), *cli.warning_lines(frame.warnings)))
 
 
@@ -334,9 +337,12 @@ def _checkpoint_due(action: Checkpoint) -> Stop:
     return Stop(CHECKPOINT_DUE, None, f"every step is done and these pockets wait: {waiting}")
 
 
-def _checkpoint_answer(task: Task, action: Checkpoint) -> Complete | Stop:
-    """Each waiting pocket's whole suite run once: green is `complete`, red a stop for a person
-    that changes no commit, tick or verdict; a run still inside its bound refuses the call, which
+def _checkpoint_answer(
+    task: Task, action: Checkpoint
+) -> tuple[Complete | Stop, tuple[WaitingPocket, ...]]:
+    """Each waiting pocket's whole suite run once, with the pockets still waiting afterwards:
+    green is `complete`, red a stop for a person that changes no commit, tick or verdict and
+    leaves its red pockets waiting; a run still inside its bound refuses the call, which
     attaches to the run when made again."""
     give_up_at = time.time() + gate_wait_seconds()
     ran = run_checkpoint(
@@ -350,8 +356,8 @@ def _checkpoint_answer(task: Task, action: Checkpoint) -> Complete | Stop:
             cli.iterations_of(task.inputs),
         )
     if isinstance(ran, CheckpointRed):
-        return Stop(CHECKPOINT_RED, None, ran.evidence)
-    return Complete()
+        return Stop(CHECKPOINT_RED, None, ran.evidence), tuple(red.pocket for red in ran.pockets)
+    return Complete(), ()
 
 
 def _first_request_refused(task: Task, action: Spawn) -> Stop | None:
@@ -434,9 +440,11 @@ def run_status(task: Task, args: argparse.Namespace, invoke: Invocation) -> Repl
     inputs, action = task.inputs, issuable_action(task.inputs)
     stop = None
     lines: tuple[str, ...] = ()
-    if isinstance(action, Stop):
-        stop = cli.stop_object(task.slug, action, invoke, task.dir / HANDOFF_FILE)
-        lines = (stop_stderr(cli.stop_view(action, task.slug, invoke)),)
+    halted = _checkpoint_due(action) if isinstance(action, Checkpoint) else action
+    if isinstance(halted, Stop):
+        handoff = task.dir / HANDOFF_FILE
+        stop = cli.stop_object(task.slug, halted, invoke, handoff, inputs.waiting)
+        lines = (stop_stderr(cli.stop_view(halted, task.slug, invoke, inputs.waiting)),)
     status = cli.status_object(task.slug, inputs, series_states(inputs), action, stop, invoke)
     if args.json:
         return Reply(status, lines)

@@ -20,6 +20,7 @@ from _plan_steps import Implementer, PlanStep
 from _step_loop_action import (
     BUDGET_CAUSE,
     Action,
+    Checkpoint,
     Complete,
     Spawn,
     Stop,
@@ -28,8 +29,9 @@ from _step_loop_action import (
     outstanding_id,
     read_outstanding,
 )
+from _step_loop_checkpoint import WaitingPocket
 from _step_loop_recording import RecordRunningError
-from _step_loop_render import Invocation, PriorAttempt, SpawnRequest, StopView
+from _step_loop_render import Invocation, PriorAttempt, SpawnRequest, StopView, pocket_summary
 from _step_loop_review import (
     Accepted,
     Due,
@@ -327,11 +329,15 @@ def complete_envelope(frame: Frame) -> dict[str, Any]:
 
 
 def stop_envelope(
-    frame: Frame, stop: Stop, invoke: str | Invocation, handoff: Path
+    frame: Frame,
+    stop: Stop,
+    invoke: str | Invocation,
+    handoff: Path,
+    waiting: Sequence[WaitingPocket] = (),
 ) -> dict[str, Any]:
     """The loop has stopped: `needs-human`, or `budget-exhausted` for the budget cause."""
     outcome = "budget-exhausted" if stop.cause == BUDGET_CAUSE else "needs-human"
-    return _envelope(frame, outcome, stop=stop_object(frame.slug, stop, invoke, handoff))
+    return _envelope(frame, outcome, stop=stop_object(frame.slug, stop, invoke, handoff, waiting))
 
 
 def error_envelope(frame: Frame, code: str, message: str) -> dict[str, Any]:
@@ -363,18 +369,35 @@ def prior_attempt(record: IterationRecord) -> PriorAttempt:
     )
 
 
-def stop_view(stop: Stop, slug: str, invoke: str | Invocation) -> StopView:
+def stop_view(
+    stop: Stop, slug: str, invoke: str | Invocation, waiting: Sequence[WaitingPocket] = ()
+) -> StopView:
     attempts = tuple(prior_attempt(record) for record in stop.attempts)
-    return StopView(stop.cause, stop.step, stop.evidence, attempts, slug, invoke)
+    return StopView(stop.cause, stop.step, stop.evidence, attempts, slug, invoke, tuple(waiting))
 
 
-def stop_object(slug: str, stop: Stop, invoke: str | Invocation, handoff: Path) -> dict[str, Any]:
+def _waiting_part(waiting: Sequence[WaitingPocket]) -> dict[str, Any]:
+    """The `waiting` key of an object, present only when a pocket waits, so an object printed
+    when nothing waits is the one the base printed."""
+    if not waiting:
+        return {}
+    return {"waiting": [{"pocket": pocket.root, "steps": list(pocket.steps)} for pocket in waiting]}
+
+
+def stop_object(
+    slug: str,
+    stop: Stop,
+    invoke: str | Invocation,
+    handoff: Path,
+    waiting: Sequence[WaitingPocket] = (),
+) -> dict[str, Any]:
     return {
         "cause": stop.cause,
         "step": stop.step,
         "evidence": stop.evidence,
         "attempts": [_attempt_object(record) for record in stop.attempts],
         "replan_request": stop.replan_request,
+        **_waiting_part(waiting),
         "handoff": str(handoff),
         "resume": Invocation.of(invoke).command("next", slug),
     }
@@ -434,6 +457,8 @@ def outcome_of(action: Action) -> str:
         return "spawn"
     if isinstance(action, Complete):
         return "complete"
+    if isinstance(action, Checkpoint):
+        return "needs-human"  # the `checkpoint-due` stop a `record` prints in its place
     return "budget-exhausted" if action.cause == BUDGET_CAUSE else "needs-human"
 
 
@@ -456,6 +481,7 @@ def status_object(
         "pending_request": pending,
         "iterations": {"used": used, "budget": budget},
         "steps": [_step_row(step, states[step.id], inputs) for step in inputs.steps],
+        **_waiting_part(inputs.waiting),
         "stop": None if stop is None else dict(stop),
         "selected_step": _selected_step(inputs, states, action),
         "then": None if pending is None else record_command(slug, pending, invoke),
@@ -467,7 +493,7 @@ def _selected_step(inputs: LoopInputs, states: Mapping[str, Series], action: Act
     the first step not done; None once the loop is complete."""
     if isinstance(action, Spawn):
         return action.step.id
-    if isinstance(action, Complete):
+    if isinstance(action, (Complete, Checkpoint)):
         return None
     if action.step is not None:
         return action.step
@@ -504,6 +530,9 @@ def next_line(slug: str, action: Action, invoke: str | Invocation) -> str:
         return f"run `{Invocation.of(invoke).command('next', slug)}` to start {action.key.id}"
     if isinstance(action, Complete):
         return "every step is done"
+    if isinstance(action, Checkpoint):
+        resume = Invocation.of(invoke).command("next", slug)
+        return f"every step is done; run `{resume}` to run the checkpoint"
     return f"stopped ({action.cause}): {action.evidence}"
 
 
@@ -531,4 +560,6 @@ def status_table(status: Mapping[str, Any], next_line: str, steps: Sequence[Plan
     head = f"{status['slug']} · iterations {used}/{budget}"
     if status["pending_request"]:
         head += f" · pending {status['pending_request']}"
-    return "\n".join([head, *table, f"next: {next_line}"]) + "\n"
+    waiting = "; ".join(pocket_summary(w["pocket"], w["steps"]) for w in status.get("waiting", ()))
+    named = [f"waiting for the checkpoint: {waiting}"] if waiting else []
+    return "\n".join([head, *table, *named, f"next: {next_line}"]) + "\n"

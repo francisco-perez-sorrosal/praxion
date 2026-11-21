@@ -12,6 +12,7 @@ branch: worktree-per-step-gate
 pipeline_tier: standard
 affected_files:
   - scripts/_step_loop_checkpoint.py
+  - scripts/_step_loop_checkpoint_run.py
   - scripts/_step_loop_record_gate.py
   - scripts/_step_loop_io.py
   - scripts/_step_loop_action.py
@@ -31,7 +32,7 @@ Every driven step's gate ran each pocket the test scope selected, and a pocket t
 ## Decision
 
 1. The gate of a non-goal step with a readable `Check:` does not run a pocket the resolver answers with a full selection; it writes `Deferred: <root> (widened): whole suite waits for the checkpoint` in the step's block, before the `Result:` lines. Steps with no readable check and goal steps gate as before.
-2. A new component, `scripts/_step_loop_checkpoint.py`, owns the deferral grammar, the derivation of the waiting pockets (`waiting_pockets`: committed deferrals since each pocket's last green checkpoint block) and the checkpoint run.
+2. Two new components own the checkpoint: `scripts/_step_loop_checkpoint.py` (a pure leaf: the deferral grammar and the derivation of the waiting pockets, `waiting_pockets`: committed deferrals since each pocket's last green checkpoint block) and `scripts/_step_loop_checkpoint_run.py` (the checkpoint run). They are split at the pure/shell seam because the gate imports the grammar and the run imports the gate's reading, so one module would be an import cycle (found at planning).
 3. The pure action core gains a `Checkpoint` action when every step is done and a pocket waits. `run_next` runs it with the gate's detached run machinery: green prints `complete`, red stops `checkpoint-red` naming the waiting steps, unfinished answers `gate-running`.
 4. The waiting set is derived, never stored; `status --json` and every stop envelope carry it only when non-empty. Checkpoint evidence is a step-free `## Checkpoint <root> at <head7>` block the shape checker accepts.
 

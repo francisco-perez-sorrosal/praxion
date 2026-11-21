@@ -589,3 +589,70 @@ def test_a_no_run_block_that_is_not_the_drivers_is_still_bound_by_the_ceiling(
     path = _write(tmp_path, "TEST_RESULTS.md", block)
 
     assert [f.kind for f in find_findings(path, DEFAULT_CEILING_BYTES)] == ["no-run-over-ceiling"]
+
+
+# ---------------------------------------------------------------------------
+# The block the step loop's checkpoint writes: under a `## Checkpoint <root> at <head>` heading,
+# it belongs to no step, and is held to the step blocks' own shape rules.
+# ---------------------------------------------------------------------------
+
+_CHECKPOINT_HEADING = "## Checkpoint bench at 1a2b3c4\n"
+_CHECKPOINT_COVERS = f"Covers: {STEP} 1\n"
+_CHECKPOINT_SCOPE = "Scope: bench files=12 tests=12 widened\n"
+
+
+def _checkpoint_block(result: str | None, padding: str = "") -> str:
+    lines = [_CHECKPOINT_HEADING, "\n", _CHECKPOINT_COVERS, _CHECKPOINT_SCOPE]
+    if result is not None:
+        lines.append(f"{result}\n")
+    return "".join(lines) + padding
+
+
+def test_checkpoint_heading_is_not_a_non_step_heading_finding(tmp_path: Path) -> None:
+    body = _fixed_shape_green() + "\n" + _checkpoint_block("Result: pass=12 fail=0 skip=0")
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    assert _kinds(find_findings(path, DEFAULT_CEILING_BYTES)) == []
+    assert main([str(path)]) == 0
+
+
+def test_another_level_two_heading_is_still_a_non_step_heading_finding(tmp_path: Path) -> None:
+    body = (
+        _fixed_shape_green()
+        + "\n"
+        + _checkpoint_block("Result: pass=12 fail=0 skip=0")
+        + "\n## Notes\n\nfree text\n"
+    )
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert [(f.kind, f.section) for f in findings] == [("non-step-heading", "Notes")]
+
+
+def test_green_checkpoint_block_over_the_ceiling_is_flagged(tmp_path: Path) -> None:
+    body = _checkpoint_block("Result: pass=12 fail=0 skip=0", padding="x" * DEFAULT_CEILING_BYTES)
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert [f.kind for f in findings] == ["green-over-ceiling"]
+    assert findings[0].section.startswith("Checkpoint bench")
+
+
+def test_checkpoint_block_with_no_result_line_is_flagged(tmp_path: Path) -> None:
+    path = _write(tmp_path, "TEST_RESULTS.md", _checkpoint_block(None))
+
+    findings = find_findings(path, DEFAULT_CEILING_BYTES)
+
+    assert [f.kind for f in findings] == ["missing-result-line"]
+    assert findings[0].section.startswith("Checkpoint bench")
+
+
+def test_red_checkpoint_block_is_never_flagged_for_size(tmp_path: Path) -> None:
+    failures = "Failed: tests/test_a.py::test_b\n" * 100
+    body = _checkpoint_block("Result: pass=11 fail=1 skip=0", padding=failures)
+    path = _write(tmp_path, "TEST_RESULTS.md", body)
+    assert len(body.encode("utf-8")) > DEFAULT_CEILING_BYTES
+
+    assert _kinds(find_findings(path, DEFAULT_CEILING_BYTES)) == []

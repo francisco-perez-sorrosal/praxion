@@ -825,3 +825,59 @@ def test_canary_a_line_of_repeated_list_markers_parses_in_linear_time() -> None:
     )
     scripts_dir = str(Path(__file__).resolve().parent)
     subprocess.run([sys.executable, "-c", probe, scripts_dir], check=True, timeout=10)
+
+
+# ---------------------------------------------------------------------------
+# is_checkpoint_heading -- the heading of the block the loop's checkpoint writes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Checkpoint bench at 1a2b3c4",
+        "Checkpoint . at 1a2b3c4",
+        "Checkpoint services/api at 1a2b3c4",
+    ],
+)
+def test_is_checkpoint_heading_accepts_the_heading_the_checkpoint_writes(title: str) -> None:
+    assert schema.is_checkpoint_heading(title) is True
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        f"{STEP} 1 — step-loop gate, req-1",
+        "Notes",
+        "Checkpointing",
+        "Summary of the checkpoint",
+    ],
+)
+def test_is_checkpoint_heading_rejects_every_other_heading(title: str) -> None:
+    assert schema.is_checkpoint_heading(title) is False
+
+
+def test_a_checkpoint_block_after_a_step_block_gives_the_step_none_of_its_lines() -> None:
+    """Characterization guard: green on the commit before the checkpoint block existed.
+
+    Only a step heading opens a block and a level-2 heading that is no step heading closes the
+    open one, so the lines under a checkpoint heading belong to no step.
+    """
+    text = (
+        f"## {STEP} 1 — step-loop gate, req-1\n"
+        "\n"
+        "Scope: . files=2 tests=4 narrow\n"
+        "Result: pass=3 fail=0 skip=0 pending=0 by=step-loop\n"
+        "\n"
+        "## Checkpoint bench at 1a2b3c4\n"
+        "\n"
+        f"Covers: {STEP} 1\n"
+        "Scope: bench files=12 tests=12 widened\n"
+        "Result: pass=12 fail=0 skip=0 pending=0 by=step-loop\n"
+    )
+
+    blocks = schema.split_step_blocks(text)
+
+    assert len(blocks) == 1
+    assert "Checkpoint" not in blocks[0].text
+    assert [line.passed for _, line in blocks[0].results] == [3]

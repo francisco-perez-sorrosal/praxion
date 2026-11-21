@@ -11,7 +11,9 @@
                         [--max-turns T (40)] [--max-budget-usd X (2.00)]
 
 `next` reads the plan, `WIP.md`, the iteration ledger, the light-review files and the task brief,
-asks the reconciler for ground truth and prints the loop's one next action. `record` takes back
+asks the reconciler for ground truth and prints the loop's one next action; with every step done
+and a pocket's whole suite waiting, it first runs that suite once (`complete` when green, the stop
+`checkpoint-red` when not, `gate-running` while a run is inside its bound). `record` takes back
 what an agent left. `status` reports without writing. `goal` scaffolds a one-step goal plan in
 the repository it is run from (no location options) and prints `{"schema", "slug", "files",
 "warnings"}`, or refuses and writes nothing. `run` repeats `next`, a fresh headless `claude -p`
@@ -70,6 +72,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import traceback
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -85,7 +88,16 @@ from _handoff_inputs import HandoffError, resolve_base_ref
 from _loop_fields import GoalBudget, OutstandingAttempt, parse_attempts
 from _plan_steps import PlanStep, parse_plan_steps
 from _repo_root import git_toplevel_from_cwd
-from _step_loop_action import CHECK_CANNOT_COLLECT, Complete, Spawn, Stop, issuable_action
+from _step_loop_action import (
+    CHECK_CANNOT_COLLECT,
+    Checkpoint,
+    Complete,
+    Spawn,
+    Stop,
+    issuable_action,
+)
+from _step_loop_checkpoint import waiting_pockets
+from _step_loop_checkpoint_run import CheckpointRed, CheckpointRunning, run_checkpoint
 from _step_loop_cli import CallerError
 from _step_loop_files import (
     iteration_patches,
@@ -99,7 +111,12 @@ from _step_loop_files import (
     write_stop_handoff,
 )
 from _step_loop_io import commits_touching, paths_differing_from_head
-from _step_loop_record_gate import GATE_DIRECTORY, RESULTS_FILE, check_collects
+from _step_loop_record_gate import (
+    GATE_DIRECTORY,
+    RESULTS_FILE,
+    check_collects,
+    gate_wait_seconds,
+)
 from _step_loop_recording import RecordRunningError, holding_record
 from _step_loop_render import (
     GoalState,
@@ -133,6 +150,8 @@ PLAN_FILE, WIP_FILE, BRIEF_FILE, HANDOFF_FILE = (
 )
 REVIEW_FILE = "LIGHT_REVIEW_step-{}.md"
 HANDOFF_NOT_WRITTEN = "handoff-not-written"
+CHECKPOINT_RED = "checkpoint-red"
+GATE_RUNNING = "gate-running"
 
 
 @dataclass(frozen=True)
@@ -192,6 +211,9 @@ def read_task(args: argparse.Namespace) -> Task:
     )
     inputs = replace(inputs, uncommitted=uncommitted_files(repo, inputs))
     inputs = replace(inputs, outside_work=outside_work(repo, inputs, base_ref))
+    results = directory / RESULTS_FILE
+    results_text = results.read_text("utf-8") if results.is_file() else ""
+    inputs = replace(inputs, waiting=waiting_pockets(results_text, ledger.records))
     brief = directory / BRIEF_FILE
     brief_text = brief.read_text("utf-8") if brief.is_file() else ""
     return Task(args.slug, repo, work, directory, base_ref, wip_text, brief_text, inputs)
@@ -265,8 +287,11 @@ def _required(path: Path) -> str:
 def run_next(
     task: Task, args: argparse.Namespace, invoke: Invocation, took: rec.Taken | None = None
 ) -> Reply:
-    """The next action, carrying what a `record` took back."""
+    """The next action, carrying what a `record` took back. A checkpoint is run here and
+    turned into `complete` or a stop before anything renders it."""
     action, counts = issuable_action(task.inputs), cli.iterations_of(task.inputs)
+    if isinstance(action, Checkpoint):
+        action = _checkpoint_answer(task, action)
     frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
     if isinstance(action, Spawn):
         action = _first_request_refused(task, action) or action
@@ -294,6 +319,26 @@ def run_next(
         )
     doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
     return Reply(doc, (stop_stderr(view), *cli.warning_lines(frame.warnings)))
+
+
+def _checkpoint_answer(task: Task, action: Checkpoint) -> Complete | Stop:
+    """Each waiting pocket's whole suite run once: green is `complete`, red a stop for a person
+    that changes no commit, tick or verdict; a run still inside its bound refuses the call, which
+    attaches to the run when made again."""
+    give_up_at = time.time() + gate_wait_seconds()
+    ran = run_checkpoint(
+        task.repo, task.dir, action.waiting, task.inputs.records, give_up_at, os.environ
+    )
+    if isinstance(ran, CheckpointRunning):
+        raise CallerError(
+            GATE_RUNNING,
+            f"the checkpoint's run in {ran.description} is still inside its bound; nothing was"
+            " decided. To fix: run the same call again.",
+            cli.iterations_of(task.inputs),
+        )
+    if isinstance(ran, CheckpointRed):
+        return Stop(CHECKPOINT_RED, None, ran.evidence)
+    return Complete()
 
 
 def _first_request_refused(task: Task, action: Spawn) -> Stop | None:

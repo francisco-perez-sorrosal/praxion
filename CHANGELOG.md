@@ -1,3 +1,39 @@
+## v0.67.0 (2026-11-21)
+
+### Feat
+
+- Retire the working-directory notice hook
+
+### Fix
+
+- Read repo-wide inputs once per resolver call
+- Run the audit-gated liveness scenarios apart from the rest
+- Name the project, not the worktree, in the doc manifest
+- Size every limit and the audit's bound from the measured readings
+- Close, continue and reindex find a paired run in its own directory
+- Give the paired axis its own default results directory
+- Name a refused spawn in the startup instrument's withheld reason
+- Make a dry run state the smallest run cap that admits every planned session
+- Remove the liveness jobs from the scheduled health workflow and its invariant test
+- Add the liveness workflow's own invariant test
+- Create the liveness workflow with its four jobs and placeholder limits
+- Add the scenario record that reports each scenario's duration and the free disk
+- Make the selection probe and the CLI hold the audit to its declared bound
+- Declare the selection audit's own bound and read it from one place
+- Read the pack transports and an assignment before a shell
+- Run the mutation sensor on mutmut 3.8.1
+- Recover from several outstanding requests by repairing WIP
+- Read every option spelling a transport accepts
+- Close the driver's small review remarks
+- Read a commit a git option configures or runs
+- Name Praxion's review skill qualified
+- Say when a JavaScript pocket installs first
+
+### Refactor
+
+- Read the paired results directory into the output help
+- Type the adherence axes as axes
+
 ## v0.66.0 (2026-11-18)
 
 ### Feat

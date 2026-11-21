@@ -115,7 +115,7 @@ class Spawn:
 
 @dataclass(frozen=True)
 class Complete:
-    """Every step is done."""
+    """Every step is done and no pocket waits."""
 
 
 @dataclass(frozen=True)

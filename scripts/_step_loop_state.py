@@ -109,9 +109,8 @@ class LoopInputs:
     outside_work: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     # ^ the commits, oldest first, that touched a step's files since its work began, by step id;
     # only a step `wants_outside_work` names has an entry (its work was committed by hand)
-    waiting: tuple[
-        WaitingPocket, ...
-    ] = ()  # the pockets whose whole suite waits for the checkpoint
+    waiting: tuple[WaitingPocket, ...] = ()
+    # ^ the pockets whose whole suite waits for the checkpoint
 
     @classmethod
     def read(

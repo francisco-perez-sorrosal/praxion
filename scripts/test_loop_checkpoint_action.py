@@ -49,7 +49,7 @@ EVIDENCE = "bench is red; it waits for 1"
 SLUG, INVOKE = "demo", "python3 scripts/step_loop.py"
 
 CHECKPOINT_MODULE = SCRIPT_DIR / "_step_loop_checkpoint.py"
-MODULES_THAT_DO_IO = {"_step_loop_record_gate", "_step_loop_io"}
+MODULES_IMPORTING_THE_CHECKPOINT = {"_step_loop_record_gate", "_step_loop_io"}
 
 
 def done_inputs(**given) -> LoopInputs:
@@ -214,6 +214,21 @@ def waiting_in(*lines: str) -> tuple[WaitingPocket, ...]:
     return waiting_pockets("\n".join(lines) + "\n", [committed_attempt("1", "req-1")])
 
 
+def test_a_step_heading_ends_a_checkpoint_block_so_its_result_never_decides_it() -> None:
+    red = "Result: pass=11 fail=1 skip=0 pending=0 by=step-loop"
+    lines = [
+        *gate_block("1", "req-1", "bench"),
+        "",
+        checkpoint_heading("bench", "1a2b3c4"),
+        red,
+        "",
+        f"### {STEP_LABEL}2 — a later step",
+        GREEN_RESULT,
+    ]
+
+    assert waiting_in(*lines) == (WaitingPocket("bench", ("1",)),)
+
+
 @pytest.mark.parametrize("fence", [FENCE, INDENTED_FENCE])
 def test_a_deferred_line_inside_a_fence_names_no_root_whatever_the_fence_indent(fence: str) -> None:
     lines = [fence, deferred_line("bench"), fence, deferred_line("services/api")]
@@ -255,12 +270,13 @@ def test_a_green_checkpoint_for_a_pocket_nothing_waits_on_clears_nothing() -> No
 # --- The leaf stays a leaf -----------------------------------------------------------------------
 
 
-def test_the_checkpoint_module_imports_no_module_that_does_io() -> None:
+def test_the_checkpoint_module_never_imports_the_modules_that_import_it() -> None:
     tree = ast.parse(CHECKPOINT_MODULE.read_text(encoding="utf-8"))
-    imported = {
-        node.module
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and node.module is not None
-    }
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module is not None:
+            imported.add(node.module)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
 
-    assert imported.isdisjoint(MODULES_THAT_DO_IO)
+    assert imported.isdisjoint(MODULES_IMPORTING_THE_CHECKPOINT)

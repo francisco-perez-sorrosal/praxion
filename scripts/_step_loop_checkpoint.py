@@ -12,8 +12,9 @@ ledger record names the request and a commit), because an uncommitted attempt's 
 of the history a checkpoint would judge. A file written before deferrals existed holds no
 `Deferred:` line and derives nothing.
 
-Pure leaf: values in, values out, no file read and no clock. It imports no module that does I/O,
-so the gate and the checkpoint run, which import it, can never form a cycle with it.
+Pure leaf: values in, values out; this module reads no file and no clock. It never imports the
+gate or the run modules, which import it, so no cycle can form (`_step_loop_files` is imported
+only for the gate block's heading and the step label).
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from _step_schema import (
     Counts,
     is_checkpoint_heading,
     parse_result_line,
+    step_id_from_heading,
     step_sort_key,
 )
 
@@ -54,14 +56,20 @@ def deferred_line(root: str) -> str:
 def deferred_roots(lines: Iterable[str]) -> tuple[str, ...]:
     """The pocket roots the `Deferred:` lines among `lines` name, in order. A line counts only
     at column 0 and outside a code fence, as every other line of a results block does."""
-    roots = []
+    roots = (_deferred_root(line) for line in _outside_fences(lines))
+    return tuple(root for root in roots if root is not None)
+
+
+def _outside_fences(lines: Iterable[str]) -> tuple[str, ...]:
+    """The lines that sit outside a code fence, the fence lines themselves left out."""
+    outside = []
     inside_fence = False
     for line in lines:
         if line.lstrip().startswith(_FENCES):
             inside_fence = not inside_fence
-        elif not inside_fence and (root := _deferred_root(line)) is not None:
-            roots.append(root)
-    return tuple(roots)
+        elif not inside_fence:
+            outside.append(line)
+    return tuple(outside)
 
 
 def _deferred_root(line: str) -> str | None:
@@ -129,17 +137,16 @@ def _committed_gate_blocks(records: Iterable[IterationRecord]) -> dict[str, str]
 
 
 def _blocks(text: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
-    """Each `## ` block of the text as `(its heading line, the lines under it)`; a heading inside
-    a code fence opens nothing."""
+    """Each block of the text as `(its heading line, the lines under it outside code fences)`.
+
+    A block runs to the next level-2 heading or step heading, the ends the shape checker gives a
+    checkpoint block; a heading inside a code fence opens nothing.
+    """
     blocks: list[tuple[str, list[str]]] = []
-    inside_fence = False
-    for line in text.splitlines():
-        if line.lstrip().startswith(_FENCES):
-            inside_fence = not inside_fence
-        elif not inside_fence and line.startswith(_HEADING_MARK):
+    for line in _outside_fences(text.splitlines()):
+        if line.startswith(_HEADING_MARK) or step_id_from_heading(line):
             blocks.append((line, []))
-            continue
-        if blocks:
+        elif blocks:
             blocks[-1][1].append(line)
     return tuple((heading, tuple(body)) for heading, body in blocks)
 

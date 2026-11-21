@@ -13,7 +13,8 @@
 `next` reads the plan, `WIP.md`, the iteration ledger, the light-review files and the task brief,
 asks the reconciler for ground truth and prints the loop's one next action; with every step done
 and a pocket's whole suite waiting, it first runs that suite once (`complete` when green, the stop
-`checkpoint-red` when not, `gate-running` while a run is inside its bound). `record` takes back
+`checkpoint-red` when not, `gate-running` while a run is inside its bound); a `record` that
+leaves only that checkpoint to run starts none and stops `checkpoint-due`. `record` takes back
 what an agent left. `status` reports without writing. `goal` scaffolds a one-step goal plan in
 the repository it is run from (no location options) and prints `{"schema", "slug", "files",
 "warnings"}`, or refuses and writes nothing. `run` repeats `next`, a fresh headless `claude -p`
@@ -151,6 +152,7 @@ PLAN_FILE, WIP_FILE, BRIEF_FILE, HANDOFF_FILE = (
 REVIEW_FILE = "LIGHT_REVIEW_step-{}.md"
 HANDOFF_NOT_WRITTEN = "handoff-not-written"
 CHECKPOINT_RED = "checkpoint-red"
+CHECKPOINT_DUE = "checkpoint-due"
 GATE_RUNNING = "gate-running"
 
 
@@ -288,10 +290,11 @@ def run_next(
     task: Task, args: argparse.Namespace, invoke: Invocation, took: rec.Taken | None = None
 ) -> Reply:
     """The next action, carrying what a `record` took back. A checkpoint is run here and
-    turned into `complete` or a stop before anything renders it."""
+    turned into `complete` or a stop before anything renders it, but only for a `next`: a
+    `record` that chains into one stops `checkpoint-due` and starts no run."""
     action, counts = issuable_action(task.inputs), cli.iterations_of(task.inputs)
     if isinstance(action, Checkpoint):
-        action = _checkpoint_answer(task, action)
+        action = _checkpoint_due(action) if took else _checkpoint_answer(task, action)
     frame = cli.Frame(task.slug, counts, *((took.warnings, took.recorded) if took else ()))
     if isinstance(action, Spawn):
         action = _first_request_refused(task, action) or action
@@ -319,6 +322,16 @@ def run_next(
         )
     doc = cli.stop_envelope(frame, action, invoke, task.dir / HANDOFF_FILE)
     return Reply(doc, (stop_stderr(view), *cli.warning_lines(frame.warnings)))
+
+
+def _checkpoint_due(action: Checkpoint) -> Stop:
+    """The stop a `record` answers when the checkpoint is what comes next: it names each pocket
+    left waiting, and the plain `next` call that runs them."""
+    waiting = "; ".join(
+        f"{pocket.root} (waiting steps: {', '.join(f'{STEP_LABEL}{s}' for s in pocket.steps)})"
+        for pocket in action.waiting
+    )
+    return Stop(CHECKPOINT_DUE, None, f"every step is done and these pockets wait: {waiting}")
 
 
 def _checkpoint_answer(task: Task, action: Checkpoint) -> Complete | Stop:

@@ -453,6 +453,9 @@ _ACTIONS = {  # `{step}` is the stop's step id
         " the fix, because a run is keyed by the commit and an uncommitted fix reads the old red"
         " run"
     ),
+    "checkpoint-due": (
+        "run next at once: it runs each waiting pocket's whole suite once, and a record never does"
+    ),
     "iteration-budget": "re-tier or split the remaining steps with the user",
 }
 

@@ -574,10 +574,12 @@ class PocketScope:
 @dataclass(frozen=True)
 class ScopeRuns:
     """The derived scope: the resolver's decision and the pockets it ran, in the resolver's
-    order. A pocket with nothing selected is not listed."""
+    order. A pocket with nothing selected is not listed; `deferred` holds the roots of the
+    widened pockets left unrun when the caller asked to defer them."""
 
     decision: str
     pockets: tuple[PocketScope, ...]
+    deferred: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -657,19 +659,25 @@ def run_derived_scope(
     run_dir: Path,
     environ: Mapping[str, str],
     give_up_at: float = math.inf,
+    defer_widened: bool = False,
 ) -> Union[ScopeRuns, ScopeUnresolved]:  # noqa: UP007 -- runtime value, 3.9 floor
     """Resolve the test scope for `changed` and run every invocation it lists, each under its
     pocket's bound, in order. The runs live under `run_dir`: asked again with the same `run_dir`,
-    a run already started is picked up instead of started, and a finished one is not run again."""
+    a run already started is picked up instead of started, and a finished one is not run again.
+    With `defer_widened`, a pocket the resolver widened to its whole suite is not run: its root
+    is returned in `deferred` for the caller to leave for a later run."""
     ask = (sys.executable, str(RESOLVER), "--repo-root", str(repo), "--changed", *changed, "--json")
     resolver = run_command(ask, repo, RESOLVER_TIMEOUT_SECONDS)
     plan = _read_plan(resolver)
     if plan is None:
         return ScopeUnresolved(resolver)
-    pockets, number = [], 1
+    pockets, deferred, number = [], [], 1
     for entry in plan["pockets"]:
         invocations = entry["invocations"]
         if not invocations:
+            continue
+        if defer_widened and entry["selection"] == _WIDENED:
+            deferred.append(entry["root"])
             continue
         reading = pocket_bound(repo, entry["root"], environ)
         for warning in reading.warnings:
@@ -688,7 +696,7 @@ def run_derived_scope(
         )
         if isinstance(runs[-1], StillRunning):
             break  # the budget is spent: nothing after a run still inside its bound starts
-    return ScopeRuns(str(plan["decision"]), tuple(pockets))
+    return ScopeRuns(str(plan["decision"]), tuple(pockets), tuple(deferred))
 
 
 def _run_in_order(specs: list[RunSpec], give_up_at: float) -> tuple[Observed, ...]:

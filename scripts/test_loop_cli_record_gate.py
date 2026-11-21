@@ -384,7 +384,7 @@ def run_the_gate_over(monkeypatch, tmp_path, *pockets, changed=("a.py",), check=
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: changed)
     monkeypatch.setattr(gating, "run_bounded_check", lambda *_: check or PASSED)
-    monkeypatch.setattr(gating, "run_derived_scope", lambda *_: scope(*pockets))
+    monkeypatch.setattr(gating, "run_derived_scope", lambda *_, **__: scope(*pockets))
     task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
     return gating.run_gate(task, task.inputs.steps[0], REQUEST)
 
@@ -508,7 +508,7 @@ def run_the_gate(monkeypatch, tmp_path, plan, *, changed=(), decision=None):
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: changed)
     monkeypatch.setattr(gating, "run_bounded_check", lambda *_: PASSED)
-    monkeypatch.setattr(gating, "run_derived_scope", lambda *_: ScopeRuns(decision, ()))
+    monkeypatch.setattr(gating, "run_derived_scope", lambda *_, **__: ScopeRuns(decision, ()))
     task = gate_task(tmp_path, plan)
     return gating.run_gate(task, task.inputs.steps[0], REQUEST)
 
@@ -674,7 +674,7 @@ def test_a_scope_that_did_not_resolve_still_says_what_it_was_derived_from(monkey
     monkeypatch.setattr(gating, "head_sha", lambda _repo: HEAD)
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py", "b.py"))
     monkeypatch.setattr(gating, "run_bounded_check", lambda *_: PASSED)
-    monkeypatch.setattr(gating, "run_derived_scope", lambda *_: ScopeUnresolved(PASSED))
+    monkeypatch.setattr(gating, "run_derived_scope", lambda *_, **__: ScopeUnresolved(PASSED))
     task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
 
     gate = gating.run_gate(task, task.inputs.steps[0], REQUEST)
@@ -737,7 +737,7 @@ def test_a_scope_with_a_run_still_inside_its_bound_raises_before_anything_is_wri
     monkeypatch.setattr(gating, "paths_differing_from_head", lambda *_: ("a.py",))
     monkeypatch.setattr(gating, "run_bounded_check", lambda *_: PASSED)
     monkeypatch.setattr(
-        gating, "run_derived_scope", lambda *_: scope((".", finished(".")), ("eval", still))
+        gating, "run_derived_scope", lambda *_, **__: scope((".", finished(".")), ("eval", still))
     )
     task = gate_task(tmp_path, gate_plan("**Files**: `a.py`\n", CHECK_LINE))
 
@@ -755,7 +755,7 @@ def test_the_scope_is_run_against_a_deadline_the_call_budget_sets(monkeypatch, t
     monkeypatch.setattr(
         gating,
         "run_derived_scope",
-        lambda *args: asked.append(args) or ScopeRuns("nothing-to-run", ()),
+        lambda *args, **_: asked.append(args) or ScopeRuns("nothing-to-run", ()),
     )
 
     gating.scope_run(tmp_path, tmp_path / "gate", ["a.py"], NOTHING_PENDING)

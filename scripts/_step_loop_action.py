@@ -88,9 +88,16 @@ HUMAN_CAUSES = tuple(
     """attempts-exhausted stalled blocked-marker conflict-marker human-verdict unnamed-attempts
     review-revised-twice review-unfinished revision-failed review-without-work not-driven
     dependency-defect commit-disturbed-tree loop-state-defect files-glob request-outstanding
-    attempts-disagree unreadable-plan-field check-cannot-collect checkpoint-red""".split()
+    attempts-disagree unreadable-plan-field check-cannot-collect checkpoint-red
+    checkpoint-due""".split()
 )
-NULL_STEP_CAUSES = ("unnamed-attempts", "loop-state-defect", "checkpoint-red", BUDGET_CAUSE)
+NULL_STEP_CAUSES = (
+    "unnamed-attempts",
+    "loop-state-defect",
+    "checkpoint-red",
+    "checkpoint-due",
+    BUDGET_CAUSE,
+)
 REPLAN_CAUSES = ("attempts-exhausted", "stalled")  # the stops of a spent bound
 _REVIEW_STOPS = {
     RevisedTwice: ("review-revised-twice", "the light review asked for revision twice"),

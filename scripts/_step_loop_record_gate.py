@@ -14,6 +14,11 @@ The reconciler reads a step's latest block for its `Mutation:` line, so the bloc
 step's latest earlier one, set before the `Result:` lines to keep the deciding line last. A derived
 scope the resolver answers `nothing-to-run` (documents, say) contributes no run: the `Check:`
 decides, and a step with no check reads as unverifiable, which is red.
+
+A step with a readable `Check:` starts no run of a pocket the resolver widened to its whole suite:
+the block names it on a `Deferred:` line, after the scope's lines and before every `Result:` line,
+for the checkpoint to run once. A pocket left unrun is neither a `Scope:` nor a result, so the
+check and the narrow runs alone decide.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ from typing import Any, Protocol, cast
 
 from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep
+from _step_loop_checkpoint import deferred_line, deferred_roots
 from _step_loop_files import gate_heading, write_atomic, write_gate_block
 from _step_loop_gate import (
     GateRun,
@@ -139,6 +145,11 @@ class Gate:
     def deciding(self) -> str:
         return self.body[-1]
 
+    @property
+    def deferred(self) -> tuple[str, ...]:
+        """The roots of the widened pockets this gate left for the checkpoint."""
+        return deferred_roots(self.body)
+
 
 class GateStillRunningError(Exception):
     """The scope has a run still inside its bound after the call's budget. Nothing was written:
@@ -198,10 +209,15 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     changed = paths_differing_from_head(task.repo, step.files) if step.files else ()
     run_dir = task.dir / GATE_DIRECTORY / request
     give_up_at = time.time() + gate_wait_seconds()
+    deferred: tuple[str, ...] = ()
     if goal:
         scope, check = goal_runs(task.repo, run_dir, step, changed, give_up_at)
     else:
-        scope = scope_run(task.repo, run_dir, changed, ownership, give_up_at) if changed else None
+        if changed:
+            defer = isinstance(step.check, Check)
+            scope, deferred = scope_run(task.repo, run_dir, changed, ownership, give_up_at, defer)
+        else:
+            scope = None
         check = check_run(task.repo, run_dir, step, ownership, give_up_at)
     runs = tuple(run for run in (scope and scope.deciding, check) if run is not None)
     if not runs:
@@ -219,6 +235,7 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
     body = (
         *summary,
         *command,
+        *map(deferred_line, deferred),
         *evidence_lines(scope, check),
         *carried_mutation(results, step.id),
         *kept,
@@ -304,7 +321,7 @@ def goal_runs(
         check = classified(ran, targets, step.check.command)
     else:
         check = check_run(repo, run_dir, step, targets, give_up_at)
-    scope = scope_run(repo, run_dir, changed, targets, give_up_at) if changed else None
+    scope = scope_run(repo, run_dir, changed, targets, give_up_at)[0] if changed else None
     return scope, check
 
 
@@ -314,21 +331,25 @@ def scope_run(
     changed: Sequence[str],
     rule: PendingRule,
     give_up_at: float | None = None,
-) -> ScopeReading | None:
-    """The derived scope of `changed`, every invocation it lists run and read; None when the
-    resolver decides no test is needed (a run that failed is red, a run never asked is not).
+    defer_widened: bool = False,
+) -> tuple[ScopeReading | None, tuple[str, ...]]:
+    """The derived scope of `changed`, every invocation it lists run and read, and the roots of
+    the widened pockets it left unrun (none unless `defer_widened`). The reading is None when no
+    run was needed: the resolver decides no test is needed, or every pocket it selects is
+    deferred (a run that failed is red, a run never asked is not).
     The runs are waited for until `give_up_at`, by default the call's gate wait from now."""
     deadline = time.time() + gate_wait_seconds() if give_up_at is None else give_up_at
-    resolved = run_derived_scope(repo, changed, run_dir, os.environ, deadline)
+    resolved = run_derived_scope(
+        repo, changed, run_dir, os.environ, deadline, defer_widened=defer_widened
+    )
     if isinstance(resolved, ScopeUnresolved):
         why = resolved.resolver.problem or f"exit {resolved.resolver.returncode}"
-        return ScopeReading(
-            GateRun(SCOPE_COMMAND, NoRun(f"the test scope did not resolve ({why})"))
-        )
+        unresolved = GateRun(SCOPE_COMMAND, NoRun(f"the test scope did not resolve ({why})"))
+        return ScopeReading(unresolved), ()
     if not resolved.pockets:
-        if resolved.decision == NOTHING_TO_RUN:
-            return None
-        return ScopeReading(GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test")))
+        if resolved.deferred or resolved.decision == NOTHING_TO_RUN:
+            return None, resolved.deferred
+        return ScopeReading(GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test"))), ()
     running = tuple(
         pocket.pocket
         for pocket in resolved.pockets
@@ -336,7 +357,7 @@ def scope_run(
     )
     if running:
         raise GateStillRunningError(running)
-    return read_scope(resolved, rule, repo)
+    return read_scope(resolved, rule, repo), resolved.deferred
 
 
 @dataclass(frozen=True)

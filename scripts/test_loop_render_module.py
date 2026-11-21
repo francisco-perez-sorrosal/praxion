@@ -632,7 +632,7 @@ CAUSES = {
     "review-without-work", "not-driven", "dependency-defect", "commit-disturbed-tree", "loop-state-defect",
     "iteration-budget", "files-glob", "request-outstanding", "attempts-disagree",
     "unreadable-plan-field",
-    "check-cannot-collect",
+    "check-cannot-collect", "checkpoint-red",
 }  # fmt: skip
 
 

@@ -26,6 +26,8 @@ The working-directory notice hook was added because a `cd` inside a Bash command
 
 Remove `hooks/notice_working_directory.sh`, `hooks/test_notice_working_directory.py` and their three registrations in `hooks/hooks.json` (`PreToolUse` matcher `""` as `pre`; `PostToolUse` and `PostToolUseFailure`, matcher `Bash`, as `post`). `PostToolUseFailure` held only this hook and leaves the file. The rows naming the hook in `.ai-state/DESIGN.md` and `scripts/CLAUDE.md` go with it. The per-session records it wrote under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/praxion/cwd-notice/` are left to age: nothing reads them, and the hook pruned only its own. The removal reaches a session only after a release, a plugin update and a restart; until then the installed copy keeps running from the plugin cache, which this change does not touch.
 
+**Correction (2026-11-20).** The last sentence holds only for a session on the installed plugin. A session started with `praxion-claude-dev` (`claude --plugin-dir` on the checkout) runs the checkout's hooks and reads their registrations once, at start: it gets the removal at once, and a session already open when the script was deleted fails on every call the hook is registered for, non-blocking ("No such file or directory"), until a restart. The session that made this change failed that way 185 times before its restart.
+
 ## Considered Options
 
 ### Keep the hook for older CLIs

@@ -23,10 +23,11 @@ Bound here, because the specification or the base commit fixes them:
 - how long one call waits for its runs is set through `GATE_WAIT_VARIABLE`, the gate's own
   wait at the base commit; a checkpoint run is taken to honour the same wait.
 
-Not yet bound (each raises until a binding step binds it to the designed interface):
+Bound to the designed interface (a key `waiting`, present only when a pocket waits, a list of
+`{"pocket": <root>, "steps": [<id>, ...]}`):
 
-- where `status --json` lists the pockets waiting for the checkpoint and their steps;
-- where a stop lists the pockets waiting for the checkpoint and their steps.
+- `status --json` lists the pockets waiting for the checkpoint and their steps under `waiting`;
+- a stop lists them under `stop.waiting`, in the same shape.
 """
 
 from __future__ import annotations
@@ -328,20 +329,19 @@ def verdicts(task: LoopTask) -> dict[str, tuple[Any, Any]]:
     return {step: (v.get("verdict"), v.get("decided_by")) for step, v in read.items()}
 
 
-# -- Not yet bound ----------------------------------------------------------------------------
+# -- What the command lists as waiting --------------------------------------------------------
+
+
+def waiting_pockets_by_root(listed: list[dict[str, Any]] | None) -> dict[str, list[str]]:
+    """A `waiting` list as {pocket root: sorted step ids}; `{}` when the key was absent."""
+    return {entry["pocket"]: sorted(entry["steps"]) for entry in listed or []}
 
 
 def waiting_in_status(task: LoopTask) -> dict[str, list[str]]:
     """Each pocket `status --json` lists as waiting, mapped to its waiting steps' ids, sorted."""
-    raise NotImplementedError(
-        "status in its JSON form does not yet list each pocket that waits for the checkpoint "
-        "with the steps whose committed changes reached it since its last green run"
-    )
+    return waiting_pockets_by_root(step_loop.status(task, as_json=True).json().get("waiting"))
 
 
 def waiting_named_by_stop(envelope: Envelope) -> dict[str, list[str]]:
     """Each pocket a stop names as waiting, mapped to its waiting steps' ids, sorted."""
-    raise NotImplementedError(
-        "a stop does not yet list each pocket that waits for the checkpoint with the steps "
-        f"whose committed changes reached it since its last green run: {envelope.stop}"
-    )
+    return waiting_pockets_by_root((envelope.stop or {}).get("waiting"))

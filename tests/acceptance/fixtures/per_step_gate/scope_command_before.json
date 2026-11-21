@@ -1,0 +1,8 @@
+{
+ "base_commit": "ec962553be69acb14a997a2525ae54deec1ec3a2",
+ "sha256": {
+  "scripts/_native_selection.py": "497a4bbfbbdd9eae2a1469dcd352b5e41257ae42afee81365956eae81321a0e3",
+  "scripts/_python_selection.py": "fda84cc935001ca7aaff843fd2a4fe86a55bd642a93c74b4bba95bddcaebb402",
+  "scripts/resolve_test_scope.py": "9250b12a8bc2381cad68ed8e5afeafb215f469bd206283e9af31b8a437aa64a2"
+ }
+}

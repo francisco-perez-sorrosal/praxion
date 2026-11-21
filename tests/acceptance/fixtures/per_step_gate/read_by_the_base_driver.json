@@ -1,0 +1,107 @@
+{
+ "base_commit": "ec962553be69acb14a997a2525ae54deec1ec3a2",
+ "cases": {
+  "widened-all-done": {
+   "next": {
+    "iterations": {
+     "budget": 2,
+     "used": 1
+    },
+    "outcome": "complete",
+    "schema": 1,
+    "slug": "loop-task",
+    "warnings": []
+   },
+   "scratch_base": "c6c615057e9931c61536677fa1d38bc213da387a",
+   "status": {
+    "iterations": {
+     "budget": 2,
+     "used": 1
+    },
+    "outcome": "complete",
+    "pending_request": null,
+    "schema": 1,
+    "selected_step": null,
+    "slug": "loop-task",
+    "steps": [
+     {
+      "assignee": "implementer",
+      "attempt_cap": 2,
+      "attempts": 1,
+      "commit": "59a6230",
+      "review": null,
+      "step": "1",
+      "verdict": "verified-complete"
+     }
+    ],
+    "stop": null,
+    "then": null
+   }
+  },
+  "widened-then-outstanding": {
+   "next": {
+    "iterations": {
+     "budget": 4,
+     "used": 1
+    },
+    "outcome": "spawn",
+    "request": {
+     "agent_call": {
+      "description": "Step 2 attempt 1/2",
+      "model": "sonnet",
+      "prompt": "Task slug: loop-task\nSpawn request: s2-a1-implement\nRead <ROOT>/project/.ai-work/loop-task/PROMPT_s2-a1-implement.md first and follow it; it holds your step and its constraints.",
+      "subagent_type": "praxion:implementer"
+     },
+     "attempt": 1,
+     "attempt_cap": 2,
+     "id": "s2-a1-implement",
+     "kind": "implement",
+     "prompt_path": "<ROOT>/project/.ai-work/loop-task/PROMPT_s2-a1-implement.md",
+     "reissued": true,
+     "step": "2"
+    },
+    "schema": 1,
+    "slug": "loop-task",
+    "then": "python3 scripts/step_loop.py record loop-task --request s2-a1-implement --agent-id <agentId> --marker <complete|blocked|conflict|partial|none> --repo-root <ROOT>/project --base-ref 47e7f57cc5d071ecd881bc53f621f60cbf4f14fa",
+    "warnings": []
+   },
+   "scratch_base": "47e7f57cc5d071ecd881bc53f621f60cbf4f14fa",
+   "status": {
+    "iterations": {
+     "budget": 4,
+     "used": 1
+    },
+    "outcome": "spawn",
+    "pending_request": "s2-a1-implement",
+    "schema": 1,
+    "selected_step": "2",
+    "slug": "loop-task",
+    "steps": [
+     {
+      "assignee": "implementer",
+      "attempt_cap": 2,
+      "attempts": 1,
+      "commit": "b214700",
+      "review": null,
+      "step": "1",
+      "verdict": "verified-complete"
+     },
+     {
+      "assignee": "implementer",
+      "attempt_cap": 2,
+      "attempts": 1,
+      "commit": null,
+      "review": null,
+      "step": "2",
+      "verdict": "in-flight"
+     }
+    ],
+    "stop": null,
+    "then": "python3 scripts/step_loop.py record loop-task --request s2-a1-implement --agent-id <agentId> --marker <complete|blocked|conflict|partial|none> --repo-root <ROOT>/project --base-ref 47e7f57cc5d071ecd881bc53f621f60cbf4f14fa"
+   }
+  }
+ },
+ "root_placeholder": "<ROOT>",
+ "slug": "loop-task",
+ "written_by": "the base commit's scripts/step_loop.py, run from `git archive` of the base commit"
+}

@@ -205,11 +205,12 @@ def whole_suites(repo: Path) -> dict[str, tuple[Invocation, ...]] | NoRun:
 def record_once(results: Path, heading: str, body: Sequence[str]) -> None:
     """Append the block under `heading` unless the results file holds that heading already."""
     text = results.read_text("utf-8") if results.is_file() else ""
-    lines = text.splitlines()
-    if heading in lines:
+    if heading in text.splitlines():
         return
-    spaced = [*lines, ""] if lines and lines[-1] != "" else lines
-    write_atomic(results, "\n".join([*spaced, heading, "", *body]) + "\n")
+    # No blank line is added before the heading: the last block above keeps its bytes, so the
+    # append changes nothing but the new block, however a reader compares blocks across it.
+    ended = text if not text or text.endswith("\n") else text + "\n"
+    write_atomic(results, ended + "\n".join([heading, "", *body]) + "\n")
 
 
 class _NothingPends:

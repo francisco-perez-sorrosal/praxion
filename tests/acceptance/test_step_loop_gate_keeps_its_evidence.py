@@ -224,7 +224,8 @@ def test_a_green_block_names_each_pocket_run_with_its_file_and_test_counts(tmp_p
 
 def test_a_green_block_says_when_a_pocket_run_was_widened(tmp_path):
     unmapped = "config/settings.ini"
-    task = build_loop(tmp_path, Step("1", more_files=(unmapped,)))
+    # A step with no Check: runs a widened pocket whole at its gate; a checked one defers it.
+    task = build_loop(tmp_path, Step("1", more_files=(unmapped,), declares_check=False))
 
     request_id, returned = _one_gate(task, Work(other_edits=((unmapped, "[app]\nmode = 1\n"),)))
 

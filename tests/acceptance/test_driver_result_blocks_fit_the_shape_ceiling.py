@@ -72,7 +72,17 @@ def _base_files() -> dict[str, str]:
 
 def _edits() -> tuple[tuple[str, str], ...]:
     changed = [(m, "VALUE = 2\n") for m in (ROOT_MODULE, *POCKET_MODULES.values())]
-    tests = [(t, "def test_declared_behaviour():\n    assert True\n") for t in DECLARED_TESTS]
+    # Each declared test imports a declared helper, so every changed source reaches a test and
+    # the scope stays narrow in every pocket: a widened pocket would be left for the checkpoint
+    # and the block would no longer be wide.
+    tests = [
+        (
+            t,
+            f"from src.{_module_name(DECLARED_SOURCES[i % len(DECLARED_SOURCES)])} import HELPER"
+            "\n\n\ndef test_declared_behaviour():\n    assert HELPER\n",
+        )
+        for i, t in enumerate(DECLARED_TESTS)
+    ]
     sources = [(s, "HELPER = True\n") for s in DECLARED_SOURCES]
     return tuple(changed + tests + sources)
 

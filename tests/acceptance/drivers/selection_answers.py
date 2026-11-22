@@ -8,8 +8,7 @@ test here read the whole repository.
 
 A pocket whose adapter needs a tool on `PATH` answers by what the machine has installed (the
 dashboard's vitest pocket widens as `tool-unavailable` without it). Every answer here is taken
-with no vitest and no jest on `PATH`, the condition the frozen base answers were recorded under,
-so a comparison never reads the machine.
+with no vitest and no jest on `PATH`, so an answer never depends on what the machine installed.
 
 A test is selected for a file when the answer of the pocket holding the test is that pocket's full
 suite or a list naming the test.

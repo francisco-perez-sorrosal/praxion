@@ -24,16 +24,23 @@ HOOK_DELIVERY_TEST = "hooks/test_inject_subagent_context_delivery.py"
 KERNEL_MANIFEST_TEST = "scripts/test_check_kernel_manifest.py"
 RESULTS_PARITY_TEST = "scripts/test_kernel_run_evidence_parity.py"
 
-NAMED_PAIRS = {
-    "eval/pyproject.toml": "scripts/test_pocket_gate_declarations.py",
-    ".ai-state/kernel_adoption.yaml": "tests/acceptance/test_spawn_kernel_injection.py",
-    "hooks/_commit_command.py": HOOK_DELIVERY_TEST,
-    "hooks/_hook_utils.py": HOOK_DELIVERY_TEST,
-    "rules/swe/testing-conventions.md": "tests/acceptance/test_other_channels_carry_the_kernel.py",
-    "rules/swe/vcs/git-conventions.md": KERNEL_MANIFEST_TEST,
-    "rules/_manifest.yaml": KERNEL_MANIFEST_TEST,
-    "hooks/inject_rules.py": HOOK_DELIVERY_TEST,
-}
+NAMED_PAIRS = (
+    ("eval/pyproject.toml", "scripts/test_pocket_gate_declarations.py"),
+    (".ai-state/kernel_adoption.yaml", "tests/acceptance/test_spawn_kernel_injection.py"),
+    ("hooks/_commit_command.py", HOOK_DELIVERY_TEST),
+    ("hooks/_hook_utils.py", HOOK_DELIVERY_TEST),
+    ("hooks/_hook_utils.py", "tests/acceptance/test_adherence_eval_stays_out_of_band.py"),
+    ("hooks/_hook_utils.py", "tests/acceptance/test_live_eval_treats_archives_as_byproducts.py"),
+    ("hooks/_hook_utils.py", "tests/acceptance/test_log_archives_stay_out_of_version_control.py"),
+    ("hooks/_hook_utils.py", "tests/acceptance/test_log_health_checks.py"),
+    (
+        "rules/swe/testing-conventions.md",
+        "tests/acceptance/test_other_channels_carry_the_kernel.py",
+    ),
+    ("rules/swe/vcs/git-conventions.md", KERNEL_MANIFEST_TEST),
+    ("rules/_manifest.yaml", KERNEL_MANIFEST_TEST),
+    ("hooks/inject_rules.py", HOOK_DELIVERY_TEST),
+)
 
 RESULTS_DIRECTORY = ".ai-state/eval_ledger/adherence/"
 RUN_INDEX = RESULTS_DIRECTORY + "index.json"
@@ -47,7 +54,7 @@ def copy(tmp_path_factory):
     return make_copy(tmp_path_factory.mktemp("named-gaps"))
 
 
-@pytest.mark.parametrize(("changed", "reader"), sorted(NAMED_PAIRS.items()))
+@pytest.mark.parametrize(("changed", "reader"), NAMED_PAIRS)
 def test_a_change_to_the_file_alone_selects_the_test_that_reads_it(copy, changed, reader):
     answer = answers_for(copy, [changed])[changed]
 

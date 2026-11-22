@@ -284,6 +284,7 @@ Apply each lens in sequence. Annotate the architecture with findings.
 - **Developer lens**: Is this implementable in small increments? Are the boundaries clear? Will developers understand where new code goes?
 - **Test lens**: Is this testable? Are there seams for mocking? Are critical paths observable?
 - **Operations lens**: Is this deployable? Can it be rolled back? Are there monitoring or observability needs?
+- **Requirement lens**: For each call path an interface line adds (a new caller of an entry point, or a call chained from another one), re-read every requirement that names that call. One design let a chained call run what a requirement said that call never starts, and the conflict surfaced only when the implementer reached it.
 
 When activation criteria from [design-synthesis.md — When to Activate](../skills/software-planning/references/design-synthesis.md#when-to-activate) fire, extend the lens set with Security, Performance, Simplicity, and Testability per the [lens catalog](../skills/software-planning/references/design-synthesis.md#lens-catalog).
 

@@ -1,3 +1,25 @@
+## v0.68.0 (2026-11-22)
+
+### Feat
+
+- Name the waiting pockets in status and in every stop, state the checkpoint in the step-loop skill and document it
+- Leave a widened pocket for the checkpoint at the gate of a step with a check
+- Run each waiting pocket's whole suite once at the checkpoint and answer complete, checkpoint-red or gate-running
+- Add the pure representation of the waiting pockets and the checkpoint action
+
+### Fix
+
+- Mark a string that names a path in another tree
+- Stop a silent session at its timeout
+- Keep an in-time result and skip malformed events
+- Append a checkpoint block without touching the one above
+
+### Refactor
+
+- State the adherence results layout once
+- Name the scope run's result and its flag
+- Share the pocket-run helpers with the checkpoint
+
 ## v0.67.0 (2026-11-21)
 
 ### Feat

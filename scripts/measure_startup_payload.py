@@ -66,6 +66,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
@@ -574,6 +575,10 @@ def run_target(
     deadline = time.monotonic() + timeout
     lines = []
     late = False
+    # The deadline is read as each line arrives, so a session that prints nothing is stopped here.
+    watchdog = threading.Timer(timeout, _stop, args=(process,))
+    watchdog.daemon = True
+    watchdog.start()
     try:
         assert process.stdout is not None
         for line in process.stdout:
@@ -584,6 +589,7 @@ def run_target(
             if late or seen.ended or target_satisfied(seen, target, namespace):
                 break
     finally:
+        watchdog.cancel()
         _stop(process)
     if late:
         seen.ended = False  # a `result` read after the timeout did not end the session within it

@@ -821,6 +821,25 @@ def test_a_session_that_ignores_the_stop_signal_is_killed_after_the_grace(
     assert not outlived.exists(), "the session that ignored the stop signal was not killed"
 
 
+_SILENT_STAND_IN = """#!{python}
+import pathlib, time
+time.sleep({pause})
+pathlib.Path({outlived!r}).touch()
+"""
+
+
+def test_a_session_that_prints_nothing_is_stopped_at_the_timeout(tmp_path: Path, monkeypatch):
+    outlived = tmp_path / "outlived"
+    _stand_in_claude(tmp_path, monkeypatch, _SILENT_STAND_IN, pause=5, outlived=str(outlived))
+
+    seen, _ = msp.run_target(
+        "agent:verifier", msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", 1
+    )
+
+    assert seen == msp.StreamObservation()
+    assert not outlived.exists(), "a silent session ran past the timeout"
+
+
 _RECORDING_STAND_IN = """#!{python}
 import json, os, pathlib, sys
 pathlib.Path({record!r}).write_text(json.dumps({{"cwd": os.getcwd(), "argv": sys.argv[1:]}}))

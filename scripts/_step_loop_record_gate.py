@@ -31,7 +31,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, NamedTuple, Protocol, cast
 
 from _loop_fields import Check, GoalBudget
 from _plan_steps import PlanStep
@@ -214,8 +214,14 @@ def run_gate(task: TaskView, step: PlanStep, request: str) -> Gate:
         scope, check = goal_runs(task.repo, run_dir, step, changed, give_up_at)
     else:
         if changed:
-            defer = isinstance(step.check, Check)
-            scope, deferred = scope_run(task.repo, run_dir, changed, ownership, give_up_at, defer)
+            scope, deferred = scope_run(
+                task.repo,
+                run_dir,
+                changed,
+                ownership,
+                give_up_at,
+                defer_widened=isinstance(step.check, Check),
+            )
         else:
             scope = None
         check = check_run(task.repo, run_dir, step, ownership, give_up_at)
@@ -321,8 +327,16 @@ def goal_runs(
         check = classified(ran, targets, step.check.command)
     else:
         check = check_run(repo, run_dir, step, targets, give_up_at)
-    scope = scope_run(repo, run_dir, changed, targets, give_up_at)[0] if changed else None
+    scope = scope_run(repo, run_dir, changed, targets, give_up_at).reading if changed else None
     return scope, check
+
+
+class ScopeOutcome(NamedTuple):
+    """What a scope run leaves: its reading, None when no run was needed, and the roots of the
+    widened pockets it left unrun for the checkpoint."""
+
+    reading: ScopeReading | None
+    deferred: tuple[str, ...]
 
 
 def scope_run(
@@ -331,8 +345,9 @@ def scope_run(
     changed: Sequence[str],
     rule: PendingRule,
     give_up_at: float | None = None,
+    *,
     defer_widened: bool = False,
-) -> tuple[ScopeReading | None, tuple[str, ...]]:
+) -> ScopeOutcome:
     """The derived scope of `changed`, every invocation it lists run and read, and the roots of
     the widened pockets it left unrun (none unless `defer_widened`). The reading is None when no
     run was needed: the resolver decides no test is needed, or every pocket it selects is
@@ -345,11 +360,13 @@ def scope_run(
     if isinstance(resolved, ScopeUnresolved):
         why = resolved.resolver.problem or f"exit {resolved.resolver.returncode}"
         unresolved = GateRun(SCOPE_COMMAND, NoRun(f"the test scope did not resolve ({why})"))
-        return ScopeReading(unresolved), ()
+        return ScopeOutcome(ScopeReading(unresolved), ())
     if not resolved.pockets:
         if resolved.deferred or resolved.decision == NOTHING_TO_RUN:
-            return None, resolved.deferred
-        return ScopeReading(GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test"))), ()
+            return ScopeOutcome(None, resolved.deferred)
+        return ScopeOutcome(
+            ScopeReading(GateRun(SCOPE_COMMAND, NoRun("the test scope selects no test"))), ()
+        )
     running = tuple(
         pocket.pocket
         for pocket in resolved.pockets
@@ -357,7 +374,7 @@ def scope_run(
     )
     if running:
         raise GateStillRunningError(running)
-    return read_scope(resolved, rule, repo), resolved.deferred
+    return ScopeOutcome(read_scope(resolved, rule, repo), resolved.deferred)
 
 
 @dataclass(frozen=True)

@@ -205,6 +205,52 @@ def test_path_literal_basename_match_does_not_fire_on_a_substring(tmp_path: Path
     assert "scripts/test_unrelated.py" not in {s.path for s in selection}
 
 
+def _selected_beside_a_catalog(root: Path, catalog_source: str) -> set[str]:
+    """What a change to an outer-loop test selects when `pkg/catalog.py` holds `catalog_source`
+    and `pkg/test_catalog.py` imports it."""
+    _write(root, "tests/acceptance/test_x.py", "def test_x():\n    assert True\n")
+    _write(root, "pkg/catalog.py", catalog_source)
+    _write(
+        root,
+        "pkg/test_catalog.py",
+        "import catalog\n\n\ndef test_it():\n    assert catalog.OUTER\n",
+    )
+    selection = python_selection.select(root, ["tests/acceptance/test_x.py"], NO_DEPS)
+    return {s.path for s in selection}
+
+
+@pytest.mark.parametrize(
+    "catalog_source",
+    [
+        pytest.param('OUTER = ("tests/acceptance",)  # test-scope:not-a-path\n', id="one line"),
+        pytest.param(
+            'OUTER = (\n    "tests/acceptance",  # test-scope:not-a-path\n)\n',
+            id="the literal's own line inside a longer statement",
+        ),
+    ],
+)
+def test_a_literal_on_a_line_marked_not_a_path_names_no_file(
+    tmp_path: Path, catalog_source: str
+) -> None:
+    assert "pkg/test_catalog.py" not in _selected_beside_a_catalog(tmp_path, catalog_source)
+
+
+@pytest.mark.parametrize(
+    "catalog_source",
+    [
+        pytest.param('OUTER = ("tests/acceptance",)\n', id="no marker"),
+        pytest.param(
+            '# test-scope:not-a-path\nOUTER = ("tests/acceptance",)\n',
+            id="the marker on another line",
+        ),
+    ],
+)
+def test_a_literal_whose_own_line_carries_no_marker_still_names_its_directory(
+    tmp_path: Path, catalog_source: str
+) -> None:
+    assert "pkg/test_catalog.py" in _selected_beside_a_catalog(tmp_path, catalog_source)
+
+
 # -- Literal classes and basename-pattern readers ------------------------------
 
 

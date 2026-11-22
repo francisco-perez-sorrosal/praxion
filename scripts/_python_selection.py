@@ -51,6 +51,12 @@ it is not source code. A pattern is a guess about which files a module reads,
 so a source file it happens to match is still unaccounted for and widens; its
 readers run within that full run.
 
+A literal naming another tree is no path literal: a string constant on a line
+carrying `test-scope:not-a-path` (a path in a scratch project an eval grades, or
+in a layout a test builds) is not indexed. Unmarked, a directory literal such as
+`tests/acceptance` in a production module makes every test that imports the
+module depend on every file under that directory.
+
 State data does not fan out: a changed non-code file under `.ai-state/`
 selects only the tests one hop away -- those holding its path or a matching
 pattern, and those declared for it. A production module naming a state file
@@ -97,6 +103,8 @@ _VIA_RANK = {"self": -1, **{via: rank for rank, via in enumerate(VIA_ORDER)}}
 _PATTERN_RANK = _VIA_RANK["path-literal"]
 _TEST_DEF = re.compile(r"^[ \t]*(?:async[ \t]+)?def[ \t]+test_", re.MULTILINE)
 _MAX_LITERAL = 300
+# A string constant on a line holding this text names a path in another tree, never a file here.
+NOT_A_PATH_MARKER = "test-scope:not-a-path"
 STATE_DIR = ".ai-state/"
 
 
@@ -286,12 +294,13 @@ class Graph:
         self._literals = _LiteralIndex(self._pockets)
         self._drivers = _PocketDrivers(self._pockets)
         for module in modules:
-            tree = _parse(root / module)
-            if tree is None:
+            parsed = _parse(root / module)
+            if parsed is None:
                 continue
+            tree, not_a_path = parsed
             for target in resolver.resolve_all(module, tree):
                 self._importers.setdefault(target, set()).add(module)
-            self._literals.add_module(module, tree)
+            self._literals.add_module(module, tree, not_a_path)
             self._drivers.add_module(module, tree)
         self.dependents = functools.lru_cache(maxsize=None)(self._dependents)
 
@@ -345,11 +354,17 @@ class Graph:
         return found
 
 
-def _parse(path: Path) -> ast.Module | None:
+def _parse(path: Path) -> tuple[ast.Module, frozenset[int]] | None:
+    """A module's tree and the numbers of its lines that carry `NOT_A_PATH_MARKER`."""
     try:
-        return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
     except (OSError, UnicodeDecodeError, SyntaxError, ValueError):
         return None
+    marked = (
+        number for number, line in enumerate(source.splitlines(), 1) if NOT_A_PATH_MARKER in line
+    )
+    return tree, frozenset(marked)
 
 
 def _tests_by_stem(test_files: Iterable[str]) -> dict[str, tuple[str, ...]]:
@@ -522,8 +537,11 @@ class _LiteralIndex:
         self._globs: list[tuple[re.Pattern[str], str]] = []
         self._basename_patterns: list[tuple[re.Pattern[str], str]] = []
 
-    def add_module(self, module: str, tree: ast.Module) -> None:
-        for literal in _string_constants(tree):
+    def add_module(
+        self, module: str, tree: ast.Module, not_a_path: frozenset[int] = frozenset()
+    ) -> None:
+        """Index `module`'s literals, except those on a line in `not_a_path`."""
+        for literal in _string_constants(tree, not_a_path):
             normalized = literal.removeprefix("./").strip("/")
             kind = _literal_class(normalized)
             if kind == "exact-basename":
@@ -607,9 +625,11 @@ def _append_compiled(
     into.append((pattern, module))
 
 
-def _string_constants(tree: ast.Module) -> Iterable[str]:
+def _string_constants(tree: ast.Module, skip_lines: frozenset[int] = frozenset()) -> Iterable[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if {node.lineno, node.end_lineno} & skip_lines:
+                continue
             value = node.value
             if len(value) <= _MAX_LITERAL and not any(ch.isspace() for ch in value):
                 yield value

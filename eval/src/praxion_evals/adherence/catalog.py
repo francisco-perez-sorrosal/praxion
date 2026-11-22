@@ -222,7 +222,8 @@ IMPLEMENTER_SIBLING = (
 IN_PROGRESS = "[IN-PROGRESS]"
 IMPLEMENTER_RETURN_LINES = 5
 IMPLEMENTER_MARKERS = ("[COMPLETE]", "[BLOCKED]", "[CONFLICT]")
-OUTER_LOOP_DIRECTORIES = ("tests/acceptance", "tests/e2e")
+# Directories of the project an implementer task grades, not of this repository.
+OUTER_LOOP_DIRECTORIES = ("tests/acceptance", "tests/e2e")  # test-scope:not-a-path
 WIP_DOCUMENTS = ("WIP.md", "WIP_implementer.md")
 TEST_RESULTS_DOCUMENTS = ("TEST_RESULTS.md", "TEST_RESULTS_implementer.md")
 # A step section whose result line the shape checker cannot read: a count with no keys.

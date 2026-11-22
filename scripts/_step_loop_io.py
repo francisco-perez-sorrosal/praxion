@@ -38,7 +38,7 @@ import subprocess
 import sys
 import tempfile
 import threading
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Union
@@ -679,18 +679,16 @@ def run_derived_scope(
         if defer_widened and entry["selection"] == _WIDENED:
             deferred.append(entry["root"])
             continue
-        reading = pocket_bound(repo, entry["root"], environ)
-        for warning in reading.warnings:
-            print(f"step-loop: {warning}", file=sys.stderr)
+        bound = warned_bound(repo, entry["root"], environ)
         specs = [
             RunSpec(
                 run_dir, number + at, with_outcome_reports(tuple(i["argv"])),
-                repo / i["cwd"], reading.bound,
+                repo / i["cwd"], bound,
             )
             for at, i in enumerate(invocations)
         ]  # fmt: skip
         number += len(specs)
-        runs = _run_in_order(specs, give_up_at)
+        runs = run_in_order(specs, give_up_at)
         pockets.append(
             PocketScope(entry["root"], entry["selection"] == _WIDENED, len(entry["tests"]), runs)
         )
@@ -699,9 +697,18 @@ def run_derived_scope(
     return ScopeRuns(str(plan["decision"]), tuple(pockets), tuple(deferred))
 
 
-def _run_in_order(specs: list[RunSpec], give_up_at: float) -> tuple[Observed, ...]:
+def warned_bound(repo: Path, root: str, environ: Mapping[str, str]) -> PocketBound:
+    """The pocket's gate bound, each warning about how it was read printed once to stderr."""
+    reading = pocket_bound(repo, root, environ)
+    for warning in reading.warnings:
+        print(f"step-loop: {warning}", file=sys.stderr)
+    return reading.bound
+
+
+def run_in_order(specs: Sequence[RunSpec], give_up_at: float) -> tuple[Observed, ...]:
     """Each run after the one before; a run still inside its bound when the budget ends is the
-    last one started, for the caller to come back to."""
+    last one started, for the caller to come back to. The gate and the checkpoint both run
+    their pockets this way."""
     runs: list[Observed] = []
     for spec in specs:
         runs.append(run_detached(spec, give_up_at))

@@ -38,14 +38,13 @@ from _step_loop_io import (
     ScopeRuns,
     head_sha,
     run_command,
+    run_in_order,
+    warned_bound,
 )
 from _step_loop_pocket_runs import (
     Observed,
-    PocketBound,
     RunSpec,
     StillRunning,
-    pocket_bound,
-    run_detached,
     with_outcome_reports,
 )
 from _step_loop_record_gate import (
@@ -139,8 +138,12 @@ def run_checkpoint(
             red.append(RedPocket(pocket, (), unrun))
             continue
         run_dir = run_directory(task_dir, pocket, head, records)
-        bound = _bound(repo, pocket.root, environ)
-        runs = _run_in_order(repo, run_dir, invocations, bound, give_up_at)
+        bound = warned_bound(repo, pocket.root, environ)
+        specs = [
+            RunSpec(run_dir, number, with_outcome_reports(argv), repo / cwd, bound)
+            for number, (cwd, argv) in enumerate(invocations, start=1)
+        ]
+        runs = run_in_order(specs, give_up_at)
         if isinstance(runs[-1], StillRunning):
             return CheckpointRunning(runs[-1])
         reading = read_scope(_whole_suite(pocket.root, runs), _NOTHING_PENDS, repo)
@@ -233,31 +236,6 @@ def _suite_of(
     if isinstance(suites, NoRun):
         return suites
     return suites.get(root) or NoRun(f"the test scope lists no whole suite for {root}")
-
-
-def _bound(repo: Path, root: str, environ: Mapping[str, str]) -> PocketBound:
-    reading = pocket_bound(repo, root, environ)
-    for warning in reading.warnings:
-        print(f"step-loop: {warning}", file=sys.stderr)
-    return reading.bound
-
-
-def _run_in_order(
-    repo: Path,
-    run_dir: Path,
-    invocations: Sequence[Invocation],
-    bound: PocketBound,
-    give_up_at: float,
-) -> tuple[Observed, ...]:
-    """Each invocation after the one before; one still inside its bound when the wait ends is the
-    last one started, for the next call to attach to."""
-    runs: list[Observed] = []
-    for number, (cwd, argv) in enumerate(invocations, start=1):
-        spec = RunSpec(run_dir, number, with_outcome_reports(argv), repo / cwd, bound)
-        runs.append(run_detached(spec, give_up_at))
-        if isinstance(runs[-1], StillRunning):
-            break
-    return tuple(runs)
 
 
 def _whole_suite(root: str, runs: tuple[Observed, ...]) -> ScopeRuns:

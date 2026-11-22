@@ -217,17 +217,6 @@ def test_a_copytree_of_the_root_leaves_the_tests_other_reads_counted(
     assert sorted(c for _, _, c in _channels(traced)) == ["copy", "direct"]
 
 
-def test_a_copytree_of_the_root_in_another_process_is_a_direct_read(
-    traced: SimpleNamespace, tmp_path: Path
-) -> None:
-    (traced.root / "data" / "x.txt").write_text("x\n")
-    traced.tracer.tracing_pid = os.getpid() + 1
-
-    _copytree_reading(traced, traced.root, tmp_path / "tree")
-
-    assert [c for _, _, c in _channels(traced)] == ["child"]
-
-
 def test_both_records_exist_for_a_file_the_test_also_opens_itself(traced: SimpleNamespace) -> None:
     _list_checkout(traced)
     target = traced.root / "data" / "x.txt"

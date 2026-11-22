@@ -241,25 +241,19 @@ class Tracer:
         """
         if os.getpid() != self.tracing_pid:
             return None
-        try:
-            absolute = os.path.abspath(os.fsdecode(source))  # type: ignore[arg-type]
-            kept_path = os.path.abspath(os.fsdecode(destination))  # type: ignore[arg-type]
-        except TypeError:  # the copy itself will fail on such a path
-            return None
+        absolute = os.path.abspath(os.fsdecode(source))  # type: ignore[arg-type]
         relative = self._repo_relative(absolute)
         if relative is None or relative.startswith(_UNTRACKED_PREFIXES):
             return None
         tree = _outermost_copytree_source()
         if tree is not None:
             return absolute if self._is_root(tree) else None
-        keeps_path = kept_path.endswith(os.sep + relative)
+        destination_path = os.path.abspath(os.fsdecode(destination))  # type: ignore[arg-type]
+        keeps_path = destination_path.endswith(os.sep + relative)
         return absolute if self.listed_checkout and keeps_path else None
 
     def _is_root(self, directory: object) -> bool:
-        try:
-            path = os.path.abspath(os.fsdecode(directory))  # type: ignore[arg-type]
-        except TypeError:
-            return False
+        path = os.path.abspath(os.fsdecode(directory))  # type: ignore[arg-type]
         return any(candidate in self.roots for candidate in (path, os.path.realpath(path)))
 
     def _repo_relative(self, absolute: str) -> str | None:

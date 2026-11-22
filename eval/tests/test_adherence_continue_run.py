@@ -63,7 +63,7 @@ from tests.stopped_run_support import (
     rewritten,
     stopped_in_eight_shapes,
 )
-from tests.test_adherence_cli_close import in_repository, paired_run_held
+from tests.test_adherence_cli_close import paired_run_held
 from tests.test_adherence_results import declared, run_results, session
 
 SEEDED_LAUNCH_ORDER = session_loop.launch_order  # as imported, before `full_first` fixes it
@@ -774,9 +774,9 @@ def test_an_outcome_other_than_measured_in_an_earlier_part_stands() -> None:
 
 
 def test_a_stopped_paired_run_in_its_own_directory_is_refused_a_continuation_untouched(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    repository: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    directory = paired_run_held(in_repository(tmp_path, monkeypatch), "paired-1")
+    directory = paired_run_held(repository, "paired-1")
     before = snapshot(directory)
 
     code = cli.main([str(scripted_checkout()), "--continue", "paired-1"])

@@ -320,6 +320,14 @@ def full_first(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
+def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A repository a run or a command starts from: its results directories hang off its top."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path.resolve()
+
+
+@pytest.fixture
 def repo_root() -> Path:
     """This checkout's top-level directory — read-only for every consumer."""
     return Path(

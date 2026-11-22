@@ -337,14 +337,14 @@ def _open_judge(config: RunConfig) -> JudgeClient | None:
 
 
 def _default_output(config: RunConfig, run_id: str) -> Path:
-    return results_dir(config) / _results_name(run_id)
+    return results_dir(config) / results_name(run_id)
 
 
 def results_dir(config: RunConfig) -> Path:
     """The directory holding the runs a run is listed beside: where its results file goes."""
     if config.output:
         return config.output.parent
-    return _axis_results_dir(_results_root(), config.axis)
+    return axis_results_dir(_results_root(), config.axis)
 
 
 def run_directory(config: RunConfig, run_id: str) -> Path:
@@ -356,20 +356,27 @@ def run_directory(config: RunConfig, run_id: str) -> Path:
     root = _results_root()
     # A stable sort: the run's own axis first, the others in their declared order.
     axes = sorted(AXES, key=lambda axis: axis != config.axis)
-    directories = [_axis_results_dir(root, axis) for axis in axes]
-    holding = (where for where in directories if (where / _results_name(run_id)).is_file())
+    directories = [axis_results_dir(root, axis) for axis in axes]
+    holding = (where for where in directories if (where / results_name(run_id)).is_file())
     return next(holding, directories[0])
 
 
 def _results_root() -> Path:
-    return Path(_git(Path.cwd(), "rev-parse", "--show-toplevel").strip()) / OUTPUT_DIR
+    return results_root(Path(_git(Path.cwd(), "rev-parse", "--show-toplevel").strip()))
 
 
-def _axis_results_dir(root: Path, axis: Axis) -> Path:
+def results_root(checkout: Path) -> Path:
+    """Where a checkout holds its adherence results: each axis's directory hangs off it."""
+    return checkout / OUTPUT_DIR
+
+
+def axis_results_dir(root: Path, axis: Axis) -> Path:
+    """The directory under a results root that holds the runs of `axis`."""
     return root / axis_run(axis).results_subdir
 
 
-def _results_name(run_id: str) -> str:
+def results_name(run_id: str) -> str:
+    """The name of the results file of the run `run_id`."""
     return f"{run_id}.json"
 
 

@@ -4,7 +4,6 @@ behaviour in every field, and the plan routed through it."""
 from __future__ import annotations
 
 import dataclasses
-import subprocess
 from dataclasses import replace
 from pathlib import Path
 
@@ -177,14 +176,6 @@ def test_a_run_config_declares_the_default_axis_unless_told_otherwise():
 
 
 # --- where an axis's runs are written and read ---
-
-
-@pytest.fixture
-def repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A repository the run is started from: its results directories hang off its top level."""
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    monkeypatch.chdir(tmp_path)
-    return tmp_path.resolve()
 
 
 def _paired_config(*options: str) -> RunConfig:

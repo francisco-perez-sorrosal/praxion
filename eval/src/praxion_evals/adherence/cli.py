@@ -450,7 +450,7 @@ def _reindex(config: RunConfig) -> int:
     """Rebuild the run index beside the results files of the axis named, in the checkout named or
     in this one."""
     directory = (
-        config.checkout / OUTPUT_DIR / axis_run(config.axis).results_subdir
+        session_loop.axis_results_dir(session_loop.results_root(config.checkout), config.axis)
         if config.checkout
         else session_loop.results_dir(config)
     )
@@ -535,7 +535,7 @@ def _read_tip(
 ) -> tuple[Tip, tuple[Path, ...], tuple[results.RunResults, ...]]:
     """The run to continue, the files of its lineage and the parts they hold, up to it; neither
     when its results file cannot be read."""
-    named = directory / f"{run_id}.json"
+    named = directory / session_loop.results_name(run_id)
     try:
         if named.exists():
             results.load(named)

@@ -301,10 +301,11 @@ def test_reindex_replaces_a_stale_index_and_is_idempotent_byte_for_byte(tmp_path
 
 
 @pytest.mark.parametrize(
-    ("axis", "named", "other"), [("inherited-context", "", PAIRED), (PAIRED, PAIRED, "")]
+    ("axis", "named", "other", "run"),
+    [("inherited-context", "", PAIRED, "run-a"), (PAIRED, PAIRED, "", "run-p")],
 )
 def test_reindex_rebuilds_the_index_of_the_directory_of_the_axis_it_names(
-    tmp_path: Path, axis: str, named: str, other: str
+    tmp_path: Path, axis: str, named: str, other: str, run: str
 ) -> None:
     ordinary = checkout_with_a_run(tmp_path)
     paired = ordinary / PAIRED
@@ -314,9 +315,7 @@ def test_reindex_rebuilds_the_index_of_the_directory_of_the_axis_it_names(
     code = cli.main([str(tmp_path), "--axis", axis, "--reindex"])
 
     assert code == 0
-    assert list(json.loads((ordinary / named / INDEX).read_text())["runs"]) == [
-        "run-p" if named else "run-a"
-    ]
+    assert list(json.loads((ordinary / named / INDEX).read_text())["runs"]) == [run]
     assert not (ordinary / other / INDEX).exists()
 
 

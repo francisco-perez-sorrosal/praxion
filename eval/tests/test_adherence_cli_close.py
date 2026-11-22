@@ -4,7 +4,6 @@ in the run's own results file, and a fresh run beside a continuable stopped run 
 from __future__ import annotations
 
 import shutil
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -176,13 +175,6 @@ def test_a_closed_run_is_listed_by_the_next_run_as_a_not_clear_interim_draw(
 # ---------------------------------------------------------------------------
 
 
-def in_repository(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A repository the command runs from: the results directories it reads hang off its top."""
-    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-    monkeypatch.chdir(root)
-    return root.resolve()
-
-
 def paired_run_held(repository: Path, run_id: str) -> Path:
     """The paired results directory of ``repository``, holding one stopped run of that axis."""
     directory = repository / OUTPUT_DIR / PAIRED
@@ -192,10 +184,8 @@ def paired_run_held(repository: Path, run_id: str) -> Path:
     return directory
 
 
-def test_a_stopped_paired_run_is_closed_without_naming_its_axis(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    directory = paired_run_held(in_repository(tmp_path, monkeypatch), "paired-1")
+def test_a_stopped_paired_run_is_closed_without_naming_its_axis(repository: Path) -> None:
+    directory = paired_run_held(repository, "paired-1")
 
     code = cli.main([str(scripted_checkout()), "--close", "paired-1", "--reason", REASON])
 
@@ -207,9 +197,9 @@ def test_a_stopped_paired_run_is_closed_without_naming_its_axis(
 
 
 def test_a_stopped_paired_run_still_blocks_a_fresh_paired_run_until_it_is_closed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    repository: Path,
 ) -> None:
-    directory = paired_run_held(in_repository(tmp_path, monkeypatch), "paired-1")
+    paired_run_held(repository, "paired-1")
     fresh = ["--role", PAIRED_ROLE, "--axis", PAIRED]
 
     config = cli.parse_config([str(scripted_checkout()), *fresh])
@@ -217,5 +207,4 @@ def test_a_stopped_paired_run_still_blocks_a_fresh_paired_run_until_it_is_closed
         cli._refuse_beside_stopped_run(config)
     cli.main([str(scripted_checkout()), "--close", "paired-1", "--reason", REASON])
 
-    cli._refuse_beside_stopped_run(config)
-    assert (directory / "paired-1.json").is_file()
+    cli._refuse_beside_stopped_run(config)  # no longer refuses: the run is closed

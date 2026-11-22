@@ -1,9 +1,10 @@
-"""Tests for the tracer's `copy` channel: reads made only to copy a listed checkout.
+"""Tests for the tracer's `copy` channel: reads made only to copy the checkout as a whole.
 
 A test that lists the checkout with `git ls-files` at the repository root and copies
-the listed files, each to a path that keeps its repository path, is copying the
-checkout as a whole; the source-side reads of those copies go on their own channel
-so the verdict can set them aside. Everything short of that stays an ordinary read.
+the listed files, each to a path that keeps its repository path, or that runs a
+`copytree` of the repository root, is copying the checkout as a whole; the source-side
+reads of those copies go on their own channel so the verdict can set them aside.
+Everything short of that stays an ordinary read.
 The in-process tests feed the tracer synthetic audit events, the way the tracer's
 other unit tests do; one real traced pytest run in a scratch repository proves the
 wiring through the interpreter's own events. This file imports only the tracer.
@@ -162,18 +163,69 @@ def test_a_copy_of_a_file_outside_the_repository_is_not_recorded(
     assert _channels(traced) == []
 
 
-def test_a_copy_made_while_copytree_runs_is_not_this_shape(
+def _copytree_reading(traced: SimpleNamespace, source: Path, destination: Path, **options) -> None:
+    """`shutil.copytree`, with a copy function that makes the audit events a real copy would."""
+
+    def copy_function(file: object, target: str) -> None:
+        _copy_and_read(traced, Path(os.fsdecode(file)), Path(target))
+
+    shutil.copytree(source, destination, copy_function=copy_function, **options)
+
+
+def test_a_copytree_of_the_root_with_an_ignore_filter_is_a_copy_read(
     traced: SimpleNamespace, tmp_path: Path
 ) -> None:
     (traced.root / "data" / "x.txt").write_text("x\n")
-    _list_checkout(traced)
+    (traced.root / "data" / "left-out.txt").write_text("y\n")
 
-    def copy_function(source: str, destination: str) -> None:
-        _copy_and_read(traced, Path(source), Path(destination))
+    _copytree_reading(
+        traced, traced.root, tmp_path / "tree", ignore=shutil.ignore_patterns("left-out*")
+    )
 
-    shutil.copytree(traced.root, tmp_path / "tree", copy_function=copy_function)
+    assert _channels(traced) == [(TEST_A, "data/x.txt", "copy")]
 
-    assert [c for _, _, c in _channels(traced)] == ["direct"]
+
+def test_a_copytree_of_a_directory_below_the_root_is_a_direct_read(
+    traced: SimpleNamespace, tmp_path: Path
+) -> None:
+    (traced.root / "data" / "x.txt").write_text("x\n")
+
+    _copytree_reading(traced, traced.root / "data", tmp_path / "tree")
+
+    assert _channels(traced) == [(TEST_A, "data/x.txt", "direct")]
+
+
+def test_the_inner_recursion_of_a_copytree_of_the_root_does_not_hide_the_outermost(
+    traced: SimpleNamespace, tmp_path: Path
+) -> None:
+    (traced.root / "data" / "deep").mkdir()
+    (traced.root / "data" / "deep" / "y.txt").write_text("y\n")
+
+    _copytree_reading(traced, traced.root, tmp_path / "tree")
+
+    assert _channels(traced) == [(TEST_A, "data/deep/y.txt", "copy")]
+
+
+def test_a_copytree_of_the_root_leaves_the_tests_other_reads_counted(
+    traced: SimpleNamespace, tmp_path: Path
+) -> None:
+    (traced.root / "data" / "x.txt").write_text("x\n")
+
+    _copytree_reading(traced, traced.root, tmp_path / "tree")
+    _read(traced, traced.root / "data" / "x.txt")
+
+    assert sorted(c for _, _, c in _channels(traced)) == ["copy", "direct"]
+
+
+def test_a_copytree_of_the_root_in_another_process_is_a_direct_read(
+    traced: SimpleNamespace, tmp_path: Path
+) -> None:
+    (traced.root / "data" / "x.txt").write_text("x\n")
+    traced.tracer.tracing_pid = os.getpid() + 1
+
+    _copytree_reading(traced, traced.root, tmp_path / "tree")
+
+    assert [c for _, _, c in _channels(traced)] == ["child"]
 
 
 def test_both_records_exist_for_a_file_the_test_also_opens_itself(traced: SimpleNamespace) -> None:
@@ -317,6 +369,30 @@ def test_reads_a_listed_file_itself_and_copies_it(tmp_path):
     shutil.copy2(ROOT / "data" / "both.txt", tmp_path / "data" / "both.txt")
 """
 
+COPIES_THE_ROOT = """\
+import shutil
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_copies_the_root_but_not_the_tests(tmp_path):
+    shutil.copytree(ROOT, tmp_path / "tree", ignore=shutil.ignore_patterns(".git", "tests"))
+    assert (tmp_path / "tree" / "data" / "tree.txt").read_text() == "tree\\n"
+"""
+
+COPIES_A_SUBDIRECTORY = """\
+import shutil
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_copies_the_data_directory(tmp_path):
+    shutil.copytree(ROOT / "data", tmp_path / "tree")
+    assert (tmp_path / "tree" / "sub.txt").read_text() == "sub\\n"
+"""
+
 
 @pytest.fixture
 def scratch_repo(tmp_path: Path) -> Path:
@@ -325,6 +401,10 @@ def scratch_repo(tmp_path: Path) -> Path:
         "data/listed.txt": "listed\n",
         "data/named.txt": "named\n",
         "data/both.txt": "both\n",
+        "data/tree.txt": "tree\n",
+        "data/sub.txt": "sub\n",
+        "tests/test_copies_the_root.py": COPIES_THE_ROOT,
+        "tests/test_copies_a_subdirectory.py": COPIES_A_SUBDIRECTORY,
         "tests/test_copies_listed_files.py": COPIES_LISTED_FILES,
         "tests/test_copies_by_name.py": COPIES_BY_NAME,
         "tests/test_reads_and_copies.py": READS_AND_COPIES,
@@ -370,3 +450,7 @@ def test_a_traced_run_classifies_listed_copies_and_leaves_other_reads_alone(
     assert ("tests/test_copies_by_name.py", "data/named.txt", "copy") not in reads
     assert ("tests/test_reads_and_copies.py", "data/both.txt", "direct") in reads
     assert ("tests/test_reads_and_copies.py", "data/both.txt", "copy") in reads
+    assert ("tests/test_copies_the_root.py", "data/tree.txt", "copy") in reads
+    assert ("tests/test_copies_the_root.py", "data/tree.txt", "direct") not in reads
+    assert ("tests/test_copies_a_subdirectory.py", "data/sub.txt", "direct") in reads
+    assert ("tests/test_copies_a_subdirectory.py", "data/sub.txt", "copy") not in reads

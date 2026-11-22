@@ -23,9 +23,11 @@ tests; `import` is an in-process read made while the import machinery
 (`_find_and_load`) is on the stack, which credits whichever test imported a
 module first; `direct` is every other in-process read, explicit path loads
 (`spec_from_file_location`, `runpy`) included; `copy` is the source-side read of
-a `shutil.copyfile` that copies a file of a checkout the running test has just
-listed with `git ls-files` at the repository root, to a destination that keeps
-the file's repository path (see `Tracer._copied_source`). A bytecode-cache read
+a `shutil.copyfile` that copies the checkout as a whole, in either of two shapes
+(see `Tracer._copied_source`): a file of a checkout the running test has just
+listed with `git ls-files` at the repository root, copied to a destination that
+keeps the file's repository path; or any file copied by a `shutil.copytree` whose
+source is the repository root itself. A bytecode-cache read
 is recorded as the `.py` source it stands for, so a module's first load looks
 the same whether it compiled or read a cached `.pyc`.
 
@@ -94,16 +96,22 @@ def _import_machinery_on_stack() -> bool:
     return False
 
 
-def _copytree_on_stack() -> bool:
+def _outermost_copytree_source() -> object | None:
+    """The `src` of the outermost `shutil.copytree` on the stack, or None when there is none.
+
+    `copytree` calls itself for each subdirectory, so the innermost frame names a
+    directory below the one the test asked to copy; only the outermost names it.
+    """
+    source = None
     frame = sys._getframe(1)
     while frame is not None:
         if (
             frame.f_code.co_name == _COPYTREE_FUNCTION
             and frame.f_globals.get("__name__") == _COPYTREE_MODULE
         ):
-            return True
+            source = frame.f_locals.get("src")
         frame = frame.f_back
-    return False
+    return source
 
 
 def _listed_directory(argv: object, directory: object) -> str | None:
@@ -225,19 +233,34 @@ class Tracer:
         return armed
 
     def _copied_source(self, source: object, destination: object) -> str | None:
-        """The source of a copy of a listed checkout file to a path that keeps its repository path.
+        """The source of a copy of the checkout as a whole, or None for an ordinary read.
 
-        A copy made while `copytree` runs is a different shape with its own rule. A copy to
-        another path, or one made without listing the checkout first, is an ordinary read.
+        Two shapes: a copy made while a `copytree` of the repository root runs (its `ignore`
+        filter is the parts it leaves out), and a copy of a listed checkout file to a path
+        that keeps its repository path. A `copytree` of a directory below the root is neither.
         """
-        if not self.listed_checkout or os.getpid() != self.tracing_pid or _copytree_on_stack():
+        if os.getpid() != self.tracing_pid:
             return None
-        absolute = os.path.abspath(os.fsdecode(source))  # type: ignore[arg-type]
+        try:
+            absolute = os.path.abspath(os.fsdecode(source))  # type: ignore[arg-type]
+            kept_path = os.path.abspath(os.fsdecode(destination))  # type: ignore[arg-type]
+        except TypeError:  # the copy itself will fail on such a path
+            return None
         relative = self._repo_relative(absolute)
         if relative is None or relative.startswith(_UNTRACKED_PREFIXES):
             return None
-        kept = os.path.abspath(os.fsdecode(destination)).endswith(os.sep + relative)  # type: ignore[arg-type]
-        return absolute if kept else None
+        tree = _outermost_copytree_source()
+        if tree is not None:
+            return absolute if self._is_root(tree) else None
+        keeps_path = kept_path.endswith(os.sep + relative)
+        return absolute if self.listed_checkout and keeps_path else None
+
+    def _is_root(self, directory: object) -> bool:
+        try:
+            path = os.path.abspath(os.fsdecode(directory))  # type: ignore[arg-type]
+        except TypeError:
+            return False
+        return any(candidate in self.roots for candidate in (path, os.path.realpath(path)))
 
     def _repo_relative(self, absolute: str) -> str | None:
         for root in self.roots:

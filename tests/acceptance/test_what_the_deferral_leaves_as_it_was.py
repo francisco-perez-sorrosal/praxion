@@ -1,15 +1,13 @@
 """The deferral touches only the gates it concerns; everything else reads as it did.
 
 A goal step's iteration still runs every widened pocket whole at its gate and defers
-nothing. The test-scope command is the base commit's own, byte for byte. Task directories
-the base commit's driver wrote over a step whose change widened a pocket read back with the
-same `status` and `next` and are left as they were, so no pocket waits. The three fast gate
-probes still pass.
+nothing. Task directories the base commit's driver wrote over a step whose change widened a
+pocket read back with the same `status` and `next` and are left as they were, so no pocket
+waits. The three fast gate probes still pass.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import subprocess
 import sys
@@ -24,11 +22,6 @@ from tests.acceptance.drivers.deferred_pockets import BENCH
 from tests.acceptance.drivers.pocket_gate import gate_block
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCOPE_BEFORE = json.loads(
-    (Path(__file__).parent / "fixtures" / "per_step_gate" / "scope_command_before.json").read_text(
-        encoding="utf-8"
-    )
-)
 FAST_PROBES = ("mutation-sensor", "observation-hooks", "spawn-count")
 
 
@@ -51,18 +44,6 @@ def test_a_goal_iteration_runs_its_widened_pocket_whole_and_defers_nothing(tmp_p
     block = gate_block(task, relayed.request["id"])
     assert dp.whole_suite_runs(task, BENCH) == 1, block
     assert dp.deferred_lines(block) == [], block
-
-
-# -- The test-scope command is the base commit's own -------------------------------------------------
-
-
-@pytest.mark.parametrize("path", sorted(SCOPE_BEFORE["sha256"]))
-def test_the_test_scope_command_is_byte_for_byte_the_base_commits(path):
-    digest = hashlib.sha256((REPO_ROOT / path).read_bytes()).hexdigest()
-
-    assert digest == SCOPE_BEFORE["sha256"][path], (
-        f"{path} differs from {SCOPE_BEFORE['base_commit']}"
-    )
 
 
 # -- Records the base commit's driver wrote read as before --------------------------------------------

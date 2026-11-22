@@ -38,9 +38,14 @@ the resolver's import graph covers it; a data file opened at import time has no
 such edge and goes unaudited. The verdict's notes count both kinds on every run.
 Only tracked files are audited, because only a tracked file can appear in a diff.
 
+A read made only to copy the checkout as a whole arrives on the `copy` channel: it is set aside,
+not audited, and counted in a note on every verdict, together with the fact that what the
+copying tests read later from their copies is not audited. A copying test's other reads are
+judged as before, a pair that is also read directly included.
+
 `judge`-style functions here are pure; `run` and the helpers under "the edge"
 are the only effects. Imports are flat siblings, the layout the mutation sensor
-reads. Tests: `scripts/gate_probes/test_selection.py`.
+reads. Tests: `scripts/gate_probes/test_selection.py`, `scripts/gate_probes/test_selection_copy_rule.py`.
 """
 
 from __future__ import annotations
@@ -66,8 +71,8 @@ RESOLVER = "scripts/resolve_test_scope.py"
 # Found beside the package, not beside this file: the mutation sensor runs a flat copy of the latter.
 TRACER_DIR = Path(gate_probes.__file__).resolve().parent / "tracer"
 
-DIRECT, CHILD, IMPORT = "direct", "child", "import"
-CHANNELS = (DIRECT, CHILD, IMPORT)
+DIRECT, CHILD, IMPORT, COPY = "direct", "child", "import", "copy"
+CHANNELS = (DIRECT, CHILD, IMPORT, COPY)
 
 RESOLVER_SCHEMA = 2
 ROOT_POCKET_ROOTS = (".", "")
@@ -164,7 +169,7 @@ def _audit(repo_root: Path, env: Mapping[str, str]) -> tuple[tuple[Pair, ...], t
         raise ProbeError(_failure("tests to read tracked repository files", "none did"))
     answers = _ask_resolver(repo_root, env, sorted({read for _, read in pairs}), RESOLVER_TIMEOUT_S)
     skipped = () if canary is not None else (CANARY_SKIPPED,)
-    notes = (*skipped, *suite_notes, import_note(observed, tracked))
+    notes = (*skipped, *suite_notes, import_note(observed, tracked), copy_note(observed, tracked))
     return find_unselected(pairs, answers), notes
 
 
@@ -258,6 +263,23 @@ def import_note(observed: ObservedReads, tracked: frozenset[str]) -> str:
     return (
         f"read only at import time, not audited per test: {len(unaudited) - code} data files "
         f"(no import edge covers them) and {code} code files (the resolver's import graph covers them)"
+    )
+
+
+def copy_note(observed: ObservedReads, tracked: frozenset[str]) -> str:
+    """The copy rule's size: reads of copies of the checkout it set aside, and by how many tests.
+
+    A pair also read directly or by a child is audited, so it is not set aside; what a copying
+    test reads later from its own copies is never traced to the repository, hence the sentence.
+    """
+    copied = {pair for pair in observed.pairs_by_channel[COPY] if pair[1] in tracked}
+    set_aside = copied - observed.verdict_pairs()
+    if not set_aside:
+        return "copies of the checkout: none set aside (no test copied the checkout), 0 reads by 0 tests"
+    tests = {test for test, _ in set_aside}
+    return (
+        f"copies of the checkout, set aside and not audited per file: {len(set_aside)} reads "
+        f"by {len(tests)} tests; what those tests read later from their copies is not audited"
     )
 
 

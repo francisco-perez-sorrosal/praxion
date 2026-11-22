@@ -97,6 +97,8 @@ API_CREDENTIAL_VARIABLES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 SUBSCRIPTION_CREDENTIAL = "subscription"
 REDACTED = "[redacted]"
 STDERR_TAIL_CHARS = 600
+# A session told to stop gets this long to exit before it is killed, and the kill as long to land.
+STOP_GRACE_SECONDS = 10
 REFUSAL_TEXT_CHARS = 200
 CUT_MARK = " [cut]"
 # Stands in for the text of a refusal the stream records only as a denial entry.
@@ -142,6 +144,10 @@ class Profile:
         return {**named, "key": self.key}
 
 
+# The three counts a first request is billed for, in `FirstRequest` field order.
+_USAGE_KEYS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
+
+
 @dataclass(frozen=True)
 class FirstRequest:
     """The billed input of one first request."""
@@ -154,9 +160,7 @@ class FirstRequest:
 
     @classmethod
     def from_usage(cls, usage: dict, model: str) -> FirstRequest:
-        input_tokens = int(usage.get("input_tokens", 0))
-        creation = int(usage.get("cache_creation_input_tokens", 0))
-        read = int(usage.get("cache_read_input_tokens", 0))
+        input_tokens, creation, read = (int(usage.get(key, 0)) for key in _USAGE_KEYS)
         return cls(input_tokens + creation + read, input_tokens, creation, read, model)
 
 
@@ -244,7 +248,7 @@ def _fold_event(seen: StreamObservation, event: dict) -> None:
         seen.claude_code_version = event.get("claude_code_version")
         seen.mcp_servers = {
             str(s.get("name")): str(s.get("status"))
-            for s in event.get("mcp_servers") or []
+            for s in _list(event.get("mcp_servers"))
             if isinstance(s, dict)
         }
     elif kind == "assistant":
@@ -257,13 +261,13 @@ def _fold_event(seen: StreamObservation, event: dict) -> None:
 
 
 def _fold_assistant(seen: StreamObservation, event: dict) -> None:
-    message = event.get("message") or {}
+    message = _mapping(event.get("message"))
     for block in _content_blocks(message):
         if block.get("type") == "tool_use" and block.get("name") == AGENT_TOOL:
-            subagent = (block.get("input") or {}).get("subagent_type")
+            subagent = _mapping(block.get("input")).get("subagent_type")
             seen.agent_calls[str(block.get("id"))] = str(subagent or "")
     usage = message.get("usage")
-    if not isinstance(usage, dict):
+    if not _is_usage(usage):
         return
     request = FirstRequest.from_usage(usage, str(message.get("model", "")))
     if event.get("parent_tool_use_id"):
@@ -273,7 +277,7 @@ def _fold_assistant(seen: StreamObservation, event: dict) -> None:
 
 
 def _fold_tool_results(seen: StreamObservation, event: dict) -> None:
-    for block in _content_blocks(event.get("message") or {}):
+    for block in _content_blocks(_mapping(event.get("message"))):
         subagent = seen.agent_calls.get(str(block.get("tool_use_id")))
         if block.get("type") == "tool_result" and block.get("is_error") and subagent is not None:
             text = _result_text(block.get("content")) or DENIED_WITHOUT_TEXT
@@ -281,11 +285,29 @@ def _fold_tool_results(seen: StreamObservation, event: dict) -> None:
 
 
 def _fold_denials(seen: StreamObservation, event: dict) -> None:
-    for denial in event.get("permission_denials") or []:
+    for denial in _list(event.get("permission_denials")):
         if isinstance(denial, dict) and denial.get("tool_name") == AGENT_TOOL:
             subagent = seen.agent_calls.get(str(denial.get("tool_use_id")))
             if subagent is not None:
                 seen.refusals.setdefault(subagent, DENIED_WITHOUT_TEXT)
+
+
+def _mapping(value: object) -> dict:
+    """A field the stream gives as an object, or an empty one when it gives anything else."""
+    return value if isinstance(value, dict) else {}
+
+
+def _list(value: object) -> list:
+    """A field the stream gives as an array, or an empty one when it gives anything else."""
+    return value if isinstance(value, list) else []
+
+
+def _is_usage(usage: object) -> bool:
+    """A usage object whose present counts are integers; `from_usage` reads an absent one as 0."""
+    if not isinstance(usage, dict):
+        return False
+    present = [usage[key] for key in _USAGE_KEYS if key in usage]
+    return all(isinstance(count, int) and not isinstance(count, bool) for count in present)
 
 
 def _content_blocks(message: dict) -> list:
@@ -551,26 +573,25 @@ def run_target(
     seen = StreamObservation()
     deadline = time.monotonic() + timeout
     lines = []
+    late = False
     try:
         assert process.stdout is not None
         for line in process.stdout:
+            late = time.monotonic() > deadline
             lines.append(line)
             seen = parse_stream(lines)
-            if target_satisfied(seen, target, namespace) or time.monotonic() > deadline:
+            # After the `result` event no line can change a first request, so stop reading.
+            if late or seen.ended or target_satisfied(seen, target, namespace):
                 break
     finally:
-        out_of_time = time.monotonic() > deadline
         _stop(process)
-    if out_of_time:
-        seen.ended = (
-            False  # a `result` that came after the timeout did not end the session within it
-        )
-    stderr_tail = ""
-    if process.stderr is not None:
-        try:
-            stderr_tail = redact(process.stderr.read(), token)[-STDERR_TAIL_CHARS:]
-        except (OSError, ValueError):
-            stderr_tail = ""
+    if late:
+        seen.ended = False  # a `result` read after the timeout did not end the session within it
+    assert process.stderr is not None
+    try:
+        stderr_tail = redact(process.stderr.read(), token)[-STDERR_TAIL_CHARS:]
+    except (OSError, ValueError):
+        stderr_tail = ""
     return seen, stderr_tail
 
 
@@ -579,10 +600,10 @@ def _stop(process: subprocess.Popen) -> None:
         return
     process.terminate()
     try:
-        process.wait(timeout=10)
+        process.wait(timeout=STOP_GRACE_SECONDS)
     except subprocess.TimeoutExpired:
         process.kill()
-        process.wait(timeout=10)
+        process.wait(timeout=STOP_GRACE_SECONDS)
 
 
 def measure(

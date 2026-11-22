@@ -1,7 +1,7 @@
-"""Tests for the startup-payload probe's pure core: stream folding, target
-selection, comparison, baseline bookkeeping and the invocation it builds.
-No test here spawns a session; `run_target` is the only impure function and
-it is exercised by hand (`--json`) rather than under pytest."""
+"""Tests for the startup-payload probe: stream folding, target selection,
+comparison, baseline bookkeeping and the invocation it builds. No test starts a
+real session: `run_target`, the only impure function, runs against a stand-in
+`claude` script put first on `PATH`."""
 
 from __future__ import annotations
 
@@ -81,6 +81,90 @@ def test_malformed_and_unrelated_lines_are_skipped():
 
     assert seen.main == msp.FirstRequest(6, 1, 2, 3, "m")
     assert seen.claude_code_version is None
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        pytest.param({"type": "assistant", "message": "text"}, id="a message that is a string"),
+        pytest.param(
+            {"type": "assistant", "message": ["a", "list"]}, id="a message that is a list"
+        ),
+        pytest.param(
+            {"type": "assistant", "message": {"model": "m", "usage": {"input_tokens": None}}},
+            id="a usage count that is not a number",
+        ),
+        pytest.param(
+            {"type": "assistant", "message": {"model": "m", "usage": {"input_tokens": True}}},
+            id="a usage count that is a boolean",
+        ),
+        pytest.param({"type": "user", "message": 7}, id="a tool result message that is a number"),
+        pytest.param(
+            {"type": "system", "subtype": "init", "mcp_servers": 3}, id="servers that are a number"
+        ),
+        pytest.param({"type": "result", "permission_denials": 3}, id="denials that are a number"),
+        pytest.param(
+            {"type": "result", "permission_denials": ["x"]}, id="a denial that is a string"
+        ),
+    ],
+)
+def test_a_malformed_event_is_skipped_and_the_stream_still_read(event: dict):
+    seen = msp.parse_stream([_line(event), _assistant((1, 2, 3), "m")])
+
+    assert seen.main == msp.FirstRequest(6, 1, 2, 3, "m")
+    assert seen.agent_calls == {}
+    assert seen.mcp_servers == {}
+
+
+def test_absent_cache_counts_read_as_zero():
+    usage = {"input_tokens": 4}
+
+    seen = msp.parse_stream(
+        [_line({"type": "assistant", "message": {"model": "m", "usage": usage}})]
+    )
+
+    assert seen.main == msp.FirstRequest(4, 4, 0, 0, "m")
+
+
+def test_a_later_system_event_leaves_what_the_init_event_gave():
+    servers = [{"name": "likec4", "status": "connected"}]
+    init = {"type": "system", "subtype": "init", "claude_code_version": "2.1.330"}
+
+    seen = msp.parse_stream(
+        [
+            _line({**init, "mcp_servers": servers}),
+            _line({"type": "system", "subtype": "hook_started"}),
+        ]
+    )
+
+    assert seen.claude_code_version == "2.1.330"
+    assert seen.mcp_servers == {"likec4": "connected"}
+
+
+def test_a_request_whose_message_names_no_model_records_an_empty_model():
+    seen = msp.parse_stream(
+        [_line({"type": "assistant", "message": {"usage": {"input_tokens": 1}}})]
+    )
+
+    assert seen.main == msp.FirstRequest(1, 1, 0, 0, "")
+
+
+def test_a_subagent_request_without_its_type_is_kept_under_an_empty_name():
+    message = {"model": "m", "usage": {"input_tokens": 2}}
+
+    seen = msp.parse_stream(
+        [_line({"type": "assistant", "parent_tool_use_id": "tu_1", "message": message})]
+    )
+
+    assert seen.agents == {"": msp.FirstRequest(2, 2, 0, 0, "m")}
+
+
+def test_an_agent_call_whose_input_is_not_an_object_is_kept_with_no_subagent_type():
+    block = {"type": "tool_use", "id": "tu_1", "name": "Agent", "input": "x"}
+
+    seen = msp.parse_stream([_line({"type": "assistant", "message": {"content": [block]}})])
+
+    assert seen.agent_calls == {"tu_1": ""}
 
 
 # -- refused spawns --------------------------------------------------------------
@@ -663,6 +747,101 @@ def test_a_result_event_ends_the_session_only_when_it_came_inside_the_timeout(
     )
 
     assert seen.ended is ended
+
+
+# Prints one event, then, unless it is stopped first, lives on and leaves a file behind.
+_LINGERING_STAND_IN = """#!{python}
+import json, pathlib, signal, time
+if {ignore_term}:
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+print(json.dumps({event}), flush=True)
+time.sleep({pause})
+pathlib.Path({outlived!r}).touch()
+"""
+
+_SUBAGENT_REQUEST = {
+    "type": "assistant",
+    "parent_tool_use_id": "tu_1",
+    "subagent_type": "praxion:verifier",
+    "message": {"model": "m", "usage": {"input_tokens": 3}},
+}
+
+
+def _lingering(tmp_path: Path, monkeypatch, event: dict, ignore_term: bool = False) -> Path:
+    outlived = tmp_path / "outlived"
+    _stand_in_claude(
+        tmp_path,
+        monkeypatch,
+        _LINGERING_STAND_IN,
+        event=repr(event),
+        pause=5,
+        outlived=str(outlived),
+        ignore_term=ignore_term,
+    )
+    return outlived
+
+
+def test_a_result_inside_the_timeout_ends_the_reading_and_the_session_there(
+    tmp_path: Path, monkeypatch
+):
+    outlived = _lingering(tmp_path, monkeypatch, {"type": "result", "subtype": "success"})
+
+    seen, _ = msp.run_target(
+        "agent:verifier", msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", 1
+    )
+
+    assert seen.ended is True
+    assert not outlived.exists(), "the session outlived its result: it was not stopped there"
+
+
+def test_the_targets_first_request_ends_the_reading_and_the_session_there(
+    tmp_path: Path, monkeypatch
+):
+    outlived = _lingering(tmp_path, monkeypatch, _SUBAGENT_REQUEST)
+
+    seen, _ = msp.run_target(
+        "agent:verifier", msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", 30
+    )
+
+    assert seen.agents == {"praxion:verifier": msp.FirstRequest(3, 3, 0, 0, "m")}
+    assert not outlived.exists(), "the session outlived the target's first request"
+
+
+def test_a_session_that_ignores_the_stop_signal_is_killed_after_the_grace(
+    tmp_path: Path, monkeypatch
+):
+    outlived = _lingering(tmp_path, monkeypatch, {"type": "result"}, ignore_term=True)
+    monkeypatch.setattr(msp, "STOP_GRACE_SECONDS", 0.2)
+
+    seen, _ = msp.run_target(
+        "agent:verifier", msp.Profile("unmanaged", "sonnet"), tmp_path, "praxion", 30
+    )
+
+    assert seen.ended is True
+    assert not outlived.exists(), "the session that ignored the stop signal was not killed"
+
+
+_RECORDING_STAND_IN = """#!{python}
+import json, os, pathlib, sys
+pathlib.Path({record!r}).write_text(json.dumps({{"cwd": os.getcwd(), "argv": sys.argv[1:]}}))
+"""
+
+
+def test_the_session_runs_the_built_invocation_in_the_directory_it_is_given(
+    tmp_path: Path, monkeypatch
+):
+    record = tmp_path / "record.json"
+    _stand_in_claude(tmp_path, monkeypatch, _RECORDING_STAND_IN, record=str(record))
+    workdir = tmp_path / "project"
+    workdir.mkdir()
+    profile = msp.Profile("unmanaged", "sonnet")
+
+    seen, _ = msp.run_target("agent:verifier", profile, workdir, "praxion", 30)
+
+    recorded = json.loads(record.read_text())
+    assert Path(recorded["cwd"]).resolve() == workdir.resolve()
+    assert recorded["argv"] == msp.build_invocation("agent:verifier", profile, "praxion")[1:]
+    assert seen == msp.StreamObservation()
 
 
 def _run_main(tmp_path: Path, monkeypatch, capsys, *extra: str):

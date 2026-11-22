@@ -13,6 +13,7 @@ import ast
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -69,6 +70,16 @@ def suite_text(runs_log: Path, *, passes: bool = True, hold: Path | None = None)
 @pytest.fixture
 def runs_log(tmp_path: Path) -> Path:
     return tmp_path / "runs.log"
+
+
+@pytest.fixture
+def hold(tmp_path: Path) -> Iterator[Path]:
+    """A file the suite waits on while it exists; removed at teardown, so a failing assertion
+    never leaves a held run alive until its bound."""
+    path = tmp_path / "hold"
+    path.touch()
+    yield path
+    path.unlink(missing_ok=True)
 
 
 def build_repo(tmp_path: Path, runs_log: Path, **suite) -> Path:
@@ -187,9 +198,7 @@ def test_a_red_run_keeps_the_pocket_waiting_and_names_the_failing_test(tmp_path,
     assert waiting_pockets(results(repo), records) == wait_for(("41", "42"))
 
 
-def test_a_run_past_its_bound_is_red_and_says_it_was_cut_off(tmp_path, runs_log):
-    hold = tmp_path / "hold"
-    hold.touch()
+def test_a_run_past_its_bound_is_red_and_says_it_was_cut_off(tmp_path, runs_log, hold):
     repo = build_repo(tmp_path, runs_log, hold=hold)
 
     outcome = checkpoint(repo, environ=SHORT_BOUND)
@@ -214,10 +223,8 @@ def test_a_finished_run_asked_again_adds_no_block_and_starts_no_run(tmp_path, ru
 
 
 def test_a_run_inside_its_bound_is_still_running_and_the_next_call_attaches_to_it(
-    tmp_path, runs_log
+    tmp_path, runs_log, hold
 ):
-    hold = tmp_path / "hold"
-    hold.touch()
     repo = build_repo(tmp_path, runs_log, hold=hold)
 
     held = checkpoint(repo, wait=NO_WAIT)
@@ -231,15 +238,12 @@ def test_a_run_inside_its_bound_is_still_running_and_the_next_call_attaches_to_i
     assert len(checkpoint_blocks(results(repo))) == 1
 
 
-def test_a_still_running_call_writes_no_block(tmp_path, runs_log):
-    hold = tmp_path / "hold"
-    hold.touch()
+def test_a_still_running_call_writes_no_block(tmp_path, runs_log, hold):
     repo = build_repo(tmp_path, runs_log, hold=hold)
 
     checkpoint(repo, wait=NO_WAIT)
 
     assert checkpoint_blocks(results(repo)) == []
-    hold.unlink()
 
 
 # --- Where a run lives ----------------------------------------------------------------------------
@@ -339,10 +343,8 @@ def test_next_over_a_red_pocket_stops_naming_it_its_test_and_its_steps(tmp_path,
 
 
 def test_next_over_a_run_still_inside_its_bound_answers_gate_running(
-    tmp_path, runs_log, monkeypatch
+    tmp_path, runs_log, monkeypatch, hold
 ):
-    hold = tmp_path / "hold"
-    hold.touch()
     repo = build_repo(tmp_path, runs_log, hold=hold)
     waiting_task(repo)
     monkeypatch.setenv("PRAXION_STEP_LOOP_GATE_WAIT_SECONDS", "0")

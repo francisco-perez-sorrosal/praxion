@@ -1,7 +1,8 @@
 ---
-id: dec-draft-3d2d9a77
+id: dec-523
+draft_id: dec-draft-3d2d9a77
 title: Widened pockets wait for a checkpoint the step-loop driver runs before complete
-status: proposed
+status: accepted
 category: architectural
 date: 2026-11-21
 summary: A driven step with a check skips every pocket the test scope widens, records a Deferred line, and a new checkpoint action runs each waiting pocket's whole suite once before complete; the waiting set is derived from the results file and the iteration ledger, never stored.

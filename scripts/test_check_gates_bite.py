@@ -396,6 +396,73 @@ def test_unknown_gate_is_rejected_with_exit_two(tmp_path: Path) -> None:
     assert cgb.main(["--repo-root", str(tmp_path), "--gate", "no-such-gate"]) == 2
 
 
+def test_json_report_file_reads_back_equal_to_what_json_prints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    install_probes(tmp_path, monkeypatch, fail__spawn_count=FAILING.format(gate="SPAWN_COUNT"))
+    report_path = tmp_path / "report.json"
+
+    code = cgb.main(
+        ["--json", "--json-report", str(report_path), "--repo-root", str(tmp_path)]
+        + ["--gate", "spawn-count"]
+    )
+
+    printed = capsys.readouterr().out
+    assert code == 1
+    assert report_path.read_text(encoding="utf-8") == printed
+    assert json.loads(printed)["passed"] is False
+
+
+def test_json_report_composes_with_the_text_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    install_probes(tmp_path, monkeypatch, pass__spawn_count=PASSING.format(gate="SPAWN_COUNT"))
+    report_path = tmp_path / "report.json"
+
+    code = cgb.main(
+        ["--json-report", str(report_path), "--repo-root", str(tmp_path), "--gate", "spawn-count"]
+    )
+
+    assert code == 0
+    assert capsys.readouterr().out.startswith("PASS spawn-count")
+    assert json.loads(report_path.read_text(encoding="utf-8"))["passed"] is True
+
+
+def test_json_report_into_a_missing_directory_exits_two_before_any_probe_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    probe_ran = tmp_path / "probe-ran"
+    install_probes(
+        tmp_path,
+        monkeypatch,
+        pass__spawn_count=f"open({str(probe_ran)!r}, 'w').close()\n"
+        + PASSING.format(gate="SPAWN_COUNT"),
+    )
+    missing = tmp_path / "no-such-dir" / "report.json"
+
+    code = cgb.main(
+        ["--json-report", str(missing), "--repo-root", str(tmp_path), "--gate", "spawn-count"]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "no-such-dir" in captured.err
+    assert captured.out == ""
+    assert not probe_ran.exists()
+
+
+def test_no_json_report_flag_writes_no_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "checkout"
+    root.mkdir()
+    install_probes(tmp_path, monkeypatch, pass__spawn_count=PASSING.format(gate="SPAWN_COUNT"))
+
+    run_report(capsys, root, "--gate", "spawn-count")
+
+    assert list(root.iterdir()) == []
+
+
 def test_run_leaves_the_checkout_unchanged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

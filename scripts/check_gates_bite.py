@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Gate liveness: does each gate still bite on known input, in production shape?
 
-    check_gates_bite.py [--gate ID]... [--json] [--repo-root DIR]
+    check_gates_bite.py [--gate ID]... [--json] [--json-report PATH] [--repo-root DIR]
 
 Runs one probe per selected gate (`mutation-sensor`, `observation-hooks`,
 `spawn-count`, `selection-audit`; all four when no `--gate` is given), always in
@@ -24,7 +24,9 @@ variables (`CLAUDE*`, `PRAXION_*`, `GIT_*`, `ANTHROPIC_*`, `GH_TOKEN`,
 one with no secret.
 
 The report is the schema-1 JSON of `gate_probes/verdict.py` (`--json`) or one
-`PASS`/`FAIL` line per gate. Exit codes: 0 every selected gate passes, 1 any
+`PASS`/`FAIL` line per gate; `--json-report PATH` also writes the JSON to PATH once the
+verdicts are in, whatever the stdout form, and refuses a PATH whose directory is missing
+before any probe runs. Exit codes: 0 every selected gate passes, 1 any
 fails, 2 usage error or no usable repository root. The root is `--repo-root`, else
 the git toplevel of the working directory; it is never derived from this file's
 location (managed projects run scripts through a symlink into the plugin), and a
@@ -126,13 +128,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         args = _build_parser().parse_args(argv)
     except SystemExit as exc:  # argparse exits on usage errors; keep the int contract
         return exc.code if isinstance(exc.code, int) else EXIT_USAGE
+    if args.json_report and not args.json_report.parent.is_dir():
+        print(
+            f"error: the directory of --json-report {args.json_report} does not exist",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
     try:
         repo_root = _resolve_root(args.repo_root)
     except RootError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_USAGE
     verdicts = run_gates(_selected(args.gate), repo_root, _scrubbed_env(os.environ))
-    print(render_json(verdicts) if args.json else _render_text(verdicts))
+    report = render_json(verdicts)
+    print(report if args.json else _render_text(verdicts))
+    if args.json_report:
+        args.json_report.write_text(report + "\n", encoding="utf-8")
     return EXIT_PASS if all(verdict.passed for verdict in verdicts) else EXIT_FAILED
 
 
@@ -281,6 +292,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="run only this gate (repeatable); default all four",
     )
     parser.add_argument("--json", action="store_true", help="emit the schema-1 JSON report")
+    parser.add_argument(
+        "--json-report",
+        type=Path,
+        metavar="PATH",
+        help="also write the schema-1 JSON report to PATH (its directory must exist)",
+    )
     parser.add_argument("--repo-root", help="repo root override (default: git toplevel of cwd)")
     return parser
 

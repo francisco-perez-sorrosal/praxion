@@ -1418,3 +1418,74 @@ tests = [
   "tests/test_installer_scoped_plugin_checks.py",
 ]
 why = "start the registered hooks in child processes, and the hooks import these scripts (the banner and install hooks, the context-surface hook, the feedback hook) with no path literal naming one; the tests are the ones the hook-module entry lists, since a child-process hook start reaches every module the hooks import, and `scripts/praxion_feedback` is listed by the three files the feedback hook reaches"
+
+[[dep]]
+paths = [
+  ".ai-state/DESIGN.md",
+]
+tests = [
+  "tests/acceptance/test_architecture_render_embeds.py",
+  "tests/acceptance/test_liveness_checks_run_in_a_workflow_of_their_own.py",
+]
+why = "the embed driver lists the tracked documentation pages and reads each one while the render-embed test is collected, so the liveness test, which collects every test module of the workflow's jobs in a child process, reads the design document there with no path literal in its own file naming it; the paths are the one state document the driver lists, and state data stops after one hop so each reader is listed by file"
+
+[[dep]]
+paths = [
+  ".ai-state/SYSTEM_DEPLOYMENT.md",
+]
+tests = [
+  "tests/acceptance/test_routing_facts_keep_every_other_reach.py",
+  "tests/acceptance/test_routing_surfaces_state_the_harness_facts.py",
+  "tests/acceptance/test_spawn_check_follows_the_corrected_routing.py",
+]
+why = "read the configuration table of the deployment document through the routing-facts driver's reader, a path held in the driver and never named in a test file; the tests are every importer of that driver, and state data stops after one hop so each reader is listed by file"
+
+[[dep]]
+paths = [
+  ".ai-state/calibration_log.md",
+]
+tests = [
+  "tests/acceptance/test_the_verifier_reaches_the_tier_signals_through_its_definition.py",
+]
+why = "reads every plugin file the verifier definition's calibration sub-step names, found by a pattern over the sub-step's text and opened by the path it gives, so no path literal in the test names the log; state data stops after one hop so the reader is listed by file"
+
+[[dep]]
+paths = [
+  ".ai-state/eval_ledger/*",
+]
+tests = [
+  "tests/acceptance/test_recorded_runs_keep_their_outcomes.py",
+]
+why = "checks the digest of every file a recorded listing says the eval ledger held, opening each by a path joined from the ledger directory and the listed name, so no path literal names the log or the two context-layer baselines; the paths are the files directly under the ledger directory, whose adherence results have an entry of their own, and state data stops after one hop so the reader is listed by file"
+
+[[dep]]
+paths = [
+  ".ai-state/token_budget_baseline.json",
+]
+tests = [
+  "tests/acceptance/test_adr_rule_is_delivered_by_its_path.py",
+  "tests/acceptance/test_managed_sessions_receive_todays_process_text.py",
+  "tests/acceptance/test_routing_facts_keep_every_other_reach.py",
+  "tests/acceptance/test_routing_move_keeps_every_other_reach.py",
+  "tests/acceptance/test_routing_table_leaves_session_start.py",
+  "tests/acceptance/test_unmanaged_sessions_keep_only_the_constitution.py",
+]
+why = "take the always-loaded budget reading through the drivers that run the budget command in a child process, and the command opens its baseline by a path joined from name parts, so no path literal names it; the tests are every caller of those drivers' budget readers, and state data stops after one hop so each reader is listed by file"
+
+[[dep]]
+paths = [
+  "tests/fixtures/diagram_regen/renders/*.svg",
+]
+tests = [
+  "scripts/test_regenerate_diagrams_checks.py",
+]
+why = "copies the whole renders directory into a scratch directory with `copytree` before each check, so each render is read by the directory's name and no path literal names one; the paths are the committed renders directly under it"
+
+[[dep]]
+paths = [
+  "docs/lean-spawn-kernels.md",
+]
+tests = [
+  "tests/acceptance/test_move_documentation.py",
+]
+why = "reads the how-to page and every page it links, found by a pattern over the how-to's text and opened by the target it gives, so no path literal in the test names the kernels page"

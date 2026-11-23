@@ -2,9 +2,7 @@
 # Five jobs, one per kind of check (the whole-suite scenarios are split in two to
 # stay under the 240-minute ceiling below), so each gets a time limit that fits it
 # and none hides another's conclusion (no job waits on, or is conditional on, another).
-# Until td-500's copy-read question is answered, `selection-audit` and
-# `scenarios-whole-suite-audit-gated` are red every week by design; every other
-# job's red is news:
+# Every job's red is news:
 #
 #   fast-probes           three quick probes of `scripts/check_gates_bite.py`
 #                         (mutation-sensor, observation-hooks, spawn-count)
@@ -115,7 +113,16 @@ jobs:
       # The command holds the audit to the bound declared in pyproject.toml;
       # a red here is the job's red and the run's red.
       - name: Prove the selection audit still bites
-        run: .venv/bin/python scripts/check_gates_bite.py --gate selection-audit
+        run: .venv/bin/python scripts/check_gates_bite.py --gate selection-audit --json-report tmp/selection-audit-verdict.json
+
+      - name: Upload the audit's verdict
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: selection-audit-verdict
+          path: tmp/selection-audit-verdict.json
+          if-no-files-found: warn
+          retention-days: 30
 
   scenarios-quick:
     name: Gate liveness, quick scenarios
@@ -197,7 +204,7 @@ jobs:
         run: python3 scripts/liveness_scenario_record.py report tmp/liveness-scenarios.jsonl
 
   scenarios-whole-suite-audit-gated:
-    name: Gate liveness, whole-suite scenarios that need a passing audit (red until td-500)
+    name: Gate liveness, whole-suite scenarios that need a passing audit
     runs-on: ubuntu-latest
     # fixed is the allowance for freeing the runner's toolchains, unmeasured and added unmargined;
     # step is the sum of this job's scenario durations plus the one pytest session overhead of 200.2 s.

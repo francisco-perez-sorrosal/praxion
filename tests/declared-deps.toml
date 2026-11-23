@@ -1192,6 +1192,11 @@ why = "parses the check-name function of it with `ast` from a path joined out of
 paths = [".ai-state/kernel_adoption.yaml"]
 tests = [
   "scripts/gate_probes/test_observation.py",
+  "scripts/test_check_kernel_manifest.py",
+  "scripts/test_check_kernel_manifest_flip.py",
+  "scripts/test_check_kernel_manifest_freshness.py",
+  "scripts/test_check_kernel_manifest_liveness.py",
+  "scripts/test_check_kernel_manifest_spawn_split.py",
   "scripts/test_kernel_run_index.py",
   "tests/acceptance/test_adr_rule_move_keeps_every_other_reach.py",
   "tests/acceptance/test_an_untrusted_split_falls_back_to_the_whole_unit.py",
@@ -1225,7 +1230,7 @@ tests = [
   "tests/e2e/test_a_rule_edit_reaches_each_audience_after_regeneration.py",
   "tests/e2e/test_switched_role_journey.py",
 ]
-why = "start the spawn hook or the registered hooks in a child process over a copy of the checkout, and the hook reads the adoption ledger there; no path literal in the test names it, and state data stops after one hop so each reader is listed by file"
+why = "start the spawn hook or the registered hooks in a child process over a copy of the checkout, and the hook reads the adoption ledger there; the five manifest-checker tests that take their copy from the shared kernel-checker testkit (one template, built once per process and credited with the read to whichever of them reaches it first) are listed too; no path literal in the test names it, and state data stops after one hop so each reader is listed by file"
 
 [[dep]]
 paths = [".ai-state/eval_ledger/adherence/**"]
@@ -1549,3 +1554,47 @@ tests = [
   "tests/acceptance/test_architecture_model_coverage.py",
 ]
 why = "lists the committed renders directly under the directory and reads each to see which elements it draws, so no path literal names one"
+
+[[dep]]
+paths = [
+  "agents/diagrams/agent-pipeline-flowchart/**",
+]
+tests = [
+  "scripts/test_check_kernel_manifest.py",
+  "scripts/test_check_kernel_manifest_flip.py",
+  "scripts/test_check_kernel_manifest_freshness.py",
+  "scripts/test_check_kernel_manifest_liveness.py",
+  "scripts/test_check_kernel_manifest_spawn_split.py",
+]
+why = "take their copy of the checkout from the shared kernel-checker testkit, which copies the whole `agents/` directory into one template built once per process and credited with the read to whichever of them reaches it first; no path literal names a diagram file, and `agents/*.md` already selects them for the definitions"
+
+[[dep]]
+paths = [
+  "claude/aac-templates/**",
+]
+tests = [
+  "scripts/test_install_diagram_kit.py",
+]
+why = "copies the whole template directory into a stand-in plugin (a directory copy, no file named) and installs the kit from it, so every template is read there whichever one the installer places"
+
+[[dep]]
+paths = [
+  "skills/skill-crafting/**",
+]
+tests = [
+  "tests/acceptance/test_skill_validator_warnings.py",
+]
+why = "its whole-tree run copies the shipped `skill-crafting` skill into a sandbox (a directory copy through the driver, no file named) and runs the validator found there; the glob takes in the skill's own `tests/` files because the sandbox copies them too, and the acceptance test is a different reader from each of them"
+
+[[dep]]
+paths = [
+  "lib/settings_hooks.py",
+]
+tests = [
+  "tests/e2e/test_model_routing_install_journey.py",
+  "tests/acceptance/test_routing_facts_keep_every_other_reach.py",
+  "tests/test_install_check_instructions_version.py",
+  "tests/test_install_check_rule_links.py",
+  "tests/test_installer_scoped_plugin_checks.py",
+]
+why = "run `install_claude.sh code --check` (directly or through `install.sh`), whose stale-hook warning runs this helper in a child process by a path the script joins, so no path literal in the test names it; the five are the tests that run the installer's check mode"

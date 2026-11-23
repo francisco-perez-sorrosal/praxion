@@ -1289,3 +1289,39 @@ tests = [
   "tests/acceptance/test_writer_roles_are_eligible_and_unswitched.py",
 ]
 why = "read every rule through the kernel tools they run (the manifest checker, the kernel generator, the codex installer) over the checkout or a copy of it, so no path literal names a rule; the rule files are exactly the tracked files under `rules/` but its two index files"
+
+[[dep]]
+paths = [
+  "hooks/[!t]*",
+  "hooks/_observation_log/*.py",
+]
+tests = [
+  "hooks/test_inject_subagent_context_delivery.py",
+  "hooks/test_observation_log_checkouts.py",
+  "scripts/gate_probes/test_observation.py",
+  "tests/acceptance/test_adherence_eval_stays_out_of_band.py",
+  "tests/acceptance/test_blacklist_template_and_user_blacklists.py",
+  "tests/acceptance/test_live_eval_treats_archives_as_byproducts.py",
+  "tests/acceptance/test_log_archives_stay_out_of_version_control.py",
+  "tests/acceptance/test_log_health_checks.py",
+  "tests/acceptance/test_log_readers_across_archives.py",
+  "tests/acceptance/test_log_rotation_keeps_history.py",
+  "tests/acceptance/test_managed_is_decided_by_the_project_state.py",
+  "tests/acceptance/test_managed_sessions_receive_todays_process_text.py",
+  "tests/acceptance/test_observation_log_compatibility.py",
+  "tests/acceptance/test_observation_log_location.py",
+  "tests/acceptance/test_other_channels_carry_the_kernel.py",
+  "tests/acceptance/test_process_text_survives_absent_hooks.py",
+  "tests/acceptance/test_recording_never_breaks_the_session.py",
+  "tests/acceptance/test_spawn_slug_attribution.py",
+  "tests/acceptance/test_spawn_tally_charges_only_its_pipelines_spawns.py",
+  "tests/acceptance/test_spawn_tally_spans_checkouts.py",
+  "tests/acceptance/test_split_recipients_receive_the_rules_without_orchestrator_only_text.py",
+  "tests/acceptance/test_the_shed_text_is_counted_at_no_cost.py",
+  "tests/acceptance/test_the_verifier_reaches_the_tier_signals_through_its_definition.py",
+  "tests/acceptance/test_unmanaged_sessions_keep_only_the_constitution.py",
+  "tests/acceptance/test_worktree_log_merge_in.py",
+  "tests/test_install_check_rule_links.py",
+  "tests/test_installer_scoped_plugin_checks.py",
+]
+why = "start the registered hooks in child processes, or over a copy of the hooks directory, and so import every module they reach with no path literal naming one; the paths are every tracked file directly under `hooks/` and every module of the observation-log package, `[!t]` leaving out the `hooks/test_*.py` files, which no hook imports"

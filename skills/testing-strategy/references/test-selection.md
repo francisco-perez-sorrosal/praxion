@@ -71,6 +71,14 @@ why   = "frozen historical analysis; no test reads it"
 
 If the file is absent, the resolver reads it as an empty list — no entries required. Every entry is validated at resolve time (never cached) by a smart constructor with six invariants: `schema == 1`; only `schema`/`dep`/`inert` keys at top level; `paths` and `tests` are non-empty lists of non-empty, repo-relative strings (no leading `/`, no `..` segment); `why` is non-empty; every `tests` glob matches at least one tracked test file; a path matched by both a `dep` and an `inert` entry resolves to `dep` (the over-select direction). A violation never drops the entry silently — it widens with `declared-deps-invalid` and names the violation.
 
+### Sizing an entry to its reader
+
+The weekly gate-liveness audit (below) closes each gap it finds by an entry here, and an entry that closes one follows three rules:
+
+- **Sized to the reader.** It selects every test that reaches the shared reader (the helper, fixture or hook a test goes through), never only the test a run credited. A read cached once per process is credited to whichever test of a worker asked first, so an entry sized to the credited test passes with one worker count and fails with another.
+- **Names its channel.** Its `why` says how the read happens (a child process over a copy of the checkout, an `ast` parse of a path joined at run time, a scanner walking a glob), so the next reader can tell a real edge from a leftover.
+- **A union, never a narrowing.** It only adds tests, and the paths are the glob the reader scans, not `**`, unless the reader scans every tracked file. Removing a test or a path from an entry narrows a selection and is a defect; the list exists to over-select.
+
 ## Ecosystem Dispatch
 
 Python is derived (the five edges above, read with stdlib `ast`). Every other ecosystem is dispatched to its own native tool — Praxion derives only where no native tool exists:
@@ -120,6 +128,21 @@ A plan step's `Tests:` field, when present, overrides the derived selection: `Te
 ## The Selection Audit
 
 `audit_tests.py` closes the loop between "what did selection run" and "what should have run": given a junit file with failures and the change set that produced it, it classifies each failure as `selected`, `widened`, `missed`, or `unattributable`, names a `suggested_edge` for every `missed`, and exits `1` when anything is missed. With a rerun junit file, a failure that flips to pass is classified `flaky` instead of `real`. `--slow N` reports the top-N slowest tests. This is the mechanism that lets selection stay derived rather than hand-audited — a miss is a concrete, closeable finding, not a vague worry about coverage.
+
+### The Audit's `copy` Channel
+
+`scripts/check_gates_bite.py` (weekly in `.github/workflows/gate-liveness.yml`) traces the default suite and asks the resolver, per read, whether it selects the test that made it. The tracer sorts every read into one of four channels, and the verdict judges `direct` and `child` only (`import` is reported, not judged; see `scripts/gate_probes/selection.py`).
+
+`copy` is the source-side open of a `shutil` copy of the checkout as a whole, in either of two shapes:
+
+- a file copied while a `shutil.copytree` of the repository root runs; or
+- a file copied to a destination that keeps its repository-relative path, after the running test listed the checkout with `git ls-files` at the root.
+
+A sandbox built this way opens every copied file, and the opens show that a test needs a checkout, not that it depends on each file. So these pairs are set aside, not audited per file. A copy of a directory below the root, or of one named file, is an ordinary read and is judged. What a copying test reads from its own copies later is never traced back to the repository, and stays unaudited.
+
+The rule classifies open events, never tests: a copying test's other reads, including a pair that is also read directly, are judged as before. A copier whose reader the resolver cannot see is closed by an entry in the declared list above, sized as the rule there says.
+
+Every verdict carries a note counting what was set aside, with the sentence that later reads from the copies are not audited: `copies of the checkout, set aside and not audited per file: <N> reads by <M> tests; ...`, or `copies of the checkout: none set aside (no test copied the checkout), 0 reads by 0 tests`. `check_gates_bite.py --json-report PATH` also writes the full verdict to a file (its directory must exist), which the audit job uploads as the `selection-audit-verdict` artifact, so a red run can be read pair by pair. The audit is expected green: a red is a finding, not a standing condition.
 
 ## Selection-Size Baseline
 

@@ -430,9 +430,13 @@ CODE_DIRS = ("scripts", "hooks")
 
 
 def _gate_code() -> list[str]:
-    """Every file of this checkout's scripts and hooks that the gate imports."""
+    """Every file of this checkout's scripts and hooks that the gate imports.
+
+    The child runs isolated (`-I`), so a startup module the environment injects through
+    PYTHONPATH (the selection audit's tracer) is not mistaken for a module the gate imports.
+    """
     done = subprocess.run(
-        [sys.executable, "-c", GATE_IMPORTS],
+        [sys.executable, "-I", "-c", GATE_IMPORTS],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

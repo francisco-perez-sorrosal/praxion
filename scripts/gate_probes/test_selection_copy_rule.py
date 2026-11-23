@@ -115,6 +115,17 @@ def test_a_pair_read_by_a_child_as_well_is_audited_and_not_counted_as_set_aside(
     assert "none set aside" in selection.copy_note(observed, TRACKED)
 
 
+def test_a_copy_whose_every_read_was_audited_too_is_not_reported_as_no_copy():
+    observed = _observed(direct=[(COPYING_TEST, COPIED)], copy=[(COPYING_TEST, COPIED)])
+
+    note = selection.copy_note(observed, TRACKED)
+
+    assert note == (
+        "copies of the checkout: none set aside (every file a copy read was also read"
+        " another way, so it was audited), 0 reads by 0 tests"
+    )
+
+
 def test_an_untracked_copied_file_is_not_counted():
     observed = _observed(copy=[(COPYING_TEST, COPIED), (COPYING_TEST, UNTRACKED)])
 

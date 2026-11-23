@@ -275,7 +275,12 @@ def copy_note(observed: ObservedReads, tracked: frozenset[str]) -> str:
     copied = {pair for pair in observed.pairs_by_channel[COPY] if pair[1] in tracked}
     set_aside = copied - observed.verdict_pairs()
     if not set_aside:
-        return "copies of the checkout: none set aside (no test copied the checkout), 0 reads by 0 tests"
+        why = (
+            "every file a copy read was also read another way, so it was audited"
+            if copied
+            else "no test copied the checkout"
+        )
+        return f"copies of the checkout: none set aside ({why}), 0 reads by 0 tests"
     tests = {test for test, _ in set_aside}
     return (
         f"copies of the checkout, set aside and not audited per file: {len(set_aside)} reads "

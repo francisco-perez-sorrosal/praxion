@@ -127,8 +127,8 @@ jobs:
   scenarios-quick:
     name: Gate liveness, quick scenarios
     runs-on: ubuntu-latest
-    # sized: measured=2026-11-19 commit=ea85b08d52ea where=local step=1217.1s scale=1.53 setup=10s fixed=0s margin=1.5 limit=47min
-    timeout-minutes: 47
+    # sized: measured=2026-11-23 commit=97543a08a86c where=local step=1103s scale=1.53 setup=10s fixed=0s margin=1.5 limit=43min
+    timeout-minutes: 43
     permissions:
       contents: read
     steps:
@@ -150,7 +150,7 @@ jobs:
       # The step limit sits two minutes under the job's, so a cut leaves time
       # for the report.
       - name: Run the quick liveness scenarios
-        timeout-minutes: 45
+        timeout-minutes: 41
         run: .venv/bin/python -m pytest -m liveness tests/acceptance -n 0 --no-cov -p no:cacheprovider -p scripts.liveness_scenario_record --liveness-record=tmp/liveness-scenarios.jsonl
 
       - name: Report each scenario's duration and the free disk

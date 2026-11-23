@@ -1489,3 +1489,63 @@ tests = [
   "tests/acceptance/test_move_documentation.py",
 ]
 why = "reads the how-to page and every page it links, found by a pattern over the how-to's text and opened by the target it gives, so no path literal in the test names the kernels page"
+
+# The whole-repository scanners: tests that make no copy but read most of the checkout, directly
+# or through a child process that walks it. Each entry is scoped to the glob the test scans, so a
+# change outside that glob does not select it.
+
+[[dep]]
+paths = ["**"]
+tests = [
+  "tests/acceptance/test_command_family_is_retired.py",
+  "tests/acceptance/test_skill_authoring_reference_pages.py",
+]
+why = "list every tracked file and read each as text, looking for a retired name, so any tracked file can change what they report"
+
+[[dep]]
+paths = [
+  "**/*.md",
+  "**/*.yml",
+  "**/*.yaml",
+  "**/*.sh",
+  "**/*.tmpl",
+  "**/*.frag",
+  "**/*.c4",
+  "**/*.toml",
+  "**/*.txt",
+  "**/*.py",
+]
+tests = [
+  "tests/acceptance/test_diagram_review_guidance.py",
+]
+why = "scans every tracked file with one of these suffixes for the toolchain versions it states, so a change to any of them can change what the test reports"
+
+[[dep]]
+paths = [
+  "**/*.py",
+  "**/pyproject.toml",
+]
+tests = [
+  "tests/acceptance/test_eval_change_selects_the_root_tests_that_drive_it.py",
+  "tests/acceptance/test_selection_ignores_bare_names_across_pockets.py",
+]
+why = "run the resolver over this repository in a child process, which walks every Python source and every project file to draw its import and pocket maps, so a change to either can change the selection they assert on"
+
+[[dep]]
+paths = [
+  ".ai-state/decisions/*.md",
+]
+tests = [
+  "tests/acceptance/test_architecture_model_coverage.py",
+  "tests/acceptance/test_retired_elements_come_from_decisions.py",
+]
+why = "read every numbered decision record to learn which architecture elements an accepted decision retires, through a driver that lists the directory, so no path literal names a record"
+
+[[dep]]
+paths = [
+  "docs/diagrams/architecture/rendered/*.svg",
+]
+tests = [
+  "tests/acceptance/test_architecture_model_coverage.py",
+]
+why = "lists the committed renders directly under the directory and reads each to see which elements it draws, so no path literal names one"

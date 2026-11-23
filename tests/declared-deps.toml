@@ -1226,3 +1226,34 @@ tests = [
   "tests/e2e/test_switched_role_journey.py",
 ]
 why = "start the spawn hook or the registered hooks in a child process over a copy of the checkout, and the hook reads the adoption ledger there; no path literal in the test names it, and state data stops after one hop so each reader is listed by file"
+
+[[dep]]
+paths = [".ai-state/eval_ledger/adherence/**"]
+tests = [
+  "scripts/test_check_kernel_manifest.py",
+  "scripts/test_check_kernel_manifest_flip.py",
+  "scripts/test_check_kernel_manifest_freshness.py",
+  "scripts/test_check_kernel_manifest_liveness.py",
+  "scripts/test_check_kernel_manifest_spawn_split.py",
+  "scripts/test_kernel_run_evidence.py",
+  "scripts/test_kernel_run_evidence_parity.py",
+  "scripts/test_kernel_run_evidence_unreadable.py",
+  "scripts/test_kernel_run_index.py",
+  "scripts/test_kernel_run_standing.py",
+  "tests/acceptance/test_adr_rule_move_keeps_every_other_reach.py",
+  "tests/acceptance/test_fallback_and_flip_gate.py",
+  "tests/acceptance/test_flag_eligibility_and_liveness_gates.py",
+  "tests/acceptance/test_flip_gate_names_an_unreadable_results_file.py",
+  "tests/acceptance/test_flip_gate_takes_standing_from_results.py",
+  "tests/acceptance/test_implementer_checks_its_citations_before_reporting.py",
+  "tests/acceptance/test_ratified_evidence_and_the_run_index.py",
+  "tests/acceptance/test_recorded_runs_keep_their_outcomes.py",
+  "tests/acceptance/test_routing_facts_keep_every_other_reach.py",
+  "tests/acceptance/test_routing_move_keeps_every_other_reach.py",
+  "tests/acceptance/test_switched_records_rest_on_their_results.py",
+  "tests/acceptance/test_the_giants_principle_reaches_its_readers.py",
+  "tests/acceptance/test_writer_roles_are_eligible_and_unswitched.py",
+  "tests/e2e/test_continued_run_counts_as_one.py",
+  "tests/e2e/test_switched_role_journey.py",
+]
+why = "read the committed adherence results (the run files, `index.json` and `moves/`) directly, through the kernel-checker testkit, or in a child process over a copy of the checkout; one test parses every results file at import time and shows on no judged channel, and state data stops after one hop so each reader is listed by file"

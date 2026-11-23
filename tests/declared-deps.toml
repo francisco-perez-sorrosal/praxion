@@ -1169,3 +1169,60 @@ why = "reads the model through a likec4 export of this directory, a source no pa
 paths = [".ai-state/kernel_adoption.yaml"]
 tests = ["tests/acceptance/test_flag_eligibility_and_liveness_gates.py"]
 why   = "its sandboxes copy the checkout, the live adoption ledger included, and judge liveness and eligibility over that copy; no path literal names the ledger"
+
+[[dep]]
+paths = ["eval/pyproject.toml"]
+tests = ["scripts/test_pocket_gate_declarations.py"]
+why = "reads the eval pocket's declared gate bound from it through the driver's pocket reader, which joins the pocket name to the file name at run time, so no path literal names it"
+
+[[dep]]
+paths = ["eval/EVAL_PLAN.md"]
+tests = [
+  "tests/acceptance/test_move_decision_records_documentation.py",
+  "tests/acceptance/test_move_documentation.py",
+]
+why = "read the documented `--move` section of it from a path joined out of parts, so no path literal names the file"
+
+[[dep]]
+paths = ["eval/src/praxion_evals/adherence/model.py"]
+tests = ["scripts/test_kernel_run_evidence_parity.py"]
+why = "parses the check-name function of it with `ast` from a path joined out of parts (no import of the eval, which needs Python 3.13), so neither import nor path literal names it"
+
+[[dep]]
+paths = [".ai-state/kernel_adoption.yaml"]
+tests = [
+  "scripts/gate_probes/test_observation.py",
+  "scripts/test_kernel_run_index.py",
+  "tests/acceptance/test_adr_rule_move_keeps_every_other_reach.py",
+  "tests/acceptance/test_an_untrusted_split_falls_back_to_the_whole_unit.py",
+  "tests/acceptance/test_every_delivery_outside_the_split_is_unchanged.py",
+  "tests/acceptance/test_fallback_and_flip_gate.py",
+  "tests/acceptance/test_implementer_checks_its_citations_before_reporting.py",
+  "tests/acceptance/test_log_readers_across_archives.py",
+  "tests/acceptance/test_log_rotation_keeps_history.py",
+  "tests/acceptance/test_loop_agents_count_as_iterations.py",
+  "tests/acceptance/test_observation_log_compatibility.py",
+  "tests/acceptance/test_observation_log_location.py",
+  "tests/acceptance/test_one_count_of_an_agents_requests.py",
+  "tests/acceptance/test_other_channels_carry_the_kernel.py",
+  "tests/acceptance/test_paired_runs_keep_a_results_directory_of_their_own.py",
+  "tests/acceptance/test_recording_never_breaks_the_session.py",
+  "tests/acceptance/test_role_kernels.py",
+  "tests/acceptance/test_routing_facts_keep_every_other_reach.py",
+  "tests/acceptance/test_routing_move_keeps_every_other_reach.py",
+  "tests/acceptance/test_small_debt_is_fixed_not_filed.py",
+  "tests/acceptance/test_spawn_kernel_injection.py",
+  "tests/acceptance/test_spawn_slug_attribution.py",
+  "tests/acceptance/test_spawn_tally_charges_only_its_pipelines_spawns.py",
+  "tests/acceptance/test_spawn_tally_spans_checkouts.py",
+  "tests/acceptance/test_split_recipients_receive_the_rules_without_orchestrator_only_text.py",
+  "tests/acceptance/test_the_giants_principle_reaches_its_readers.py",
+  "tests/acceptance/test_the_shed_text_is_counted_at_no_cost.py",
+  "tests/acceptance/test_the_verifier_reaches_the_tier_signals_through_its_definition.py",
+  "tests/acceptance/test_what_the_deferral_leaves_as_it_was.py",
+  "tests/acceptance/test_worktree_log_merge_in.py",
+  "tests/acceptance/test_writer_roles_are_eligible_and_unswitched.py",
+  "tests/e2e/test_a_rule_edit_reaches_each_audience_after_regeneration.py",
+  "tests/e2e/test_switched_role_journey.py",
+]
+why = "start the spawn hook or the registered hooks in a child process over a copy of the checkout, and the hook reads the adoption ledger there; no path literal in the test names it, and state data stops after one hop so each reader is listed by file"

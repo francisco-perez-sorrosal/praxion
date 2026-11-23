@@ -174,7 +174,7 @@ def test_a_passing_verdict_carries_the_copy_note(traced):
     verdict = traced(observed, {COPIED: _selects(COPYING_TEST)})
 
     assert verdict.passed, verdict.reason
-    assert [note for note in _copy_notes(verdict) if "2 reads by 1 tests" in note]
+    assert any("2 reads by 1 tests" in note for note in _copy_notes(verdict)), verdict.notes
 
 
 def test_a_failing_verdict_carries_the_copy_note_and_judges_the_copying_tests_other_reads(traced):
@@ -186,11 +186,12 @@ def test_a_failing_verdict_carries_the_copy_note_and_judges_the_copying_tests_ot
 
     assert not verdict.passed
     assert verdict.unselected == ((COPYING_TEST, COPIED),)
-    assert [note for note in _copy_notes(verdict) if "1 reads by 1 tests" in note]
+    assert any("1 reads by 1 tests" in note for note in _copy_notes(verdict)), verdict.notes
 
 
 def test_a_verdict_of_a_run_with_no_copy_carries_the_none_note(traced):
     verdict = traced(_observed(direct=[(COPYING_TEST, COPIED)]), {COPIED: _selects(COPYING_TEST)})
 
     assert verdict.passed, verdict.reason
-    assert [note for note in _copy_notes(verdict) if "none set aside" in note and "0 reads" in note]
+    notes = _copy_notes(verdict)
+    assert any("none set aside" in note and "0 reads" in note for note in notes), verdict.notes

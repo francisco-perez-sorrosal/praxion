@@ -57,7 +57,12 @@ _IMPORT_MODULE = "importlib._bootstrap"
 _IMPORT_FUNCTION = "_find_and_load"
 _COPYTREE_MODULE = "shutil"
 _COPYTREE_FUNCTION = "copytree"
-_AUDITED_EVENTS = frozenset({"open", "shutil.copyfile", "subprocess.Popen"})
+# Each audited event and the `Tracer` method that takes its arguments.
+_HANDLERS = {
+    "open": "_record_open",
+    "shutil.copyfile": "_note_copy",
+    "subprocess.Popen": "_note_command",
+}
 _GIT_LISTING = "ls-files"
 _GIT_OPTION_WITH_ARGUMENT = {"-c": False, "-C": True}  # True: the argument moves the directory
 
@@ -159,16 +164,12 @@ class Tracer:
         self._copied = threading.local()  # `.source`: the file the copy under way is about to read
 
     def on_audit(self, event: str, args: tuple) -> None:
-        if event not in _AUDITED_EVENTS or not self.test or getattr(self._busy, "on", False):
+        handler = _HANDLERS.get(event)
+        if handler is None or not self.test or getattr(self._busy, "on", False):
             return
         self._busy.on = True
         try:
-            if event == "open":
-                self._record_open(*args)
-            elif event == "subprocess.Popen":
-                self._note_command(*args)
-            else:
-                self._note_copy(*args)
+            getattr(self, handler)(*args)
         except Exception as exc:  # an audit hook that raises would break the code it watches
             self.write_error = repr(exc)  # surfaced loudly by `check`
         finally:

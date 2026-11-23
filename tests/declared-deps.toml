@@ -1257,3 +1257,35 @@ tests = [
   "tests/e2e/test_switched_role_journey.py",
 ]
 why = "read the committed adherence results (the run files, `index.json` and `moves/`) directly, through the kernel-checker testkit, or in a child process over a copy of the checkout; one test parses every results file at import time and shows on no judged channel, and state data stops after one hop so each reader is listed by file"
+
+[[dep]]
+paths = [
+  "rules/_*.yaml",
+  "rules/*/*.md",
+  "rules/*/*/*.md",
+]
+tests = [
+  "scripts/test_check_kernel_manifest.py",
+  "scripts/test_check_kernel_manifest_flip.py",
+  "scripts/test_check_kernel_manifest_freshness.py",
+  "scripts/test_check_kernel_manifest_liveness.py",
+  "scripts/test_check_kernel_manifest_spawn_split.py",
+  "scripts/test_generate_kernels_live.py",
+  "scripts/test_install_codex.py",
+  "scripts/test_kernel_ledger.py",
+  "scripts/test_kernel_sources.py",
+  "tests/acceptance/test_adherence_check_catalog.py",
+  "tests/acceptance/test_live_eval_treats_archives_as_byproducts.py",
+  "tests/acceptance/test_log_archives_stay_out_of_version_control.py",
+  "tests/acceptance/test_log_health_checks.py",
+  "tests/acceptance/test_log_readers_across_archives.py",
+  "tests/acceptance/test_log_rotation_keeps_history.py",
+  "tests/acceptance/test_other_channels_carry_the_kernel.py",
+  "tests/acceptance/test_paired_runs_keep_a_results_directory_of_their_own.py",
+  "tests/acceptance/test_resident_text_is_moved_not_cut.py",
+  "tests/acceptance/test_spawn_tally_spans_checkouts.py",
+  "tests/acceptance/test_the_giants_principle_reaches_its_readers.py",
+  "tests/acceptance/test_worktree_log_merge_in.py",
+  "tests/acceptance/test_writer_roles_are_eligible_and_unswitched.py",
+]
+why = "read every rule through the kernel tools they run (the manifest checker, the kernel generator, the codex installer) over the checkout or a copy of it, so no path literal names a rule; the rule files are exactly the tracked files under `rules/` but its two index files"

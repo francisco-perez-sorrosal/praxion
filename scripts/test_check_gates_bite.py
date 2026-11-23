@@ -451,6 +451,29 @@ def test_json_report_into_a_missing_directory_exits_two_before_any_probe_runs(
     assert not probe_ran.exists()
 
 
+def test_json_report_naming_a_directory_exits_two_before_any_probe_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    probe_ran = tmp_path / "probe-ran"
+    install_probes(
+        tmp_path,
+        monkeypatch,
+        pass__spawn_count=f"open({str(probe_ran)!r}, 'w').close()\n"
+        + PASSING.format(gate="SPAWN_COUNT"),
+    )
+    a_directory = tmp_path / "reports"
+    a_directory.mkdir()
+
+    code = cgb.main(
+        ["--json-report", str(a_directory), "--repo-root", str(tmp_path), "--gate", "spawn-count"]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "is a directory" in captured.err
+    assert not probe_ran.exists()
+
+
 def test_no_json_report_flag_writes_no_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

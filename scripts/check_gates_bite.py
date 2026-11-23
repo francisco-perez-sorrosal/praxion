@@ -134,6 +134,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
         return EXIT_USAGE
+    if args.json_report and args.json_report.is_dir():  # refused now, not after the probes ran
+        print(f"error: --json-report {args.json_report} is a directory", file=sys.stderr)
+        return EXIT_USAGE
     try:
         repo_root = _resolve_root(args.repo_root)
     except RootError as exc:

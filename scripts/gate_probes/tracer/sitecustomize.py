@@ -117,17 +117,21 @@ def _outermost_copytree_source() -> object | None:
 def _listed_directory(argv: object, directory: object) -> str | None:
     """The directory a `git ls-files` command lists, or None for any other command.
 
-    `directory` is where the command starts; `-C <path>` moves it. A shape not
-    understood reads as "not a listing", which leaves a later copy audited.
+    `directory` is where the command starts (None: this process's own working
+    directory); `-C <path>` moves it. A shape not understood reads as "not a
+    listing", which leaves a later copy audited.
     """
     if not isinstance(argv, (list, tuple)) or not argv:
         return None
     try:
         words = [os.fsdecode(word) for word in argv]
-        current = os.fsdecode(directory)  # type: ignore[arg-type]
     except TypeError:
         return None
     if os.path.basename(words[0]) != "git":
+        return None
+    try:  # only now: a command that is no listing must cost nothing here
+        current = os.getcwd() if directory is None else os.fsdecode(directory)  # type: ignore[arg-type]
+    except (OSError, TypeError):  # a removed working directory lists nothing
         return None
     remaining = iter(words[1:])
     for word in remaining:
@@ -218,7 +222,7 @@ class Tracer:
         """Remember that this test listed the checkout: its copies of listed files are checkout copies."""
         if os.getpid() != self.tracing_pid:  # a forked child never inherits the listing
             return
-        listed = _listed_directory(argv, os.getcwd() if cwd is None else cwd)
+        listed = _listed_directory(argv, cwd)
         if listed is not None and any(c in self.roots for c in (listed, os.path.realpath(listed))):
             self.listed_checkout = True
 

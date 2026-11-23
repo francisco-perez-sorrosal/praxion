@@ -134,6 +134,21 @@ def test_a_command_that_does_not_list_the_root_arms_nothing(
     assert [c for _, _, c in _channels(traced)] == ["direct"]
 
 
+@pytest.mark.parametrize("argv", [["echo", "hi"], LISTING], ids=["another-command", "a-listing"])
+def test_a_command_started_from_a_vanished_directory_records_no_error(
+    traced: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> None:
+    def gone() -> str:
+        raise FileNotFoundError("the working directory was removed")
+
+    monkeypatch.setattr(os, "getcwd", gone)
+
+    traced.tracer.on_audit("subprocess.Popen", (argv[0], argv, None, None))
+
+    assert traced.tracer.write_error == ""
+    assert traced.tracer.listed_checkout is False
+
+
 def test_a_listing_in_one_test_never_classifies_the_next_tests_copy(
     traced: SimpleNamespace,
 ) -> None:

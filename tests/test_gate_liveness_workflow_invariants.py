@@ -23,7 +23,8 @@ import shlex
 import tomllib
 from dataclasses import dataclass
 from fractions import Fraction
-from pathlib import Path
+from itertools import pairwise
+from pathlib import Path, PurePosixPath
 
 import yaml
 
@@ -32,6 +33,7 @@ WORKFLOW_FILE = PROJECT_ROOT / ".github/workflows/gate-liveness.yml"
 PYPROJECT_FILE = PROJECT_ROOT / "pyproject.toml"
 
 GATE_COMMAND = "scripts/check_gates_bite.py"
+REPORT_OPTION = "--json-report"
 SYNCED_INTERPRETER = ".venv/bin/python"
 SYNC_STEP = "uv sync --frozen"
 FAST_PROBES = frozenset({"mutation-sensor", "observation-hooks", "spawn-count"})
@@ -163,6 +165,18 @@ def test_the_selection_audit_never_runs_beside_the_fast_probes() -> None:
     ]
     assert not together, (
         f"the selection audit needs a time limit of its own, never the fast probes' job: {together}"
+    )
+
+
+def test_each_report_directory_is_made_before_the_gate_command_writes_into_it() -> None:
+    unmade = {
+        job_id: directories
+        for job_id, job in _workflow()["jobs"].items()
+        if (directories := _unmade_report_directories(job))
+    }
+    assert not unmade, (
+        f"a fresh checkout holds no ignored directory and the gate command refuses a missing "
+        f"{REPORT_OPTION} directory, so an earlier step must run 'mkdir -p' on it: {unmade}"
     )
 
 
@@ -299,6 +313,26 @@ def _gate_misruns(job: dict) -> list[str]:
         ]
         synced = synced or SYNC_STEP in text
     return misrun
+
+
+def _unmade_report_directories(job: dict) -> list[str]:
+    """Each report directory the gate command is given before a step of the job made it."""
+    made = {"."}
+    unmade = []
+    for line in _run_lines(job):
+        arguments = shlex.split(line)
+        if arguments[:2] == ["mkdir", "-p"]:
+            made |= {str(PurePosixPath(argument)) for argument in arguments[2:]}
+        elif GATE_COMMAND in line:
+            unmade += [path for path in _report_directories(arguments) if path not in made]
+    return unmade
+
+
+def _report_directories(arguments: list[str]) -> list[str]:
+    """The directory of each `--json-report PATH` (or `=PATH`) in one command."""
+    reports = [value for flag, value in pairwise(arguments) if flag == REPORT_OPTION]
+    reports += [arg.split("=", 1)[1] for arg in arguments if arg.startswith(f"{REPORT_OPTION}=")]
+    return [str(PurePosixPath(report).parent) for report in reports]
 
 
 def _selects_the_marker_in_scenario_trees(line: str) -> bool:

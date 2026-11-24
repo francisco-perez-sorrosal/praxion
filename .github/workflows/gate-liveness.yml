@@ -110,6 +110,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      # tmp/ is gitignored, so a fresh checkout has none, and the command
+      # refuses a report directory that does not exist.
+      - name: Make the verdict's directory
+        run: mkdir -p tmp
+
       # The command holds the audit to the bound declared in pyproject.toml;
       # a red here is the job's red and the run's red.
       - name: Prove the selection audit still bites

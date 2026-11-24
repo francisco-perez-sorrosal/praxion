@@ -18,7 +18,7 @@ affected_files:
   - scripts/resolve_test_scope.py
   - tests/declared-deps.toml
 affected_reqs: [REQ-04, REQ-05, REQ-06]
-superseded_in_part_by: [dec-draft-c74dd28f]
+superseded_in_part_by: [dec-525]
 ---
 
 ## Context

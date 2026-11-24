@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-22T16:15:09Z'
+generated_at: '2026-11-24T15:03:46Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-21'
+  last_modified: '2026-11-22'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -134,7 +134,7 @@ surfaces:
   path: docs/architecture.md
   type: markdown
   title: Architecture Guide
-  last_modified: '2026-11-21'
+  last_modified: '2026-11-22'
   diataxis: reference
   audience: developer
   renderer: architecture_explorer
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-21'
+  last_modified: '2026-11-22'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -668,7 +668,7 @@ surfaces:
   path: .ai-state/TECH_DEBT_LEDGER.md
   type: markdown
   title: Technical Debt Ledger
-  last_modified: '2026-11-21'
+  last_modified: '2026-11-24'
   renderer: default_markdown
   surfaces_referenced:
   - ai-state-tech-debt-resolved
@@ -676,13 +676,13 @@ surfaces:
   path: .ai-state/TECH_DEBT_RESOLVED.md
   type: markdown
   title: Resolved Tech Debt
-  last_modified: '2026-11-21'
+  last_modified: '2026-11-22'
   renderer: default_markdown
 - id: ai-state-calibration-log
   path: .ai-state/calibration_log.md
   type: markdown
   title: Calibration Log
-  last_modified: '2026-11-21'
+  last_modified: '2026-11-24'
   renderer: default_markdown
 - id: ai-state-design-changelog
   path: .ai-state/DESIGN_CHANGELOG.md
@@ -3221,7 +3221,7 @@ surfaces:
   path: .ai-state/decisions/420-selection-audit-oracle-from-traced-reads.md
   type: markdown
   title: The selection audit's oracle is traced direct and child-process reads, with first-importer credit reported but not judged, evaluated through a per-path resolver mode
-  last_modified: '2026-10-02'
+  last_modified: '2026-11-22'
   renderer: adr_card
 - id: ai-state-decisions-421-tagged-step-blocks-without-a-mutation-reading
   path: .ai-state/decisions/421-tagged-step-blocks-without-a-mutation-reading.md
@@ -3849,11 +3849,17 @@ surfaces:
   title: A string marked test-scope:not-a-path is no path literal in the test-scope resolver
   last_modified: '2026-11-22'
   renderer: adr_card
+- id: ai-state-decisions-525-checkout-copies-set-aside
+  path: .ai-state/decisions/525-checkout-copies-set-aside.md
+  type: markdown
+  title: The selection audit sets aside reads made by copying the checkout as a whole, counts them in its notes, and still judges every other read
+  last_modified: '2026-11-24'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-21'
+  last_modified: '2026-11-22'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -3921,12 +3927,6 @@ surfaces:
   title: Sentinel Report
   last_modified: '2026-10-31'
   renderer: default_markdown
-- id: ai-state-metrics-reports-metrics-report-2026-09-20-15-21-06
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-20_15-21-06.json
-  type: json
-  title: METRICS_REPORT_2026-09-20_15-21-06.json
-  last_modified: '2026-09-20'
-  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-21_12-04-57.json
   type: json
@@ -3981,12 +3981,12 @@ surfaces:
   title: METRICS_REPORT_2026-11-16_14-52-59.json
   last_modified: '2026-11-16'
   renderer: metrics_view
-- id: ai-state-metrics-reports-metrics-report-2026-09-20-15-21-06
-  path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-20_15-21-06.md
-  type: markdown
-  title: Project Metrics Report
-  last_modified: '2026-09-20'
-  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-11-23-17-28-14
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-11-23_17-28-14.json
+  type: json
+  title: METRICS_REPORT_2026-11-23_17-28-14.json
+  last_modified: '2026-11-23'
+  renderer: metrics_view
 - id: ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
   path: .ai-state/metrics_reports/METRICS_REPORT_2026-09-21_12-04-57.md
   type: markdown
@@ -4040,6 +4040,12 @@ surfaces:
   type: markdown
   title: Project Metrics Report
   last_modified: '2026-11-16'
+  renderer: default_markdown
+- id: ai-state-metrics-reports-metrics-report-2026-11-23-17-28-14
+  path: .ai-state/metrics_reports/METRICS_REPORT_2026-11-23_17-28-14.md
+  type: markdown
+  title: Project Metrics Report
+  last_modified: '2026-11-23'
   renderer: default_markdown
 - id: ai-state-specs-spec-adherence-eval-2026-10-12
   path: .ai-state/specs/SPEC_adherence-eval_2026-10-12.md
@@ -4273,6 +4279,12 @@ surfaces:
   title: 'Spec: routing-facts (every routing surface states the harness''s current resolution order and alias facts, the L tier is the `haiku` alias, and the advisory spawn-model check reads real prompts
     and driver requests correctly)'
   last_modified: '2026-11-02'
+  renderer: default_markdown
+- id: ai-state-specs-spec-selection-audit-verdict-2026-11-24
+  path: .ai-state/specs/SPEC_selection-audit-verdict_2026-11-24.md
+  type: markdown
+  title: 'Spec: selection-audit-verdict (the selection audit''s verdict names only reads a reader can act on)'
+  last_modified: '2026-11-24'
   renderer: default_markdown
 - id: ai-state-specs-spec-sentinel-phase-b-2026-09-13
   path: .ai-state/specs/SPEC_sentinel-phase-b_2026-09-13.md
@@ -4887,12 +4899,11 @@ groups:
   - ai-state-decisions-522-retire-the-working-directory-notice-hook
   - ai-state-decisions-523-widened-pockets-wait-for-checkpoint
   - ai-state-decisions-524-a-marked-string-names-no-file
+  - ai-state-decisions-525-checkout-copies-set-aside
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger
   - ai-state-landscape-watchlist
-  - ai-state-metrics-reports-metrics-report-2026-09-20-15-21-06
-  - ai-state-metrics-reports-metrics-report-2026-09-20-15-21-06
   - ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
   - ai-state-metrics-reports-metrics-report-2026-09-21-12-04-57
   - ai-state-metrics-reports-metrics-report-2026-09-23-16-09-26
@@ -4911,6 +4922,8 @@ groups:
   - ai-state-metrics-reports-metrics-report-2026-11-09-15-17-14
   - ai-state-metrics-reports-metrics-report-2026-11-16-14-52-59
   - ai-state-metrics-reports-metrics-report-2026-11-16-14-52-59
+  - ai-state-metrics-reports-metrics-report-2026-11-23-17-28-14
+  - ai-state-metrics-reports-metrics-report-2026-11-23-17-28-14
   - ai-state-sentinel-reports-sentinel-report-2026-08-24-21-04-27
   - ai-state-sentinel-reports-sentinel-report-2026-08-30-20-15-49
   - ai-state-sentinel-reports-sentinel-report-2026-09-04-22-41-32
@@ -4957,6 +4970,7 @@ groups:
   - ai-state-specs-spec-ralph-lite-2026-10-08
   - ai-state-specs-spec-refactoring-delivery-2026-11-15
   - ai-state-specs-spec-routing-facts-2026-11-02
+  - ai-state-specs-spec-selection-audit-verdict-2026-11-24
   - ai-state-specs-spec-sentinel-phase-b-2026-09-13
   - ai-state-specs-spec-sidecar-placement-2026-09-03
   - ai-state-specs-spec-step-loop-dogfood-2026-10-08

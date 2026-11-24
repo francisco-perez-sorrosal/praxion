@@ -1,7 +1,8 @@
 ---
-id: dec-draft-c74dd28f
+id: dec-525
+draft_id: dec-draft-c74dd28f
 title: The selection audit sets aside reads made by copying the checkout as a whole, counts them in its notes, and still judges every other read
-status: proposed
+status: accepted
 category: behavioral
 date: 2026-11-22
 summary: "The tracer adds a fourth channel, copy, for the source-side open of a shutil copy of the checkout as a whole. That is a copytree whose outermost source is the repository root, or copy2 calls that keep repository-relative paths after the running test listed the checkout with git ls-files at the root. Copy pairs are not audited, and the verdict's notes count them (reads and tests) and say that later reads from the copies are unaudited. A copy of a directory or a named file is still an ordinary read. A copying test's other reads stay direct or child and are judged as before. Gaps are closed by reader-sized additive declared entries"

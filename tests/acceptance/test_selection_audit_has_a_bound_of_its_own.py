@@ -15,7 +15,7 @@ from tests.acceptance.drivers.audit_bound import declare_audit_bound, declared_a
 from tests.acceptance.drivers.gate_liveness import Gate, make_copy, run_liveness
 from tests.acceptance.drivers.liveness_workflow import REPO_ROOT
 
-STEP_LOOP_BOUND_SECONDS = 1500
+STEP_LOOP_BOUND_SECONDS = 2500
 SHORT_BOUND_SECONDS = 7
 STILL_GOING = re.compile(
     r"still (?:going|running)|had not (?:yet )?finished|did not finish|unfinished|was running",
@@ -26,7 +26,9 @@ STILL_GOING = re.compile(
 def test_the_audit_bound_is_longer_than_the_step_loops_gate_bound():
     bound = declared_audit_bound_seconds(REPO_ROOT)
 
-    assert bound > STEP_LOOP_BOUND_SECONDS, f"the audit's bound {bound} s is not past 1500 s"
+    assert bound > STEP_LOOP_BOUND_SECONDS, (
+        f"the audit's bound {bound} s is not past {STEP_LOOP_BOUND_SECONDS} s"
+    )
 
 
 @pytest.mark.liveness

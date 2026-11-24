@@ -202,11 +202,13 @@ venvPath = "."
 venv = ".venv"
 # --- end static type-check baseline -----------------------------------------
 
-# The step-loop gate runs the whole root suite when a runner config changes: 930 s measured, so
-# 1500 s leaves 61 percent headroom (the driver default is 540 s). The selection audit does not
+# The step-loop gate runs the whole root suite at a checkpoint and when a runner config changes:
+# 1617 s measured on 2026-11-23 at 769 test files (12 workers, nothing else running), so 2500 s is
+# that reading times 1.5, rounded up to the next 100 s (the driver default is 540 s). It was 1500 s,
+# sized from 930 s at 534 test files, until the suite outgrew it. The selection audit does not
 # read this bound: it has its own, declared under `[tool.praxion.gate-liveness]` below.
 [tool.praxion.step-loop]
-gate-timeout-seconds = 1500
+gate-timeout-seconds = 2500
 
 # The selection audit holds its traced run of the default suite to its own bound, declared here
 # and read through `scripts/gate_probes/suite_bound.py`; it is not the step loop's bound above.

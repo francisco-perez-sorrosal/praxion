@@ -61,7 +61,7 @@ from tests.acceptance.drivers.liveness_workflow import (
     selects_the_marker,
 )
 
-STEP_LOOP_BOUND_SECONDS = 1500
+STEP_LOOP_BOUND_SECONDS = 2500
 
 
 # -- A workflow of its own --------------------------------------------------------------------

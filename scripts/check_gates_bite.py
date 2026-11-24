@@ -27,7 +27,8 @@ The report is the schema-1 JSON of `gate_probes/verdict.py` (`--json`) or one
 `PASS`/`FAIL` line per gate; `--json-report PATH` also writes the JSON to PATH once the
 verdicts are in, whatever the stdout form, and refuses a PATH whose directory is missing
 before any probe runs. Exit codes: 0 every selected gate passes, 1 any
-fails, 2 usage error or no usable repository root. The root is `--repo-root`, else
+fails, 2 usage error, a report that could not be written, or no usable repository
+root. The root is `--repo-root`, else
 the git toplevel of the working directory; it is never derived from this file's
 location (managed projects run scripts through a symlink into the plugin), and a
 plugin-cache root is refused.
@@ -145,9 +146,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     verdicts = run_gates(_selected(args.gate), repo_root, _scrubbed_env(os.environ))
     report = render_json(verdicts)
     print(report if args.json else _render_text(verdicts))
-    if args.json_report:
-        args.json_report.write_text(report + "\n", encoding="utf-8")
+    if args.json_report and not _write_report(args.json_report, report):
+        return EXIT_USAGE
     return EXIT_PASS if all(verdict.passed for verdict in verdicts) else EXIT_FAILED
+
+
+def _write_report(path: Path, report: str) -> bool:
+    """Write the report to PATH; False, with the reason on stderr, when it cannot be written."""
+    try:
+        path.write_text(report + "\n", encoding="utf-8")
+    except OSError as exc:
+        print(f"error: --json-report {path} could not be written: {exc}", file=sys.stderr)
+        return False
+    return True
 
 
 def run_gates(gates: Sequence[GateId], repo_root: Path, env: Mapping[str, str]) -> list[Verdict]:

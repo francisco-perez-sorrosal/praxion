@@ -474,6 +474,24 @@ def test_json_report_naming_a_directory_exits_two_before_any_probe_runs(
     assert not probe_ran.exists()
 
 
+def test_json_report_that_cannot_be_written_exits_two_with_the_reason(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    install_probes(tmp_path, monkeypatch, pass__spawn_count=PASSING.format(gate="SPAWN_COUNT"))
+    # A dangling link passes both up-front checks and fails the write, even for root.
+    report_path = tmp_path / "report.json"
+    report_path.symlink_to(tmp_path / "gone" / "report.json")
+
+    code = cgb.main(
+        ["--json-report", str(report_path), "--repo-root", str(tmp_path), "--gate", "spawn-count"]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "could not be written" in captured.err
+    assert captured.out.startswith("PASS spawn-count")
+
+
 def test_no_json_report_flag_writes_no_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -35,7 +35,7 @@ The weekly selection audit (`dec-420`, hosted by `dec-520`) failed at the base 2
 
   Every other copy, of a subdirectory or of a named file, stays `direct` or `child`.
 - **The verdict still audits `direct ∪ child` only.** `copy − (direct ∪ child)` over tracked files is set aside and counted in a note on every run: the reads (test, file pairs) and the tests that made them, and that later reads from the copies are not audited, with a count of none when no test copied. The rule classifies open events, never tests or pairs, so a copying test's other reads of the same files are judged.
-- **Closures are sized to the reader.** A remaining gap is closed by an additive `[[dep]]` entry that selects every test reaching the shared reader, not the one test a run credited, so a local pass predicts the runner's. AC-03's local pass is taken at the default worker count and at `PYTEST_XDIST_AUTO_NUM_WORKERS=4`.
+- **Closures are sized to the reader.** A remaining gap is closed by an additive `[[dep]]` entry that selects every test reaching the shared reader, not the one test a run credited, so a local pass predicts the runner's. The local pass is taken at the default worker count and at `PYTEST_XDIST_AUTO_NUM_WORKERS=4`.
 
 ## Considered Options
 
@@ -57,7 +57,7 @@ The weekly selection audit (`dec-420`, hosted by `dec-520`) failed at the base 2
 ### Option 4: widen every change to every copier (a `**` declared entry)
 
 - **Pro**: the safe direction. A sandboxed test plausibly depends on the whole checkout.
-- **Con**: every test that *can* be credited with a template build must be listed (far more than the 23 test files the selection-size bound allows), so every change's selection grows past the bound. It also contradicts the user's reading of what a copy shows.
+- **Con**: every test that *can* be credited with a template build must be listed (far more than the roughly 38 test files the selection-size bound allows, 5 points of the 764-file corpus), so every change's selection grows past the bound. It also contradicts the user's reading of what a copy shows.
 
 ## Consequences
 
@@ -72,6 +72,7 @@ The weekly selection audit (`dec-420`, hosted by `dec-520`) failed at the base 2
 - Reads made later from a copy (outside the root) are unaudited. That was already true of `dec-420`'s tracer. It is now stated, counted and attributed.
 - The tracer handles two more audit events. Their cost is per copy and per process start, not per open.
 - The trace wire format gains a channel. An old probe reading a new trace fails loudly, and the two ship together.
+- Reader-sized closures widen selection, because a declared entry holds at every hop: the median narrow root selection grew from 21.6 to 25.6 percent of test files (+4.0 points), most of it the hook-replay tests joining every change that reaches a module the hooks import. The selection-size limit was amended from +3 to +5 points on the user's word; how far a hook dependency should reach is left to its own design.
 
 ## Disconfirmation
 

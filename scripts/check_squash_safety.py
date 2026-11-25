@@ -19,6 +19,14 @@ file deliberately will also trigger the warning. That is a false positive,
 not a false negative -- users can inspect the diagnostic message and ignore
 it. Missing a real squash erasure would be worse.
 
+Report retention is the one deliberate deletion set aside, because a bot makes
+it every week: `prune_reports.py` keeps each report family's newest runs and the
+metrics and sentinel workflows commit the older ones' deletion, so every pull
+of such a commit would warn. A deleted report whose run is older than every run
+its family still holds at HEAD is retention's work. A squash that replaced the
+tree erases the reports the target gathered since the branch diverged, the
+newest of their family, so it is still flagged.
+
 Under the sidecar-placement ruling (`ARCH_WT_RULING.md` § 8) the project
 repository no longer owns `.ai-state/` when it is `SidecarOwned` -- the
 squash signature this script exists to catch happens in the state mount at
@@ -48,6 +56,7 @@ import sys
 from pathlib import Path
 
 import _sidecar_mount
+import prune_reports
 from _git_runner import git_output
 from _repo_root import resolve_repo_root as _resolve_repo_root
 from _script_cli import configure_logging
@@ -143,6 +152,32 @@ def detect_potentially_erased_files(parent_sha: str, head_sha: str) -> list[str]
     if output is None:
         return []
     return sorted(line for line in output.splitlines() if line.strip())
+
+
+def ai_state_files_at(rev: str) -> list[str]:
+    """Every tracked path under `.ai-state/` at `rev`; empty when the git query fails."""
+    output = _git("ls-tree", "-r", "--name-only", rev, "--", AI_STATE_PREFIX)
+    if output is None:
+        return []
+    return [line for line in output.splitlines() if line.strip()]
+
+
+def retention_pruned(erased: list[str], kept: list[str]) -> set[str]:
+    """The erased paths that report retention deletes, judged against the files `kept`.
+
+    A deleted run older than every run its family keeps is retention's; a family that
+    keeps no run at all leaves its deleted runs flagged.
+    """
+    oldest_kept: dict[tuple[str, str], str] = {}
+    for run in filter(None, map(prune_reports.report_run, kept)):
+        oldest_kept[run.family] = min(run.timestamp, oldest_kept.get(run.family, run.timestamp))
+    return {
+        path
+        for path in erased
+        if (run := prune_reports.report_run(path)) is not None
+        and run.family in oldest_kept
+        and run.timestamp < oldest_kept[run.family]
+    }
 
 
 def _resolve_parent(since: str | None) -> str | None:
@@ -282,11 +317,18 @@ def _run(since: str | None) -> int:
         return 0
 
     erased = detect_potentially_erased_files(parent_sha, "HEAD")
-    if not erased:
+    pruned = retention_pruned(erased, ai_state_files_at("HEAD")) if erased else set()
+    if pruned:
+        logger.info(
+            "check_squash_safety: %d .ai-state/ deletion(s) are report retention's; set aside",
+            len(pruned),
+        )
+    unexpected = [path for path in erased if path not in pruned]
+    if not unexpected:
         logger.info("check_squash_safety: no .ai-state/ erasure detected")
         return 0
 
-    emit_warning(erased)
+    emit_warning(unexpected)
     return 0
 
 

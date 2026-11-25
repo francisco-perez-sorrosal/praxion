@@ -41,7 +41,8 @@ import logging
 import re
 import sys
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from typing import NamedTuple
 
 from _repo_root import is_plugin_cache_path, resolve_repo_root
 
@@ -96,6 +97,33 @@ def _timestamp_of(name: str) -> str | None:
     return match.group(0) if match else None
 
 
+def _run_timestamp(name: str, prefix: str) -> str | None:
+    """The run token of a ``<prefix>_REPORT_`` file name, or None for any other file."""
+    return _timestamp_of(name) if name.startswith(f"{prefix}{_REPORT_MARKER}") else None
+
+
+class ReportRun(NamedTuple):
+    """The report family a file belongs to, and the run within it."""
+
+    family: tuple[str, str]  # (directory relative to the repo root, prefix), as in _REPORT_FAMILIES
+    timestamp: str
+
+
+def report_run(rel_path: str) -> ReportRun | None:
+    """The family and run of a repo-relative path, or None for a file retention never prunes.
+
+    The same test ``_report_runs`` applies to a directory listing, for a caller that holds
+    only paths, such as the names in a git tree.
+    """
+    path = PurePosixPath(rel_path)
+    for family in _REPORT_FAMILIES:
+        directory, prefix = family
+        timestamp = _run_timestamp(path.name, prefix) if str(path.parent) == directory else None
+        if timestamp is not None:
+            return ReportRun(family, timestamp)
+    return None
+
+
 def _report_runs(family_dir: Path, prefix: str) -> dict[str, list[Path]]:
     """Map each run timestamp to its report files (e.g. a `.md` + `.json` pair).
 
@@ -104,15 +132,11 @@ def _report_runs(family_dir: Path, prefix: str) -> dict[str, list[Path]]:
     construction, and a *sibling series* in the same directory is excluded by
     the prefix — which is the whole point of carrying one.
     """
-    marker = f"{prefix}{_REPORT_MARKER}"
     runs: dict[str, list[Path]] = {}
     for path in family_dir.iterdir():
-        if not path.is_file() or not path.name.startswith(marker):
-            continue
-        ts = _timestamp_of(path.name)
-        if ts is None:
-            continue
-        runs.setdefault(ts, []).append(path)
+        ts = _run_timestamp(path.name, prefix) if path.is_file() else None
+        if ts is not None:
+            runs.setdefault(ts, []).append(path)
     return runs
 
 

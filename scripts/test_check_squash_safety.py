@@ -721,3 +721,101 @@ class TestProjectSideSkipsUnderSidecarOwnership:
         combined = (result.stdout + result.stderr).lower()
         assert "does not own" in combined
         assert ".ai-state" in combined
+
+
+# -- Report retention is not a squash -------------------------------------------------
+#
+# `prune_reports.py` keeps each report family's newest runs and deletes the older ones,
+# and the weekly metrics and sentinel bots commit that deletion. A pull of such a commit
+# fast-forwards to a single-parent commit that deletes `.ai-state/` files, the same
+# signature a squash leaves, so these scenarios build both shapes in real repositories.
+
+METRICS = (".ai-state/metrics_reports", "METRICS")
+SELF_HEALING = (".ai-state/metrics_reports", "SELF_HEALING")
+STAMPS = ("2026-09-20_15-21-06", "2026-10-05_17-28-14", "2026-11-16_17-28-14")
+NEWER_STAMP = "2026-11-23_17-28-14"
+
+
+def _rt_run_files(family: tuple[str, str], stamp: str) -> list[str]:
+    directory, prefix = family
+    return [f"{directory}/{prefix}_REPORT_{stamp}.{ext}" for ext in ("json", "md")]
+
+
+def _rt_write_run(repo: Path, family: tuple[str, str], stamp: str) -> list[str]:
+    paths = _rt_run_files(family, stamp)
+    for rel in paths:
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(f"{family[1]} report {stamp}\n")
+    return paths
+
+
+def _rt_repo(tmp_path: Path) -> Path:
+    """A project whose state holds one ADR and three runs of the metrics report."""
+    repo = tmp_path / "project"
+    repo.mkdir()
+    _tm_git_ok(repo, "init", "-q", "-b", "main")
+    _tm_configure_identity(repo)
+    (repo / ".ai-state" / "decisions").mkdir(parents=True)
+    (repo / ".ai-state" / "decisions" / "001-first.md").write_text(_tm_adr_body(1, "first"))
+    for stamp in STAMPS:
+        _rt_write_run(repo, METRICS, stamp)
+    _tm_commit_all(repo, "seed state")
+    return repo
+
+
+def _rt_commit_deleting(repo: Path, paths: list[str], message: str) -> None:
+    for rel in paths:
+        _tm_git_ok(repo, "rm", "-q", rel)
+    _tm_commit_all(repo, message)
+
+
+def _rt_diagnose(tmp_path: Path, repo: Path) -> str:
+    result = _tm_run(_tm_safe_cwd(tmp_path), "--repo-root", str(repo))
+    assert result.returncode == 0, result.stderr
+    return result.stdout + result.stderr
+
+
+class TestReportRetentionIsNotASquash:
+    def test_a_commit_that_prunes_the_oldest_report_run_draws_no_warning(self, tmp_path: Path):
+        repo = _rt_repo(tmp_path)
+        _rt_write_run(repo, METRICS, NEWER_STAMP)
+        _rt_commit_deleting(
+            repo, _rt_run_files(METRICS, STAMPS[0]), "chore(state): scheduled metrics report"
+        )
+
+        diagnosis = _rt_diagnose(tmp_path, repo)
+
+        assert "Squash-merge detected" not in diagnosis, diagnosis
+
+    def test_a_commit_that_erases_the_newest_report_run_still_warns(self, tmp_path: Path):
+        repo = _rt_repo(tmp_path)
+        newest = _rt_run_files(METRICS, STAMPS[-1])
+        _rt_commit_deleting(repo, newest, "squash a branch cut before the newest run")
+
+        diagnosis = _rt_diagnose(tmp_path, repo)
+
+        assert "Squash-merge detected" in diagnosis
+        assert all(path in diagnosis for path in newest), diagnosis
+
+    def test_only_the_deletions_retention_makes_are_set_aside(self, tmp_path: Path):
+        repo = _rt_repo(tmp_path)
+        oldest = _rt_run_files(METRICS, STAMPS[0])
+        adr = ".ai-state/decisions/001-first.md"
+        _rt_commit_deleting(repo, [*oldest, adr], "squash that also dropped an ADR")
+
+        diagnosis = _rt_diagnose(tmp_path, repo)
+
+        assert "Files deleted under .ai-state/: 1" in diagnosis, diagnosis
+        assert adr in diagnosis
+        assert not any(path in diagnosis for path in oldest), diagnosis
+
+    def test_a_series_is_judged_by_its_own_runs_not_its_directory_neighbours(self, tmp_path: Path):
+        repo = _rt_repo(tmp_path)
+        only_run = _rt_write_run(repo, SELF_HEALING, STAMPS[0])
+        _tm_commit_all(repo, "a self-healing run")
+        _rt_commit_deleting(repo, only_run, "squash that dropped the only self-healing run")
+
+        diagnosis = _rt_diagnose(tmp_path, repo)
+
+        assert "Squash-merge detected" in diagnosis
+        assert all(path in diagnosis for path in only_run), diagnosis

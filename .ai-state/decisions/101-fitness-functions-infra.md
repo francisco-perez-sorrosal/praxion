@@ -21,6 +21,8 @@ affected_files:
   - skills/architectural-fitness-functions/references/import-linter-recipes.md
 re_affirmed_by:
   - dec-104
+superseded_in_part_by:
+  - dec-526
 ---
 
 ## Context

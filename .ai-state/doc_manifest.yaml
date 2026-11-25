@@ -1,6 +1,6 @@
 schema_version: 2
 generator_version: praxion-0.7.0
-generated_at: '2026-11-24T15:03:46Z'
+generated_at: '2026-11-25T03:52:13Z'
 project_name: praxion
 project_slug: praxion
 surfaces:
@@ -55,7 +55,7 @@ surfaces:
   path: CHANGELOG.md
   type: markdown
   title: CHANGELOG.md
-  last_modified: '2026-11-22'
+  last_modified: '2026-11-25'
   renderer: default_markdown
 - id: docs-readme
   path: docs/README.md
@@ -637,7 +637,7 @@ surfaces:
   path: .ai-state/DESIGN.md
   type: markdown
   title: Architecture
-  last_modified: '2026-11-22'
+  last_modified: '2026-11-24'
   diataxis: explanation
   audience: architect
   renderer: architecture_explorer
@@ -3221,7 +3221,7 @@ surfaces:
   path: .ai-state/decisions/420-selection-audit-oracle-from-traced-reads.md
   type: markdown
   title: The selection audit's oracle is traced direct and child-process reads, with first-importer credit reported but not judged, evaluated through a per-path resolver mode
-  last_modified: '2026-11-22'
+  last_modified: '2026-11-24'
   renderer: adr_card
 - id: ai-state-decisions-421-tagged-step-blocks-without-a-mutation-reading
   path: .ai-state/decisions/421-tagged-step-blocks-without-a-mutation-reading.md
@@ -3855,11 +3855,17 @@ surfaces:
   title: The selection audit sets aside reads made by copying the checkout as a whole, counts them in its notes, and still judges every other read
   last_modified: '2026-11-24'
   renderer: adr_card
+- id: ai-state-decisions-526-fitness-contracts-cite-in-broken-contract-guidance
+  path: .ai-state/decisions/526-fitness-contracts-cite-in-broken-contract-guidance.md
+  type: markdown
+  title: An import-linter contract carries its citation in broken_contract_guidance, not description
+  last_modified: '2026-11-24'
+  renderer: adr_card
 - id: ai-state-decisions-decisions-index
   path: .ai-state/decisions/DECISIONS_INDEX.md
   type: markdown
   title: Decisions Index
-  last_modified: '2026-11-22'
+  last_modified: '2026-11-24'
   renderer: default_markdown
 - id: ai-state-idea-ledgers-idea-ledger
   path: .ai-state/idea_ledgers/IDEA_LEDGER.md
@@ -4900,6 +4906,7 @@ groups:
   - ai-state-decisions-523-widened-pockets-wait-for-checkpoint
   - ai-state-decisions-524-a-marked-string-names-no-file
   - ai-state-decisions-525-checkout-copies-set-aside
+  - ai-state-decisions-526-fitness-contracts-cite-in-broken-contract-guidance
   - ai-state-decisions-decisions-index
   - ai-state-design-changelog
   - ai-state-idea-ledgers-idea-ledger

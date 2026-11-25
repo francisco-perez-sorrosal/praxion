@@ -755,6 +755,12 @@ def _git_env() -> dict[str, str]:
             "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
             "GIT_COMMITTER_NAME": "fixture",
             "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            # A commit otherwise starts `git maintenance run --auto --detach`, which takes and
+            # drops `.git/objects/maintenance.lock` while a scenario's `copytree` of the
+            # checkout walks it: the copy then finds a listed file gone.
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "maintenance.auto",
+            "GIT_CONFIG_VALUE_0": "false",
         }
     )
     return env

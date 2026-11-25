@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.acceptance.drivers.adherence_eval import FakeClaude, install_fake_claude
+from tests.acceptance.drivers.adherence_eval import FakeClaude, _git_env, install_fake_claude
 from tests.acceptance.drivers.move_eval import (
     DEFAULT_FLOOR_SESSIONS,
     DEFAULT_PAIRED_TASKS,
@@ -204,3 +204,23 @@ def test_a_change_inside_the_eval_package_selects_each_root_module_driving_a_mov
     module, selected_by_an_eval_change
 ):
     assert module in selected_by_an_eval_change, f"{EVAL_PACKAGE_FILE} did not select {module}"
+
+
+# -- The checkout every scenario copies ---------------------------------------------------------
+
+
+def test_a_commit_in_the_checkout_starts_no_background_git_maintenance(tmp_path):
+    # A detached `git maintenance run --auto` takes and drops `.git/objects/maintenance.lock`
+    # while a later scenario's copytree walks the template, which then finds a listed file gone.
+    checkout = move_checkout(tmp_path)
+
+    traced = subprocess.run(
+        ["git", "commit", "--allow-empty", "-q", "-m", "one more commit"],
+        cwd=checkout,
+        env={**_git_env(), "GIT_TRACE": "1"},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert "maintenance run" not in traced.stderr, traced.stderr

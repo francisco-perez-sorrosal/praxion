@@ -73,11 +73,12 @@ If the file is absent, the resolver reads it as an empty list — no entries req
 
 ### Sizing an entry to its reader
 
-The weekly gate-liveness audit (below) closes each gap it finds by an entry here, and an entry that closes one follows three rules:
+The weekly gate-liveness audit (below) closes each gap it finds by an entry here, and an entry that closes one follows four rules:
 
 - **Sized to the reader.** It selects every test that reaches the shared reader (the helper, fixture or hook a test goes through), never only the test a run credited. A read cached once per process is credited to whichever test of a worker asked first, so an entry sized to the credited test passes with one worker count and fails with another.
 - **Names its channel.** Its `why` says how the read happens (a child process over a copy of the checkout, an `ast` parse of a path joined at run time, a scanner walking a glob), so the next reader can tell a real edge from a leftover.
 - **A union, never a narrowing.** It only adds tests, and the paths are the glob the reader scans, not `**`, unless the reader scans every tracked file. Removing a test or a path from an entry narrows a selection and is a defect; the list exists to over-select.
+- **Sized for every hop.** A change selects an entry's tests whenever its import chain reaches the entry's paths, not only when it touches them, so an entry for a widely imported module (the hooks, say) joins every change to what that module imports: measure it with `measure_selection_size.py` before committing it.
 
 ## Ecosystem Dispatch
 

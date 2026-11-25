@@ -252,6 +252,7 @@ GitHub Actions provides built-in usage and performance metrics on all plans (sin
 | **Path filters on required checks** -- blocks merging when workflow doesn't run | Use `dorny/paths-filter` at job level instead of workflow-level path triggers |
 | **Secrets in logs** -- `echo $SECRET` or debug output leaking credentials | Never echo secrets; use `::add-mask::` for dynamic values |
 | **Testing only on PR** -- main branch can still break | Run full pipeline on merge to main, not just on PR |
+| **Writing into a gitignored directory** -- `tmp/` or `.ai-work/` exists in every local tree and on no fresh runner, so the step passes locally and fails in CI | Create the directory in the step (`mkdir -p`) or write under `$RUNNER_TEMP`; run the job's steps in a fresh `git clone --no-local` before calling the change verified |
 
 ## Integration with Other Skills
 

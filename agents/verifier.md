@@ -178,6 +178,8 @@ Convention checks (derived from `coding-style` rule):
 
 **Model-routing changes.** When the change touches model routing, run `python3 scripts/check_spawn_models.py <transcripts-dir>` over the recorded sessions the change touches; it is advisory and costs nothing, and only an `unexplained` verdict is a finding.
 
+**Workflow changes.** When the change touches `.github/workflows/`, check that every directory a step writes into exists on a fresh checkout: a gitignored one (`tmp/`, `.ai-work/`) is in every local tree and in no CI checkout, so the step passes every local run and fails on the runner. Run the job's steps in a fresh `git clone --no-local` before passing the change.
+
 #### Specialist Design Review (conditional)
 
 When a specialist artifact exists in `.ai-work/<task-slug>/` — `INTERFACE_DESIGN.md` (task involved an interface surface: web UI, TUI/CLI output, API, MCP tools), `TRANSACTIONS_DESIGN.md` (task involved agentic payments or trading), `ARCHITECTURE_VALIDATION.md` (the architect-validator ran), or any `CONSULT_<discipline>.md` — or when `SYSTEMS_PLAN.md § Architecture` carries a populated `### Data Structures` section, or the diff introduces or alters domain types, state shapes, or component/agent schemas (representation surface):

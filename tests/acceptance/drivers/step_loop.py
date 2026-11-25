@@ -238,6 +238,11 @@ def _clean_env() -> dict[str, str]:
     # task must see only the ones the scenario sets itself, never the gate's.
     env = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", AMBIENT_LOOP_PREFIX))}
     env.pop("PYTEST_ADDOPTS", None)
+    # A scenario rewrites a step's source between attempts, often within the same second and at
+    # the same size (`return None` and `return '41'`). CPython reuses a cached .pyc whose recorded
+    # source mtime (whole seconds) and size both match, so a check would import the earlier
+    # attempt's code. No bytecode is written, so every check compiles what is on disk.
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     # `python` on PATH must be an interpreter that has pytest, as it is under `uv run`.
     env["PATH"] = f"{Path(PYTHON).parent}{os.pathsep}{env.get('PATH', '')}"
     return env

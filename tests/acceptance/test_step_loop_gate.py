@@ -9,6 +9,8 @@ reconciler itself still runs no declared command.
 
 from __future__ import annotations
 
+import os
+
 from tests.acceptance.drivers.step_loop import (
     Step,
     Work,
@@ -17,8 +19,11 @@ from tests.acceptance.drivers.step_loop import (
     commits_after,
     head,
     ledger_records,
+    next_action,
     reconciler_verdict,
+    record,
     snapshot,
+    work_on,
 )
 
 SHARED_MODULE = "src/shared.py"
@@ -148,3 +153,21 @@ def test_a_verified_attempt_is_the_only_new_commit_after_a_failed_one(tmp_path):
     attempt(task, Work())
 
     assert len(commits_after(task, head_before)) == 1
+
+
+def test_a_green_attempt_written_in_the_red_attempts_second_is_checked_as_written(tmp_path):
+    # CPython reuses a cached .pyc when the source's mtime (whole seconds) and size both match
+    # what it recorded, and on a fast machine both attempts land in one second. A two-character
+    # step id makes the green source (`return '41'`) as long as the red one (`return None`).
+    task = build_loop(tmp_path, Step("41"))
+    attempt(task, Work(passes=False))
+    source = task.root / task.step("41").source
+    red = source.stat()
+
+    asked = next_action(task)
+    agent_id = work_on(task, asked.request, Work())
+    os.utime(source, (red.st_mtime, red.st_mtime))
+    returned = record(task, asked.request["id"], agent_id=agent_id, marker="complete")
+
+    assert source.stat().st_size == red.st_size, "the scenario needs sources of one size"
+    assert returned.recorded["commit"] is not None, returned.doc

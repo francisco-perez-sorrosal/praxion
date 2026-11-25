@@ -50,9 +50,9 @@ def test_fails_contract_when_check_script_imports_finalize_script(
     This proves the gate bites: if someone adds `import finalize_adrs` inside
     a check_* script, the fitness suite catches it.
 
-    NOTE: import-linter needs the package on sys.path. We write a pyproject.toml
-    with the scripts package as a root package and run via `uv run` from
-    project_root so the environment is consistent.
+    NOTE: import-linter needs the package on sys.path, so PYTHONPATH points at
+    tmp_path. `uv run --project` runs the project's locked import-linter, so the
+    result does not depend on whether the caller is itself inside `uv run`.
     """
     # -- Fixture mini-package (separate from the real scripts/ to avoid conflicts) --
     pkg = tmp_path / "scripts_fixture"
@@ -77,7 +77,7 @@ def test_fails_contract_when_check_script_imports_finalize_script(
         [importlinter:contract:boundary-violation]
         name = check_* must not import finalize_*
         type = forbidden
-        description = CLAUDE.md§Structural Beauty: pre-commit scripts must not import post-merge scripts.
+        broken_contract_guidance = CLAUDE.md§Structural Beauty: pre-commit scripts must not import post-merge scripts.
         source_modules =
             scripts_fixture.check_bad
         forbidden_modules =
@@ -90,8 +90,8 @@ def test_fails_contract_when_check_script_imports_finalize_script(
         [
             "uv",
             "run",
-            "--with",
-            "import-linter",
+            "--project",
+            str(project_root),
             "lint-imports",
             "--config",
             str(cfg_file),
@@ -110,3 +110,5 @@ def test_fails_contract_when_check_script_imports_finalize_script(
         f"script (the boundary invariant is violated).\n"
         f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
     )
+    # A configuration error also exits non-zero; only a broken contract proves the bite.
+    assert "BROKEN" in result.stdout, f"no contract broke:\n{result.stdout}\n{result.stderr}"

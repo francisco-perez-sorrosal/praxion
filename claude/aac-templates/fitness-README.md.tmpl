@@ -8,7 +8,7 @@ Behavior tests live in `tests/`.
 Every fitness rule MUST cite either an ADR id or a CLAUDE.md principle. The citation lives in:
 
 - **pytest tests**: the module docstring of each test file
-- **import-linter contracts**: the `description=` field of each `[importlinter:contract:*]` stanza
+- **import-linter contracts**: the `broken_contract_guidance=` field of each `[importlinter:contract:*]` stanza, which import-linter prints when the contract breaks (2.16+ rejects any option a contract does not define, so `description=` fails the run)
 
 Citation anchors must match one of:
 

@@ -73,7 +73,7 @@ def test_canary_rejects_a_family_importing_an_sdk_directly(
             name = {CONTRACT}
             type = forbidden
             allow_indirect_imports = True
-            description = dec-204 the adapter owns the auth seam.
+            broken_contract_guidance = dec-204 the adapter owns the auth seam.
             source_modules =
                 evals_fixture.families
             forbidden_modules =
@@ -82,7 +82,7 @@ def test_canary_rejects_a_family_importing_an_sdk_directly(
         encoding="utf-8",
     )
     result = subprocess.run(
-        ["uv", "run", "--with", "import-linter", "lint-imports", "--config", str(cfg)],
+        ["uv", "run", "--project", str(project_root), "lint-imports", "--config", str(cfg)],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -123,7 +123,7 @@ def test_canary_reaching_the_sdk_through_the_adapter_is_allowed(
             name = through the adapter is allowed
             type = forbidden
             allow_indirect_imports = True
-            description = dec-204 the adapter owns the auth seam.
+            broken_contract_guidance = dec-204 the adapter owns the auth seam.
             source_modules =
                 evals_ok.families
             forbidden_modules =
@@ -132,7 +132,7 @@ def test_canary_reaching_the_sdk_through_the_adapter_is_allowed(
         encoding="utf-8",
     )
     result = subprocess.run(
-        ["uv", "run", "--with", "import-linter", "lint-imports", "--config", str(cfg)],
+        ["uv", "run", "--project", str(project_root), "lint-imports", "--config", str(cfg)],
         cwd=tmp_path,
         capture_output=True,
         text=True,

@@ -19,8 +19,9 @@ source_modules =
     scripts
 forbidden_modules =
     agents
-description  = CLAUDE.md§Structural Beauty — scripts are standalone utilities; importing
-               agent definitions would create a circular knowledge dependency.
+broken_contract_guidance =
+    CLAUDE.md§Structural Beauty — scripts are standalone utilities; importing
+    agent definitions would create a circular knowledge dependency.
 ```
 
 **Fields:**
@@ -31,7 +32,7 @@ description  = CLAUDE.md§Structural Beauty — scripts are standalone utilities
 | `type` | Always `forbidden` for this recipe |
 | `source_modules` | One module per line; these are the importers being restricted |
 | `forbidden_modules` | One module per line; these must not appear in source_modules' import graph |
-| `description` | Required citation (`dec-\d{3,}` or `CLAUDE.md§...`) + rationale |
+| `broken_contract_guidance` | Required citation (`dec-\d{3,}` or `CLAUDE.md§...`) + rationale; printed under a broken contract |
 | `ignore_imports` | Optional; one `a.b -> c.d` per line for unavoidable transitive imports |
 
 Use `ignore_imports` sparingly — each entry is a known exception that should be
@@ -53,8 +54,9 @@ layers =
     agents
     rules
 containers   = .
-description  = CLAUDE.md§Structural Beauty — lower layers (skills) must not import
-               from higher layers (agents, rules); keep knowledge flow one-way.
+broken_contract_guidance =
+    CLAUDE.md§Structural Beauty — lower layers (skills) must not import
+    from higher layers (agents, rules); keep knowledge flow one-way.
 ```
 
 **Fields:**
@@ -83,8 +85,9 @@ type         = independence
 modules =
     skills
     agents
-description  = CLAUDE.md§Structural Beauty — skills and agents are orthogonal
-               subsystems; cross-imports indicate accidental coupling.
+broken_contract_guidance =
+    CLAUDE.md§Structural Beauty — skills and agents are orthogonal
+    subsystems; cross-imports indicate accidental coupling.
 ```
 
 **Fields:**
@@ -112,11 +115,11 @@ Good:
 ```ini
 [importlinter:contract:no-scripts-import-agents]
 ...
-description = CLAUDE.md§Structural Beauty — ...
+broken_contract_guidance = CLAUDE.md§Structural Beauty — ...
 
 [importlinter:contract:no-agents-import-fitness]
 ...
-description = CLAUDE.md§Root Causes Over Workarounds — ...
+broken_contract_guidance = CLAUDE.md§Root Causes Over Workarounds — ...
 ```
 
 Avoid:
@@ -134,10 +137,17 @@ a single contract without accidentally relaxing a different invariant.
 
 **Star imports defeat static analysis.** `from module import *` is opaque to
 import-linter's graph builder. If a contract is known to be unreliable in the
-presence of star imports, add a note in the `description=` field:
+presence of star imports, add a note in the `broken_contract_guidance=` field:
 ```ini
-description = dec-NNN — Note: reliability limited if star imports exist in source_modules.
+broken_contract_guidance = dec-NNN — Note: reliability limited if star imports exist in source_modules.
 ```
+
+**An unknown option fails the run.** Since 2.16 import-linter rejects any option no
+field of the contract recognizes (`description: Unrecognized option.`), and earlier
+versions ignored it silently. A config written for an older version that carries its
+citation in `description =` breaks on the first upgrade: rename the key to
+`broken_contract_guidance`, which 2.14+ prints under a broken contract and older
+versions ignore.
 
 **Dynamic imports via `importlib` cannot be statically traced.** Code that uses
 `importlib.import_module("some.module")` or `__import__()` is invisible to

@@ -5,9 +5,11 @@
 # src, or whatever appears as the top-level importable name in your project).
 # You may list multiple packages, one per line, indented under root_packages.
 #
-# Each [importlinter:contract:*] stanza must carry a `description=` field that
-# cites an ADR id or a CLAUDE.md principle — the meta-citation fitness rule will
-# FAIL the suite if any contract lacks a citation.
+# Each [importlinter:contract:*] stanza must carry a `broken_contract_guidance=`
+# field that cites an ADR id or a CLAUDE.md principle — the meta-citation fitness
+# rule will FAIL the suite if any contract lacks a citation. import-linter prints
+# the field when the contract breaks; since 2.16 it rejects any option a contract
+# does not define, so the older `description=` fails the run.
 #
 # Citation anchors that satisfy the regex dec-\d{3,}|CLAUDE\.md§[A-Z][A-Za-z ]+:
 #   ADR example:        dec-NNN (e.g. dec-042)
@@ -23,7 +25,7 @@ root_packages =
 [importlinter:contract:independence-example]
 name = api must not import persistence (example — replace with a real invariant)
 type = independence
-description = Decouple the entry-point layer from storage so each can evolve independently. CLAUDE.md§Structural Beauty: clean boundaries, cohesive modules.
+broken_contract_guidance = Decouple the entry-point layer from storage so each can evolve independently. CLAUDE.md§Structural Beauty: clean boundaries, cohesive modules.
 modules =
     {{YOUR_ROOT_PACKAGE}}.api
     {{YOUR_ROOT_PACKAGE}}.persistence

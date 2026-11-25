@@ -55,7 +55,7 @@ enables the meta-citation rule to enforce coverage automatically.
 | Rule type | Citation location |
 |-----------|-------------------|
 | pytest test module | Module docstring (first line is sufficient) |
-| Graph-rule contract (Python) | `description=` field of the contract stanza |
+| Graph-rule contract (Python) | `broken_contract_guidance=` field of the contract stanza |
 | Graph-rule contract (TypeScript) | `comment` field of the rule object |
 | ESLint per-file restriction | `message` field of the pattern |
 

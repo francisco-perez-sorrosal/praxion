@@ -47,8 +47,10 @@ fitness = [
 ### Config Layout
 
 `fitness/import-linter.cfg` holds all import contracts. Each contract stanza follows
-the `[importlinter:contract:<name>]` pattern and **must** have a `description=` field
-containing a citation:
+the `[importlinter:contract:<name>]` pattern and **must** have a
+`broken_contract_guidance=` field containing a citation. import-linter prints it under
+a broken contract. Since 2.16 it rejects any option a contract does not define, so the
+older `description=` fails the run (`description: Unrecognized option.`):
 
 ```ini
 [importlinter]
@@ -59,7 +61,7 @@ name = Domain must not import infra
 type = forbidden
 source_modules = mypackage.domain
 forbidden_modules = mypackage.infra
-description = CLAUDE.md§Structural Beauty (domain layer stays clean; infrastructure is a detail)
+broken_contract_guidance = CLAUDE.md§Structural Beauty (domain layer stays clean; infrastructure is a detail)
 
 [importlinter:contract:layers]
 name = Layer ordering
@@ -69,7 +71,7 @@ layers =
     mypackage.services
     mypackage.domain
     mypackage.infra
-description = dec-NNN (layered architecture decision)
+broken_contract_guidance = dec-NNN (layered architecture decision)
 ```
 
 **Contract types** (see [`../references/import-linter-recipes.md`](../references/import-linter-recipes.md) for full recipes):
@@ -183,7 +185,7 @@ docstring).
 
 The rule enforces three contracts simultaneously:
 1. Every `fitness/tests/test_*.py` module docstring contains a citation.
-2. Every `[importlinter:contract:*]` stanza has a `description=` with a citation.
+2. Every `[importlinter:contract:*]` stanza has a `broken_contract_guidance=` with a citation.
 3. Every `# fitness-waiver:` inline comment has both a citation anchor and a reason.
 
 **Waiver syntax** (Python source files):
@@ -197,7 +199,7 @@ import some_forbidden_module  # fitness-waiver: dec-NNN migration in progress; r
 | Rule type | Citation location | Example |
 |-----------|-------------------|---------|
 | pytest test module | Module docstring (first line is sufficient) | `"""... Cites: dec-NNN ..."""` |
-| import-linter contract | `description=` field of the contract stanza | `description = dec-NNN (layered arch)` |
+| import-linter contract | `broken_contract_guidance=` field of the contract stanza | `broken_contract_guidance = dec-NNN (layered arch)` |
 | Fitness waiver | Inline comment after `# fitness-waiver:` | `# fitness-waiver: dec-NNN migration in progress` |
 
 ## Authoring Workflow — Python
@@ -205,7 +207,7 @@ import some_forbidden_module  # fitness-waiver: dec-NNN migration in progress; r
 1. **Choose the tool** per the decision rubric in [SKILL.md](../SKILL.md): graph rule
    (import-linter) vs assertion-based test (pytest).
 
-2. **Write the citation first** — in the `description=` field or module docstring —
+2. **Write the citation first** — in the `broken_contract_guidance=` field or module docstring —
    before writing the rule logic. This forces upfront justification and prevents
    the meta-citation rule from catching you by surprise.
 
@@ -222,7 +224,7 @@ import some_forbidden_module  # fitness-waiver: dec-NNN migration in progress; r
 
    Both must be GREEN before the rule is considered done.
 
-5. **The meta-citation rule self-polices** docstring/description coverage — if you forgot
+5. **The meta-citation rule self-polices** docstring/guidance coverage — if you forgot
    the citation, the suite FAILs noisily before any merge.
 
 ## References

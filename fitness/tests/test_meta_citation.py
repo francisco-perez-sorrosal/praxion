@@ -6,7 +6,7 @@ so rules are never silently orphaned from the decisions that motivated them).
 
 Scans:
 - `fitness/tests/test_*.py` module docstrings (excluding self)
-- `fitness/import-linter.cfg` `description=` fields
+- `fitness/import-linter.cfg` `broken_contract_guidance=` fields
 
 Citation regex: `dec-\\d{3,}|CLAUDE\\.md§[A-Z][A-Za-z ]+`
 
@@ -62,17 +62,17 @@ def test_every_fitness_test_has_citation(project_root: Path) -> None:
 
 
 def test_every_import_linter_contract_has_citation(import_linter_cfg: Path) -> None:
-    """Every [importlinter:contract:*] stanza's description= field contains a citation."""
+    """Every [importlinter:contract:*] stanza's broken_contract_guidance= carries a citation."""
     parser = configparser.ConfigParser(strict=False)
     parser.read(import_linter_cfg)
     failures: list[str] = []
     for section in parser.sections():
         if not section.startswith("importlinter:contract:"):
             continue
-        description = parser.get(section, "description", fallback="")
-        if not CITATION_REGEX.search(description):
+        guidance = parser.get(section, "broken_contract_guidance", fallback="")
+        if not CITATION_REGEX.search(guidance):
             failures.append(
-                f"[{section}]: description= lacks citation matching {CITATION_REGEX.pattern!r}"
+                f"[{section}]: broken_contract_guidance= lacks citation matching {CITATION_REGEX.pattern!r}"
             )
     assert not failures, "Citation contract violations:\n  " + "\n  ".join(failures)
 

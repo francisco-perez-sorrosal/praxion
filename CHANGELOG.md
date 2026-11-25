@@ -1,3 +1,34 @@
+## v0.69.0 (2026-11-25)
+
+### Feat
+
+- Add `--json-report PATH` to the audit's command line
+- Make the tracer record the reads of a `copytree` of the repository root
+- Make the tracer record the reads of a checkout copy listed by `git ls-files`
+- Teach the judge the `copy` channel and the copy note
+
+### Fix
+
+- Exit 2 when the verdict report cannot be written
+- Make the verdict's directory before the audit
+- Re-size the root pocket's gate bound
+- Close the reads the first local audit pass named
+- List the gate's imports in an isolated interpreter
+- Refuse a report path that is a directory up front
+- Say why the copy note set nothing aside
+- Look up the working directory only for a git listing
+- Close the whole-repository scanners by entries scoped to what each scans
+- Close the state, fixture and doc remainders by reader-sized entries
+- Close the agent, skill and script remainders by reader-sized entries
+- Close every hook module by a reader-sized entry
+- Close every rule file by a reader-sized entry
+- Close the committed adherence results by a reader-sized entry
+- Close the eval project file and the kernel adoption ledger by reader-sized entries
+
+### Refactor
+
+- Name each audited event's handler once
+
 ## v0.68.0 (2026-11-22)
 
 ### Feat
